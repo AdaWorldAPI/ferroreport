@@ -163,7 +163,7 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>POST /render/&lt;name&gt;</code></td><td>Renders <code>&lt;name&gt;.jrxml</code> from the templates directory (subfolders allowed: <code>/render/sales/invoice</code>)</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /render</code></td><td>Renders the template sent in the request</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /inspect</code></td><td>Reports a template's parameters, fields and unsupported features</td><td>JSON</td></tr>
-        <tr><td><code>GET /health</code></td><td>For load balancers</td><td><code>{"status": "ok", "version": "0.5.0"}</code></td></tr>
+        <tr><td><code>GET /health</code></td><td>For load balancers</td><td><code>{"status": "ok", "version": "0.6.0"}</code></td></tr>
       </table>
       <p>The request body is JSON:</p>
       <table>
