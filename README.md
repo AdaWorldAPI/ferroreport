@@ -35,8 +35,9 @@ JasperReports on everyday reports, with **a tenth of the memory**, output that m
 ## Use it from your language
 
 > **[Full documentation](https://cristianencarnacion.github.io/ferroreport/docs.html)**: every command, endpoint, function and option.
-> The npm, PyPI and crates.io packages are published with release 0.2.0, which is on its way; the
-> [release binaries](https://github.com/cristianEncarnacion/ferroreport/releases) and the Docker image work today.
+> The [npm package](https://www.npmjs.com/package/ferroreport), the
+> [release binaries](https://github.com/cristianEncarnacion/ferroreport/releases) and the Docker image are available now.
+> The PyPI and crates.io packages are being published.
 
 **JavaScript / TypeScript** (Node.js, Deno, Bun, browsers): `npm install ferroreport`
 

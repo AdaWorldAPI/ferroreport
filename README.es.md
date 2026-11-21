@@ -36,9 +36,9 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 ## Desde tu lenguaje
 
 > **[Documentación completa](https://cristianencarnacion.github.io/ferroreport/docs.html)** (en inglés): cada comando,
-> endpoint, función y opción. Los paquetes de npm, PyPI y crates.io se publican con la versión 0.2.0, que está en
-> camino; los [binarios de Releases](https://github.com/cristianEncarnacion/ferroreport/releases) y la imagen Docker
-> ya funcionan.
+> endpoint, función y opción. El [paquete de npm](https://www.npmjs.com/package/ferroreport), los
+> [binarios de Releases](https://github.com/cristianEncarnacion/ferroreport/releases) y la imagen Docker ya están disponibles.
+> Los paquetes de PyPI y crates.io se están publicando.
 
 - **JavaScript/TypeScript:** `npm install ferroreport` y
   `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF.
