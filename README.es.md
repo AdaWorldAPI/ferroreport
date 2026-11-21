@@ -12,10 +12,10 @@ Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 26 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 28 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
-> subreportes, tablas, listas, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 28 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
+> subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
+> estilo de JFreeChart. Las 30 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
 > algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
@@ -24,8 +24,8 @@ Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
 - **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
   Importa en CLIs, funciones serverless y contenedores.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 26 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 28 coinciden.
+  píxel: hoy los 28 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 30 coinciden.
 - **PDF, Excel y CSV.** La misma plantilla da un PDF, un `.xlsx` armado como el de JasperReports
   (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos) o un CSV.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
@@ -107,7 +107,12 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
   celdas, y gráficos y códigos de barras como imágenes (al doble de resolución que Jasper). Los
   valores van como texto formateado, igual que en Jasper; con `--xlsx-numbers` los números van
   como números con su formato.
-- Aún no: crosstabs, listas horizontales, orden horizontal de columnas, conexiones JDBC.
+- Crosstabs (tablas cruzadas): grupos de filas y columnas con totales al inicio o al final,
+  varias medidas (suma, conteo, promedio, máximo, mínimo...), totales con `$V{medida_grupo_ALL}`,
+  parámetros, datos del reporte o de un subdataset. Si no caben a lo ancho se parten en bloques de
+  columnas, y si no caben a lo alto siguen en la página siguiente con las cabeceras repetidas.
+- Aún no: `percentageOf` en crosstabs, listas horizontales, orden horizontal de columnas,
+  conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -130,7 +135,7 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
   condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado, gráficos
-  tablas y listas. Siguiente: crosstabs y memoria constante en reportes enormes.
+  tablas, listas y crosstabs. Siguiente: memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** más tipos de gráficos; listo: exportación a Excel (XLSX) y CSV.

@@ -353,6 +353,9 @@ struct LayoutEnv<'a> {
     scope: &'a dyn Scope,
     /// Chart datasets collected so far.
     charts: &'a HashMap<usize, crate::chart::DataState>,
+    /// The report being filled and its rows read so far (crosstabs over the report's data).
+    report: &'a Report,
+    records: &'a [Record],
 }
 
 /// Evaluates a chart's title, axis labels and range limits.
@@ -776,6 +779,8 @@ struct Measured {
     content: Option<Arc<Vec<Segment>>>,
     /// Laid-out barcode symbol.
     symbol: Option<crate::barcode::Symbol>,
+    /// A crosstab: where it starts, and the room it gets on this page (`None`: all of it).
+    crosstab: Option<(crate::crosstab::Rest, Option<f32>)>,
 }
 
 /// Lays out `elements` in a container of design height `design_h`. With `avail`, content
@@ -827,6 +832,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             image: None,
             content: None,
             symbol: None,
+            crosstab: None,
         };
         if visible {
             match &el.kind {
@@ -885,6 +891,17 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 ElementKind::Content { segments, .. } => {
                     m.new_h = el.height.max(Segment::flow_height(segments));
                     m.content = Some(segments.clone());
+                }
+                ElementKind::Crosstab(ct) => {
+                    let filled = fill_crosstab(le, ct, el)?;
+                    let rest = crate::crosstab::Rest { filled, part: 0, row: 0 };
+                    m.new_h = el.height.max(rest.filled.plan(0, 0, f32::INFINITY).1);
+                    m.blank = rest.filled.rows.is_empty();
+                    m.crosstab = Some((rest, None));
+                }
+                ElementKind::CrosstabRest(rest) => {
+                    m.new_h = rest.filled.plan(rest.part, rest.row, f32::INFINITY).1;
+                    m.crosstab = Some((rest.clone(), None));
                 }
                 _ => {}
             }
@@ -1072,6 +1089,27 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         let mut part_box = *boxed;
                         part_box.bottom.width = 0.0;
                         frame_split = Some((inner, part_box));
+                    }
+                    ElementKind::Crosstab(_) | ElementKind::CrosstabRest(_) => {
+                        // A crosstab breaks between its rows; the column headers print again
+                        // where it continues.
+                        let Some((rest_at, _)) = m.crosstab.take() else { continue };
+                        let room = a - y;
+                        let (chunks, _, next) = rest_at.filled.plan(rest_at.part, rest_at.row, room);
+                        if chunks.is_empty() {
+                            let mut cont = freeze(el, None);
+                            cont.kind = ElementKind::CrosstabRest(rest_at);
+                            rest.push(cont);
+                            continue;
+                        }
+                        if let Some((part, row)) = next {
+                            let mut cont = freeze(el, None);
+                            cont.kind =
+                                ElementKind::CrosstabRest(crate::crosstab::Rest { filled: rest_at.filled.clone(), part, row });
+                            rest.push(cont);
+                        }
+                        m.crosstab = Some((rest_at, Some(room)));
+                        h = a - y;
                     }
                     ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content { .. } => {
                         let framed = is_framed(&el.kind);
@@ -1338,6 +1376,11 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 box_items(&bc.boxed, x, y, w, h, &mut out.items);
                 close_mark(&mut out.items, mark);
             }
+            ElementKind::Crosstab(_) | ElementKind::CrosstabRest(_) => {
+                if let Some((at, room)) = m.crosstab.take() {
+                    render_crosstab(le, &at, room.unwrap_or(f32::INFINITY), el, x, y, &mut out.items)?;
+                }
+            }
             ElementKind::Break => out.has_break = true,
             ElementKind::ColumnBreak => out.has_column_break = true,
             ElementKind::Unsupported(_) => {}
@@ -1537,6 +1580,450 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
     let returns =
         sr.returns.iter().map(|r| (r.to.clone(), r.calculation, vars.get(&r.from).cloned().unwrap_or(Value::Null))).collect();
     Ok((segments, returns))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Crosstabs
+
+/// Evaluates bucket and measure expressions on one row of a crosstab's data.
+struct RecordScope<'a> {
+    record: &'a Record,
+    fields: &'a [Field],
+    params: Option<&'a HashMap<String, Value>>,
+    outer: &'a dyn Scope,
+}
+
+impl Scope for RecordScope<'_> {
+    fn field(&self, name: &str) -> Result<Value> {
+        if !self.fields.iter().any(|f| f.name == name) {
+            return Err(Error::eval(format!("field `{name}` is not declared")));
+        }
+        Ok(self.record.get(name).cloned().unwrap_or(Value::Null))
+    }
+    fn param(&self, name: &str) -> Result<Value> {
+        match self.params.and_then(|p| p.get(name)) {
+            Some(v) => Ok(v.clone()),
+            None => self.outer.param(name),
+        }
+    }
+    fn variable(&self, name: &str) -> Result<Value> {
+        Err(Error::eval(format!("variable `{name}` cannot be used in crosstab buckets or measures")))
+    }
+}
+
+/// Evaluates the contents of a crosstab cell or header: measures of the cell, bucket values of
+/// its groups, and the crosstab's parameters.
+struct CellScope<'a> {
+    filled: &'a crate::crosstab::Filled,
+    row: &'a [Value],
+    column: &'a [Value],
+    outer: &'a dyn Scope,
+}
+
+impl Scope for CellScope<'_> {
+    fn field(&self, name: &str) -> Result<Value> {
+        Err(Error::eval(format!("field `{name}` cannot be used in a crosstab cell; use a measure")))
+    }
+    fn param(&self, name: &str) -> Result<Value> {
+        match self.filled.params.get(name) {
+            Some(v) => Ok(v.clone()),
+            None => self.outer.param(name),
+        }
+    }
+    fn variable(&self, name: &str) -> Result<Value> {
+        let ct = &self.filled.crosstab;
+        if let Some(i) = ct.row_groups.iter().position(|g| g.name == name) {
+            return Ok(self.row.get(i).cloned().unwrap_or(Value::Null));
+        }
+        if let Some(j) = ct.column_groups.iter().position(|g| g.name == name) {
+            return Ok(self.column.get(j).cloned().unwrap_or(Value::Null));
+        }
+        // `measure`, `measure_rowGroup_ALL`, `measure_columnGroup_ALL`, `measure_row_column_ALL`.
+        for (k, m) in ct.measures.iter().enumerate() {
+            let (mut row, mut column) = (self.row, self.column);
+            let rest = match name.strip_prefix(m.name.as_str()) {
+                Some("") => "",
+                Some(r) => match r.strip_prefix('_').and_then(|r| r.strip_suffix("_ALL")) {
+                    Some(groups) => groups,
+                    None => continue,
+                },
+                None => continue,
+            };
+            if !rest.is_empty() {
+                let mut ok = false;
+                for (i, g) in ct.row_groups.iter().enumerate() {
+                    if rest == g.name || rest.starts_with(&format!("{}_", g.name)) {
+                        row = &row[..i.min(row.len())];
+                        ok = rest == g.name;
+                        if !ok {
+                            let col_name = &rest[g.name.len() + 1..];
+                            if let Some(j) = ct.column_groups.iter().position(|c| c.name == col_name) {
+                                column = &column[..j.min(column.len())];
+                                ok = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+                if !ok {
+                    match ct.column_groups.iter().position(|c| c.name == rest) {
+                        Some(j) => column = &column[..j.min(column.len())],
+                        None => continue,
+                    }
+                }
+            }
+            return Ok(self.filled.cell_values(row, column).get(k).cloned().unwrap_or(Value::Null));
+        }
+        Err(Error::eval(format!("variable `{name}` is not a measure or group of the crosstab")))
+    }
+}
+
+/// Reads a crosstab's rows, buckets them and aggregates its measures.
+fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Result<Arc<crate::crosstab::Filled>> {
+    use crate::crosstab::{key, leaves, sizes, split_parts, Filled};
+    let mut params = HashMap::new();
+    for (name, e) in &ct.parameters {
+        params.insert(name.clone(), eval(e, le.scope, le.env)?);
+    }
+    // The rows: a subdataset run's, or the report's own.
+    let mut own_records = Vec::new();
+    let mut run_params = HashMap::new();
+    let mut dataset_fields = Vec::new();
+    let sub = ct.run.is_some();
+    if let Some(run) = &ct.run {
+        let list = ListElement {
+            run: run.clone(),
+            contents: Band { height: 0.0, split_type: SplitType::Stretch, print_when: None, elements: Vec::new() },
+        };
+        let report = crate::table::list_report(&list, el.width);
+        for (name, e) in &run.parameters {
+            run_params.insert(name.clone(), eval(e, le.scope, le.env)?);
+        }
+        let rows = match &run.data_source {
+            Some(e) => match eval(e, le.scope, le.env)? {
+                Value::Json(j) => j,
+                Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
+                other => return Err(Error::eval(format!("crosstab data source is a {}, expected a list", other.type_name()))),
+            },
+            None => Arc::new(serde_json::Value::Array(Vec::new())),
+        };
+        own_records = crate::data::records_from_json(&report, &rows)?;
+        dataset_fields = report.fields.clone();
+    }
+    let (records, fields): (&[Record], &[Field]) =
+        if sub { (&own_records, &dataset_fields) } else { (le.records, &le.report.fields) };
+
+    let defs: Vec<VarDef> = ct
+        .measures
+        .iter()
+        .map(|m| VarDef {
+            name: m.name.clone(),
+            class: m.class,
+            calculation: m.calculation,
+            reset: ResetType::Report,
+            expression: m.expr.clone(),
+            initial: None,
+        })
+        .collect();
+    let (n, mm) = (ct.row_groups.len(), ct.column_groups.len());
+    let mut row_paths = Vec::new();
+    let mut column_paths = Vec::new();
+    let mut seen_rows = HashSet::new();
+    let mut seen_columns = HashSet::new();
+    let mut aggregates: HashMap<String, Vec<VarState>> = HashMap::new();
+    for record in records {
+        let scope = RecordScope { record, fields, params: if sub { Some(&run_params) } else { None }, outer: le.scope };
+        let bucket = |g: &CrosstabGroup| -> Result<Value> {
+            Ok(match &g.bucket {
+                Some(e) => g.class.coerce(eval(e, &scope, le.env)?),
+                None => Value::Null,
+            })
+        };
+        let row = ct.row_groups.iter().map(bucket).collect::<Result<Vec<_>>>()?;
+        let column = ct.column_groups.iter().map(bucket).collect::<Result<Vec<_>>>()?;
+        let values = ct
+            .measures
+            .iter()
+            .map(|m| match &m.expr {
+                Some(e) => eval(e, &scope, le.env),
+                None => Ok(Value::Null),
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if seen_rows.insert(key(&row)) {
+            row_paths.push(row.clone());
+        }
+        if seen_columns.insert(key(&column)) {
+            column_paths.push(column.clone());
+        }
+        for k in 0..=n {
+            for l in 0..=mm {
+                let cell = format!("{}|{}", key(&row[..k]), key(&column[..l]));
+                let states = aggregates.entry(cell).or_insert_with(|| vec![VarState::default(); defs.len()]);
+                for (i, v) in values.iter().enumerate() {
+                    update_var(&mut states[i], &defs[i], v.clone());
+                }
+            }
+        }
+    }
+    let totals = |gs: &[CrosstabGroup]| gs.iter().map(|g| g.total_position).collect::<Vec<_>>();
+    let order = |gs: &[CrosstabGroup]| gs.iter().map(|g| g.descending).collect::<Vec<_>>();
+    // Like JasperReports, totals add up the values of the buckets below them in print order
+    // (not the rows again), which decides how floating-point sums round.
+    {
+        use crate::crosstab::{prefixes, sorted_paths};
+        let rows_sorted = sorted_paths(&row_paths, &order(&ct.row_groups));
+        let columns_sorted = sorted_paths(&column_paths, &order(&ct.column_groups));
+        let cell = |r: &[Value], c: &[Value]| format!("{}|{}", key(r), key(c));
+        let merge_into = |target: String, parts: Vec<String>, aggregates: &mut HashMap<String, Vec<VarState>>| {
+            let merged: Vec<Option<VarState>> = (0..defs.len())
+                .map(|i| {
+                    let states: Vec<&VarState> = parts.iter().filter_map(|p| aggregates.get(p)).map(|s| &s[i]).collect();
+                    merge_states(&defs[i], &states)
+                })
+                .collect();
+            if let Some(t) = aggregates.get_mut(&target) {
+                for (i, m) in merged.into_iter().enumerate() {
+                    if let Some(m) = m {
+                        t[i] = m;
+                    }
+                }
+            }
+        };
+        // Column totals of every detail row, deepest first.
+        for r in &rows_sorted {
+            for l in (0..mm).rev() {
+                for p in prefixes(&columns_sorted, l) {
+                    let children: Vec<String> = prefixes(&columns_sorted, l + 1)
+                        .into_iter()
+                        .filter(|c| key(&c[..l]) == key(&p))
+                        .map(|c| cell(r, &c))
+                        .collect();
+                    merge_into(cell(r, &p), children, &mut aggregates);
+                }
+            }
+        }
+        // Then row totals of every column and column total.
+        for l in 0..=mm {
+            for p in prefixes(&columns_sorted, l) {
+                for k in (0..n).rev() {
+                    for q in prefixes(&rows_sorted, k) {
+                        let children: Vec<String> = prefixes(&rows_sorted, k + 1)
+                            .into_iter()
+                            .filter(|c| key(&c[..k]) == key(&q))
+                            .map(|c| cell(&c, &p))
+                            .collect();
+                        merge_into(cell(&q, &p), children, &mut aggregates);
+                    }
+                }
+            }
+        }
+    }
+    let rows = if records.is_empty() { Vec::new() } else { leaves(&row_paths, &totals(&ct.row_groups), &order(&ct.row_groups)) };
+    let columns = if records.is_empty() {
+        Vec::new()
+    } else {
+        leaves(&column_paths, &totals(&ct.column_groups), &order(&ct.column_groups))
+    };
+    let (widths, heights) = sizes(ct);
+    let column_widths: Vec<f32> = columns.iter().map(|c| widths[c.level]).collect();
+    let row_heights: Vec<f32> = rows.iter().map(|r| heights[r.level]).collect();
+    let header_w: f32 = ct.row_groups.iter().map(|g| g.size).sum();
+    let parts = split_parts(&column_widths, header_w, ct.repeat_row_headers, el.width);
+    // A cell without data shows zero for sums and counts, nothing for the rest.
+    let empty = ct
+        .measures
+        .iter()
+        .map(|m| match m.calculation {
+            Calculation::Sum | Calculation::Count | Calculation::DistinctCount => m.class.zero(),
+            _ => Value::Null,
+        })
+        .collect();
+    let values = aggregates.into_iter().map(|(k, states)| (k, states.into_iter().map(|s| s.value).collect())).collect();
+    Ok(Arc::new(Filled { crosstab: ct.clone(), rows, columns, row_heights, column_widths, values, empty, params, parts }))
+}
+
+/// Combines the aggregates of several buckets in order, the way JasperReports computes crosstab
+/// totals. `None` for calculations that are kept as computed from the rows.
+fn merge_states(def: &VarDef, states: &[&VarState]) -> Option<VarState> {
+    let class = def.class;
+    let mut out = VarState { initialized: states.iter().any(|s| s.initialized), ..VarState::default() };
+    match def.calculation {
+        Calculation::Sum => {
+            for s in states {
+                if let Some(v) = &s.sum {
+                    out.sum = Some(match &out.sum {
+                        Some(t) => add_values(t, v, class),
+                        None => v.clone(),
+                    });
+                }
+            }
+            out.value = out.sum.clone().unwrap_or(Value::Null);
+        }
+        Calculation::Count => {
+            out.count = states.iter().map(|s| s.count).sum();
+            out.value = class.coerce(Value::Long(out.count));
+            if matches!(class, JavaType::Object | JavaType::Number) {
+                out.value = Value::Int(out.count as i32);
+            }
+        }
+        Calculation::Average => {
+            for s in states {
+                out.count += s.count;
+                if let Some(v) = &s.sum {
+                    out.sum = Some(match &out.sum {
+                        Some(t) => add_values(t, v, class),
+                        None => v.clone(),
+                    });
+                }
+            }
+            out.value = match &out.sum {
+                Some(s) if out.count > 0 => match class {
+                    JavaType::BigDecimal => crate::value::java_decimal_divide(
+                        s.as_decimal().unwrap_or_default(),
+                        rust_decimal::Decimal::from(out.count),
+                        16,
+                    )
+                    .map(Value::Decimal)
+                    .unwrap_or(Value::Null),
+                    _ => class.coerce(Value::Double(s.as_f64().unwrap_or(0.0) / out.count as f64)),
+                },
+                _ => Value::Null,
+            };
+        }
+        Calculation::Highest | Calculation::Lowest => {
+            let want =
+                if def.calculation == Calculation::Highest { std::cmp::Ordering::Greater } else { std::cmp::Ordering::Less };
+            for s in states {
+                if !s.value.is_null() && (out.value.is_null() || s.value.compare(&out.value) == Some(want)) {
+                    out.value = s.value.clone();
+                }
+            }
+        }
+        Calculation::DistinctCount => {
+            for s in states {
+                out.distinct.extend(s.distinct.iter().cloned());
+            }
+            out.value = class.coerce(Value::Long(out.distinct.len() as i64));
+        }
+        _ => return None,
+    }
+    Some(out)
+}
+
+/// Prints the pieces of a crosstab that fit in `room`, at `(x, y)`: one frame per piece with
+/// a frame per cell, as JasperReports prints them.
+fn render_crosstab(
+    le: &mut LayoutEnv,
+    at: &crate::crosstab::Rest,
+    room: f32,
+    el: &Element,
+    x: f32,
+    y: f32,
+    out: &mut Vec<Laid>,
+) -> Result<()> {
+    let f = &*at.filled;
+    let (chunks, _, _) = f.plan(at.part, at.row, room);
+    let mut outer = el.clone();
+    outer.mode = Mode::Transparent;
+    let none: &[Value] = &[];
+    for ch in chunks {
+        let top = y + ch.y;
+        let hh = if ch.with_headers { f.header_height() } else { 0.0 };
+        let rows_h: f32 = ch.rows.clone().map(|r| f.row_heights[r]).sum();
+        let hw = f.headers_width(ch.part);
+        let mark = open_mark(out, &outer, Shape::Frame, None, x, top, f.part_width(ch.part), hh + rows_h);
+        if ch.with_headers {
+            if let (Some(c), true) = (&f.crosstab.header_cell, hw > 0.0 && hh > 0.0) {
+                place_cell(
+                    le,
+                    c,
+                    [x, top, hw, hh],
+                    (0.0, 0.0),
+                    &CellScope { filled: f, row: none, column: none, outer: le.scope },
+                    out,
+                )?;
+            }
+            for hc in f.column_headers(ch.part) {
+                let Some(c) = hc.contents else { continue };
+                let g = &f.crosstab.column_groups[hc.group];
+                let dx = if hc.total { 0.0 } else { header_offset(g.header_position, hc.w, f.design_width(hc.group)) };
+                let scope = CellScope { filled: f, row: none, column: &hc.values, outer: le.scope };
+                place_cell(le, c, [x + hc.x, top + hc.y, hc.w, hc.h], (dx, 0.0), &scope, out)?;
+            }
+        }
+        let mut ry = top + hh;
+        for r in ch.rows.clone() {
+            let row = &f.rows[r];
+            if hw > 0.0 {
+                for hc in f.row_headers(r, &ch.rows, ry) {
+                    let Some(c) = hc.contents else { continue };
+                    let g = &f.crosstab.row_groups[hc.group];
+                    let dy = if hc.total { 0.0 } else { header_offset(g.header_position, hc.h, f.design_height(hc.group)) };
+                    let scope = CellScope { filled: f, row: &hc.values, column: none, outer: le.scope };
+                    place_cell(le, c, [x + hc.x, hc.y, hc.w, hc.h], (0.0, dy), &scope, out)?;
+                }
+            }
+            let mut cx = x + hw;
+            for c in f.parts[ch.part].clone() {
+                let column = &f.columns[c];
+                let w = f.column_widths[c];
+                if let Some(contents) = f.cell_contents(row, column) {
+                    let scope = CellScope { filled: f, row: &row.values, column: &column.values, outer: le.scope };
+                    place_cell(le, contents, [cx, ry, w, f.row_heights[r]], (0.0, 0.0), &scope, out)?;
+                }
+                cx += w;
+            }
+            ry += f.row_heights[r];
+        }
+        close_mark(out, mark);
+    }
+    Ok(())
+}
+
+/// How far a group header's contents move inside the cells they span (`headerPosition`).
+fn header_offset(position: HeaderPosition, span: f32, extent: f32) -> f32 {
+    match position {
+        HeaderPosition::Middle => ((span - extent) / 2.0).max(0.0).floor(),
+        HeaderPosition::End => (span - extent).max(0.0),
+        _ => 0.0,
+    }
+}
+
+/// Lays out a cell's contents frame at `[x, y, w, h]`, its elements moved by `shift`.
+fn place_cell(
+    le: &mut LayoutEnv,
+    contents: &Element,
+    [x, y, w, h]: [f32; 4],
+    shift: (f32, f32),
+    scope: &dyn Scope,
+    out: &mut Vec<Laid>,
+) -> Result<()> {
+    let mut frame = contents.clone();
+    frame.x = x;
+    frame.y = y;
+    frame.width = w;
+    frame.height = h;
+    if let ElementKind::Frame { children, .. } = &mut frame.kind {
+        for c in children.iter_mut() {
+            c.x += shift.0;
+            c.y += shift.1;
+        }
+    }
+    let mut cell_le = LayoutEnv {
+        fonts: &mut *le.fonts,
+        images: &mut *le.images,
+        repeated: le.repeated,
+        first_on_page: le.first_on_page,
+        changed_groups: le.changed_groups,
+        env: le.env,
+        scope,
+        charts: le.charts,
+        report: le.report,
+        records: le.records,
+    };
+    let layout = layout_elements(&mut cell_le, std::slice::from_ref(&frame), y + h, None)?;
+    out.extend(layout.items);
+    Ok(())
 }
 
 /// Fills a table component: the report Jasper builds from the printed columns, run like a
@@ -1823,6 +2310,8 @@ impl<'a> Filler<'a> {
             env: self.env,
             scope: &ctx,
             charts: &self.chart_data,
+            report: self.report,
+            records: &self.records[..self.current.map_or(self.records.len(), |c| (c + 1).min(self.records.len()))],
         };
         layout_elements(&mut le, &band.elements, band.height, None).map(Some)
     }
@@ -1849,6 +2338,8 @@ impl<'a> Filler<'a> {
             env: self.env,
             scope: &ctx,
             charts: &self.chart_data,
+            report: self.report,
+            records: &self.records[..self.current.map_or(self.records.len(), |c| (c + 1).min(self.records.len()))],
         };
         layout_elements(&mut le, elements, design_h, avail)
     }

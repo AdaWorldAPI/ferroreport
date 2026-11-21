@@ -16,6 +16,7 @@
 
 pub mod barcode;
 pub mod chart;
+pub mod crosstab;
 pub mod csv;
 pub mod data;
 pub mod error;

@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="crosstab-pages" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<style name="Head" mode="Opaque" backcolor="#E6EEF7">
+		<box><pen lineWidth="0.5" lineColor="#7A8CA5"/></box>
+	</style>
+	<style name="Data">
+		<box><pen lineWidth="0.25" lineColor="#B8C2CF"/></box>
+	</style>
+	<style name="Total" mode="Opaque" backcolor="#FFF1D6">
+		<box><pen lineWidth="0.5" lineColor="#7A8CA5"/></box>
+	</style>
+	<subDataset name="sales">
+		<field name="category" class="java.lang.String"/>
+		<field name="product" class="java.lang.String"/>
+		<field name="year" class="java.lang.Integer"/>
+		<field name="month" class="java.lang.Integer"/>
+		<field name="qty" class="java.lang.Integer"/>
+		<field name="price" class="java.lang.Double"/>
+	</subDataset>
+	<parameter name="UNIT" class="java.lang.String">
+		<defaultValueExpression><![CDATA["units"]]></defaultValueExpression>
+	</parameter>
+	<field name="store" class="java.lang.String"/>
+	<field name="sales" class="java.util.List"/>
+	<pageHeader>
+		<band height="24">
+			<textField>
+				<reportElement x="0" y="0" width="555" height="18"/>
+				<textElement><font size="12" isBold="true"/></textElement>
+				<textFieldExpression><![CDATA["Monthly sales, page " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<detail>
+		<band height="24">
+			<textField>
+				<reportElement x="0" y="0" width="555" height="18"/>
+				<textElement><font size="11" isBold="true"/></textElement>
+				<textFieldExpression><![CDATA[$F{store}]]></textFieldExpression>
+			</textField>
+		</band>
+		<band height="60">
+			<crosstab columnBreakOffset="14">
+				<reportElement x="0" y="0" width="555" height="60"/>
+				<crosstabParameter name="UNIT" class="java.lang.String">
+					<parameterValueExpression><![CDATA[$P{UNIT}]]></parameterValueExpression>
+				</crosstabParameter>
+				<crosstabDataset>
+					<dataset>
+						<datasetRun subDataset="sales">
+							<dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($F{sales})]]></dataSourceExpression>
+						</datasetRun>
+					</dataset>
+				</crosstabDataset>
+				<crosstabHeaderCell>
+					<cellContents style="Head">
+						<textField>
+							<reportElement x="2" y="0" width="146" height="30"/>
+							<textElement verticalAlignment="Middle"><font isItalic="true"/></textElement>
+							<textFieldExpression><![CDATA["Quantity in " + $P{UNIT}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabHeaderCell>
+				<rowGroup name="category" width="70" totalPosition="Start" headerPosition="Middle">
+					<bucket class="java.lang.String">
+						<bucketExpression><![CDATA[$F{category}]]></bucketExpression>
+					</bucket>
+					<crosstabRowHeader>
+						<cellContents style="Head">
+							<textField>
+								<reportElement x="2" y="0" width="66" height="16"/>
+								<textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<textFieldExpression><![CDATA[$V{category}]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabRowHeader>
+					<crosstabTotalRowHeader>
+						<cellContents style="Total">
+							<textField>
+								<reportElement x="2" y="0" width="146" height="16"/>
+								<textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<textFieldExpression><![CDATA["All categories (" + $V{countMeasure_category_ALL} + " sales)"]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabTotalRowHeader>
+				</rowGroup>
+				<rowGroup name="product" width="80">
+					<bucket class="java.lang.String">
+						<bucketExpression><![CDATA[$F{product}]]></bucketExpression>
+					</bucket>
+					<crosstabRowHeader>
+						<cellContents style="Head">
+							<textField>
+								<reportElement x="2" y="0" width="78" height="16"/>
+								<textElement verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[$V{product}]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabRowHeader>
+				</rowGroup>
+				<columnGroup name="year" height="16" totalPosition="End" headerPosition="Center">
+					<bucket class="java.lang.Integer" order="Descending">
+						<bucketExpression><![CDATA[$F{year}]]></bucketExpression>
+					</bucket>
+					<crosstabColumnHeader>
+						<cellContents style="Head">
+							<textField>
+								<reportElement x="0" y="0" width="34" height="16"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<textFieldExpression><![CDATA[$V{year}]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabColumnHeader>
+					<crosstabTotalColumnHeader>
+						<cellContents style="Total">
+							<staticText>
+								<reportElement x="0" y="0" width="50" height="30"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<text><![CDATA[Both years]]></text>
+							</staticText>
+						</cellContents>
+					</crosstabTotalColumnHeader>
+				</columnGroup>
+				<columnGroup name="month" height="14" totalPosition="End">
+					<bucket class="java.lang.Integer">
+						<bucketExpression><![CDATA[$F{month}]]></bucketExpression>
+					</bucket>
+					<crosstabColumnHeader>
+						<cellContents style="Head">
+							<textField>
+								<reportElement x="0" y="0" width="34" height="14"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[$V{month} < 10 ? "0" + $V{month} : "" + $V{month}]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabColumnHeader>
+					<crosstabTotalColumnHeader>
+						<cellContents style="Total">
+							<textField>
+								<reportElement x="0" y="0" width="44" height="14"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<textFieldExpression><![CDATA["Year " + $V{year}]]></textFieldExpression>
+							</textField>
+						</cellContents>
+					</crosstabTotalColumnHeader>
+				</columnGroup>
+				<measure name="qtyMeasure" class="java.lang.Integer" calculation="Sum">
+					<measureExpression><![CDATA[$F{qty}]]></measureExpression>
+				</measure>
+				<measure name="countMeasure" class="java.lang.Integer" calculation="Count">
+					<measureExpression><![CDATA[$F{qty}]]></measureExpression>
+				</measure>
+				<measure name="priceMeasure" class="java.lang.Double" calculation="Average">
+					<measureExpression><![CDATA[$F{price}]]></measureExpression>
+				</measure>
+				<crosstabCell width="34" height="16">
+					<cellContents style="Data">
+						<textField isBlankWhenNull="true">
+							<reportElement x="0" y="0" width="32" height="16"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"/>
+							<textFieldExpression><![CDATA[$V{qtyMeasure} == 0 ? null : $V{qtyMeasure}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+				<crosstabCell width="44" height="16" columnTotalGroup="month">
+					<cellContents style="Total">
+						<textField>
+							<reportElement x="0" y="0" width="42" height="16"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+							<textFieldExpression><![CDATA[$V{qtyMeasure}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+				<crosstabCell width="50" height="16" columnTotalGroup="year">
+					<cellContents style="Total">
+						<textField pattern="#,##0.00">
+							<reportElement x="0" y="0" width="48" height="16"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+							<textFieldExpression><![CDATA[$V{priceMeasure}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+				<crosstabCell width="34" height="18" rowTotalGroup="category">
+					<cellContents style="Total">
+						<textField>
+							<reportElement x="0" y="0" width="32" height="18"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+							<textFieldExpression><![CDATA[$V{qtyMeasure}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+				<crosstabCell width="44" height="18" rowTotalGroup="category" columnTotalGroup="month">
+					<cellContents style="Total">
+						<textField>
+							<reportElement x="0" y="0" width="42" height="18"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+							<textFieldExpression><![CDATA[$V{qtyMeasure_category_month_ALL}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+				<crosstabCell width="50" height="18" rowTotalGroup="category" columnTotalGroup="year">
+					<cellContents style="Total">
+						<textField pattern="#,##0.00">
+							<reportElement x="0" y="0" width="48" height="18"/>
+							<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+							<textFieldExpression><![CDATA[$V{priceMeasure}]]></textFieldExpression>
+						</textField>
+					</cellContents>
+				</crosstabCell>
+			</crosstab>
+		</band>
+	</detail>
+</jasperReport>

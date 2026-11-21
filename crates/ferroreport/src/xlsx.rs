@@ -808,6 +808,11 @@ mod tests {
     }
 
     #[test]
+    fn crosstab_matches_jasper() {
+        check_fixture("30-crosstab");
+    }
+
+    #[test]
     fn column_names() {
         assert_eq!(column_name(0), "A");
         assert_eq!(column_name(25), "Z");

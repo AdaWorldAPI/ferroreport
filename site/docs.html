@@ -34,6 +34,7 @@
       <b>Reports</b>
       <a href="#resources">Images and subreports</a>
       <a href="#tables">Tables</a>
+      <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
       <a href="#fonts">Fonts</a>
       <a href="#locale">Locale and dates</a>
@@ -360,6 +361,25 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p>Lists (<code>jr:list</code>) use the same <code>datasetRun</code>: the list contents are repeated for each row, one
         below the other, and continue on the next page when they do not fit.</p>
 
+      <h2 id="crosstabs">Crosstabs</h2>
+      <p>Crosstabs made in Jaspersoft Studio render as they do in JasperReports. The rows come from the report itself (place the crosstab
+        in the summary band) or from a subdataset through its <code>datasetRun</code>, for example one crosstab per detail row over a nested
+        JSON array.</p>
+      <ul>
+        <li>Row and column groups sort their bucket values ascending or descending, and print their totals at the start, the end or not at all.
+          Group headers sit at the start, middle or end of the cells they span (<code>headerPosition</code>).</li>
+        <li>Measures can be Sum, Count, DistinctCount, Average, Highest, Lowest, First or Nothing. In a cell, <code>$V{measure}</code> is the
+          value of that cell, <code>$V{measure_group_ALL}</code> the total of a group, <code>$V{measure_rowGroup_columnGroup_ALL}</code> the total of
+          both, and <code>$V{group}</code> the bucket value. Cells without data show zero for sums and counts. Totals add up the totals of the
+          buckets below them, as Jasper does, so decimals round the same way.</li>
+        <li>A crosstab wider than its element is cut into column parts, printed one below the other (<code>columnBreakOffset</code> apart) with
+          the row headers repeated. One taller than the page continues on the next page with the column headers repeated
+          (<code>repeatColumnHeaders</code>, <code>repeatRowHeaders</code>).</li>
+        <li><code>&lt;crosstabParameter&gt;</code> values are evaluated in the report and read with <code>$P{}</code> inside the crosstab.</li>
+      </ul>
+      <p>Not yet: <code>percentageOf</code> measures, bucket comparators and <code>orderByExpression</code>, and crosstabs over the rows of a
+        group only (they use all the rows read so far). <code>ferroreport doctor</code> warns about these.</p>
+
       <h2 id="excel">Excel and CSV</h2>
       <p>A template that renders to PDF also exports to an Excel workbook (<code>.xlsx</code>) or a CSV file. Both follow JasperReports' own
         exporters with their default settings, so the spreadsheet comes out the way it did with Jasper: every fixture in the test suite gives
@@ -423,8 +443,8 @@ invoice.jrxml: report `invoice`
         templates your users upload.</p>
 
       <h2 id="support">What is supported</h2>
-      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
-        rotation, multi-column layouts and conditional styles, exported to PDF, Excel or CSV. Crosstabs are next. The
+      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
+        rotation, multi-column layouts and conditional styles, exported to PDF, Excel or CSV. The
         <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
         feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
     </article>

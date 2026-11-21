@@ -1,0 +1,1524 @@
+[
+ {
+  "store": "Ferreteria Ochoa #7",
+  "sales": [
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 2,
+    "qty": 26,
+    "price": 395.1
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2025,
+    "month": 3,
+    "qty": 8,
+    "price": 1361.27
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2025,
+    "month": 3,
+    "qty": 3,
+    "price": 1672.31
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 9,
+    "qty": 29,
+    "price": 1338.87
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 10,
+    "qty": 6,
+    "price": 339.46
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2026,
+    "month": 6,
+    "qty": 13,
+    "price": 554.52
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2026,
+    "month": 6,
+    "qty": 39,
+    "price": 2390.03
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 7,
+    "qty": 38,
+    "price": 1673.67
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 1,
+    "qty": 12,
+    "price": 920.99
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 3,
+    "qty": 25,
+    "price": 124.41
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2026,
+    "month": 11,
+    "qty": 14,
+    "price": 558.96
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 4,
+    "qty": 22,
+    "price": 1620.17
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2025,
+    "month": 8,
+    "qty": 3,
+    "price": 695.32
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 6,
+    "qty": 37,
+    "price": 1020.61
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 4,
+    "qty": 7,
+    "price": 1985.13
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 3,
+    "qty": 36,
+    "price": 1578.19
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 2,
+    "qty": 12,
+    "price": 522.34
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 12,
+    "qty": 7,
+    "price": 1690.45
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 5,
+    "qty": 13,
+    "price": 329.29
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 6,
+    "qty": 29,
+    "price": 1037.19
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 9,
+    "qty": 8,
+    "price": 705.85
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 4,
+    "qty": 13,
+    "price": 871.27
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 8,
+    "qty": 4,
+    "price": 1270.46
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 6,
+    "qty": 40,
+    "price": 1251.13
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 2,
+    "qty": 32,
+    "price": 387.93
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 1,
+    "qty": 17,
+    "price": 1249.9
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 6,
+    "qty": 16,
+    "price": 77.41
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 10,
+    "qty": 19,
+    "price": 1142.31
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2025,
+    "month": 3,
+    "qty": 8,
+    "price": 1439.56
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2025,
+    "month": 10,
+    "qty": 14,
+    "price": 1982.86
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 12,
+    "qty": 12,
+    "price": 1408.51
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 4,
+    "qty": 34,
+    "price": 526.85
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 5,
+    "qty": 30,
+    "price": 848.59
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2026,
+    "month": 2,
+    "qty": 34,
+    "price": 1968.64
+   },
+   {
+    "category": "Pinturas",
+    "product": "Esmalte blanco",
+    "year": 2025,
+    "month": 5,
+    "qty": 25,
+    "price": 1470.37
+   },
+   {
+    "category": "Pinturas",
+    "product": "Sellador",
+    "year": 2025,
+    "month": 11,
+    "qty": 8,
+    "price": 1844.95
+   },
+   {
+    "category": "Pinturas",
+    "product": "Sellador",
+    "year": 2025,
+    "month": 3,
+    "qty": 16,
+    "price": 982.72
+   },
+   {
+    "category": "Pinturas",
+    "product": "Sellador",
+    "year": 2026,
+    "month": 4,
+    "qty": 28,
+    "price": 2231.3
+   },
+   {
+    "category": "Pinturas",
+    "product": "Sellador",
+    "year": 2026,
+    "month": 9,
+    "qty": 38,
+    "price": 644.73
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 12,
+    "qty": 3,
+    "price": 130.79
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 5,
+    "qty": 35,
+    "price": 545.29
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 4,
+    "qty": 26,
+    "price": 131.78
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 7,
+    "qty": 13,
+    "price": 638.0
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 6,
+    "qty": 20,
+    "price": 1759.78
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 2,
+    "qty": 14,
+    "price": 211.61
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2025,
+    "month": 10,
+    "qty": 31,
+    "price": 2226.21
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 11,
+    "qty": 18,
+    "price": 1662.71
+   },
+   {
+    "category": "Pinturas",
+    "product": "Brocha 3\"",
+    "year": 2026,
+    "month": 1,
+    "qty": 5,
+    "price": 1232.06
+   },
+   {
+    "category": "Pinturas",
+    "product": "Rodillo",
+    "year": 2026,
+    "month": 1,
+    "qty": 1,
+    "price": 729.22
+   },
+   {
+    "category": "Pinturas",
+    "product": "Rodillo",
+    "year": 2026,
+    "month": 5,
+    "qty": 20,
+    "price": 2228.79
+   },
+   {
+    "category": "Pinturas",
+    "product": "Rodillo",
+    "year": 2025,
+    "month": 10,
+    "qty": 20,
+    "price": 1038.45
+   },
+   {
+    "category": "Pinturas",
+    "product": "Rodillo",
+    "year": 2025,
+    "month": 4,
+    "qty": 39,
+    "price": 399.0
+   },
+   {
+    "category": "Pinturas",
+    "product": "Rodillo",
+    "year": 2026,
+    "month": 2,
+    "qty": 37,
+    "price": 1784.18
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2026,
+    "month": 9,
+    "qty": 32,
+    "price": 2355.7
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2026,
+    "month": 9,
+    "qty": 17,
+    "price": 806.09
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2026,
+    "month": 7,
+    "qty": 14,
+    "price": 1407.89
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2026,
+    "month": 1,
+    "qty": 37,
+    "price": 643.66
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2025,
+    "month": 1,
+    "qty": 27,
+    "price": 1725.97
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2026,
+    "month": 5,
+    "qty": 7,
+    "price": 2001.46
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2025,
+    "month": 6,
+    "qty": 16,
+    "price": 1837.16
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 3,
+    "qty": 4,
+    "price": 807.15
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2025,
+    "month": 7,
+    "qty": 15,
+    "price": 1369.32
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 9,
+    "qty": 10,
+    "price": 237.8
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 8,
+    "qty": 29,
+    "price": 715.8
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 11,
+    "qty": 1,
+    "price": 2256.84
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 4,
+    "qty": 11,
+    "price": 2483.05
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 6,
+    "qty": 4,
+    "price": 2344.21
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 6,
+    "qty": 40,
+    "price": 1003.4
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 4,
+    "qty": 4,
+    "price": 1726.21
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 1,
+    "qty": 27,
+    "price": 1154.87
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 3,
+    "qty": 34,
+    "price": 2279.52
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 4,
+    "qty": 36,
+    "price": 681.06
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2025,
+    "month": 8,
+    "qty": 4,
+    "price": 386.34
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 12,
+    "qty": 13,
+    "price": 356.65
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 8,
+    "qty": 15,
+    "price": 723.52
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 7,
+    "qty": 21,
+    "price": 2093.46
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 11,
+    "qty": 27,
+    "price": 889.26
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2025,
+    "month": 11,
+    "qty": 15,
+    "price": 2247.52
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 2,
+    "qty": 7,
+    "price": 1785.39
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 5,
+    "qty": 29,
+    "price": 1108.65
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 9,
+    "qty": 7,
+    "price": 867.56
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 8,
+    "qty": 23,
+    "price": 401.01
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 8,
+    "qty": 10,
+    "price": 201.94
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 6,
+    "qty": 20,
+    "price": 1395.08
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 2,
+    "qty": 40,
+    "price": 2052.65
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 9,
+    "qty": 33,
+    "price": 1500.63
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 5,
+    "qty": 9,
+    "price": 1385.06
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 10,
+    "qty": 29,
+    "price": 1379.09
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 12,
+    "qty": 5,
+    "price": 1633.17
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 3,
+    "qty": 10,
+    "price": 1212.75
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 7,
+    "qty": 30,
+    "price": 2418.19
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 8,
+    "qty": 33,
+    "price": 376.49
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 7,
+    "qty": 32,
+    "price": 2248.89
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 6,
+    "qty": 1,
+    "price": 1274.96
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 12,
+    "qty": 9,
+    "price": 1234.03
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 3,
+    "qty": 14,
+    "price": 1784.12
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 10,
+    "qty": 32,
+    "price": 897.29
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 2,
+    "qty": 39,
+    "price": 758.89
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 2,
+    "qty": 7,
+    "price": 96.06
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 6,
+    "qty": 37,
+    "price": 490.95
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 6,
+    "qty": 27,
+    "price": 1067.17
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 5,
+    "qty": 26,
+    "price": 2061.89
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2025,
+    "month": 2,
+    "qty": 26,
+    "price": 450.88
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 3,
+    "qty": 3,
+    "price": 893.03
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 7,
+    "qty": 19,
+    "price": 2161.46
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 6,
+    "qty": 16,
+    "price": 661.08
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2026,
+    "month": 6,
+    "qty": 34,
+    "price": 1061.98
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 5,
+    "qty": 1,
+    "price": 1597.8
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 4,
+    "qty": 37,
+    "price": 93.14
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 5,
+    "qty": 13,
+    "price": 1252.07
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2026,
+    "month": 8,
+    "qty": 11,
+    "price": 756.27
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 4,
+    "qty": 18,
+    "price": 1633.67
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 8,
+    "qty": 22,
+    "price": 1804.68
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 4,
+    "qty": 28,
+    "price": 1066.75
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 1,
+    "qty": 30,
+    "price": 1357.34
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 7,
+    "qty": 6,
+    "price": 1301.2
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 8,
+    "qty": 36,
+    "price": 1336.26
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 1,
+    "qty": 16,
+    "price": 1283.83
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 7,
+    "qty": 19,
+    "price": 1895.49
+   }
+  ]
+ },
+ {
+  "store": "Ferreteria Popular",
+  "sales": [
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 2,
+    "qty": 29,
+    "price": 650.67
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 10,
+    "qty": 16,
+    "price": 1009.73
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 4,
+    "qty": 9,
+    "price": 1514.36
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 6,
+    "qty": 3,
+    "price": 688.04
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 12,
+    "qty": 7,
+    "price": 112.64
+   },
+   {
+    "category": "Herramientas",
+    "product": "Martillo",
+    "year": 2026,
+    "month": 7,
+    "qty": 3,
+    "price": 1189.75
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 8,
+    "qty": 8,
+    "price": 2386.22
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2026,
+    "month": 11,
+    "qty": 25,
+    "price": 1943.45
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 2,
+    "qty": 22,
+    "price": 959.0
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 10,
+    "qty": 19,
+    "price": 962.86
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 2,
+    "qty": 10,
+    "price": 670.53
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2025,
+    "month": 2,
+    "qty": 14,
+    "price": 1242.51
+   },
+   {
+    "category": "Herramientas",
+    "product": "Taladro",
+    "year": 2026,
+    "month": 9,
+    "qty": 29,
+    "price": 582.74
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 10,
+    "qty": 25,
+    "price": 1331.32
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 1,
+    "qty": 3,
+    "price": 1435.91
+   },
+   {
+    "category": "Herramientas",
+    "product": "Llave inglesa",
+    "year": 2025,
+    "month": 5,
+    "qty": 8,
+    "price": 1145.06
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2025,
+    "month": 2,
+    "qty": 5,
+    "price": 2107.18
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 7,
+    "qty": 19,
+    "price": 848.75
+   },
+   {
+    "category": "Herramientas",
+    "product": "Serrucho",
+    "year": 2026,
+    "month": 10,
+    "qty": 4,
+    "price": 2178.65
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 4,
+    "qty": 31,
+    "price": 1976.03
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 10,
+    "qty": 34,
+    "price": 1629.75
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 1,
+    "qty": 37,
+    "price": 2080.69
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 10,
+    "qty": 15,
+    "price": 412.94
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2026,
+    "month": 3,
+    "qty": 37,
+    "price": 1440.63
+   },
+   {
+    "category": "Herramientas",
+    "product": "Nivel",
+    "year": 2025,
+    "month": 12,
+    "qty": 35,
+    "price": 1011.14
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2025,
+    "month": 11,
+    "qty": 40,
+    "price": 939.27
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2025,
+    "month": 12,
+    "qty": 19,
+    "price": 1622.37
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2026,
+    "month": 11,
+    "qty": 11,
+    "price": 1126.97
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2025,
+    "month": 9,
+    "qty": 33,
+    "price": 1398.4
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2026,
+    "month": 4,
+    "qty": 30,
+    "price": 238.93
+   },
+   {
+    "category": "Plomeria",
+    "product": "Tubo PVC 1/2\"",
+    "year": 2025,
+    "month": 12,
+    "qty": 30,
+    "price": 1300.78
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2025,
+    "month": 12,
+    "qty": 17,
+    "price": 1283.17
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2025,
+    "month": 3,
+    "qty": 21,
+    "price": 113.26
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2025,
+    "month": 11,
+    "qty": 31,
+    "price": 60.35
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2026,
+    "month": 8,
+    "qty": 2,
+    "price": 2434.01
+   },
+   {
+    "category": "Plomeria",
+    "product": "Codo 90",
+    "year": 2026,
+    "month": 5,
+    "qty": 31,
+    "price": 392.25
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2025,
+    "month": 11,
+    "qty": 16,
+    "price": 106.75
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 4,
+    "qty": 18,
+    "price": 2087.95
+   },
+   {
+    "category": "Plomeria",
+    "product": "Llave de paso",
+    "year": 2026,
+    "month": 5,
+    "qty": 25,
+    "price": 2367.53
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 6,
+    "qty": 9,
+    "price": 912.92
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 4,
+    "qty": 16,
+    "price": 896.51
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 10,
+    "qty": 37,
+    "price": 746.27
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2026,
+    "month": 9,
+    "qty": 17,
+    "price": 1352.08
+   },
+   {
+    "category": "Plomeria",
+    "product": "Teflon",
+    "year": 2025,
+    "month": 5,
+    "qty": 18,
+    "price": 607.71
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 4,
+    "qty": 23,
+    "price": 1970.3
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 1,
+    "qty": 29,
+    "price": 1873.8
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 12,
+    "qty": 14,
+    "price": 76.1
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 7,
+    "qty": 4,
+    "price": 1694.03
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 3,
+    "qty": 31,
+    "price": 1172.06
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2026,
+    "month": 5,
+    "qty": 38,
+    "price": 1249.76
+   },
+   {
+    "category": "Plomeria",
+    "product": "Pegamento PVC",
+    "year": 2025,
+    "month": 3,
+    "qty": 19,
+    "price": 1513.35
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 11,
+    "qty": 40,
+    "price": 637.86
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 1,
+    "qty": 25,
+    "price": 2411.47
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2026,
+    "month": 5,
+    "qty": 35,
+    "price": 1606.72
+   },
+   {
+    "category": "Electricidad",
+    "product": "Cable 12",
+    "year": 2025,
+    "month": 6,
+    "qty": 33,
+    "price": 2263.41
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 11,
+    "qty": 5,
+    "price": 2354.43
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 12,
+    "qty": 40,
+    "price": 792.72
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 5,
+    "qty": 9,
+    "price": 2413.76
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 7,
+    "qty": 1,
+    "price": 1730.88
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 1,
+    "qty": 26,
+    "price": 1623.98
+   },
+   {
+    "category": "Electricidad",
+    "product": "Breaker 20A",
+    "year": 2026,
+    "month": 9,
+    "qty": 13,
+    "price": 495.62
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2026,
+    "month": 3,
+    "qty": 29,
+    "price": 647.82
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 4,
+    "qty": 3,
+    "price": 289.82
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2025,
+    "month": 3,
+    "qty": 7,
+    "price": 1568.05
+   },
+   {
+    "category": "Electricidad",
+    "product": "Tomacorriente",
+    "year": 2026,
+    "month": 3,
+    "qty": 31,
+    "price": 509.17
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 1,
+    "qty": 33,
+    "price": 718.69
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 1,
+    "qty": 25,
+    "price": 2074.03
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 9,
+    "qty": 29,
+    "price": 2156.68
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2026,
+    "month": 7,
+    "qty": 24,
+    "price": 1248.32
+   },
+   {
+    "category": "Electricidad",
+    "product": "Bombillo LED",
+    "year": 2025,
+    "month": 2,
+    "qty": 35,
+    "price": 369.43
+   }
+  ]
+ }
+]

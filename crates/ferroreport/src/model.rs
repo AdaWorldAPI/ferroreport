@@ -316,6 +316,10 @@ pub enum ElementKind {
     Table(Box<TableElement>),
     /// A list component (`jr:list`), filled like a subreport over a subdataset.
     List(Box<ListElement>),
+    /// A crosstab (`<crosstab>`).
+    Crosstab(Box<CrosstabElement>),
+    /// The rest of a crosstab continuing on a new page.
+    CrosstabRest(crate::crosstab::Rest),
     Barcode(Box<BarcodeElement>),
     Chart(Box<crate::chart::ChartElement>),
     /// Already filled subreport content still to be printed (the continuation of a subreport
@@ -535,6 +539,77 @@ pub struct ListElement {
     pub run: DatasetRun,
     /// The contents, as a band as tall as `<listContents height>`.
     pub contents: Band,
+}
+
+/// Where a group's total row or column goes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TotalPosition {
+    None,
+    Start,
+    End,
+}
+
+/// Where a group header sits in the cells it spans (`headerPosition`): along the group's
+/// direction, at its start, middle or end, or stretched over all of it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HeaderPosition {
+    Start,
+    Middle,
+    End,
+    Stretch,
+}
+
+/// A row or column group of a crosstab.
+#[derive(Debug, Clone)]
+pub struct CrosstabGroup {
+    pub name: String,
+    /// Width of a row group's headers, or height of a column group's.
+    pub size: f32,
+    pub total_position: TotalPosition,
+    pub header_position: HeaderPosition,
+    pub bucket: Option<Expr>,
+    pub descending: bool,
+    pub class: JavaType,
+    /// Header and total header contents, as frames of their design size.
+    pub header: Option<Element>,
+    pub total_header: Option<Element>,
+}
+
+/// A crosstab measure: a value aggregated per cell.
+#[derive(Debug, Clone)]
+pub struct CrosstabMeasure {
+    pub name: String,
+    pub class: JavaType,
+    pub calculation: Calculation,
+    pub expr: Option<Expr>,
+}
+
+/// The contents of one kind of crosstab cell: detail, or a total of a row and/or column group.
+#[derive(Debug, Clone)]
+pub struct CrosstabCell {
+    pub row_total: Option<String>,
+    pub column_total: Option<String>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub contents: Option<Element>,
+}
+
+/// A crosstab: values of the data aggregated by row and column groups.
+#[derive(Debug, Clone)]
+pub struct CrosstabElement {
+    /// Where the rows come from: a subdataset run, or (`None`) the report's own rows.
+    pub run: Option<DatasetRun>,
+    /// `<crosstabParameter>`s, evaluated in the report.
+    pub parameters: Vec<(String, Expr)>,
+    pub row_groups: Vec<CrosstabGroup>,
+    pub column_groups: Vec<CrosstabGroup>,
+    pub measures: Vec<CrosstabMeasure>,
+    pub cells: Vec<CrosstabCell>,
+    pub header_cell: Option<Element>,
+    pub no_data_cell: Option<Element>,
+    pub column_break_offset: f32,
+    pub repeat_column_headers: bool,
+    pub repeat_row_headers: bool,
 }
 
 /// A table column, or a column group with `children`.

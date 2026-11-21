@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<worksheet
+ xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr>
+<outlinePr summaryBelow="0"/>
+</sheetPr><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>
+<col min="1" max="1" customWidth="1" width="3.3333333"/>
+<col min="2" max="2" customWidth="1" width="11.666667"/>
+<col min="3" max="3" customWidth="1" width="15.0"/>
+<col min="4" max="4" customWidth="1" width="10.0"/>
+<col min="5" max="5" customWidth="1" width="10.0"/>
+<col min="6" max="6" customWidth="1" width="10.0"/>
+<col min="7" max="7" customWidth="1" width="10.0"/>
+<col min="8" max="8" customWidth="1" width="11.666667"/>
+<col min="9" max="9" customWidth="1" width="14.166667"/>
+<col min="10" max="10" customWidth="1" width="3.3333333"/>
+</cols>
+<sheetData>
+<row r="1" customHeight="1" ht="20">
+  <c r="A1" s="1" t="inlineStr"></c>  <c r="B1" s="1" t="inlineStr"></c>  <c r="C1" s="1" t="inlineStr"></c>  <c r="D1" s="1" t="inlineStr"></c>  <c r="E1" s="1" t="inlineStr"></c>  <c r="F1" s="1" t="inlineStr"></c>  <c r="G1" s="1" t="inlineStr"></c>  <c r="H1" s="1" t="inlineStr"></c>  <c r="I1" s="1" t="inlineStr"></c>  <c r="J1" s="1" t="inlineStr"></c></row>
+<row r="2" customHeight="1" ht="30">
+  <c r="A2" s="1" t="inlineStr"></c>  <c r="B2" s="2" t="inlineStr"><is><r>
+<t xml:space="preserve">Sales by region and quarter</t></r>
+</is></c>  <c r="C2" s="2" t="inlineStr"></c>  <c r="D2" s="2" t="inlineStr"></c>  <c r="E2" s="2" t="inlineStr"></c>  <c r="F2" s="2" t="inlineStr"></c>  <c r="G2" s="2" t="inlineStr"></c>  <c r="H2" s="2" t="inlineStr"></c>  <c r="I2" s="2" t="inlineStr"></c>  <c r="J2" s="1" t="inlineStr"></c></row>
+<row r="3" customHeight="1" ht="10">
+  <c r="A3" s="1" t="inlineStr"></c>  <c r="B3" s="1" t="inlineStr"></c>  <c r="C3" s="1" t="inlineStr"></c>  <c r="D3" s="1" t="inlineStr"></c>  <c r="E3" s="1" t="inlineStr"></c>  <c r="F3" s="1" t="inlineStr"></c>  <c r="G3" s="1" t="inlineStr"></c>  <c r="H3" s="1" t="inlineStr"></c>  <c r="I3" s="1" t="inlineStr"></c>  <c r="J3" s="1" t="inlineStr"></c></row>
+<row r="4" customHeight="1" ht="20">
+  <c r="A4" s="1" t="inlineStr"></c>  <c r="B4" s="3" t="inlineStr"><is><r>
+<t xml:space="preserve">Region / City</t></r>
+</is></c>  <c r="C4" s="3" t="inlineStr"></c>  <c r="D4" s="4" t="inlineStr"><is><r>
+<t xml:space="preserve">Q1</t></r>
+</is></c>  <c r="E4" s="4" t="inlineStr"><is><r>
+<t xml:space="preserve">Q2</t></r>
+</is></c>  <c r="F4" s="4" t="inlineStr"><is><r>
+<t xml:space="preserve">Q3</t></r>
+</is></c>  <c r="G4" s="4" t="inlineStr"><is><r>
+<t xml:space="preserve">Q4</t></r>
+</is></c>  <c r="H4" s="5" t="inlineStr"><is><r>
+<t xml:space="preserve">Total</t></r>
+</is></c>  <c r="I4" s="1" t="inlineStr"></c>  <c r="J4" s="1" t="inlineStr"></c></row>
+<row r="5" customHeight="1" ht="20">
+  <c r="A5" s="1" t="inlineStr"></c>  <c r="B5" s="6" t="inlineStr"><is><r>
+<t xml:space="preserve">Este</t></r>
+</is></c>  <c r="C5" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">Higuey</t></r>
+</is></c>  <c r="D5" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">7,825.29</t></r>
+</is></c>  <c r="E5" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="F5" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="G5" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">8,585.23</t></r>
+</is></c>  <c r="H5" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">16,410.52</t></r>
+</is></c>  <c r="I5" s="1" t="inlineStr"></c>  <c r="J5" s="1" t="inlineStr"></c></row>
+<row r="6" customHeight="1" ht="20">
+  <c r="A6" s="1" t="inlineStr"></c>  <c r="B6" s="10" t="inlineStr"></c>  <c r="C6" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">La Romana</t></r>
+</is></c>  <c r="D6" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">7,451.45</t></r>
+</is></c>  <c r="E6" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">2,902.19</t></r>
+</is></c>  <c r="F6" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">8,961.75</t></r>
+</is></c>  <c r="G6" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">5,855.64</t></r>
+</is></c>  <c r="H6" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">25,171.03</t></r>
+</is></c>  <c r="I6" s="1" t="inlineStr"></c>  <c r="J6" s="1" t="inlineStr"></c></row>
+<row r="7" customHeight="1" ht="20">
+  <c r="A7" s="1" t="inlineStr"></c>  <c r="B7" s="10" t="inlineStr"></c>  <c r="C7" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">San Pedro</t></r>
+</is></c>  <c r="D7" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">8,301.25</t></r>
+</is></c>  <c r="E7" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="F7" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">5,164.93</t></r>
+</is></c>  <c r="G7" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">9,020.37</t></r>
+</is></c>  <c r="H7" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">22,486.55</t></r>
+</is></c>  <c r="I7" s="1" t="inlineStr"></c>  <c r="J7" s="1" t="inlineStr"></c></row>
+<row r="8" customHeight="1" ht="20">
+  <c r="A8" s="1" t="inlineStr"></c>  <c r="B8" s="11" t="inlineStr"></c>  <c r="C8" s="12" t="inlineStr"><is><r>
+<t xml:space="preserve">Total region</t></r>
+</is></c>  <c r="D8" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">23,577.99</t></r>
+</is></c>  <c r="E8" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">2,902.19</t></r>
+</is></c>  <c r="F8" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">14,126.68</t></r>
+</is></c>  <c r="G8" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">23,461.24</t></r>
+</is></c>  <c r="H8" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">64,068.10</t></r>
+</is></c>  <c r="I8" s="1" t="inlineStr"></c>  <c r="J8" s="1" t="inlineStr"></c></row>
+<row r="9" customHeight="1" ht="20">
+  <c r="A9" s="1" t="inlineStr"></c>  <c r="B9" s="6" t="inlineStr"><is><r>
+<t xml:space="preserve">Norte</t></r>
+</is></c>  <c r="C9" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">La Vega</t></r>
+</is></c>  <c r="D9" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">4,875.07</t></r>
+</is></c>  <c r="E9" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">2,178.36</t></r>
+</is></c>  <c r="F9" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">4,974.13</t></r>
+</is></c>  <c r="G9" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">944.74</t></r>
+</is></c>  <c r="H9" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">12,972.30</t></r>
+</is></c>  <c r="I9" s="1" t="inlineStr"></c>  <c r="J9" s="1" t="inlineStr"></c></row>
+<row r="10" customHeight="1" ht="20">
+  <c r="A10" s="1" t="inlineStr"></c>  <c r="B10" s="10" t="inlineStr"></c>  <c r="C10" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">Puerto Plata</t></r>
+</is></c>  <c r="D10" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="E10" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">10,210.73</t></r>
+</is></c>  <c r="F10" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="G10" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="H10" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">10,210.73</t></r>
+</is></c>  <c r="I10" s="1" t="inlineStr"></c>  <c r="J10" s="1" t="inlineStr"></c></row>
+<row r="11" customHeight="1" ht="20">
+  <c r="A11" s="1" t="inlineStr"></c>  <c r="B11" s="10" t="inlineStr"></c>  <c r="C11" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">Santiago</t></r>
+</is></c>  <c r="D11" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">1,830.59</t></r>
+</is></c>  <c r="E11" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="F11" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">9,130.34</t></r>
+</is></c>  <c r="G11" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="H11" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">10,960.93</t></r>
+</is></c>  <c r="I11" s="1" t="inlineStr"></c>  <c r="J11" s="1" t="inlineStr"></c></row>
+<row r="12" customHeight="1" ht="20">
+  <c r="A12" s="1" t="inlineStr"></c>  <c r="B12" s="11" t="inlineStr"></c>  <c r="C12" s="12" t="inlineStr"><is><r>
+<t xml:space="preserve">Total region</t></r>
+</is></c>  <c r="D12" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">6,705.66</t></r>
+</is></c>  <c r="E12" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">12,389.09</t></r>
+</is></c>  <c r="F12" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">14,104.47</t></r>
+</is></c>  <c r="G12" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">944.74</t></r>
+</is></c>  <c r="H12" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">34,143.96</t></r>
+</is></c>  <c r="I12" s="1" t="inlineStr"></c>  <c r="J12" s="1" t="inlineStr"></c></row>
+<row r="13" customHeight="1" ht="20">
+  <c r="A13" s="1" t="inlineStr"></c>  <c r="B13" s="6" t="inlineStr"><is><r>
+<t xml:space="preserve">Sur</t></r>
+</is></c>  <c r="C13" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">Azua</t></r>
+</is></c>  <c r="D13" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">10,632.55</t></r>
+</is></c>  <c r="E13" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">1,572.89</t></r>
+</is></c>  <c r="F13" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">770.73</t></r>
+</is></c>  <c r="G13" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">7,316.56</t></r>
+</is></c>  <c r="H13" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">20,292.73</t></r>
+</is></c>  <c r="I13" s="1" t="inlineStr"></c>  <c r="J13" s="1" t="inlineStr"></c></row>
+<row r="14" customHeight="1" ht="20">
+  <c r="A14" s="1" t="inlineStr"></c>  <c r="B14" s="10" t="inlineStr"></c>  <c r="C14" s="7" t="inlineStr"><is><r>
+<t xml:space="preserve">Barahona</t></r>
+</is></c>  <c r="D14" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">3,150.12</t></r>
+</is></c>  <c r="E14" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="F14" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">0.00</t></r>
+</is></c>  <c r="G14" s="8" t="inlineStr"><is><r>
+<t xml:space="preserve">4,166.87</t></r>
+</is></c>  <c r="H14" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">7,316.99</t></r>
+</is></c>  <c r="I14" s="1" t="inlineStr"></c>  <c r="J14" s="1" t="inlineStr"></c></row>
+<row r="15" customHeight="1" ht="20">
+  <c r="A15" s="1" t="inlineStr"></c>  <c r="B15" s="11" t="inlineStr"></c>  <c r="C15" s="12" t="inlineStr"><is><r>
+<t xml:space="preserve">Total region</t></r>
+</is></c>  <c r="D15" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">13,782.67</t></r>
+</is></c>  <c r="E15" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">1,572.89</t></r>
+</is></c>  <c r="F15" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">770.73</t></r>
+</is></c>  <c r="G15" s="13" t="inlineStr"><is><r>
+<t xml:space="preserve">11,483.43</t></r>
+</is></c>  <c r="H15" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">27,609.72</t></r>
+</is></c>  <c r="I15" s="1" t="inlineStr"></c>  <c r="J15" s="1" t="inlineStr"></c></row>
+<row r="16" customHeight="1" ht="20">
+  <c r="A16" s="1" t="inlineStr"></c>  <c r="B16" s="14" t="inlineStr"><is><r>
+<t xml:space="preserve">Total</t></r>
+</is></c>  <c r="C16" s="14" t="inlineStr"></c>  <c r="D16" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">44,066.32</t></r>
+</is></c>  <c r="E16" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">16,864.17</t></r>
+</is></c>  <c r="F16" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">29,001.88</t></r>
+</is></c>  <c r="G16" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">35,889.41</t></r>
+</is></c>  <c r="H16" s="9" t="inlineStr"><is><r>
+<t xml:space="preserve">125,821.78</t></r>
+</is></c>  <c r="I16" s="1" t="inlineStr"></c>  <c r="J16" s="1" t="inlineStr"></c></row>
+<row r="17" customHeight="1" ht="522">
+  <c r="A17" s="1" t="inlineStr"></c>  <c r="B17" s="1" t="inlineStr"></c>  <c r="C17" s="1" t="inlineStr"></c>  <c r="D17" s="1" t="inlineStr"></c>  <c r="E17" s="1" t="inlineStr"></c>  <c r="F17" s="1" t="inlineStr"></c>  <c r="G17" s="1" t="inlineStr"></c>  <c r="H17" s="1" t="inlineStr"></c>  <c r="I17" s="1" t="inlineStr"></c>  <c r="J17" s="1" t="inlineStr"></c></row>
+</sheetData>
+<mergeCells>
+<mergeCell ref="B2:I2"/>
+<mergeCell ref="B4:C4"/>
+<mergeCell ref="B16:C16"/>
+</mergeCells>
+<pageMargins left="0.0" right="0.0" top="0.0" bottom="0.00" header="0.0" footer="0.0"/>
+<pageSetup orientation="portrait" paperSize="9"/>
+<drawing r:id="rIdDr1"/></worksheet>

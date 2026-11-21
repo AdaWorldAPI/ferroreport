@@ -532,6 +532,183 @@ impl Parser {
         })
     }
 
+    /// A crosstab (`<crosstab>`, or `<element kind="crosstab">` in JRXML 7).
+    fn crosstab(&mut self, n: &Node) -> Result<CrosstabElement> {
+        let dataset = n.child("crosstabDataset").and_then(|d| d.child("dataset")).or_else(|| n.child("dataset"));
+        let run = match dataset {
+            Some(d) => {
+                if matches!(attr(d, &["resetType"]), Some(t) if t != "Report") {
+                    self.warnings.push("crosstab datasets reset by group or page use all the rows printed so far".into());
+                }
+                match d.child("datasetRun") {
+                    Some(r) => Some(self.dataset_run(Some(r), "crosstab")?),
+                    None => None,
+                }
+            }
+            None => None,
+        };
+        let mut parameters = Vec::new();
+        for p in n.children.iter().filter(|c| c.name == "crosstabParameter" || c.name == "parameter") {
+            if let Some(e) = self.child_expr(p, &["parameterValueExpression", "expression"])? {
+                parameters.push((p.attr("name").unwrap_or_default().to_string(), e));
+            }
+        }
+        if n.child("parametersMapExpression").is_some() {
+            self.warnings.push("crosstab parametersMapExpression is ignored".into());
+        }
+        let mut row_groups = Vec::new();
+        let mut column_groups = Vec::new();
+        for g in &n.children {
+            let row = g.name == "rowGroup";
+            if !row && g.name != "columnGroup" {
+                continue;
+            }
+            let size_attr = if row { "width" } else { "height" };
+            let size = g.attr(size_attr).map(|v| parse_f32(v, size_attr)).transpose()?.unwrap_or(0.0);
+            let total_position = match g.attr("totalPosition") {
+                Some("Start") => TotalPosition::Start,
+                Some("End") => TotalPosition::End,
+                _ => TotalPosition::None,
+            };
+            let header_position = match g.attr("headerPosition") {
+                Some("Middle" | "Center") => HeaderPosition::Middle,
+                Some("Bottom" | "Right") => HeaderPosition::End,
+                Some("Stretch") => HeaderPosition::Stretch,
+                _ => HeaderPosition::Start,
+            };
+            let bucket = g.child("bucket");
+            if bucket.is_some_and(|b| b.child("comparatorExpression").is_some() || b.child("orderByExpression").is_some()) {
+                self.warnings.push("crosstab bucket comparators and orderByExpression are ignored (values are sorted)".into());
+            }
+            let header_node = |names: &[&str]| {
+                g.children
+                    .iter()
+                    .find(|c| names.contains(&c.name.as_str()))
+                    .and_then(|h| h.child("cellContents").or_else(|| h.child("contents")).or(Some(h)))
+            };
+            let (header_names, total_names): (&[&str], &[&str]) = if row {
+                (&["crosstabRowHeader", "header"], &["crosstabTotalRowHeader", "totalHeader"])
+            } else {
+                (&["crosstabColumnHeader", "header"], &["crosstabTotalColumnHeader", "totalHeader"])
+            };
+            let header = match header_node(header_names) {
+                Some(c) => self.cell_contents(c)?,
+                None => None,
+            };
+            let total_header = match header_node(total_names) {
+                Some(c) => self.cell_contents(c)?,
+                None => None,
+            };
+            let group = CrosstabGroup {
+                name: g.attr("name").unwrap_or_default().to_string(),
+                size,
+                total_position,
+                header_position,
+                bucket: match bucket {
+                    Some(b) => self.child_expr(b, &["bucketExpression", "expression"])?,
+                    None => None,
+                },
+                descending: bucket.and_then(|b| b.attr("order")) == Some("Descending"),
+                class: JavaType::from_class_name(bucket.and_then(|b| b.attr("class")).unwrap_or("java.lang.String")),
+                header,
+                total_header,
+            };
+            if row {
+                row_groups.push(group);
+            } else {
+                column_groups.push(group);
+            }
+        }
+        let mut measures = Vec::new();
+        for m in n.children_named("measure") {
+            if m.attr("percentageOf").is_some() {
+                self.warnings.push("crosstab measures with percentageOf show the plain value".into());
+            }
+            let calculation = match m.attr("calculation") {
+                Some("Count") => Calculation::Count,
+                Some("DistinctCount") => Calculation::DistinctCount,
+                Some("Sum") => Calculation::Sum,
+                Some("Average") => Calculation::Average,
+                Some("Lowest") => Calculation::Lowest,
+                Some("Highest") => Calculation::Highest,
+                Some("First") => Calculation::First,
+                Some("StandardDeviation") => Calculation::StandardDeviation,
+                Some("Variance") => Calculation::Variance,
+                _ => Calculation::Nothing,
+            };
+            measures.push(CrosstabMeasure {
+                name: m.attr("name").unwrap_or_default().to_string(),
+                class: JavaType::from_class_name(m.attr("class").unwrap_or("java.lang.Object")),
+                calculation,
+                expr: self.child_expr(m, &["measureExpression", "expression"])?,
+            });
+        }
+        let mut cells = Vec::new();
+        for c in n.children_named("crosstabCell").chain(n.children_named("cell")) {
+            let num = |a: &str| c.attr(a).map(|v| parse_f32(v, a)).transpose();
+            let contents = match c.child("cellContents").or_else(|| c.child("contents")) {
+                Some(cc) => self.cell_contents(cc)?,
+                None => None,
+            };
+            cells.push(CrosstabCell {
+                row_total: c.attr("rowTotalGroup").map(str::to_string),
+                column_total: c.attr("columnTotalGroup").map(str::to_string),
+                width: num("width")?,
+                height: num("height")?,
+                contents,
+            });
+        }
+        let special = |name: &str, alt: &str| {
+            n.child(name).or_else(|| n.child(alt)).and_then(|h| h.child("cellContents").or_else(|| h.child("contents")))
+        };
+        let header_cell = match special("crosstabHeaderCell", "headerCell") {
+            Some(c) => self.cell_contents(c)?,
+            None => None,
+        };
+        let no_data_cell = match special("whenNoDataCell", "whenNoDataCell") {
+            Some(c) => self.cell_contents(c)?,
+            None => None,
+        };
+        let flag = |names: &[&str]| attr(n, names).map(parse_bool).unwrap_or(true);
+        Ok(CrosstabElement {
+            run,
+            parameters,
+            row_groups,
+            column_groups,
+            measures,
+            cells,
+            header_cell,
+            no_data_cell,
+            column_break_offset: attr(n, &["columnBreakOffset"]).and_then(|v| v.trim().parse().ok()).unwrap_or(10.0),
+            repeat_column_headers: flag(&["isRepeatColumnHeaders", "repeatColumnHeaders"]),
+            repeat_row_headers: flag(&["isRepeatRowHeaders", "repeatRowHeaders"]),
+        })
+    }
+
+    /// The `<cellContents>` of a crosstab cell as a frame (sized when the cell is placed).
+    fn cell_contents(&mut self, c: &Node) -> Result<Option<Element>> {
+        let mut re_attrs = vec![
+            ("x".to_string(), "0".to_string()),
+            ("y".to_string(), "0".to_string()),
+            ("width".to_string(), "0".to_string()),
+            ("height".to_string(), "0".to_string()),
+        ];
+        for a in ["style", "mode", "backcolor"] {
+            if let Some(v) = c.attr(a) {
+                re_attrs.push((a.to_string(), v.to_string()));
+            }
+        }
+        // Cell contents are transparent unless they say otherwise (or their style does).
+        if c.attr("mode").is_none() && c.attr("style").is_none() {
+            re_attrs.push(("mode".to_string(), "Transparent".to_string()));
+        }
+        let mut children =
+            vec![Node { name: "reportElement".into(), attrs: re_attrs, children: Vec::new(), text: String::new() }];
+        children.extend(c.children.iter().cloned());
+        let frame_node = Node { name: "frame".into(), attrs: Vec::new(), children, text: String::new() };
+        Ok(Some(self.element(&frame_node, "frame")?))
+    }
+
     /// A list component (`jr:list`, or `<component kind="list">` in JRXML 7).
     fn list(&mut self, l: &Node) -> Result<ListElement> {
         let run = self.dataset_run(l.child("datasetRun"), "list")?;
@@ -1283,6 +1460,7 @@ impl Parser {
                     font_size: props.font_size,
                 }))
             }
+            "crosstab" => ElementKind::Crosstab(Box::new(self.crosstab(n)?)),
             "break" => {
                 self.warnings.push("page breaks (<break>) are applied after the band that contains them".into());
                 if attr(n, &["type"]) == Some("Column") {
@@ -1323,7 +1501,7 @@ mod tests {
   <title><band height="30">
     <staticText><reportElement style="Head" x="0" y="0" width="200" height="20"/><textElement textAlignment="Center"/><text><![CDATA[Hi]]></text></staticText>
     <textField isStretchWithOverflow="true" pattern="#,##0.00"><reportElement x="0" y="0" width="100" height="10"/><textFieldExpression><![CDATA[$V{total}]]></textFieldExpression></textField>
-    <crosstab><reportElement x="0" y="0" width="10" height="10"/></crosstab>
+    <genericElement><reportElement x="0" y="0" width="10" height="10"/><genericElementType namespace="x" name="y"/></genericElement>
   </band></title>
 </jasperReport>"##;
 
@@ -1341,7 +1519,7 @@ mod tests {
         assert!(tf.stretch);
         assert!(matches!(&tf.content, TextContent::Expression { pattern: Some(p), .. } if p == "#,##0.00"));
         assert!(matches!(band.elements[2].kind, ElementKind::Unsupported(_)));
-        assert!(r.warnings.iter().any(|w| w.contains("crosstab")));
+        assert!(r.warnings.iter().any(|w| w.contains("genericElement")));
     }
 
     const V7: &str = r##"<jasperReport name="t7" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
