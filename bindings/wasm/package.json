@@ -1,6 +1,6 @@
 {
   "name": "ferroreport",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The fastest JasperReports engine: render JRXML templates to PDF in milliseconds from Node.js, Deno, Bun and browsers. No JVM, pixel-identical output, safe with untrusted templates.",
   "license": "MIT OR Apache-2.0",
   "author": "Cristian Encarnacion",

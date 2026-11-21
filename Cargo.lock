@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64",
  "chrono",
@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ferroreport",
  "serde_json",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport-python"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "ferroreport",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport-wasm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ferroreport",
  "js-sys",
