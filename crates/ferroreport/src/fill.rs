@@ -1185,8 +1185,8 @@ impl<'a> Filler<'a> {
 
     fn reset_where(&mut self, pred: impl Fn(&ResetType) -> bool) -> Result<()> {
         let mut vars = std::mem::take(&mut self.committed);
-        for i in 0..self.defs.len() {
-            if pred(&self.defs[i].reset) {
+        for (i, def) in self.defs.iter().enumerate() {
+            if pred(&def.reset) {
                 self.reset_var(&mut vars, i)?;
             }
         }
@@ -1198,12 +1198,12 @@ impl<'a> Filler<'a> {
     fn calculate(&self, base: &[VarState]) -> Result<Vec<VarState>> {
         let mut vars = base.to_vec();
         let rec = self.current.and_then(|c| self.records.get(c));
-        for i in 0..self.defs.len() {
-            let ev = match &self.defs[i].expression {
+        for (i, def) in self.defs.iter().enumerate() {
+            let ev = match &def.expression {
                 Some(e) => self.eval_with(e, &vars, rec)?,
                 None => Value::Null,
             };
-            update_var(&mut vars[i], &self.defs[i], ev);
+            update_var(&mut vars[i], def, ev);
         }
         Ok(vars)
     }
@@ -1522,11 +1522,11 @@ impl<'a> Filler<'a> {
 
     fn group_footers(&mut self, from: usize, mode: Values) -> Result<()> {
         let r = self.report;
-        for gi in (from..r.groups.len()).rev() {
-            for b in &r.groups[gi].footer {
+        for g in r.groups.iter().skip(from).rev() {
+            for b in &g.footer {
                 self.print_body_band(b, mode)?;
             }
-            let name = r.groups[gi].name.clone();
+            let name = g.name.clone();
             self.resolve_pending(|t| t.time == EvaluationTime::Group && t.group.as_deref() == Some(name.as_str()), mode)?;
         }
         Ok(())
@@ -1534,9 +1534,8 @@ impl<'a> Filler<'a> {
 
     fn group_headers(&mut self, from: usize) -> Result<()> {
         let r = self.report;
-        for gi in from..r.groups.len() {
+        for (gi, g) in r.groups.iter().enumerate().skip(from) {
             self.starting_group = Some(gi);
-            let g = &r.groups[gi];
             let header_h: f32 = g.header.iter().map(|b| b.height).sum();
             let remaining = self.body_limit() - self.offset_y;
             if self.page_has_content
@@ -1558,8 +1557,9 @@ impl<'a> Filler<'a> {
     fn group_rupture(&mut self) -> Result<Option<usize>> {
         let rec = self.current.and_then(|c| self.records.get(c));
         let mut first = None;
-        for gi in 0..self.report.groups.len() {
-            let v = match &self.report.groups[gi].expression {
+        let groups = &self.report.groups;
+        for (gi, group) in groups.iter().enumerate() {
+            let v = match &group.expression {
                 Some(e) => self.eval_with(e, &self.committed, rec)?,
                 None => Value::Null,
             };
