@@ -404,7 +404,7 @@ const DIFF = {
   "21-markup": "Same result: 7 pixels differ at 100 dpi, where the edges of a few letters are smoothed differently.",
   "dashboard": "Same data, layout and colors. The charts are drawn after JFreeChart's look but not pixel for pixel, so lines and labels differ slightly.",
 };
-let engine, example = "02-invoice", ferroUrl, edited = false, lastMs = 0, anim;
+let engine, example = "02-invoice", ferroUrl, edited = false, lastMs = 0, coldMs = null, anim;
 try {
   engine = await import("./pkg/ferroreport.js");
   await engine.default();
@@ -456,6 +456,12 @@ function toggleDiff(open) {
 function run(replay) {
   if (!engine) return;
   try {
+    // A browser compiles WebAssembly the first time it runs, so the first render is not timed as the engine's.
+    if (coldMs === null) {
+      const c0 = performance.now();
+      engine.render($("tpl").value, $("data").value, $("params").value, { locale: "en_US" });
+      coldMs = performance.now() - c0;
+    }
     const t0 = performance.now();
     const pdf = engine.render($("tpl").value, $("data").value, $("params").value, { locale: "en_US" });
     lastMs = Math.max(performance.now() - t0, 0.1);
@@ -464,7 +470,8 @@ function run(replay) {
     $("pdf").src = ferroUrl + VIEW;
     $("download").href = ferroUrl;
     $("fsize").textContent = kb(pdf.length);
-    set(edited ? `Rendered your changes in ${lastMs.toFixed(1)} ms.` : `Rendered in ${lastMs.toFixed(1)} ms.`, "ok");
+    set(edited ? `Rendered your changes in ${lastMs.toFixed(1)} ms.`
+      : `Rendered in ${lastMs.toFixed(1)} ms. The very first run took ${coldMs.toFixed(0)} ms, because your browser was still compiling the WebAssembly.`, "ok");
     compareText();
     if (replay) {
       race();
