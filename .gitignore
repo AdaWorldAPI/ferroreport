@@ -3,3 +3,4 @@
 !fixtures/**/*.pdf
 *.jasper
 !site/examples/*/jasper.pdf
+__pycache__/

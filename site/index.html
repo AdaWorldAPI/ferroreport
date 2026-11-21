@@ -76,11 +76,17 @@
       <div class="race-foot">
         <span>Real timings: the 2-page invoice benchmark below, measured from process start. Jasper's phase split is approximate.</span>
         <button class="replay" id="replay" type="button">Run the race again</button>
+        <button class="replay" id="watch" type="button">▶ Watch the video with sound</button>
         <a class="replay" href="video/ferroreport-race.mp4" download>Download the video</a>
       </div>
     </div>
   </div>
 </div>
+
+<dialog class="watch" id="watch-dialog" aria-label="The race, as a video with sound">
+  <button type="button" id="watch-close">Close</button>
+  <video id="watch-video" src="video/ferroreport-race.mp4" controls playsinline preload="none"></video>
+</dialog>
 
 <main class="wrap">
   <section id="numbers" style="padding-top:56px">
@@ -132,8 +138,8 @@
 
   <section id="playground">
     <h2>Same template, both engines</h2>
-    <p class="sub">ferroreport renders live in this page, as WebAssembly. JasperReports needs a JVM and cannot run in a browser,
-      so its side shows the PDF it produced from the same template on a server, with the time it took. Switch between the two and compare.</p>
+    <p class="sub">Pick a report. ferroreport renders it right here in your browser; JasperReports needs Java, so its PDF was made from the
+      same template on a server, and the bars replay how long each one took. Then compare the two PDFs side by side.</p>
 
     <div class="pg">
       <div class="pg-bar">
@@ -146,38 +152,56 @@
         </div>
       </div>
 
-      <div class="duel" role="tablist" aria-label="Engine to show">
-        <button class="side ferro" role="tab" id="tab-ferro" aria-selected="true" aria-controls="viewer" type="button">
-          <span class="name">ferroreport</span>
-          <span class="where">Rendered just now, in your browser</span>
+      <div class="heats" aria-live="polite">
+        <div class="heat ferro">
+          <div class="eng"><b>ferroreport</b><span>Generated now, in your browser</span></div>
+          <div class="run"><i id="lane-f"></i></div>
           <span class="time" id="ftime">…</span>
-          <span class="size" id="fsize"></span>
-        </button>
-        <button class="side jasper" role="tab" id="tab-jasper" aria-selected="false" aria-controls="viewer" type="button">
-          <span class="name">JasperReports 6.20</span>
-          <span class="where">Rendered on a server with Java 21</span>
+        </div>
+        <div class="heat jasper">
+          <div class="eng"><b>JasperReports 6.20</b><span>Generated on a server with Java 21 (Java cannot run in a browser)</span></div>
+          <div class="run"><i id="lane-j"></i></div>
           <span class="time" id="jtime">…</span>
-          <span class="size" id="jsize"></span>
-        </button>
+        </div>
+        <p class="heats-note"><span id="lanes-note">Both bars move at real speed.</span>
+          <button class="replay" id="rerun" type="button">Run it again</button></p>
       </div>
 
-      <div class="pg-grid">
-        <div class="editor">
+      <div class="pair">
+        <figure class="viewer">
+          <figcaption><b>ferroreport</b> <span id="fsize"></span>
+            <a id="download" download="ferroreport.pdf" href="#">PDF</a> <a id="download-xlsx" href="#">Excel</a></figcaption>
+          <iframe id="pdf" title="PDF rendered by ferroreport"></iframe>
+        </figure>
+        <figure class="viewer">
+          <figcaption><b>JasperReports</b> <span id="jsize"></span>
+            <a id="jdownload" download="jasperreports.pdf" href="#">PDF</a></figcaption>
+          <iframe id="jpdf" title="PDF rendered by JasperReports"></iframe>
+        </figure>
+      </div>
+      <div class="same">
+        <p id="same-text"></p>
+        <button class="replay" id="diff-btn" type="button" aria-expanded="false">Show the differences</button>
+      </div>
+      <figure class="diff" id="diff" hidden>
+        <img id="diff-img" alt="The two PDFs laid over each other: grey where they agree, red where only JasperReports has ink, blue where only ferroreport has it">
+        <figcaption>Both PDFs laid over each other. Grey: the same in both. <span class="r">Red</span>: only in JasperReports.
+          <span class="b">Blue</span>: only in ferroreport.</figcaption>
+      </figure>
+
+      <div class="editor">
+        <div class="ehead">
           <div class="etabs" role="tablist" aria-label="Report input">
             <button type="button" role="tab" aria-selected="true" aria-controls="tpl" data-pane="tpl">Template</button>
             <button type="button" role="tab" aria-selected="false" aria-controls="data" data-pane="data">Data</button>
             <button type="button" role="tab" aria-selected="false" aria-controls="params" data-pane="params">Parameters</button>
           </div>
-          <textarea id="tpl" spellcheck="false" aria-label="Template (JRXML)"></textarea>
-          <textarea id="data" spellcheck="false" aria-label="Data (JSON rows)" hidden></textarea>
-          <textarea id="params" spellcheck="false" aria-label="Parameters (JSON)" hidden>{}</textarea>
-          <p id="status" role="status">Loading the engine…</p>
+          <p class="enote">Your JasperReports template, unchanged: ferroreport reads the same <code>.jrxml</code> files. Edit anything and it renders again.</p>
         </div>
-        <div class="viewer" id="viewer" role="tabpanel">
-          <iframe id="pdf" title="Rendered PDF"></iframe>
-          <p class="caption"><span id="caption"></span> <a id="download" download="report.pdf" href="#">Download this PDF</a>
-            <a id="download-xlsx" href="#">or as Excel</a></p>
-        </div>
+        <div class="code-wrap" data-pane-for="tpl"><pre class="hl" aria-hidden="true"></pre><textarea id="tpl" spellcheck="false" aria-label="Template (JRXML)"></textarea></div>
+        <div class="code-wrap" data-pane-for="data" hidden><pre class="hl" aria-hidden="true"></pre><textarea id="data" spellcheck="false" aria-label="Data (JSON rows)"></textarea></div>
+        <div class="code-wrap" data-pane-for="params" hidden><pre class="hl" aria-hidden="true"></pre><textarea id="params" spellcheck="false" aria-label="Parameters (JSON)">{}</textarea></div>
+        <p id="status" role="status">Loading the engine…</p>
       </div>
     </div>
 
@@ -372,7 +396,15 @@ const set = (text, cls = "") => { status.textContent = text; status.className = 
 const JASPER_SECONDS = { "02-invoice": 3.01, "dashboard": 2.80, "18-barcodes": 3.49, "21-markup": 2.68, "26-barcodes-1d": 2.89 };
 const VIEW = "#toolbar=0&navpanes=0&view=FitH";
 const kb = (n) => (n / 1024).toFixed(1) + " KB";
-let engine, example = "02-invoice", showing = "ferro", ferroUrl, edited = false;
+// Pixels that differ between the two engines' first pages (tools/compare.py, at 100 dpi).
+const DIFF = {
+  "02-invoice": "Same result: checked pixel by pixel at 100 dpi, 0 pixels differ.",
+  "18-barcodes": "Same result: checked pixel by pixel at 100 dpi, 0 pixels differ, QR codes included.",
+  "26-barcodes-1d": "Same result: checked pixel by pixel at 100 dpi, 0 pixels differ, every bar included.",
+  "21-markup": "Same result: 7 pixels differ at 100 dpi, where the edges of a few letters are smoothed differently.",
+  "dashboard": "Same data, layout and colors. The charts are drawn after JFreeChart's look but not pixel for pixel, so lines and labels differ slightly.",
+};
+let engine, example = "02-invoice", ferroUrl, edited = false, lastMs = 0, anim;
 try {
   engine = await import("./pkg/ferroreport.js");
   await engine.default();
@@ -380,35 +412,65 @@ try {
   set("Could not load the WebAssembly engine: " + e, "err");
 }
 
-function show(which) {
-  showing = which;
-  $("tab-ferro").setAttribute("aria-selected", String(which === "ferro"));
-  $("tab-jasper").setAttribute("aria-selected", String(which === "jasper"));
-  const jasperUrl = `examples/${example}/jasper.pdf`;
-  const url = which === "ferro" ? ferroUrl : jasperUrl;
-  if (!url) return;
-  $("pdf").src = url + VIEW;
-  $("download").href = url;
-  $("download").download = which === "ferro" ? "ferroreport.pdf" : "jasperreports.pdf";
-  $("download-xlsx").hidden = which !== "ferro";
-  $("caption").textContent = which === "ferro"
-    ? "Showing the PDF ferroreport rendered in this page."
-    : "Showing the PDF JasperReports produced for this example" + (edited ? ", before your edits." : ".");
+// Both bars on the same clock: the track is as long as Jasper's run, and both fill at real speed.
+function race() {
+  cancelAnimationFrame(anim);
+  const jms = JASPER_SECONDS[example] * 1000;
+  const t0 = performance.now();
+  $("jtime").textContent = "0.00 s";
+  $("lane-f").style.width = "0%";
+  $("lane-j").style.width = "0%";
+  $("lanes-note").textContent = "Both bars move at real speed.";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const step = (now) => {
+    const t = reduce ? jms : Math.min(now - t0, jms);
+    $("lane-f").style.width = (Math.min(t, lastMs) / jms * 100) + "%";
+    $("lane-j").style.width = (t / jms * 100) + "%";
+    $("ftime").textContent = t >= lastMs ? lastMs.toFixed(1) + " ms" : (t / 1000).toFixed(3) + " s";
+    $("jtime").textContent = (t / 1000).toFixed(2) + " s";
+    if (t < jms) {
+      anim = requestAnimationFrame(step);
+    } else {
+      const times = Math.round(jms / lastMs);
+      $("lanes-note").textContent = `In the time JasperReports made this report, ferroreport could have made it about ${times.toLocaleString("en-US")} times.`;
+    }
+  };
+  anim = requestAnimationFrame(step);
 }
 
-function run() {
+function compareText() {
+  $("same-text").textContent = edited
+    ? "You edited the report: the JasperReports PDF still shows the original, so the two may differ."
+    : DIFF[example];
+  $("diff-btn").hidden = edited;
+  if (edited) toggleDiff(false);
+}
+
+function toggleDiff(open) {
+  $("diff").hidden = !open;
+  $("diff-btn").setAttribute("aria-expanded", String(open));
+  $("diff-btn").textContent = open ? "Hide the differences" : "Show the differences";
+  if (open) $("diff-img").src = `examples/${example}/diff.png`;
+}
+
+function run(replay) {
   if (!engine) return;
   try {
     const t0 = performance.now();
     const pdf = engine.render($("tpl").value, $("data").value, $("params").value, { locale: "en_US" });
-    const ms = performance.now() - t0;
+    lastMs = Math.max(performance.now() - t0, 0.1);
     if (ferroUrl) URL.revokeObjectURL(ferroUrl);
     ferroUrl = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
-    $("ftime").textContent = ms.toFixed(1) + " ms";
+    $("pdf").src = ferroUrl + VIEW;
+    $("download").href = ferroUrl;
     $("fsize").textContent = kb(pdf.length);
-    const times = Math.round(JASPER_SECONDS[example] * 1000 / ms);
-    set(edited ? `Rendered your changes in ${ms.toFixed(1)} ms.` : `Rendered in ${ms.toFixed(1)} ms, about ${times}× faster than the JasperReports run. Edit anything and it renders again.`, "ok");
-    show("ferro");
+    set(edited ? `Rendered your changes in ${lastMs.toFixed(1)} ms.` : `Rendered in ${lastMs.toFixed(1)} ms.`, "ok");
+    compareText();
+    if (replay) {
+      race();
+    } else {
+      $("ftime").textContent = lastMs.toFixed(1) + " ms";
+    }
   } catch (e) {
     set(String(e.message || e), "err");
   }
@@ -416,14 +478,55 @@ function run() {
 
 async function load(name) {
   example = name; edited = false;
+  toggleDiff(false);
   const get = (f) => fetch(`examples/${name}/${f}`).then((r) => (r.ok ? r.text() : ""));
   [$("tpl").value, $("data").value, $("params").value] =
     [await get("report.jrxml"), (await get("data.json")) || "[]", (await get("params.json")) || "{}"];
-  $("jtime").textContent = JASPER_SECONDS[name].toFixed(2) + " s";
-  fetch(`examples/${name}/jasper.pdf`, { method: "HEAD" })
-    .then((r) => ($("jsize").textContent = r.ok ? kb(+r.headers.get("content-length")) : ""));
-  run();
+  ["tpl", "data", "params"].forEach(paint);
+  const jurl = `examples/${name}/jasper.pdf`;
+  $("jpdf").src = jurl + VIEW;
+  $("jdownload").href = jurl;
+  fetch(jurl, { method: "HEAD" }).then((r) => ($("jsize").textContent = r.ok ? kb(+r.headers.get("content-length")) : ""));
+  run(true);
 }
+
+// Syntax colors: a highlighted copy of the text sits under a transparent textarea.
+const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function highlightXml(src) {
+  let out = "";
+  const re = /(<!--[\s\S]*?-->)|(<!\[CDATA\[)([\s\S]*?)(\]\]>)|(<\/?)([\w:.-]+)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?>)|(<\?[\s\S]*?\?>)/g;
+  let last = 0, m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    if (m[1]) out += `<span class="c">${esc(m[1])}</span>`;
+    else if (m[2]) out += `<span class="p">${esc(m[2])}</span><span class="x">${esc(m[3])}</span><span class="p">${esc(m[4])}</span>`;
+    else if (m[9]) out += `<span class="c">${esc(m[9])}</span>`;
+    else {
+      const attrs = m[7].replace(/(\s+)([\w:.-]+)(\s*=\s*)("[^"]*"|'[^']*')/g, (_, sp, k, eq, v) =>
+        /^(xmlns|xsi:)/.test(k)
+          ? `${sp}<span class="c">${esc(k + eq + v)}</span>`
+          : `${sp}<span class="a">${esc(k)}</span>${esc(eq)}<span class="v">${esc(v)}</span>`);
+      out += `<span class="p">${esc(m[5])}</span><span class="t">${esc(m[6])}</span>${attrs}<span class="p">${esc(m[8])}</span>`;
+    }
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+function highlightJson(src) {
+  return esc(src).replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\b/g,
+    (m, str, colon, lit) => str ? `<span class="${colon ? "a" : "v"}">${str}</span>${colon || ""}` : `<span class="x">${lit}</span>`);
+}
+function paint(id) {
+  const ta = $(id), pre = ta.previousElementSibling;
+  pre.innerHTML = (id === "tpl" ? highlightXml(ta.value) : highlightJson(ta.value)) + "\n";
+  pre.scrollTop = ta.scrollTop;
+  pre.scrollLeft = ta.scrollLeft;
+}
+["tpl", "data", "params"].forEach((id) => $(id).addEventListener("scroll", () => {
+  const pre = $(id).previousElementSibling;
+  pre.scrollTop = $(id).scrollTop;
+  pre.scrollLeft = $(id).scrollLeft;
+}));
 
 // The same report as an Excel workbook, rendered on demand.
 $("download-xlsx").addEventListener("click", (e) => {
@@ -440,20 +543,28 @@ $("download-xlsx").addEventListener("click", (e) => {
     set(String(err.message || err), "err");
   }
 });
-$("tab-ferro").addEventListener("click", () => show("ferro"));
-$("tab-jasper").addEventListener("click", () => show("jasper"));
+// The race as a video, with its sound: a click is what lets the browser play audio.
+const dialog = $("watch-dialog"), video = $("watch-video");
+$("watch").addEventListener("click", () => { dialog.showModal(); video.currentTime = 0; video.play(); });
+const closeWatch = () => { video.pause(); dialog.close(); };
+$("watch-close").addEventListener("click", closeWatch);
+dialog.addEventListener("click", (e) => { if (e.target === dialog) closeWatch(); });
+dialog.addEventListener("close", () => video.pause());
+$("diff-btn").addEventListener("click", () => toggleDiff($("diff").hidden));
+$("rerun").addEventListener("click", () => run(true));
 const examples = $("examples");
 examples.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { pick(examples, b); load(b.dataset.ex); }));
 const etabs = document.querySelectorAll(".etabs button");
 etabs.forEach((b) => b.addEventListener("click", () => etabs.forEach((x) => {
   x.setAttribute("aria-selected", String(x === b));
-  $(x.dataset.pane).hidden = x !== b;
+  document.querySelector(`[data-pane-for="${x.dataset.pane}"]`).hidden = x !== b;
 })));
 let timer;
 ["tpl", "data", "params"].forEach((id) => $(id).addEventListener("input", () => {
   edited = true;
+  paint(id);
   clearTimeout(timer);
-  timer = setTimeout(run, 350);
+  timer = setTimeout(() => run(false), 350);
 }));
 load("02-invoice");
 </script>
