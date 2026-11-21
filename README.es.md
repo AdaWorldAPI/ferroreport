@@ -5,7 +5,7 @@
 rápido** que JasperReports en reportes del día a día, con **la décima parte de la memoria**,
 salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar código** en tu servidor.
 
-<p align="center"><img src="docs/benchmark.svg" alt="Factura: JasperReports 3.01 s, ferroreport 0.010 s" width="760"></p>
+<p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Carrera: JasperReports genera 1 factura en 3.01 s; ferroreport genera 301 en el mismo tiempo" width="760"></a></p>
 
 **[Pruébalo en tu navegador](https://cristianencarnacion.github.io/ferroreport/)** ·
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·

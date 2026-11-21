@@ -34,10 +34,11 @@ jobs:
       - run: bindings/wasm/build.sh
       - name: Assemble the site
         run: |
+          mkdir -p _site
+          cp -r site/. _site/
           mkdir -p _site/pkg _site/examples
-          cp site/index.html _site/
           cp bindings/wasm/pkg/web/* _site/pkg/
-          for f in 02-invoice 24-charts 18-barcodes 21-markup; do
+          for f in 02-invoice 18-barcodes 21-markup; do
             mkdir -p _site/examples/$f
             cp fixtures/$f/report.jrxml fixtures/$f/data.json _site/examples/$f/
             [ -f fixtures/$f/params.json ] && cp fixtures/$f/params.json _site/examples/$f/ || true

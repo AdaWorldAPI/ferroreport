@@ -5,7 +5,7 @@ already have and renders them to PDF in milliseconds, without a JVM: about **300
 JasperReports on everyday reports, with **a tenth of the memory**, output that matches
 **pixel for pixel**, and templates that **cannot run code** on your server.
 
-<p align="center"><img src="docs/benchmark.svg" alt="Invoice render: JasperReports 3.01 s, ferroreport 0.010 s" width="760"></p>
+<p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Race: JasperReports renders 1 invoice in 3.01 s; ferroreport renders 301 in the same time" width="760"></a></p>
 
 **[Try it in your browser](https://cristianencarnacion.github.io/ferroreport/)** ·
 [Download](https://github.com/cristianEncarnacion/ferroreport/releases) ·

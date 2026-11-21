@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="dashboard" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<field name="region" class="java.lang.String"/>
+	<field name="quarter" class="java.lang.String"/>
+	<field name="sales" class="java.lang.Double"/>
+	<variable name="region_total" class="java.lang.Double" resetType="Group" resetGroup="region" calculation="Sum"><variableExpression><![CDATA[$F{sales}]]></variableExpression></variable>
+	<variable name="region_best" class="java.lang.Double" resetType="Group" resetGroup="region" calculation="Highest"><variableExpression><![CDATA[$F{sales}]]></variableExpression></variable>
+	<group name="region"><groupExpression><![CDATA[$F{region}]]></groupExpression></group>
+	<title><band height="24"><staticText><reportElement x="0" y="0" width="535" height="20"/><textElement><font size="14" isBold="true"/></textElement><text><![CDATA[Sales dashboard]]></text></staticText></band></title>
+	<summary>
+		<band height="700">
+			<pieChart>
+				<chart evaluationTime="Report">
+					<reportElement x="0" y="0" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Sales by region"]]></titleExpression></chartTitle>
+				</chart>
+				<pieDataset>
+					<dataset incrementType="Group" incrementGroup="region"/>
+					<keyExpression><![CDATA[$F{region}]]></keyExpression>
+					<valueExpression><![CDATA[$V{region_total}]]></valueExpression>
+				</pieDataset>
+				<piePlot><plot/></piePlot>
+			</pieChart>
+			<barChart>
+				<chart evaluationTime="Report">
+					<reportElement x="275" y="0" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Sales by quarter"]]></titleExpression></chartTitle>
+				</chart>
+				<categoryDataset>
+					<categorySeries>
+						<seriesExpression><![CDATA[$F{region}]]></seriesExpression>
+						<categoryExpression><![CDATA[$F{quarter}]]></categoryExpression>
+						<valueExpression><![CDATA[$F{sales}]]></valueExpression>
+					</categorySeries>
+				</categoryDataset>
+				<barPlot><plot/><categoryAxisLabelExpression><![CDATA["Quarter"]]></categoryAxisLabelExpression><valueAxisLabelExpression><![CDATA["RD$"]]></valueAxisLabelExpression></barPlot>
+			</barChart>
+			<lineChart>
+				<chart evaluationTime="Report">
+					<reportElement x="0" y="235" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Trend"]]></titleExpression></chartTitle>
+				</chart>
+				<categoryDataset>
+					<categorySeries>
+						<seriesExpression><![CDATA[$F{region}]]></seriesExpression>
+						<categoryExpression><![CDATA[$F{quarter}]]></categoryExpression>
+						<valueExpression><![CDATA[$F{sales}]]></valueExpression>
+					</categorySeries>
+				</categoryDataset>
+				<linePlot><plot/></linePlot>
+			</lineChart>
+			<stackedBarChart>
+				<chart evaluationTime="Report">
+					<reportElement x="275" y="235" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Stacked"]]></titleExpression></chartTitle>
+				</chart>
+				<categoryDataset>
+					<categorySeries>
+						<seriesExpression><![CDATA[$F{region}]]></seriesExpression>
+						<categoryExpression><![CDATA[$F{quarter}]]></categoryExpression>
+						<valueExpression><![CDATA[$F{sales}]]></valueExpression>
+					</categorySeries>
+				</categoryDataset>
+				<barPlot><plot orientation="Horizontal"/></barPlot>
+			</stackedBarChart>
+			<areaChart>
+				<chart evaluationTime="Report">
+					<reportElement x="0" y="470" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Area"]]></titleExpression></chartTitle>
+				</chart>
+				<categoryDataset>
+					<categorySeries>
+						<seriesExpression><![CDATA[$F{region}]]></seriesExpression>
+						<categoryExpression><![CDATA[$F{quarter}]]></categoryExpression>
+						<valueExpression><![CDATA[$F{sales}]]></valueExpression>
+					</categorySeries>
+				</categoryDataset>
+				<areaPlot><plot/></areaPlot>
+			</areaChart>
+			<pie3DChart>
+				<chart evaluationTime="Report" isShowLegend="false">
+					<reportElement x="275" y="470" width="260" height="220"/>
+					<chartTitle><titleExpression><![CDATA["Pie 3D"]]></titleExpression></chartTitle>
+				</chart>
+				<pieDataset>
+					<dataset incrementType="Group" incrementGroup="region"/>
+					<keyExpression><![CDATA[$F{region} + " best"]]></keyExpression>
+					<valueExpression><![CDATA[$V{region_best}]]></valueExpression>
+				</pieDataset>
+				<pie3DPlot><plot/></pie3DPlot>
+			</pie3DChart>
+		</band>
+	</summary>
+</jasperReport>
