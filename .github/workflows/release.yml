@@ -141,7 +141,13 @@ jobs:
         working-directory: bindings/wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if npm view "ferroreport@$V" version >/dev/null 2>&1; then
+            echo "ferroreport@$V is already on npm"
+          else
+            npm publish --provenance --access public
+          fi
 
   wheels:
     strategy:
@@ -194,6 +200,8 @@ jobs:
           merge-multiple: true
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   crates:
     if: vars.PUBLISH_CRATES == 'true'
@@ -215,5 +223,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
         run: |
-          cargo publish --locked -p ferroreport
-          cargo publish --locked -p ferroreport-cli
+          V=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name=="ferroreport") | .version')
+          published() { curl -fsS -A "ferroreport-release-workflow" "https://crates.io/api/v1/crates/$1/$V" >/dev/null 2>&1; }
+          published ferroreport || cargo publish --locked -p ferroreport
+          published ferroreport-cli || cargo publish --locked -p ferroreport-cli
