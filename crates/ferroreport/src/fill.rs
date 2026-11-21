@@ -216,6 +216,8 @@ enum Deferred {
 struct DeferredText {
     what: Deferred,
     forecolor: Color,
+    /// Background of an opaque text element (for exporters).
+    back: Option<Color>,
     x: f32,
     y: f32,
     w: f32,
@@ -272,10 +274,21 @@ fn move_to_top(elements: &mut [Element]) -> f32 {
 
 fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
     match item {
+        PrintItem::Cell(info, inner) => {
+            let info = Arc::make_mut(info);
+            info.x += dx;
+            info.y += dy;
+            translate(inner, dx, dy);
+        }
         PrintItem::Group(items) => {
             for i in items {
                 translate(i, dx, dy);
             }
+        }
+        PrintItem::Element(info) => {
+            let info = Arc::make_mut(info);
+            info.x += dx;
+            info.y += dy;
         }
         PrintItem::Path { ops, .. } => {
             let (dx, dy) = (dx as f64, dy as f64);
@@ -381,9 +394,17 @@ fn collect_charts<'a>(elements: &'a [Element], out: &mut Vec<&'a crate::chart::C
 }
 
 /// Evaluates the text displayed by a text element.
-fn text_value(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result<String> {
+/// The text of a text element, with the number behind it and its pattern (for exporters).
+#[derive(Debug, Clone, Default)]
+struct TextValue {
+    text: String,
+    number: Option<f64>,
+    pattern: Option<String>,
+}
+
+fn text_value_full(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result<TextValue> {
     match content {
-        TextContent::Static(s) => Ok(s.clone()),
+        TextContent::Static(s) => Ok(TextValue { text: s.clone(), ..Default::default() }),
         TextContent::Expression { expr, pattern, pattern_expr, blank_when_null, .. } => {
             let value = match expr {
                 Some(e) => eval(e, scope, env)?,
@@ -391,15 +412,108 @@ fn text_value(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result
             };
             if value.is_null() {
                 // Jasper prints the literal text "null" unless isBlankWhenNull is set.
-                return Ok(if *blank_when_null { String::new() } else { "null".to_string() });
+                let text = if *blank_when_null { String::new() } else { "null".to_string() };
+                return Ok(TextValue { text, ..Default::default() });
             }
             let pattern = match pattern_expr {
                 Some(pe) => Some(eval(pe, scope, env)?.to_java_string()),
                 None => pattern.clone(),
             };
-            Ok(format_value(&value, pattern.as_deref(), env.locale))
+            let number = value.as_f64();
+            Ok(TextValue { text: format_value(&value, pattern.as_deref(), env.locale), number, pattern })
         }
     }
+}
+
+/// Wraps the item drawing a text element with what non-PDF exporters need.
+#[allow(clippy::too_many_arguments)]
+fn cell_item(
+    fonts: &mut FontSet,
+    te: &TextElement,
+    color: Color,
+    back: Option<Color>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    value: &TextValue,
+    drawn: PrintItem,
+) -> PrintItem {
+    let (text, runs) = printed_text(fonts, te, color, w, h, &value.text);
+    let info = CellInfo {
+        x,
+        y,
+        w,
+        h,
+        text,
+        runs,
+        number: value.number,
+        pattern: value.pattern.clone(),
+        font: te.style.font.clone(),
+        color,
+        back,
+        halign: te.style.halign,
+        valign: te.style.valign,
+        rotation: te.style.rotation,
+        boxed: te.boxed,
+    };
+    PrintItem::Cell(Arc::new(info), Box::new(drawn))
+}
+
+/// The part of a text that fits its box, as JasperReports keeps it in the printed element (a
+/// text that does not fit is cut after its last whole line). Styled and HTML text keep their
+/// words; the markup becomes plain text.
+fn printed_text(
+    fonts: &mut FontSet,
+    te: &TextElement,
+    color: Color,
+    w: f32,
+    h: f32,
+    text: &str,
+) -> (String, Vec<crate::rich::Run>) {
+    let (w, h) = match te.style.rotation {
+        Rotation::Left | Rotation::Right => (h, w),
+        _ => (w, h),
+    };
+    let p = te.boxed.padding;
+    let (cw, ch) = ((w - p.left - p.right).max(0.0), h - p.top - p.bottom);
+    if te.markup != crate::rich::Markup::None {
+        let st = crate::rich::parse(text, &run_style(te, color), te.markup);
+        let (k, total, rest) = crate::rich::lines_that_fit(&st, fonts, cw, te.style.line_spacing, ch);
+        let mut out = st.text;
+        if k < total {
+            out.truncate(rest);
+            if out.ends_with('\n') {
+                out.pop();
+            }
+        }
+        let runs = st
+            .runs
+            .into_iter()
+            .filter(|r| r.start < out.len() && r.end > r.start)
+            .map(|mut r| {
+                r.end = r.end.min(out.len());
+                r
+            })
+            .collect();
+        return (out, runs);
+    }
+    let face_id = fonts.resolve(&te.style.font);
+    let face = fonts.face(face_id);
+    let size = te.style.font.size;
+    let vm = vertical_metrics(face, size, te.style.line_spacing);
+    let lines = break_lines(text, face, size, cw, Measure::Fill);
+    let fit = vm.lines_that_fit(ch).min(lines.len());
+    let text = match lines.get(fit) {
+        // Jasper keeps the spaces the last line ends with.
+        Some(next) => {
+            let normalized = crate::text::normalize(text);
+            let head = &normalized[..next.start];
+            head.strip_suffix('\n').unwrap_or(head).to_string()
+        }
+        None => text.to_string(),
+    };
+    (text, Vec::new())
 }
 
 /// The base style of a text element's runs.
@@ -541,6 +655,42 @@ fn plain_text_item(
     (PrintText { face: face_id, size, color, underline: f.underline, strike: f.strike, lines: print_lines }, needed)
 }
 
+/// Whether JasperReports prints the element's content in a frame (tables and lists do,
+/// subreports do not).
+fn is_framed(kind: &ElementKind) -> bool {
+    match kind {
+        ElementKind::Table(_) | ElementKind::List(_) => true,
+        ElementKind::Content { framed, .. } => *framed,
+        _ => false,
+    }
+}
+
+/// Starts the items of a non-text element with its marker for spreadsheet exporters; close it
+/// with [`close_mark`] once its items are pushed.
+#[allow(clippy::too_many_arguments)]
+fn open_mark(out: &mut Vec<Laid>, el: &Element, shape: Shape, boxed: Option<BoxStyle>, x: f32, y: f32, w: f32, h: f32) -> usize {
+    let info = ElementInfo {
+        x,
+        y,
+        w,
+        h,
+        shape,
+        back: (el.mode == Mode::Opaque).then_some(el.backcolor),
+        fore: el.forecolor,
+        boxed,
+        len: 0,
+    };
+    out.push(Laid { item: PrintItem::Element(Arc::new(info)), deferred: None });
+    out.len() - 1
+}
+
+fn close_mark(out: &mut [Laid], mark: usize) {
+    let len = out.len() - mark - 1;
+    if let PrintItem::Element(info) = &mut out[mark].item {
+        Arc::make_mut(info).len = len;
+    }
+}
+
 fn box_items(boxed: &BoxStyle, x: f32, y: f32, w: f32, h: f32, out: &mut Vec<Laid>) {
     let mut push = |pen: Pen, x1: f32, y1: f32, x2: f32, y2: f32| {
         if pen.width > 0.0 {
@@ -617,6 +767,9 @@ struct Measured {
     /// Not printed or empty (for isRemoveLineWhenBlank).
     blank: bool,
     text: Option<String>,
+    /// The number behind the text and its pattern (for exporters).
+    number: Option<f64>,
+    pattern: Option<String>,
     children: Option<BandLayout>,
     image: Option<Arc<ImageData>>,
     /// Filled subreport content.
@@ -668,6 +821,8 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             blank: !visible,
             new_h: el.height,
             text: None,
+            number: None,
+            pattern: None,
             children: None,
             image: None,
             content: None,
@@ -679,7 +834,10 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     let deferred = matches!(&te.content, TextContent::Expression { evaluation_time, .. }
                         if !matches!(evaluation_time, EvaluationTime::Now | EvaluationTime::Band));
                     if !deferred {
-                        let text = text_value(&te.content, le.scope, le.env)?;
+                        let tv = text_value_full(&te.content, le.scope, le.env)?;
+                        m.number = tv.number;
+                        m.pattern = tv.pattern;
+                        let text = tv.text;
                         if te.stretch {
                             let (_, needed) = text_item(le.fonts, te, el.forecolor, 0.0, 0.0, el.width, el.height, &text, false);
                             // JasperReports 6 keeps element geometry in whole points.
@@ -724,7 +882,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     m.symbol = barcode_symbol(bc, el, le)?;
                     m.blank = m.symbol.is_none();
                 }
-                ElementKind::Content(segments) => {
+                ElementKind::Content { segments, .. } => {
                     m.new_h = el.height.max(Segment::flow_height(segments));
                     m.content = Some(segments.clone());
                 }
@@ -915,7 +1073,8 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         part_box.bottom.width = 0.0;
                         frame_split = Some((inner, part_box));
                     }
-                    ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content(_) => {
+                    ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content { .. } => {
+                        let framed = is_framed(&el.kind);
                         // Subreport content breaks between its bands; the page and column
                         // headers of the subreport are printed again where it continues.
                         let all = m.content.take().unwrap_or_default();
@@ -935,7 +1094,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         let only_headers = segments[..k].iter().all(|s| s.header);
                         if k == 0 || (only_headers && k < segments.len()) {
                             let mut cont = freeze(el, None);
-                            cont.kind = ElementKind::Content(all);
+                            cont.kind = ElementKind::Content { segments: all, framed };
                             rest.push(cont);
                             continue;
                         }
@@ -945,7 +1104,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                             tail.extend(segments[k..].iter().cloned());
                             tail.extend(footers.iter().cloned());
                             let mut cont = freeze(el, None);
-                            cont.kind = ElementKind::Content(Arc::new(tail));
+                            cont.kind = ElementKind::Content { segments: Arc::new(tail), framed };
                             rest.push(cont);
                             // Jasper prints it right after the last band that fits.
                             part.extend(footers.iter().map(|f| Segment { footer: false, ..f.clone() }));
@@ -976,6 +1135,9 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 match m.text.take() {
                     Some(text) => {
                         let (item, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
+                        let value = TextValue { text, number: m.number, pattern: m.pattern.take() };
+                        let back = (el.mode == Mode::Opaque).then_some(el.backcolor);
+                        let item = cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item);
                         out.items.push(Laid { item, deferred: None });
                     }
                     None => {
@@ -998,6 +1160,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                             deferred: Some(DeferredText {
                                 what: Deferred::Text(Box::new(te.clone())),
                                 forecolor: el.forecolor,
+                                back: (el.mode == Mode::Opaque).then_some(el.backcolor),
                                 x,
                                 y,
                                 w,
@@ -1011,6 +1174,16 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 box_items(&te.boxed, x, y, w, h, &mut out.items);
             }
             ElementKind::Line { direction, pen } => {
+                let mark = open_mark(
+                    &mut out.items,
+                    el,
+                    Shape::Line { pen: *pen, top_down: *direction == LineDirection::TopDown },
+                    None,
+                    x,
+                    y,
+                    w,
+                    h,
+                );
                 // Jasper draws 1pt-thin lines along the element's center edge.
                 let item = if w <= 1.0 && h > 1.0 {
                     PrintItem::Line { x1: x + 0.5, y1: y, x2: x + 0.5, y2: y + h, pen: *pen }
@@ -1024,32 +1197,38 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 if pen.width > 0.0 {
                     out.items.push(Laid { item, deferred: None });
                 }
+                close_mark(&mut out.items, mark);
             }
-            ElementKind::Rectangle { radius, pen } => out.items.push(Laid {
-                item: PrintItem::Rect {
-                    x,
-                    y,
-                    w,
-                    h,
-                    fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
-                    stroke: (pen.width > 0.0).then_some(*pen),
-                    radius: *radius,
-                    path: true,
-                },
-                deferred: None,
-            }),
-            ElementKind::Ellipse { pen } => out.items.push(Laid {
-                item: PrintItem::Ellipse {
-                    x,
-                    y,
-                    w,
-                    h,
-                    fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
-                    stroke: (pen.width > 0.0).then_some(*pen),
-                },
-                deferred: None,
-            }),
+            ElementKind::Rectangle { radius, pen } => {
+                let stroke = (pen.width > 0.0).then_some(*pen);
+                let mark = open_mark(&mut out.items, el, Shape::Rectangle(stroke), None, x, y, w, h);
+                out.items.push(Laid {
+                    item: PrintItem::Rect {
+                        x,
+                        y,
+                        w,
+                        h,
+                        fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
+                        stroke,
+                        radius: *radius,
+                        path: true,
+                    },
+                    deferred: None,
+                });
+                close_mark(&mut out.items, mark);
+            }
+            ElementKind::Ellipse { pen } => {
+                let stroke = (pen.width > 0.0).then_some(*pen);
+                let mark = open_mark(&mut out.items, el, Shape::Ellipse(stroke), None, x, y, w, h);
+                out.items.push(Laid {
+                    item: PrintItem::Ellipse { x, y, w, h, fill: (el.mode == Mode::Opaque).then_some(el.backcolor), stroke },
+                    deferred: None,
+                });
+                close_mark(&mut out.items, mark);
+            }
             ElementKind::Frame { boxed, .. } => {
+                let frame_box = frame_split.as_ref().map(|f| f.1).unwrap_or(*boxed);
+                let mark = open_mark(&mut out.items, el, Shape::Frame, Some(frame_box), x, y, w, h);
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
                         item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
@@ -1073,8 +1252,11 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     }
                 }
                 box_items(&frame_box, x, y, w, h, &mut out.items);
+                close_mark(&mut out.items, mark);
             }
             ElementKind::Image(img) => {
+                let shape = Shape::Image { data: m.image.clone(), scale: img.scale, halign: img.halign, valign: img.valign };
+                let mark = open_mark(&mut out.items, el, shape, Some(img.boxed), x, y, w, h);
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
                         item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
@@ -1085,10 +1267,19 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     out.items.push(Laid { item: place_image(img, data, x, y, w, h), deferred: None });
                 }
                 box_items(&img.boxed, x, y, w, h, &mut out.items);
+                close_mark(&mut out.items, mark);
             }
-            ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content(_) => {
+            ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content { .. } => {
+                // JasperReports puts a subreport's elements on the page itself; tables and lists
+                // with content are printed in a frame as tall as the content.
+                let content = m.content.take();
+                let printed = || content.iter().flat_map(|c| c.iter()).filter(|s| !s.footer);
+                let content_h: f32 = printed().map(|s| s.height).sum();
+                let has_items = printed().any(|s| !s.items.is_empty());
+                let mark = (is_framed(&el.kind) && has_items)
+                    .then(|| open_mark(&mut out.items, el, Shape::Frame, None, x, y, w, content_h));
                 let mut top = y;
-                for seg in m.content.take().iter().flat_map(|c| c.iter()).filter(|s| !s.footer) {
+                for seg in printed() {
                     for item in &seg.items {
                         let mut item = item.clone();
                         translate(&mut item, x, top);
@@ -1096,8 +1287,12 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     }
                     top += seg.height;
                 }
+                if let Some(mark) = mark {
+                    close_mark(&mut out.items, mark);
+                }
             }
             ElementKind::Chart(ch) => {
+                let mark = open_mark(&mut out.items, el, Shape::Picture { symbol: None }, Some(ch.boxed), x, y, w, h);
                 if ch.evaluation_time == EvaluationTime::Now {
                     let texts = chart_texts(ch, le.scope, le.env)?;
                     let empty = crate::chart::DataState::default();
@@ -1110,6 +1305,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         deferred: Some(DeferredText {
                             what: Deferred::Chart(ch.clone()),
                             forecolor: el.forecolor,
+                            back: None,
                             x,
                             y,
                             w,
@@ -1120,8 +1316,16 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     });
                 }
                 box_items(&ch.boxed, x, y, w, h, &mut out.items);
+                close_mark(&mut out.items, mark);
             }
             ElementKind::Barcode(bc) => {
+                // JasperReports sizes a barcode picture in whole points (barcode4j works in mm).
+                let unit = match bc.symbology {
+                    Symbology::Qr { .. } => 1.0,
+                    _ => 72.0 / 25.4,
+                };
+                let symbol = m.symbol.as_ref().map(|s| ((s.width * unit + 0.01).floor(), (s.height * unit + 0.01).floor()));
+                let mark = open_mark(&mut out.items, el, Shape::Picture { symbol }, Some(bc.boxed), x, y, w, h);
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
                         item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
@@ -1132,6 +1336,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     place_symbol(le.fonts, bc, el, sym, x, y, &mut out.items);
                 }
                 box_items(&bc.boxed, x, y, w, h, &mut out.items);
+                close_mark(&mut out.items, mark);
             }
             ElementKind::Break => out.has_break = true,
             ElementKind::ColumnBreak => out.has_column_break = true,
@@ -1966,8 +2171,9 @@ impl<'a> Filler<'a> {
             let d = &p.text;
             let item = match &d.what {
                 Deferred::Text(te) => {
-                    let text = text_value(&te.content, &ctx, self.env)?;
-                    text_item(self.fonts, te, d.forecolor, d.x, d.y, d.w, d.h, &text, true).0
+                    let value = text_value_full(&te.content, &ctx, self.env)?;
+                    let item = text_item(self.fonts, te, d.forecolor, d.x, d.y, d.w, d.h, &value.text, true).0;
+                    cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item)
                 }
                 Deferred::Chart(ch) => {
                     let texts = chart_texts(ch, &ctx, self.env)?;
@@ -2160,6 +2366,7 @@ pub fn fill(
         name: report.name.clone(),
         page_width: report.page_width,
         page_height: report.page_height,
+        landscape: report.landscape,
         pages: filler.pages,
     })
 }

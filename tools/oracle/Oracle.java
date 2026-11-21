@@ -10,7 +10,7 @@ import java.util.*;
 /**
  * Reference renderer: compiles a JRXML with JasperReports, fills it with rows from a JSON
  * array (field values converted to each field's declared class) and exports a PDF.
- * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf> [params.json]
+ * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf|out.xlsx|out.csv|out.jrpxml> [params.json]
  */
 public class Oracle {
     public static void main(String[] args) throws Exception {
@@ -48,7 +48,22 @@ public class Oracle {
         JRDataSource ds = args[1].equals("-") ? new JREmptyDataSource(0) : new JRMapCollectionDataSource(rows);
         JasperPrint print = JasperFillManager.fillReport(report, params, ds);
         long t2 = System.nanoTime();
-        JasperExportManager.exportReportToPdfFile(print, args[2]);
+        if (args[2].endsWith(".xlsx")) {
+            net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter x = new net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter();
+            x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
+            x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
+            x.exportReport();
+        } else if (args[2].endsWith(".jrpxml")) {
+            // The filled print (elements, frames and their boxes), for debugging exporters.
+            net.sf.jasperreports.engine.JasperExportManager.exportReportToXmlFile(print, args[2], false);
+        } else if (args[2].endsWith(".csv")) {
+            net.sf.jasperreports.engine.export.JRCsvExporter x = new net.sf.jasperreports.engine.export.JRCsvExporter();
+            x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
+            x.setExporterOutput(new net.sf.jasperreports.export.SimpleWriterExporterOutput(args[2]));
+            x.exportReport();
+        } else {
+            JasperExportManager.exportReportToPdfFile(print, args[2]);
+        }
         long t3 = System.nanoTime();
         System.err.printf("compile_ms=%.1f fill_ms=%.1f export_ms=%.1f pages=%d%n",
             (t1 - t0) / 1e6, (t2 - t1) / 1e6, (t3 - t2) / 1e6, print.getPages().size());

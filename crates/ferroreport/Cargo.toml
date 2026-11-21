@@ -1,6 +1,6 @@
 [package]
 name = "ferroreport"
-description = "The fastest JasperReports engine: render JRXML templates to PDF without a JVM, pixel-identical"
+description = "The fastest JasperReports engine: render JRXML templates to PDF, Excel (XLSX) and CSV without a JVM, pixel-identical"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,7 @@ authors.workspace = true
 rust-version.workspace = true
 readme = "../../README.md"
 homepage.workspace = true
-keywords = ["jasperreports", "jrxml", "pdf", "report"]
+keywords = ["jasperreports", "jrxml", "pdf", "xlsx", "report"]
 categories = ["text-processing", "template-engine"]
 
 [dependencies]
@@ -23,6 +23,7 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 rust_decimal = "1"
 thiserror = "2"
 png = "0.17"
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 base64 = "0.22"
 
 [dev-dependencies]

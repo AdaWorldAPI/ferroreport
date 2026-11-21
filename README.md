@@ -1,9 +1,10 @@
 # ferroreport
 
 **The fastest way to render JasperReports.** ferroreport reads the `.jrxml` templates you
-already have and renders them to PDF in milliseconds, without a JVM: about **300× faster** than
-JasperReports on everyday reports, with **a tenth of the memory**, output that matches
-**pixel for pixel**, and templates that **cannot run code** on your server.
+already have and renders them to PDF, Excel (XLSX) or CSV in milliseconds, without a JVM: about
+**300× faster** than JasperReports on everyday reports, with **a tenth of the memory**, PDFs that
+match **pixel for pixel**, spreadsheets with **the same cells** Jasper produces, and templates
+that **cannot run code** on your server.
 
 <p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Race: JasperReports renders 1 invoice in 3.01 s; ferroreport renders 301 in the same time" width="760"></a></p>
 
@@ -14,15 +15,18 @@ JasperReports on everyday reports, with **a tenth of the memory**, output that m
 
 > Status: **preview.** All 26 comparable test templates render pixel for pixel like
 > JasperReports 6.20, including band splitting, images, subreports, tables, lists, QR codes and barcodes, styled text and
-> multi-column layouts; charts follow JFreeChart's look closely. Some features are still missing;
-> see [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
+> multi-column layouts; charts follow JFreeChart's look closely. All 28 also export the same
+> Excel and CSV files as Jasper. Some features are still missing; see
+> [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
 
 ## Why
 
 - **No JVM.** One ~8 MB binary (fonts included). Starts in milliseconds, which matters for CLIs,
   serverless functions and containers.
-- **Identical output.** Every fixture is rendered by both engines and compared pixel by pixel
-  (see [how output is verified](#how-output-is-verified)).
+- **Identical output.** Every fixture is rendered by both engines and compared pixel by pixel,
+  and its Excel and CSV exports cell by cell (see [how output is verified](#how-output-is-verified)).
+- **PDF, Excel and CSV.** The same template gives a PDF, an `.xlsx` workbook laid out like
+  JasperReports' (merged cells, fonts, fills, borders, row heights, images, charts) or a CSV.
 - **Safe with untrusted templates.** JasperReports compiles template expressions to Java and
   loads serialized `.jasper` files, which is how recent remote-code-execution bugs happened
   (CVE-2025-10492, CVE-2026-6009). ferroreport never deserializes objects and interprets
@@ -45,6 +49,7 @@ JasperReports on everyday reports, with **a tenth of the memory**, output that m
 ```js
 import { render } from "ferroreport";
 const pdf = render(jrxmlSource, rows, { CUSTOMER: "Distribuidora Caribe" }, { locale: "es_DO" });
+const xlsx = render(jrxmlSource, rows, params, { format: "xlsx" }); // or "csv"
 ```
 
 **Python**: `pip install ferroreport`
@@ -52,6 +57,7 @@ const pdf = render(jrxmlSource, rows, { CUSTOMER: "Distribuidora Caribe" }, { lo
 ```python
 import ferroreport
 pdf = ferroreport.render("invoice.jrxml", rows, {"CUSTOMER": "Distribuidora Caribe"}, locale="es_DO")
+ferroreport.render_to_file("invoice.jrxml", "invoice.xlsx", rows)  # format from the extension
 ```
 
 **Any language, over HTTP** (Java, C#, PHP, Go, Ruby...):
@@ -65,8 +71,9 @@ curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
 ```
 
 `POST /render` also accepts the template itself (`{"template": "<jasperReport...", "data": ...,
-"resources": {"logo.png": "<base64>"}}`), `POST /inspect` reports unsupported features, and
-`GET /health` is there for load balancers. Set `FERROREPORT_TOKEN` to require a bearer token.
+"resources": {"logo.png": "<base64>"}}`); add `"format": "xlsx"` or `"csv"` (or `?format=xlsx`)
+for Excel or CSV. `POST /inspect` reports unsupported features, and `GET /health` is there for
+load balancers. Set `FERROREPORT_TOKEN` to require a bearer token.
 
 **Rust**: `cargo add ferroreport` (example below). **Command line**: download a binary from
 [Releases](https://github.com/cristianEncarnacion/ferroreport/releases) or `cargo install
@@ -81,6 +88,7 @@ Language packages are published by the [release workflow](RELEASING.md).
 cargo install --path crates/ferroreport-cli
 
 ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
+ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .csv)
 ferroreport doctor invoice.jrxml     # what in this template is (not yet) supported
 ```
 
@@ -104,7 +112,24 @@ let pdf = ferroreport::Renderer::new()
     .locale("es_DO")
     .render_json(&template, &rows, &serde_json::json!({ "CUSTOMER": "Distribuidora Caribe" }))?;
 std::fs::write("invoice.pdf", pdf)?;
+// Excel or CSV: render_json_as(&template, &rows, &params, ferroreport::Format::Xlsx)
 ```
+
+### Excel and CSV
+
+The XLSX and CSV exports follow JasperReports' own exporters with their default settings, so a
+spreadsheet made from a template looks the way it did with Jasper:
+
+- All pages go on one sheet named after the report. Element edges and page margins cut the page
+  into columns and rows; each text takes the cells it covers (merged), with its font, colors,
+  borders, alignment and rotation; styled and HTML text keeps its runs.
+- Lines become cell borders, rectangles and frames fill and outline their cells, and images sit
+  over their cells with the same scale mode and alignment. Charts and barcodes are drawn as
+  pictures (at twice Jasper's resolution, so they stay sharp).
+- Values are written as the formatted text, like Jasper. Pass `--xlsx-numbers` (or
+  `XlsxOptions { detect_cell_type: true }`) to write numbers as numbers with their format.
+- CSV has one row for every line where a text starts, and one field for every column where a
+  text starts on that page.
 
 ## Compatibility
 
@@ -123,6 +148,7 @@ std::fs::write("invoice.pdf", pdf)?;
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules, string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math`, `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding | arbitrary Java classes, `$R{}` resource bundles |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font` | font extension jars |
+| Output | PDF; XLSX and CSV laid out like Jasper's exporters (default settings) | DOCX, HTML, ODS/ODT, XLS (old format), exporter properties (`net.sf.jasperreports.export.*`) other than number detection |
 
 QR codes are encoded exactly like ZXing (same version, mask and modules) and are drawn the way
 JasperReports draws them, which makes them a good fit for printed electronic invoices (for
@@ -137,6 +163,11 @@ ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture ma
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
 26 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
 (`crates/ferroreport/tests/barcode4j.rs`).
+
+`tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
+XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
+same, and every picture anchored to the same cells. All 28 fixtures pass. Jasper's output for four
+of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 | Fixture | What it exercises | Result |
 |---|---|---|
@@ -179,6 +210,7 @@ To run it yourself you need a JDK and the JasperReports jars (`jasperreports`,
 ```bash
 cargo build --release
 JASPER_LIB=/path/to/jars python3 tools/compare.py      # diff images land in target/compare/
+JASPER_LIB=/path/to/jars python3 tools/compare_sheets.py   # XLSX and CSV
 JASPER_LIB=/path/to/jars python3 tools/bench.py 02-invoice
 ```
 
@@ -205,7 +237,7 @@ also smaller (1.1 MB instead of 4.5 MB for 09-large).
   tables and lists. Next: crosstabs, constant memory for huge reports (streaming pages to the PDF).
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.
-- **Phase 4:** more chart types, Excel export.
+- **Phase 4:** more chart types; done: Excel (XLSX) and CSV export.
 
 ## Contributing
 

@@ -1,4 +1,5 @@
-//! WebAssembly bindings: `render(template, data, params, options)` returning the PDF bytes.
+//! WebAssembly bindings: `render(template, data, params, options)` returning the PDF (or XLSX or
+//! CSV) bytes.
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
@@ -25,12 +26,13 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
     }
 }
 
-/// Renders a JRXML template to PDF.
+/// Renders a JRXML template to PDF (or to Excel or CSV with `options.format`).
 ///
 /// - `template`: the JRXML source.
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
-/// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string } }`.
+/// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
+///   format?: "pdf" | "xlsx" | "csv" }`.
 #[wasm_bindgen]
 pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) -> Result<Vec<u8>, JsError> {
     let rows = to_json(&data, serde_json::Value::Array(Vec::new()))?;
@@ -64,7 +66,12 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
             r.add_resource(&name, bytes);
         }
     }
-    r.render_json(template, &rows, &params).map_err(js_err)
+    let format = match get(&options, "format").as_string() {
+        Some(f) => ferroreport::Format::parse(&f)
+            .ok_or_else(|| JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx or csv)")))?,
+        None => ferroreport::Format::Pdf,
+    };
+    r.render_json_as(template, &rows, &params, format).map_err(js_err)
 }
 
 /// Parses a template: `{ name, parameters, fields, warnings }`, where `warnings` lists what

@@ -27,7 +27,7 @@
     <div class="headline">
       <h1>Your JasperReports,<br><span class="hot">300× faster.</span></h1>
       <p class="lead">Keep the <code>.jrxml</code> templates you already have. ferroreport turns them into the same PDF,
-        pixel for pixel, in milliseconds and without a JVM.</p>
+        pixel for pixel, or the same Excel and CSV files, in milliseconds and without a JVM.</p>
       <div class="cta">
         <a class="btn solid" href="#playground">Render a report in your browser</a>
         <a class="btn quiet" href="docs.html">Read the docs</a>
@@ -123,9 +123,9 @@
     <div class="features">
       <div class="feature"><h3>Pixel-identical</h3><p>Every test report is rendered by both engines and compared pixel by pixel: text metrics, line breaks, page splits, groups and variables follow Jasper exactly.</p></div>
       <div class="feature"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only load from directories you allow.</p></div>
-      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest.</p></div>
+      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest. It starts in milliseconds, so it suits serverless functions too.</p></div>
       <div class="feature"><h3>The features you use</h3><p>Bands that split across pages, frames, images, subreports, tables, lists, charts, QR codes, EAN, UPC, Code 128, Code 39 and other barcodes, styled and HTML text, rotation, multi-column layouts, conditional styles.</p></div>
-      <div class="feature"><h3>Ready for serverless</h3><p>It starts in milliseconds instead of seconds, which suits Lambda, Cloud Run, edge functions and command-line tools.</p></div>
+      <div class="feature"><h3>PDF, Excel and CSV</h3><p>The same template exports to an <code>.xlsx</code> workbook with the cells, merges, fonts, borders, images and charts Jasper's exporter gives, or to CSV. Checked cell by cell against Jasper, and three times faster.</p></div>
       <div class="feature"><h3>Free and open source</h3><p>MIT or Apache-2.0, built for the community. Contributions and new test templates are welcome.</p></div>
     </div>
   </section>
@@ -175,7 +175,8 @@
         </div>
         <div class="viewer" id="viewer" role="tabpanel">
           <iframe id="pdf" title="Rendered PDF"></iframe>
-          <p class="caption"><span id="caption"></span> <a id="download" download="report.pdf" href="#">Download this PDF</a></p>
+          <p class="caption"><span id="caption"></span> <a id="download" download="report.pdf" href="#">Download this PDF</a>
+            <a id="download-xlsx" href="#">or as Excel</a></p>
         </div>
       </div>
     </div>
@@ -389,6 +390,7 @@ function show(which) {
   $("pdf").src = url + VIEW;
   $("download").href = url;
   $("download").download = which === "ferro" ? "ferroreport.pdf" : "jasperreports.pdf";
+  $("download-xlsx").hidden = which !== "ferro";
   $("caption").textContent = which === "ferro"
     ? "Showing the PDF ferroreport rendered in this page."
     : "Showing the PDF JasperReports produced for this example" + (edited ? ", before your edits." : ".");
@@ -423,6 +425,21 @@ async function load(name) {
   run();
 }
 
+// The same report as an Excel workbook, rendered on demand.
+$("download-xlsx").addEventListener("click", (e) => {
+  e.preventDefault();
+  if (!engine) return;
+  try {
+    const xlsx = engine.render($("tpl").value, $("data").value, $("params").value, { locale: "en_US", format: "xlsx" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([xlsx], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    a.download = `${example}.xlsx`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (err) {
+    set(String(err.message || err), "err");
+  }
+});
 $("tab-ferro").addEventListener("click", () => show("ferro"));
 $("tab-jasper").addEventListener("click", () => show("jasper"));
 const examples = $("examples");

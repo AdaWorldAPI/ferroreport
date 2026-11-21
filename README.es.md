@@ -1,9 +1,10 @@
 # ferroreport
 
 **La forma más rápida de generar reportes de JasperReports.** ferroreport lee las plantillas
-`.jrxml` que ya tienes y las convierte a PDF en milisegundos, sin JVM: unas **300 veces más
-rápido** que JasperReports en reportes del día a día, con **la décima parte de la memoria**,
-salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar código** en tu servidor.
+`.jrxml` que ya tienes y las convierte a PDF, Excel (XLSX) o CSV en milisegundos, sin JVM: unas
+**300 veces más rápido** que JasperReports en reportes del día a día, con **la décima parte de la
+memoria**, PDF **idénticos píxel por píxel**, hojas de cálculo con **las mismas celdas** que saca
+Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
 
 <p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Carrera: JasperReports genera 1 factura en 3.01 s; ferroreport genera 301 en el mismo tiempo" width="760"></a></p>
 
@@ -14,7 +15,8 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 > Estado: **vista previa.** Las 26 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
 > subreportes, tablas, listas, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Todavía faltan algunas funciones; ver
+> estilo de JFreeChart. Las 28 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
+> algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
 ## Por qué
@@ -22,7 +24,10 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 - **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
   Importa en CLIs, funciones serverless y contenedores.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 26 comparables salen idénticos.
+  píxel: hoy los 26 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 28 coinciden.
+- **PDF, Excel y CSV.** La misma plantilla da un PDF, un `.xlsx` armado como el de JasperReports
+  (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos) o un CSV.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -41,12 +46,15 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 > Los [crates](https://crates.io/crates/ferroreport) también; el paquete de PyPI se está publicando.
 
 - **JavaScript/TypeScript:** `npm install ferroreport` y
-  `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF.
+  `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF; con
+  `{ format: "xlsx" }` o `"csv"`, el Excel o el CSV.
 - **Python:** `pip install ferroreport` y
-  `ferroreport.render("factura.jrxml", filas, parametros, locale="es_DO")`.
+  `ferroreport.render("factura.jrxml", filas, parametros, locale="es_DO")` (agrega
+  `format="xlsx"` o `"csv"`, o usa `render_to_file(..., "factura.xlsx", ...)`).
 - **Cualquier lenguaje por HTTP:**
   `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates ghcr.io/cristianencarnacion/ferroreport`
-  y luego `POST /render/factura` con `{"data": [...], "params": {...}}` te devuelve el PDF.
+  y luego `POST /render/factura` con `{"data": [...], "params": {...}}` te devuelve el PDF
+  (agrega `"format": "xlsx"` o `"csv"` para Excel o CSV).
 - **Rust:** `cargo add ferroreport`. **Línea de comandos:** binarios en
   [Releases](https://github.com/cristianEncarnacion/ferroreport/releases); `-d -` y `-o -` leen
   las filas de stdin y escriben el PDF en stdout.
@@ -57,6 +65,7 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 cargo install --path crates/ferroreport-cli
 
 ferroreport render factura.jrxml --data filas.json --params parametros.json -o factura.pdf --locale es_DO
+ferroreport render factura.jrxml --data filas.json -o factura.xlsx   # Excel (o .csv)
 ferroreport doctor factura.jrxml     # qué soporta (y qué no) esta plantilla
 ```
 
@@ -92,6 +101,12 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
   y pies de tabla, de columna y de grupo, columnas ocultas, celda sin datos, y encabezados que se
   repiten en cada página.
 - Listas (`jr:list`) verticales, también cuando siguen en otra página.
+- Exportación a Excel (XLSX) y CSV como la de JasperReports con su configuración por defecto: todas
+  las páginas en una hoja con el nombre del reporte, cada texto en las celdas que cubre
+  (combinadas) con su fuente, colores, bordes y alineación; líneas como bordes, imágenes sobre sus
+  celdas, y gráficos y códigos de barras como imágenes (al doble de resolución que Jasper). Los
+  valores van como texto formateado, igual que en Jasper; con `--xlsx-numbers` los números van
+  como números con su formato.
 - Aún no: crosstabs, listas horizontales, orden horizontal de columnas, conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
@@ -118,7 +133,7 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
   tablas y listas. Siguiente: crosstabs y memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
-- **Fase 4:** más tipos de gráficos y exportación a Excel.
+- **Fase 4:** más tipos de gráficos; listo: exportación a Excel (XLSX) y CSV.
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

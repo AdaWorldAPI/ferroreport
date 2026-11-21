@@ -3,7 +3,8 @@
 //! ```text
 //! POST /render             {"template": "<jasperReport ...>" | "templateName": "invoice.jrxml",
 //!                           "data": [...], "params": {...}, "locale": "es_DO",
-//!                           "resources": {"logo.png": "<base64>"}}      -> application/pdf
+//!                           "resources": {"logo.png": "<base64>"},
+//!                           "format": "pdf" | "xlsx" | "csv"}           -> the file
 //! POST /render/<name>      {"data": [...], "params": {...}}  (template from --templates)
 //! POST /inspect            {"template": "..."}                          -> JSON
 //! GET  /health                                                          -> JSON
@@ -45,7 +46,12 @@ fn safe_name(name: &str) -> Option<PathBuf> {
     Some(p.to_path_buf())
 }
 
-fn render(cfg: &Config, body: &serde_json::Value, name: Option<&str>) -> Result<Vec<u8>, (u16, String)> {
+fn render(
+    cfg: &Config,
+    body: &serde_json::Value,
+    name: Option<&str>,
+    format: ferroreport::Format,
+) -> Result<Vec<u8>, (u16, String)> {
     let bad = |m: String| (400, m);
     let (source, dir) = match (name, body.get("templateName").and_then(|v| v.as_str()), body.get("template")) {
         (Some(n), _, _) | (None, Some(n), _) => {
@@ -83,7 +89,7 @@ fn render(cfg: &Config, body: &serde_json::Value, name: Option<&str>) -> Result<
     let empty_params = serde_json::Value::Object(Default::default());
     let rows = body.get("data").unwrap_or(&empty_rows);
     let params = body.get("params").unwrap_or(&empty_params);
-    r.render_json(&source, rows, params).map_err(|e| (422, e.to_string()))
+    r.render_json_as(&source, rows, params, format).map_err(|e| (422, e.to_string()))
 }
 
 fn handle(cfg: &Config, req: &mut Request) -> Reply {
@@ -132,9 +138,23 @@ fn handle(cfg: &Config, req: &mut Request) -> Reply {
                 };
             }
             let name = path.strip_prefix("/render/").map(|n| n.trim_matches('/'));
-            match render(cfg, &body, name) {
-                Ok(pdf) => Response::from_data(pdf)
-                    .with_header(Header::from_bytes("Content-Type", "application/pdf").expect("static header")),
+            // `format` in the body, or `?format=` in the URL; PDF by default.
+            let query = req.url().split_once('?').map(|(_, q)| q.to_string()).unwrap_or_default();
+            let requested = body
+                .get("format")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .or_else(|| query.split('&').find_map(|kv| kv.strip_prefix("format=").map(str::to_string)));
+            let format = match requested {
+                None => ferroreport::Format::Pdf,
+                Some(f) => match ferroreport::Format::parse(&f) {
+                    Some(f) => f,
+                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx or csv)")),
+                },
+            };
+            match render(cfg, &body, name, format) {
+                Ok(bytes) => Response::from_data(bytes)
+                    .with_header(Header::from_bytes("Content-Type", format.mime()).expect("static header")),
                 Err((status, message)) => error(status, message),
             }
         }

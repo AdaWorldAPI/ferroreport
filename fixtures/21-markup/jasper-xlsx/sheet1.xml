@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<worksheet
+ xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr>
+<outlinePr summaryBelow="0"/>
+</sheetPr><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>
+<col min="1" max="1" customWidth="1" width="6.6666665"/>
+<col min="2" max="2" customWidth="1" width="41.666668"/>
+<col min="3" max="3" customWidth="1" width="2.5"/>
+<col min="4" max="4" customWidth="1" width="41.666668"/>
+<col min="5" max="5" customWidth="1" width="6.6666665"/>
+</cols>
+<sheetData>
+<row r="1" customHeight="1" ht="40">
+  <c r="A1" s="1" t="inlineStr"></c>  <c r="B1" s="1" t="inlineStr"></c>  <c r="C1" s="1" t="inlineStr"></c>  <c r="D1" s="1" t="inlineStr"></c>  <c r="E1" s="1" t="inlineStr"></c></row>
+<row r="2" customHeight="1" ht="16">
+  <c r="A2" s="1" t="inlineStr"></c>  <c r="B2" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Customer: </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">Distribuidora Caribe</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> owes </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="CC0000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">RD$ 1,180.00</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">, due </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">today</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">.</t></r>
+</is></c>  <c r="C2" s="2" t="inlineStr"></c>  <c r="D2" s="2" t="inlineStr"></c>  <c r="E2" s="1" t="inlineStr"></c></row>
+<row r="3" customHeight="1" ht="8">
+  <c r="A3" s="1" t="inlineStr"></c>  <c r="B3" s="1" t="inlineStr"></c>  <c r="C3" s="1" t="inlineStr"></c>  <c r="D3" s="1" t="inlineStr"></c>  <c r="E3" s="1" t="inlineStr"></c></row>
+<row r="4" customHeight="1" ht="47">
+  <c r="A4" s="1" t="inlineStr"></c>  <c r="B4" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">This paragraph mixes </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">bold words</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> with plain ones and </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">italic phrases that keep going</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> so that it wraps over several lines inside a narrow box, with </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <u val="single"/>
+       </rPr>
+<t xml:space="preserve">underlined</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> and </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <strike val="true"/>
+       </rPr>
+<t xml:space="preserve">struck</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> text too.</t></r>
+</is></c>  <c r="C4" s="1" t="inlineStr"></c>  <c r="D4" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">HTML</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> markup: </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">italic</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">, </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <u val="single"/>
+       </rPr>
+<t xml:space="preserve">underline</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">, </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="0066CC" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">blue text</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">, </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">bold italic</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">.
+A second line after a break, long enough to wrap onto a third line in this box.</t></r>
+</is></c>  <c r="E4" s="1" t="inlineStr"></c></row>
+<row r="5" customHeight="1" ht="49">
+  <c r="A5" s="1" t="inlineStr"></c>  <c r="B5" s="1" t="inlineStr"></c>  <c r="C5" s="1" t="inlineStr"></c>  <c r="D5" s="1" t="inlineStr"></c>  <c r="E5" s="1" t="inlineStr"></c></row>
+<row r="6" customHeight="1" ht="24">
+  <c r="A6" s="1" t="inlineStr"></c>  <c r="B6" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Small text with </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="16.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">BIG</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> words </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="7.0" />
+       </rPr>
+<t xml:space="preserve">and tiny ones</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> mixed on lines that wrap across the box width.</t></r>
+</is></c>  <c r="C6" s="1" t="inlineStr"></c>  <c r="D6" s="3" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Centered </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">styled</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> text
+with an explicit newline and </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="008800" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">highlighted</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> words.</t></r>
+</is></c>  <c r="E6" s="1" t="inlineStr"></c></row>
+<row r="7" customHeight="1" ht="7">
+  <c r="A7" s="1" t="inlineStr"></c>  <c r="B7" s="2" t="inlineStr"></c>  <c r="C7" s="1" t="inlineStr"></c>  <c r="D7" s="1" t="inlineStr"></c>  <c r="E7" s="1" t="inlineStr"></c></row>
+<row r="8" customHeight="1" ht="69">
+  <c r="A8" s="1" t="inlineStr"></c>  <c r="B8" s="1" t="inlineStr"></c>  <c r="C8" s="1" t="inlineStr"></c>  <c r="D8" s="1" t="inlineStr"></c>  <c r="E8" s="1" t="inlineStr"></c></row>
+<row r="9" customHeight="1" ht="28">
+  <c r="A9" s="1" t="inlineStr"></c>  <c r="B9" s="4" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Right aligned </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="14.0" />
+       </rPr>
+<t xml:space="preserve">larger font</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> and </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Serif"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">a serif face</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">, then </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <vertAlign val="superscript" />
+       </rPr>
+<t xml:space="preserve">sup</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> and normal.</t></r>
+</is></c>  <c r="C9" s="1" t="inlineStr"></c>  <c r="D9" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Static </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">styled</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> text &amp; entities: </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">5 &lt; 7</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">.</t></r>
+</is></c>  <c r="E9" s="1" t="inlineStr"></c></row>
+<row r="10" customHeight="1" ht="12">
+  <c r="A10" s="1" t="inlineStr"></c>  <c r="B10" s="1" t="inlineStr"></c>  <c r="C10" s="1" t="inlineStr"></c>  <c r="D10" s="2" t="inlineStr"></c>  <c r="E10" s="1" t="inlineStr"></c></row>
+<row r="11" customHeight="1" ht="40">
+  <c r="A11" s="1" t="inlineStr"></c>  <c r="B11" s="1" t="inlineStr"></c>  <c r="C11" s="1" t="inlineStr"></c>  <c r="D11" s="1" t="inlineStr"></c>  <c r="E11" s="1" t="inlineStr"></c></row>
+<row r="12" customHeight="1" ht="35">
+  <c r="A12" s="1" t="inlineStr"></c>  <c r="B12" s="5" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">Justified paragraph with </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <b val="true"/>
+       </rPr>
+<t xml:space="preserve">bold segments</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> spread across the full width of the box so that the spaces between the words grow, followed by </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+        <i val="true"/>
+       </rPr>
+<t xml:space="preserve">an italic tail</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> that continues for a while to produce at least two complete lines and a last one.</t></r>
+</is></c>  <c r="C12" s="5" t="inlineStr"></c>  <c r="D12" s="5" t="inlineStr"></c>  <c r="E12" s="1" t="inlineStr"></c></row>
+<row r="13" customHeight="1" ht="25">
+  <c r="A13" s="1" t="inlineStr"></c>  <c r="B13" s="1" t="inlineStr"></c>  <c r="C13" s="1" t="inlineStr"></c>  <c r="D13" s="1" t="inlineStr"></c>  <c r="E13" s="1" t="inlineStr"></c></row>
+<row r="14" customHeight="1" ht="33">
+  <c r="A14" s="1" t="inlineStr"></c>  <c r="B14" s="2" t="inlineStr"><is><r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve">One and a half spacing with </t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="14.0" />
+       </rPr>
+<t xml:space="preserve">larger</t></r>
+<r>
+       <rPr>
+        <rFont val="DejaVu Sans"/>
+        <color rgb="000000" />
+        <sz val="10.0" />
+       </rPr>
+<t xml:space="preserve"> words wrapping over a few lines of text in the box.</t></r>
+</is></c>  <c r="C14" s="1" t="inlineStr"></c>  <c r="D14" s="1" t="inlineStr"></c>  <c r="E14" s="1" t="inlineStr"></c></row>
+<row r="15" customHeight="1" ht="409">
+  <c r="A15" s="1" t="inlineStr"></c>  <c r="B15" s="1" t="inlineStr"></c>  <c r="C15" s="1" t="inlineStr"></c>  <c r="D15" s="1" t="inlineStr"></c>  <c r="E15" s="1" t="inlineStr"></c></row>
+</sheetData>
+<mergeCells>
+<mergeCell ref="B2:D2"/>
+<mergeCell ref="B6:B7"/>
+<mergeCell ref="D9:D10"/>
+<mergeCell ref="B12:D12"/>
+</mergeCells>
+<pageMargins left="0.0" right="0.0" top="0.0" bottom="0.00" header="0.0" footer="0.0"/>
+<pageSetup orientation="portrait" paperSize="9"/>
+<drawing r:id="rIdDr1"/></worksheet>

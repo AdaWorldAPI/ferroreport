@@ -9,7 +9,7 @@ use std::time::Instant;
 mod serve;
 
 const USAGE: &str = "\
-ferroreport — render JasperReports JRXML templates to PDF, no JVM required
+ferroreport — render JasperReports JRXML templates to PDF, Excel or CSV, no JVM required
 
 USAGE:
     ferroreport render <template.jrxml> [OPTIONS]
@@ -19,7 +19,11 @@ USAGE:
 RENDER OPTIONS:
     -d, --data <file.json>      JSON array of rows (omit for reports without data; - reads stdin)
     -p, --params <file.json>    JSON object with parameter values
-    -o, --output <file.pdf>     Output file (default: <template>.pdf; - writes stdout)
+    -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
+                                extension picks the format: .pdf, .xlsx or .csv
+    -f, --format <pdf|xlsx|csv> Output format, when the file name does not say it
+        --xlsx-numbers          In XLSX, write numbers as numbers (default: as formatted text,
+                                like JasperReports)
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
@@ -32,7 +36,8 @@ RENDER OPTIONS:
 DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
 
-SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect):
+SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
+add format xlsx or csv to the request for Excel or CSV):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
@@ -89,11 +94,15 @@ fn render(args: &[String]) -> CliResult {
     let mut now = None;
     let mut quiet = false;
     let mut resources = Vec::new();
+    let mut format = None;
+    let mut xlsx_numbers = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
         match a.as_str() {
             "-d" | "--data" => data = Some(value(a)?),
+            "-f" | "--format" => format = Some(value(a)?.to_ascii_lowercase()),
+            "--xlsx-numbers" => xlsx_numbers = true,
             "-p" | "--params" => params = Some(value(a)?),
             "-o" | "--output" => output = Some(value(a)?),
             "-l" | "--locale" => locale = value(a)?,
@@ -106,7 +115,14 @@ fn render(args: &[String]) -> CliResult {
         }
     }
     let template = template.ok_or("missing template path")?;
-    let output = output.map(PathBuf::from).unwrap_or_else(|| PathBuf::from(&template).with_extension("pdf"));
+    let format = match format {
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx or csv)"))?,
+        None => output
+            .as_deref()
+            .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))
+            .unwrap_or_default(),
+    };
+    let output = output.map(PathBuf::from).unwrap_or_else(|| PathBuf::from(&template).with_extension(format.extension()));
 
     let started = Instant::now();
     let source = std::fs::read_to_string(&template).map_err(|e| format!("{template}: {e}"))?;
@@ -142,13 +158,16 @@ fn render(args: &[String]) -> CliResult {
     let parsed = started.elapsed();
     let doc = renderer.fill(&report, &records, params)?;
     let filled = started.elapsed();
-    let pdf = renderer.to_pdf(&doc)?;
+    let bytes = match format {
+        ferroreport::Format::Xlsx => renderer.to_xlsx(&doc, &ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers }),
+        other => renderer.export(&doc, other)?,
+    };
     let to_stdout = output.as_os_str() == "-";
     if to_stdout {
-        std::io::Write::write_all(&mut std::io::stdout(), &pdf).map_err(|e| format!("stdout: {e}"))?;
+        std::io::Write::write_all(&mut std::io::stdout(), &bytes).map_err(|e| format!("stdout: {e}"))?;
         quiet = true;
     } else {
-        std::fs::write(&output, &pdf).map_err(|e| format!("{}: {e}", output.display()))?;
+        std::fs::write(&output, &bytes).map_err(|e| format!("{}: {e}", output.display()))?;
     }
     let total = started.elapsed();
 
@@ -222,7 +241,7 @@ fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, u
                 }
                 ElementKind::Break | ElementKind::ColumnBreak => "break".into(),
                 ElementKind::Image(_) => "image".into(),
-                ElementKind::Subreport(_) | ElementKind::Content(_) => "subreport".into(),
+                ElementKind::Subreport(_) | ElementKind::Content { .. } => "subreport".into(),
                 ElementKind::Table(_) => "table".into(),
                 ElementKind::List(_) => "list".into(),
                 ElementKind::Chart(c) => format!("{:?} chart", c.kind),

@@ -167,6 +167,14 @@ pub struct BoxStyle {
     pub right: Pen,
 }
 
+impl BoxStyle {
+    /// No padding and no borders (pens of zero width in `color`).
+    pub fn plain(color: Color) -> BoxStyle {
+        let pen = Pen { width: 0.0, color, style: LineStyle::Solid };
+        BoxStyle { padding: Padding::default(), top: pen, left: pen, bottom: pen, right: pen }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum HAlign {
     Left,
@@ -312,7 +320,12 @@ pub enum ElementKind {
     Chart(Box<crate::chart::ChartElement>),
     /// Already filled subreport content still to be printed (the continuation of a subreport
     /// split across pages).
-    Content(Arc<Vec<crate::print::Segment>>),
+    /// The rest of a subreport, table or list continuing on a new page; `framed` for tables and
+    /// lists, which JasperReports prints in a frame.
+    Content {
+        segments: Arc<Vec<crate::print::Segment>>,
+        framed: bool,
+    },
     /// A page break (`<break>`).
     Break,
     /// A column break (`<break type="Column">`).
@@ -380,6 +393,8 @@ pub struct Report {
     pub language: Language,
     pub page_width: f32,
     pub page_height: f32,
+    /// `orientation="Landscape"` (spreadsheet page setup).
+    pub landscape: bool,
     pub column_width: f32,
     pub column_count: u32,
     pub column_spacing: f32,

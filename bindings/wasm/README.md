@@ -1,7 +1,7 @@
 # ferroreport for JavaScript
 
-The fastest way to render **JasperReports `.jrxml` templates to PDF** from Node.js, Deno, Bun or
-the browser. No JVM: the engine is Rust compiled to WebAssembly, and a typical invoice renders
+The fastest way to render **JasperReports `.jrxml` templates to PDF, Excel or CSV** from Node.js,
+Deno, Bun or the browser. No JVM: the engine is Rust compiled to WebAssembly, and a typical invoice renders
 in a few milliseconds ([benchmarks](https://github.com/cristianEncarnacion/ferroreport#performance),
 [live playground](https://cristianencarnacion.github.io/ferroreport/)). Output is verified pixel by pixel against
 JasperReports 6.20, and templates cannot run code or read files, so they are safe to accept
@@ -27,6 +27,9 @@ const pdf = render(
   },
 );
 writeFileSync("invoice.pdf", pdf);
+
+// The same report as an Excel workbook (or CSV), laid out like JasperReports' exporters:
+writeFileSync("invoice.xlsx", render(template, rows, params, { format: "xlsx" }));
 ```
 
 In browsers (and bundlers that do not pick the Node build), initialise the module first:
@@ -48,6 +51,7 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   - `options.resources`: `{ [path]: Uint8Array | string }` images (PNG, JPEG) and subreport
     templates (a subreport named `lines.jasper` is read from `lines.jrxml`).
   - `options.now`: value of `new Date()` in expressions (`Date` or ISO string).
+  - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook) or `"csv"` (UTF-8 text).
 - `inspect(template) => { name, parameters, fields, warnings }`: `warnings` lists what the
   engine does not support in that template yet.
 - `version() => string`

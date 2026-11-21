@@ -51,3 +51,23 @@ def test_inspect_and_errors():
     assert "lines" in info["fields"]
     with pytest.raises(ferroreport.FerroreportError):
         ferroreport.render("<jasperReport", [])
+
+
+def test_excel_and_csv(tmp_path):
+    import json
+    import zipfile
+
+    fx = FIXTURES / "02-invoice"
+    rows = json.loads((fx / "data.json").read_text())
+    params = json.loads((fx / "params.json").read_text())
+    xlsx = ferroreport.render(fx / "report.jrxml", rows, params, format="xlsx")
+    assert xlsx.startswith(b"PK")
+    out = tmp_path / "invoice.xlsx"
+    out.write_bytes(xlsx)
+    assert "xl/worksheets/sheet1.xml" in zipfile.ZipFile(out).namelist()
+    csv = ferroreport.render(fx / "report.jrxml", rows, params, format="csv").decode("utf-8")
+    assert csv.splitlines()[0] == ",Ferro Industrial SRL,,,INVOICE #F-2026-,,,"
+    ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "invoice.csv", rows, params)
+    assert (tmp_path / "invoice.csv").read_text().startswith(",Ferro")
+    with pytest.raises(ferroreport.FerroreportError):
+        ferroreport.render(fx / "report.jrxml", rows, params, format="docx")

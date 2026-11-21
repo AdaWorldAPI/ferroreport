@@ -1,6 +1,6 @@
 //! # ferroreport
 //!
-//! Renders JasperReports JRXML templates to PDF without a JVM.
+//! Renders JasperReports JRXML templates to PDF, Excel (XLSX) and CSV without a JVM.
 //!
 //! ```no_run
 //! let template = std::fs::read_to_string("invoice.jrxml")?;
@@ -16,22 +16,27 @@
 
 pub mod barcode;
 pub mod chart;
+pub mod csv;
 pub mod data;
 pub mod error;
 pub mod expr;
 pub mod fill;
 pub mod fonts;
 pub mod format;
+mod grid;
 pub mod image;
 pub mod jrxml;
 pub mod model;
 pub mod pdf;
 pub mod print;
+mod raster;
 pub mod rich;
 pub mod table;
 pub mod text;
 pub mod value;
+pub mod xlsx;
 mod xml;
+mod zip;
 
 pub use data::Record;
 pub use error::{Error, Result};
@@ -47,6 +52,45 @@ use std::collections::HashMap;
 /// Parses a JRXML template.
 pub fn parse(template: &str) -> Result<Report> {
     jrxml::parse_report(template)
+}
+
+/// An output format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Format {
+    #[default]
+    Pdf,
+    /// Excel workbook, laid out like JasperReports' XLSX exporter.
+    Xlsx,
+    /// Comma-separated values, laid out like JasperReports' CSV exporter.
+    Csv,
+}
+
+impl Format {
+    /// `pdf`, `xlsx` or `csv` (any case).
+    pub fn parse(name: &str) -> Option<Format> {
+        match name.to_ascii_lowercase().as_str() {
+            "pdf" => Some(Format::Pdf),
+            "xlsx" | "excel" => Some(Format::Xlsx),
+            "csv" => Some(Format::Csv),
+            _ => None,
+        }
+    }
+
+    pub fn extension(self) -> &'static str {
+        match self {
+            Format::Pdf => "pdf",
+            Format::Xlsx => "xlsx",
+            Format::Csv => "csv",
+        }
+    }
+
+    pub fn mime(self) -> &'static str {
+        match self {
+            Format::Pdf => "application/pdf",
+            Format::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Format::Csv => "text/csv; charset=utf-8",
+        }
+    }
 }
 
 /// Renders one report: parse -> fill -> export.
@@ -120,13 +164,44 @@ impl Renderer {
         pdf::write_pdf(doc, &self.fonts, &pdf::PdfOptions { title: Some(doc.name.clone()), compress: true })
     }
 
+    /// Exports a filled document to an Excel workbook (XLSX), laid out like JasperReports'
+    /// XLSX exporter.
+    pub fn to_xlsx(&self, doc: &PrintDocument, options: &xlsx::XlsxOptions) -> Vec<u8> {
+        xlsx::write_xlsx(doc, &self.fonts, options)
+    }
+
+    /// Exports a filled document to CSV, laid out like JasperReports' CSV exporter.
+    pub fn to_csv(&self, doc: &PrintDocument, options: &csv::CsvOptions) -> String {
+        csv::write_csv(doc, options)
+    }
+
+    /// Exports a filled document in the given format (XLSX and CSV with default options).
+    pub fn export(&self, doc: &PrintDocument, format: Format) -> Result<Vec<u8>> {
+        Ok(match format {
+            Format::Pdf => self.to_pdf(doc)?,
+            Format::Xlsx => self.to_xlsx(doc, &Default::default()),
+            Format::Csv => self.to_csv(doc, &Default::default()).into_bytes(),
+        })
+    }
+
     /// Renders a template with rows from a JSON array and parameters from a JSON object.
     pub fn render_json(&mut self, template: &str, rows: &serde_json::Value, params: &serde_json::Value) -> Result<Vec<u8>> {
+        self.render_json_as(template, rows, params, Format::Pdf)
+    }
+
+    /// Like [`Renderer::render_json`], to another format.
+    pub fn render_json_as(
+        &mut self,
+        template: &str,
+        rows: &serde_json::Value,
+        params: &serde_json::Value,
+        format: Format,
+    ) -> Result<Vec<u8>> {
         let report = parse(template)?;
         let records = data::records_from_json(&report, rows)?;
         let params = params_from_json(&report, params)?;
         let doc = self.fill(&report, &records, params)?;
-        self.to_pdf(&doc)
+        self.export(&doc, format)
     }
 
     /// Font families that were substituted during the last fills.

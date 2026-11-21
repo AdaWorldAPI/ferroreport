@@ -46,6 +46,10 @@ fn render(name: &str, data_source: &str, location: &str) -> ferroreport::Result<
     let mut text = String::new();
     for page in &doc.pages {
         for item in &page.items {
+            let item = match item {
+                ferroreport::print::PrintItem::Cell(_, inner) => inner.as_ref(),
+                other => other,
+            };
             if let ferroreport::print::PrintItem::Text(t) = item {
                 for l in &t.lines {
                     text.push_str(&l.text);

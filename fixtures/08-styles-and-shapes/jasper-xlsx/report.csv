@@ -1,0 +1,10 @@
+"Card style with padding, a thick left border and a serif font inherited from the style.",,,,,,
+"Note style inherits from Card: italic, smaller, different background and accent.",,,,,,
+Left underlined,,,Center struck,,,Right bold italic
+Top,,,Middle,,,Bottom
+One and a half line spacing keeps paragraphs airy. This text wraps across several lines inside a dashed box.,,,,,"Double spacing, dotted box. Lorem ipsum dolor sit amet consectetur.",
+"Monospaced: fn main() { println!(""hola, mundo""); }
+Second line after an explicit newline.
+A very-long-hyphenated-compound-word-that-must-wrap-somewhere-in-the-middle-of-the-box-because-it-does-not-fit",,,,,,
+,Inverted,,,"Ñandú, café, acción, pingüino — “quotes” & €100 · ¿Qué? ¡Sí!",,
+This text is far too long ,,Supercalifragilistic,,,,

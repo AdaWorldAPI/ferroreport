@@ -409,6 +409,7 @@ impl Parser {
             language: if self.groovy { Language::Groovy } else { Language::Java },
             page_width,
             page_height: num(&["pageHeight"], 842.0)?,
+            landscape: attr(root, &["orientation"]) == Some("Landscape"),
             column_width: num(&["columnWidth"], page_width - left - right)?,
             column_count: num(&["columnCount"], 1.0)? as u32,
             column_spacing: num(&["columnSpacing"], 0.0)?,

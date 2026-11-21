@@ -4,12 +4,12 @@ build-backend = "maturin"
 
 [project]
 name = "ferroreport"
-description = "The fastest JasperReports engine: render JRXML templates to PDF in milliseconds, without a JVM. Pixel-identical, safe with untrusted templates."
+description = "The fastest JasperReports engine: render JRXML templates to PDF, Excel and CSV in milliseconds, without a JVM. Pixel-identical, safe with untrusted templates."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 requires-python = ">=3.9"
 authors = [{ name = "Cristian Encarnacion" }]
-keywords = ["jasperreports", "jrxml", "pdf", "report", "invoice"]
+keywords = ["jasperreports", "jrxml", "pdf", "excel", "xlsx", "csv", "report", "invoice"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

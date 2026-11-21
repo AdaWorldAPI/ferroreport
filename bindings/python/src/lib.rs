@@ -12,7 +12,7 @@ fn err(e: impl std::fmt::Display) -> PyErr {
 
 /// Renders a JRXML template (source text) with rows and parameters given as JSON text.
 #[pyfunction]
-#[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None))]
+#[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None, format=None))]
 #[allow(clippy::too_many_arguments)]
 fn render(
     py: Python<'_>,
@@ -23,7 +23,12 @@ fn render(
     resource_dirs: Vec<String>,
     resources: HashMap<String, Vec<u8>>,
     now: Option<String>,
+    format: Option<String>,
 ) -> PyResult<Py<PyBytes>> {
+    let format = match format {
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx or csv)")))?,
+        None => ferroreport::Format::Pdf,
+    };
     let pdf = py
         .detach(move || -> Result<Vec<u8>, String> {
             let rows: serde_json::Value = serde_json::from_str(&data_json).map_err(|e| format!("data: {e}"))?;
@@ -39,7 +44,7 @@ fn render(
             for (name, data) in resources {
                 r.add_resource(&name, data);
             }
-            r.render_json(&template, &rows, &params).map_err(|e| e.to_string())
+            r.render_json_as(&template, &rows, &params, format).map_err(|e| e.to_string())
         })
         .map_err(err)?;
     Ok(PyBytes::new(py, &pdf).unbind())

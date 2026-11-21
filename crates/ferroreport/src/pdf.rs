@@ -170,6 +170,7 @@ fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<Draw<'a>>) {
     for item in items {
         match item {
             PrintItem::Group(inner) => flatten(inner, out),
+            PrintItem::Cell(_, inner) => flatten(std::slice::from_ref(inner), out),
             PrintItem::Transform(m, inner) => {
                 out.push(Draw::Push(*m));
                 flatten(inner, out);
@@ -333,7 +334,7 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                 }
             };
             match item {
-                PrintItem::Group(_) | PrintItem::Transform(..) => {}
+                PrintItem::Group(_) | PrintItem::Transform(..) | PrintItem::Cell(..) | PrintItem::Element(_) => {}
                 PrintItem::Path { ops, fill, stroke, dash } => {
                     if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
                         continue;

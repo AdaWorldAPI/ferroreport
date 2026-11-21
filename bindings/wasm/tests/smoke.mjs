@@ -20,5 +20,18 @@ const info = ferroreport.inspect(template);
 assert.equal(info.name, "orders");
 assert.deepEqual(info.fields, ["order", "customer", "lines"]);
 
+const xlsx = ferroreport.render(template, data, {}, {
+  resources: { "lines.jrxml": readFileSync(new URL("lines.jrxml", fx)) },
+  now: "2026-01-01T00:00:00",
+  format: "xlsx",
+});
+assert.equal(Buffer.from(xlsx.subarray(0, 2)).toString(), "PK");
+const csv = Buffer.from(ferroreport.render(template, data, {}, {
+  resources: { "lines.jrxml": readFileSync(new URL("lines.jrxml", fx)) },
+  format: "csv",
+})).toString();
+assert.ok(csv.includes("Ferreteria"), csv.slice(0, 200));
+
 assert.throws(() => ferroreport.render("<jasperReport", [], {}, {}));
+assert.throws(() => ferroreport.render(template, data, {}, { format: "docx" }));
 console.log(`ok: ${pdf.length} bytes, engine ${ferroreport.version()}`);

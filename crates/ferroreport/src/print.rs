@@ -29,8 +29,79 @@ pub struct PrintText {
     pub lines: Vec<PrintLine>,
 }
 
+/// What spreadsheet and text exporters need to know about a printed text element: its box,
+/// its text, the number behind it, and its style. PDF ignores it and draws the wrapped item.
+#[derive(Debug, Clone)]
+pub struct CellInfo {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub text: String,
+    /// The styled runs of a styled or HTML text (empty for plain text).
+    pub runs: Vec<crate::rich::Run>,
+    /// The value when it is a number (exported as a number when type detection is on).
+    pub number: Option<f64>,
+    /// The Java format pattern of the value (`#,##0.00`, `dd/MM/yyyy`).
+    pub pattern: Option<String>,
+    pub font: crate::model::FontSpec,
+    pub color: Color,
+    /// Background, for opaque elements.
+    pub back: Option<Color>,
+    pub halign: crate::model::HAlign,
+    pub valign: crate::model::VAlign,
+    pub rotation: crate::model::Rotation,
+    pub boxed: crate::model::BoxStyle,
+}
+
+/// What a non-text element is, for spreadsheet exporters.
+#[derive(Debug, Clone)]
+pub enum Shape {
+    /// A frame, subreport, table or list: its children follow it.
+    Frame,
+    Rectangle(Option<Pen>),
+    Ellipse(Option<Pen>),
+    /// A line; `top_down` is its direction when it is neither horizontal nor vertical.
+    Line {
+        pen: Pen,
+        top_down: bool,
+    },
+    /// An image from the report (`None` when it is blank).
+    Image {
+        data: Option<Arc<ImageData>>,
+        scale: crate::model::ScaleImage,
+        halign: crate::model::HAlign,
+        valign: crate::model::VAlign,
+    },
+    /// A chart, or a barcode with the size of its symbol (in its own units; JasperReports
+    /// keeps the symbol's shape when it places the barcode picture in a spreadsheet).
+    Picture {
+        symbol: Option<(f64, f64)>,
+    },
+}
+
+/// A non-text element as spreadsheet exporters see it. It marks the start of the items that
+/// draw the element: the `len` items after it belong to it (for a frame, its children).
+#[derive(Debug, Clone)]
+pub struct ElementInfo {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub shape: Shape,
+    /// Background, for opaque elements.
+    pub back: Option<Color>,
+    pub fore: Color,
+    pub boxed: Option<crate::model::BoxStyle>,
+    pub len: usize,
+}
+
 #[derive(Debug, Clone)]
 pub enum PrintItem {
+    /// A printed text element: the item drawing it, with the data exporters other than PDF use.
+    Cell(Arc<CellInfo>, Box<PrintItem>),
+    /// Where a non-text element starts, for exporters other than PDF. Draws nothing.
+    Element(Arc<ElementInfo>),
     /// A path in page coordinates (charts), filled with the nonzero rule and/or stroked.
     Path {
         ops: Arc<Vec<PathOp>>,
@@ -103,6 +174,8 @@ pub struct PrintDocument {
     pub name: String,
     pub page_width: f32,
     pub page_height: f32,
+    /// The report's orientation is landscape.
+    pub landscape: bool,
     pub pages: Vec<PrintPage>,
 }
 

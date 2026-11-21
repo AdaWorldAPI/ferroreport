@@ -1,7 +1,7 @@
 {
   "name": "ferroreport",
-  "version": "0.4.0",
-  "description": "The fastest JasperReports engine: render JRXML templates to PDF in milliseconds from Node.js, Deno, Bun and browsers. No JVM, pixel-identical output, safe with untrusted templates.",
+  "version": "0.5.0",
+  "description": "The fastest JasperReports engine: render JRXML templates to PDF, Excel (XLSX) and CSV in milliseconds from Node.js, Deno, Bun and browsers. No JVM, pixel-identical output, safe with untrusted templates.",
   "license": "MIT OR Apache-2.0",
   "author": "Cristian Encarnacion",
   "homepage": "https://cristianencarnacion.github.io/ferroreport/",
@@ -11,7 +11,7 @@
     "directory": "bindings/wasm"
   },
   "bugs": "https://github.com/cristianEncarnacion/ferroreport/issues",
-  "keywords": ["jasperreports", "jrxml", "pdf", "report", "reporting", "invoice", "pdf-generation", "charts", "qrcode", "wasm", "fast"],
+  "keywords": ["jasperreports", "jrxml", "pdf", "excel", "xlsx", "csv", "report", "reporting", "invoice", "pdf-generation", "charts", "qrcode", "wasm", "fast"],
   "main": "./node/ferroreport.js",
   "types": "./node/ferroreport.d.ts",
   "exports": {

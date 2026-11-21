@@ -1,4 +1,4 @@
-"""Render JasperReports JRXML templates to PDF without a JVM.
+"""Render JasperReports JRXML templates to PDF, Excel or CSV without a JVM.
 
 >>> import ferroreport
 >>> pdf = ferroreport.render("invoice.jrxml", data=[{"item": "Cemento", "amount": 395}],
@@ -69,8 +69,11 @@ def render(
     resources: Optional[Mapping[str, Union[bytes, PathLike]]] = None,
     resource_dirs: Optional[Iterable[PathLike]] = None,
     now: Optional[_dt.datetime] = None,
+    format: str = "pdf",
 ) -> bytes:
-    """Renders a template to PDF and returns the PDF bytes.
+    """Renders a template and returns the file's bytes: PDF by default, or an Excel workbook
+    (format="xlsx") or CSV text encoded as UTF-8 (format="csv"), laid out like JasperReports'
+    exporters.
 
     template: path to a .jrxml file, or the JRXML source itself.
     data: rows for the main data source: a list of dicts (or objects), or JSON text.
@@ -81,6 +84,7 @@ def render(
     resource_dirs: extra directories for images and subreports. The template's own directory
         is always searched. Paths in templates can never leave these directories.
     now: value of `new Date()` in expressions (for reproducible output).
+    format: "pdf", "xlsx" or "csv".
     """
     source, directory = _load_template(template)
     dirs = [os.fspath(d) for d in (resource_dirs or [])]
@@ -104,13 +108,18 @@ def render(
             dirs,
             mem,
             now.isoformat() if now else None,
+            format,
         )
     except ValueError as e:
         raise FerroreportError(str(e)) from None
 
 
 def render_to_file(template: Union[PathLike, str], output: PathLike, *args: Any, **kwargs: Any) -> None:
-    """Like render(), writing the PDF to `output`."""
+    """Like render(), writing the file to `output`. The format follows the file's extension
+    (.pdf, .xlsx or .csv) unless `format` is given."""
+    ext = os.path.splitext(os.fspath(output))[1].lower().lstrip(".")
+    if "format" not in kwargs and ext in ("xlsx", "csv"):
+        kwargs["format"] = ext
     pdf = render(template, *args, **kwargs)
     with open(os.fspath(output), "wb") as f:
         f.write(pdf)
