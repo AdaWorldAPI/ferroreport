@@ -362,7 +362,14 @@ impl Parser {
         if t.is_empty() {
             return Ok(None);
         }
-        parse_expr(t, self.groovy).map(Some).map_err(|message| Error::ExprParse { expr: t.to_string(), message })
+        parse_expr(t, self.groovy).map(Some).map_err(|message| {
+            // Quote a long expression only in part.
+            let expr = match t.char_indices().nth(120) {
+                Some((i, _)) => format!("{}…", &t[..i]),
+                None => t.to_string(),
+            };
+            Error::ExprParse { expr, message }
+        })
     }
 
     fn child_expr(&self, n: &Node, names: &[&str]) -> Result<Option<Expr>> {

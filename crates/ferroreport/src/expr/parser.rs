@@ -48,7 +48,13 @@ pub enum Expr {
 struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    /// How deep the expression being built is nested (parentheses, operators, calls).
+    depth: usize,
 }
+
+/// Deepest nesting accepted in an expression. Evaluation recurses once per level, so a
+/// template cannot exhaust the stack with `((((...))))` or a chain of thousands of `+`.
+const MAX_DEPTH: usize = 256;
 
 const TYPE_NAMES: &[&str] = &[
     "String",
@@ -86,7 +92,7 @@ const TYPE_NAMES: &[&str] = &[
 /// Parses expression source text.
 pub fn parse_expr(src: &str, groovy: bool) -> Result<Expr, String> {
     let tokens = tokenize(src, groovy)?;
-    let mut p = Parser { tokens, pos: 0 };
+    let mut p = Parser { tokens, pos: 0, depth: 0 };
     let e = p.expr(0)?;
     match p.peek() {
         Token::Eof => Ok(e),
@@ -135,7 +141,23 @@ impl Parser {
         })
     }
 
+    fn enter(&mut self) -> Result<(), String> {
+        self.depth += 1;
+        if self.depth > MAX_DEPTH {
+            return Err(format!("expression nested more than {MAX_DEPTH} levels deep"));
+        }
+        Ok(())
+    }
+
     fn expr(&mut self, min_bp: u8) -> Result<Expr, String> {
+        let start = self.depth;
+        let r = self.expr_inner(min_bp);
+        self.depth = start;
+        r
+    }
+
+    fn expr_inner(&mut self, min_bp: u8) -> Result<Expr, String> {
+        self.enter()?;
         let mut lhs = self.unary()?;
         loop {
             let op = self.peek().clone();
@@ -143,6 +165,8 @@ impl Parser {
             if lbp < min_bp {
                 break;
             }
+            // Each operator in a chain nests the expression one level deeper.
+            self.enter()?;
             self.next();
             lhs = match op {
                 Token::Op("?") => {
@@ -178,6 +202,14 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, String> {
+        let start = self.depth;
+        let r = self.unary_inner();
+        self.depth = start;
+        r
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, String> {
+        self.enter()?;
         match self.peek().clone() {
             Token::Op("-") => {
                 self.next();
@@ -338,6 +370,17 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_expressions_nested_too_deep() {
+        let deep = format!("{}1{}", "(".repeat(100_000), ")".repeat(100_000));
+        assert!(parse_expr(&deep, false).unwrap_err().contains("nested"));
+        let chain = vec!["\"a\""; 100_000].join(" + ");
+        assert!(parse_expr(&chain, false).is_err());
+        assert!(parse_expr(&"-".repeat(100_000), false).is_err());
+        let fine = vec!["1"; 100].join(" + ");
+        assert!(parse_expr(&fine, false).is_ok());
+    }
 
     #[test]
     fn parses_typical_expressions() {

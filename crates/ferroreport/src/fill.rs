@@ -1527,6 +1527,21 @@ fn snap_like_jasper(rects: Vec<[f64; 4]>, path: Vec<PathOp>, height_mm: f64) -> 
 /// Subreports nested deeper than this are reported as an error (a template including itself).
 const MAX_SUBREPORT_DEPTH: usize = 8;
 
+/// Most subreports, tables and lists filled in one render: enough for a subreport on each of
+/// hundreds of thousands of rows, while a template that nests ten copies of itself per level
+/// stops instead of running for hours.
+const MAX_SUBREPORT_RUNS: usize = 500_000;
+
+fn count_run(le: &mut LayoutEnv, what: &str) -> Result<()> {
+    le.images.runs += 1;
+    if le.images.runs > MAX_SUBREPORT_RUNS {
+        return Err(Error::Unsupported(format!(
+            "{what}: more than {MAX_SUBREPORT_RUNS} subreports, tables and lists filled in one report"
+        )));
+    }
+    Ok(())
+}
+
 /// A subreport return value to apply: (variable, calculation, value).
 type Returned = (String, Calculation, Value);
 
@@ -1573,6 +1588,7 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
     let records = crate::data::records_from_json(&report, &rows)?;
     let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
 
+    count_run(le, &location)?;
     le.images.depth += 1;
     let filled = fill_flow(&report, &records, params, le.fonts, le.images, &env);
     le.images.depth -= 1;
@@ -2128,6 +2144,7 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
     };
     let records = crate::data::records_from_json(report, &rows)?;
     let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
+    count_run(le, what)?;
     le.images.depth += 1;
     let filled = fill_flow(report, &records, params, le.fonts, le.images, &env);
     le.images.depth -= 1;
@@ -2911,6 +2928,7 @@ pub fn fill(
     images: &mut ImageStore,
     env: &EvalEnv,
 ) -> Result<PrintDocument> {
+    images.runs = 0;
     let mut filler = new_filler(report, records, params, fonts, images, env)?;
     filler.run()?;
     Ok(PrintDocument {

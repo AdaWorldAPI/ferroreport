@@ -31,7 +31,9 @@ that **cannot run code** on your server.
   loads serialized `.jasper` files, which is how recent remote-code-execution bugs happened
   (CVE-2025-10492, CVE-2026-6009). ferroreport never deserializes objects and interprets
   expressions from a fixed allow-list: no reflection, no class loading, no network access. Images
-  and subreports are only read from the template's resource directories.
+  and subreports are only read from the template's resource directories, and limits on nesting,
+  image size and subreports keep a hostile template from exhausting memory or time
+  ([SECURITY.md](SECURITY.md)).
 - **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers) and
   Python, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (Java,
   C#, PHP, Go, Ruby...).

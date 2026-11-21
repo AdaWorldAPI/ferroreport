@@ -41,6 +41,9 @@ pub struct ImageStore {
     reports: HashMap<String, Arc<crate::model::Report>>,
     /// Subreports being filled right now (guards against runaway recursion).
     pub(crate) depth: usize,
+    /// Subreports, tables and lists filled in the current render (guards against templates
+    /// that multiply their subreports at every level).
+    pub(crate) runs: usize,
 }
 
 impl ImageStore {
@@ -122,11 +125,20 @@ impl ImageStore {
         let rel = Path::new(location);
         // Without resource directories nothing is read from disk (not even the working
         // directory): only in-memory resources are available.
-        self.roots
-            .iter()
-            .map(|r| r.join(rel))
-            .find(|p| p.is_file())
-            .ok_or_else(|| Error::Data(format!("`{location}` not found in the resource directories")))
+        // The file must really be inside the directory: a symbolic link pointing elsewhere
+        // is refused.
+        for root in &self.roots {
+            let path = root.join(rel);
+            if !path.is_file() {
+                continue;
+            }
+            let (Ok(real), Ok(real_root)) = (path.canonicalize(), root.canonicalize()) else { continue };
+            if !real.starts_with(&real_root) {
+                return Err(Error::Unsupported(format!("`{location}` links outside the resource directory and is not read")));
+            }
+            return Ok(path);
+        }
+        Err(Error::Data(format!("`{location}` not found in the resource directories")))
     }
 
     fn decode(&mut self, bytes: &[u8]) -> Result<Arc<ImageData>> {
@@ -154,10 +166,20 @@ fn fnv(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3))
 }
 
+/// Largest image decoded, in pixels (about 16000 × 4000; 400 MB at most while decoding).
+const MAX_PIXELS: u64 = 64_000_000;
+
 fn decode_png(bytes: &[u8], id: usize) -> Result<ImageData> {
     let mut decoder = png::Decoder::new(bytes);
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = decoder.read_info().map_err(|e| Error::Data(format!("PNG: {e}")))?;
+    // The header says how big the image is before anything is decoded: refuse sizes that
+    // would take more memory than any report image needs (a small file can claim billions
+    // of pixels).
+    let (w, h) = (reader.info().width as u64, reader.info().height as u64);
+    if w * h > MAX_PIXELS || reader.output_buffer_size() as u64 > MAX_PIXELS * 8 {
+        return Err(Error::Data(format!("PNG: {w}×{h} pixels is larger than the {MAX_PIXELS} pixels allowed")));
+    }
     let mut buf = vec![0; reader.output_buffer_size()];
     let info = reader.next_frame(&mut buf).map_err(|e| Error::Data(format!("PNG: {e}")))?;
     let buf = &buf[..info.buffer_size()];
@@ -263,6 +285,51 @@ mod tests {
         for bad in ["/etc/passwd", "../secret.png", "a/../../b.png", "http://example.com/x.png"] {
             assert!(store.load_location(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn refuses_images_claiming_huge_sizes() {
+        // A valid PNG header claiming 60000×60000 pixels, with almost no data.
+        fn chunk(kind: &[u8], data: &[u8]) -> Vec<u8> {
+            let mut c = (data.len() as u32).to_be_bytes().to_vec();
+            c.extend_from_slice(kind);
+            c.extend_from_slice(data);
+            let mut crc_input = kind.to_vec();
+            crc_input.extend_from_slice(data);
+            let crc = crc_input.iter().fold(!0u32, |mut c, &b| {
+                c ^= b as u32;
+                for _ in 0..8 {
+                    c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+                }
+                c
+            });
+            c.extend_from_slice(&(!crc).to_be_bytes());
+            c
+        }
+        let mut ihdr = 60_000u32.to_be_bytes().to_vec();
+        ihdr.extend_from_slice(&60_000u32.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 6, 0, 0, 0]);
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        png.extend(chunk(b"IHDR", &ihdr));
+        png.extend(chunk(b"IDAT", &miniz_oxide::deflate::compress_to_vec_zlib(&[0; 64], 9)));
+        png.extend(chunk(b"IEND", &[]));
+        let err = ImageStore::new().load_bytes(&png).unwrap_err().to_string();
+        assert!(err.contains("larger than"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_links_out_of_the_resource_directory() {
+        let dir = std::env::temp_dir().join(format!("ferroreport-link-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let link = dir.join("passwd.png");
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink("/etc/passwd", &link).unwrap();
+        let mut store = ImageStore::new();
+        store.add_root(&dir);
+        let err = store.load_location("passwd.png").unwrap_err().to_string();
+        assert!(err.contains("outside"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -48,6 +48,17 @@ add format xlsx or csv to the request for Excel or CSV):
 ";
 
 fn main() -> ExitCode {
+    // Work on a thread with a large stack: templates are processed recursively, and the main
+    // thread's stack is small on some systems (1 MB on Windows).
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(run)
+        .ok()
+        .and_then(|t| t.join().ok())
+        .unwrap_or(ExitCode::FAILURE)
+}
+
+fn run() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("render") => render(&args[1..]),

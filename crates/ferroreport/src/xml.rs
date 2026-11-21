@@ -54,6 +54,11 @@ fn predefined_entity(name: &str) -> Option<&'static str> {
 }
 
 /// Parses a whole document and returns its root element.
+/// Deepest element nesting accepted. Templates are processed recursively, so this keeps a
+/// template from exhausting the stack (also in 1 MB threads, as on Windows and in WebAssembly);
+/// real ones nest a few dozen levels at most.
+const MAX_DEPTH: usize = 100;
+
 pub fn parse(source: &str) -> Result<Node> {
     let mut reader = Reader::from_str(source);
     reader.config_mut().trim_text(false);
@@ -65,6 +70,9 @@ pub fn parse(source: &str) -> Result<Node> {
         let pos = reader.buffer_position();
         match reader.read_event() {
             Ok(Event::Start(e)) => {
+                if stack.len() >= MAX_DEPTH {
+                    return Err(Error::Xml(format!("elements nested more than {MAX_DEPTH} levels deep")));
+                }
                 stack.push(open(&e, pos)?);
             }
             Ok(Event::Empty(e)) => {
@@ -141,6 +149,12 @@ mod tests {
         assert_eq!(root.attr("x"), Some("1&2"));
         assert_eq!(root.child("b").unwrap().text, "t<1 $F{x} > 2");
         assert!(root.child("c").is_some());
+    }
+
+    #[test]
+    fn rejects_deep_nesting() {
+        let deep = format!("<a>{}{}</a>", "<b>".repeat(10_000), "</b>".repeat(10_000));
+        assert!(parse(&deep).is_err());
     }
 
     #[test]

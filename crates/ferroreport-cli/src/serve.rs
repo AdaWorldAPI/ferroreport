@@ -37,6 +37,15 @@ fn error(status: u16, message: impl std::fmt::Display) -> Reply {
     json(status, serde_json::json!({ "error": message.to_string() }))
 }
 
+/// Compares a secret in time that does not depend on where the inputs differ.
+fn same_secret(a: &[u8], b: &[u8]) -> bool {
+    let mut diff = a.len() ^ b.len();
+    for i in 0..a.len().max(b.len()) {
+        diff |= (a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(0)) as usize;
+    }
+    diff == 0
+}
+
 /// A template name from a URL: a plain relative path inside the templates directory.
 fn safe_name(name: &str) -> Option<PathBuf> {
     let p = Path::new(name);
@@ -61,6 +70,14 @@ fn render(
                 rel.set_extension("jrxml");
             }
             let path = root.join(&rel);
+            // A symbolic link in the templates directory may not point outside it.
+            let inside = match (path.canonicalize(), root.canonicalize()) {
+                (Ok(real), Ok(real_root)) => real.starts_with(real_root),
+                _ => false,
+            };
+            if !inside {
+                return Err((404, format!("template `{n}` not found")));
+            }
             let text = std::fs::read_to_string(&path).map_err(|_| (404, format!("template `{n}` not found")))?;
             (text, path.parent().map(Path::to_path_buf))
         }
@@ -94,10 +111,10 @@ fn render(
 
 fn handle(cfg: &Config, req: &mut Request) -> Reply {
     if let Some(token) = &cfg.token {
-        let ok = req
-            .headers()
-            .iter()
-            .any(|h| h.field.equiv("Authorization") && h.value.as_str().strip_prefix("Bearer ").is_some_and(|t| t == token));
+        let ok = req.headers().iter().any(|h| {
+            h.field.equiv("Authorization")
+                && h.value.as_str().strip_prefix("Bearer ").is_some_and(|t| same_secret(t.as_bytes(), token.as_bytes()))
+        });
         if !ok {
             return error(401, "missing or wrong bearer token");
         }
@@ -169,16 +186,44 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
     let workers: Vec<_> = (0..cfg.workers.max(1))
         .map(|_| {
             let (server, cfg) = (server.clone(), cfg.clone());
-            std::thread::spawn(move || {
-                while let Ok(mut req) = server.recv() {
-                    let reply = handle(&cfg, &mut req);
-                    let _ = req.respond(reply);
-                }
-            })
+            // Large stacks: templates are processed recursively (nesting is capped well below
+            // what this holds).
+            std::thread::Builder::new()
+                .stack_size(32 * 1024 * 1024)
+                .spawn(move || {
+                    while let Ok(mut req) = server.recv() {
+                        // A bug must not take the worker down with it: answer 500 and go on.
+                        let reply = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&cfg, &mut req)))
+                            .unwrap_or_else(|_| error(500, "internal error while rendering"));
+                        let _ = req.respond(reply);
+                    }
+                })
+                .expect("spawn worker")
         })
         .collect();
     for w in workers {
         let _ = w.join();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secrets_compare_exactly() {
+        assert!(same_secret(b"abc", b"abc"));
+        assert!(!same_secret(b"abc", b"abd"));
+        assert!(!same_secret(b"abc", b"abcd"));
+        assert!(!same_secret(b"", b"a"));
+    }
+
+    #[test]
+    fn template_names_stay_relative() {
+        assert!(safe_name("sales/invoice").is_some());
+        for bad in ["", "/etc/passwd", "../x", "a/../../b"] {
+            assert!(safe_name(bad).is_none(), "{bad}");
+        }
+    }
 }
