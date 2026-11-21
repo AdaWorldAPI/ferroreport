@@ -15,8 +15,12 @@ pub struct Line {
 }
 
 /// Line endings normalised to `\n` and tabs to spaces (same byte length).
-pub fn normalize(text: &str) -> String {
-    text.replace("\r\n", "\n").replace('\r', "\n").replace('\t', " ")
+pub fn normalize(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.contains(['\r', '\t']) {
+        text.replace("\r\n", "\n").replace('\r', "\n").replace('\t', " ").into()
+    } else {
+        text.into()
+    }
 }
 
 /// Which of JasperReports' two text measurements to use.
@@ -36,7 +40,7 @@ pub fn text_before_line(text: &str, lines: &[Line], k: usize) -> String {
             let head = &normalized[..l.start];
             head.strip_suffix('\n').unwrap_or(head).trim_end_matches(' ').to_string()
         }
-        None => normalized,
+        None => normalized.into_owned(),
     }
 }
 
@@ -110,13 +114,19 @@ fn break_paragraph(
     lines: &mut Vec<Line>,
 ) {
     let fits = |s: &str| measure(face, size, mode, s.trim_end_matches(' ')) <= max_width + 1e-3;
-    // `line_start..pos` is the current line, as byte offsets into `paragraph`.
-    let mut line_start = 0;
-    let mut pos = 0;
     let push = |lines: &mut Vec<Line>, from: usize, to: usize| {
         let text = paragraph[from..to].trim_end_matches(' ');
         lines.push(Line { text: text.to_string(), width: face.text_width(text, size), start: base + from });
     };
+    // Most texts are one line that fits: widths only grow with length, so when the whole
+    // paragraph fits there is nothing to break.
+    if fits(paragraph) {
+        push(lines, 0, paragraph.len());
+        return;
+    }
+    // `line_start..pos` is the current line, as byte offsets into `paragraph`.
+    let mut line_start = 0;
+    let mut pos = 0;
     for unit in units(paragraph) {
         let unit_end = pos + unit.len();
         if fits(&paragraph[line_start..unit_end]) {

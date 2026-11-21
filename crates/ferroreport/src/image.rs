@@ -44,6 +44,8 @@ pub struct ImageStore {
     /// Subreports, tables and lists filled in the current render (guards against templates
     /// that multiply their subreports at every level).
     pub(crate) runs: usize,
+    /// Texts are filled without the data only spreadsheet and text exporters use.
+    pub(crate) skip_cells: bool,
 }
 
 impl ImageStore {

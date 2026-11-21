@@ -336,6 +336,12 @@ pub trait PageSink {
         false
     }
 
+    /// Whether texts should come with what spreadsheet and text exporters need (their
+    /// [`CellInfo`]). A sink that only draws can say no and save that work.
+    fn wants_cells(&self) -> bool {
+        true
+    }
+
     /// The next page of the document.
     fn page(&mut self, page: PrintPage, fonts: &FontSet) -> Result<()>;
 
@@ -1364,7 +1370,11 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         let (item, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
                         let value = TextValue { text, number: m.number, pattern: m.pattern.take() };
                         let back = (el.mode == Mode::Opaque).then_some(el.backcolor);
-                        let item = cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item);
+                        let item = if le.images.skip_cells {
+                            item
+                        } else {
+                            cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item)
+                        };
                         out.items.push(Laid { item, deferred: None });
                     }
                     None => {
@@ -2987,7 +2997,11 @@ impl<'a> Filler<'a> {
                 Deferred::Text(te) => {
                     let value = text_value_full(&te.content, &ctx, self.env)?;
                     let item = text_item(self.fonts, te, d.forecolor, d.x, d.y, d.w, d.h, &value.text, true).0;
-                    cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item)
+                    if self.images.skip_cells {
+                        item
+                    } else {
+                        cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item)
+                    }
                 }
                 Deferred::Chart(ch) => {
                     let texts = chart_texts(ch, &ctx, self.env)?;
@@ -3182,6 +3196,7 @@ pub fn fill(
     env: &EvalEnv,
 ) -> Result<PrintDocument> {
     images.runs = 0;
+    images.skip_cells = false;
     let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.run()?;
     Ok(filler.document())
@@ -3198,6 +3213,7 @@ pub fn fill_slice(
     limits: Limits,
 ) -> Result<PrintDocument> {
     images.runs = 0;
+    images.skip_cells = false;
     let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.limits = limits;
     filler.deadline = limits.deadline();
@@ -3216,6 +3232,7 @@ pub fn fill_rows(
     limits: Limits,
 ) -> Result<PrintDocument> {
     images.runs = 0;
+    images.skip_cells = false;
     let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
     filler.limits = limits;
     filler.deadline = limits.deadline();
@@ -3237,6 +3254,7 @@ pub fn fill_to(
     sink: &mut dyn PageSink,
 ) -> Result<FillStats> {
     images.runs = 0;
+    images.skip_cells = !sink.wants_cells();
     let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
     filler.limits = limits;
     filler.deadline = limits.deadline();

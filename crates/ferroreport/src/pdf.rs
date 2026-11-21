@@ -700,6 +700,10 @@ impl<W: std::io::Write> crate::fill::PageSink for PdfStream<W> {
         true
     }
 
+    fn wants_cells(&self) -> bool {
+        false
+    }
+
     fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> Result<()> {
         PdfStream::page(self, &page.items, fonts)
     }
