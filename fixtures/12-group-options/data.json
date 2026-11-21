@@ -1,0 +1,296 @@
+[
+ {
+  "dept": "Finance",
+  "team": "AP",
+  "person": "Gina Vega",
+  "hours": 40
+ },
+ {
+  "dept": "Finance",
+  "team": "AP",
+  "person": "Eva Vega",
+  "hours": 46
+ },
+ {
+  "dept": "Finance",
+  "team": "AP",
+  "person": "Dario Vega",
+  "hours": 45
+ },
+ {
+  "dept": "Finance",
+  "team": "AP",
+  "person": "Iris Gil",
+  "hours": 36
+ },
+ {
+  "dept": "Finance",
+  "team": "AP",
+  "person": "Iris Gil",
+  "hours": 45
+ },
+ {
+  "dept": "Finance",
+  "team": "AR",
+  "person": "Ana Sosa",
+  "hours": 38
+ },
+ {
+  "dept": "Finance",
+  "team": "AR",
+  "person": "Gina Paz",
+  "hours": 24
+ },
+ {
+  "dept": "Finance",
+  "team": "AR",
+  "person": "Marta Gil",
+  "hours": 27
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Ana Vega",
+  "hours": 43
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Marta Vega",
+  "hours": 39
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Hugo Paz",
+  "hours": 30
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Iris Vega",
+  "hours": 42
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Beto Sosa",
+  "hours": 20
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Carla Paz",
+  "hours": 23
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Marta Paz",
+  "hours": 34
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Carla Sosa",
+  "hours": 32
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Hugo Gil",
+  "hours": 25
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Kiara Paz",
+  "hours": 35
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Nico Gil",
+  "hours": 22
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Marta Gil",
+  "hours": 26
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Kiara Paz",
+  "hours": 23
+ },
+ {
+  "dept": "IT",
+  "team": "Apps",
+  "person": "Iris Vega",
+  "hours": 37
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Dario Sosa",
+  "hours": 24
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Iris Vega",
+  "hours": 29
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Fidel Vega",
+  "hours": 36
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Gina Sosa",
+  "hours": 35
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Gina Sosa",
+  "hours": 20
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Nico Paz",
+  "hours": 25
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Leo Vega",
+  "hours": 20
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Hugo Paz",
+  "hours": 37
+ },
+ {
+  "dept": "IT",
+  "team": "Data",
+  "person": "Juan Gil",
+  "hours": 38
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Fidel Paz",
+  "hours": 25
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Kiara Gil",
+  "hours": 40
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Fidel Sosa",
+  "hours": 31
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Marta Sosa",
+  "hours": 27
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Beto Gil",
+  "hours": 22
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Nico Gil",
+  "hours": 44
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Gina Sosa",
+  "hours": 25
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Kiara Paz",
+  "hours": 41
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Iris Gil",
+  "hours": 33
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Carla Paz",
+  "hours": 48
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Fidel Vega",
+  "hours": 36
+ },
+ {
+  "dept": "IT",
+  "team": "Infra",
+  "person": "Gina Gil",
+  "hours": 48
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Carla Paz",
+  "hours": 34
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Marta Vega",
+  "hours": 44
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Leo Vega",
+  "hours": 21
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Nico Sosa",
+  "hours": 21
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Nico Sosa",
+  "hours": 41
+ },
+ {
+  "dept": "Legal",
+  "team": "Contracts",
+  "person": "Eva Paz",
+  "hours": 33
+ }
+]

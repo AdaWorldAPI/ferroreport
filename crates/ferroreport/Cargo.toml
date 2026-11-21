@@ -1,0 +1,26 @@
+[package]
+name = "ferroreport"
+description = "Render JasperReports JRXML templates to PDF without a JVM"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+keywords = ["jasperreports", "jrxml", "pdf", "report"]
+categories = ["text-processing", "template-engine"]
+
+[dependencies]
+quick-xml = "0.42"
+serde_json = "1"
+pdf-writer = "0.15"
+subsetter = "0.2"
+ttf-parser = "0.25"
+miniz_oxide = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+rust_decimal = "1"
+thiserror = "2"
+png = "0.17"
+base64 = "0.22"
+
+[dev-dependencies]

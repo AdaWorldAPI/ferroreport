@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="text_overflow" pageWidth="400" pageHeight="300" columnWidth="360" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+<field name="t" class="java.lang.String"/>
+<pageHeader><band height="20"><textField><reportElement x="0" y="0" width="360" height="20"/><textFieldExpression><![CDATA["HEADER " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageHeader>
+<detail><band height="40">
+<staticText><reportElement x="0" y="0" width="60" height="20"/><text><![CDATA[LABEL]]></text></staticText>
+<textField isStretchWithOverflow="true"><reportElement x="70" y="5" width="200" height="15"/><textFieldExpression><![CDATA[$F{t}]]></textFieldExpression></textField>
+<staticText><reportElement positionType="Float" x="70" y="22" width="200" height="15"/><text><![CDATA[BELOW]]></text></staticText>
+<staticText><reportElement x="280" y="25" width="80" height="15"/><text><![CDATA[RIGHTFIX]]></text></staticText>
+</band></detail>
+<pageFooter><band height="20"><textField><reportElement x="0" y="0" width="360" height="20"/><textFieldExpression><![CDATA["FOOTER " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageFooter>
+</jasperReport>

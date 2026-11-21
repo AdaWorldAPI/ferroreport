@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="layout_features" pageWidth="595" pageHeight="600" columnWidth="535" leftMargin="30" rightMargin="30" topMargin="25" bottomMargin="25">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<style name="Row" style="B">
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 == 0]]></conditionExpression>
+			<style mode="Opaque" backcolor="#EEF3F8"/>
+		</conditionalStyle>
+	</style>
+	<style name="Money" style="B">
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$F{amount} < 0]]></conditionExpression>
+			<style forecolor="#C0392B" isBold="true"/>
+		</conditionalStyle>
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$F{amount} > 2000]]></conditionExpression>
+			<style mode="Opaque" backcolor="#D5F5E3" isItalic="true"/>
+		</conditionalStyle>
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$F{amount} < -300]]></conditionExpression>
+			<style isUnderline="true"/>
+		</conditionalStyle>
+	</style>
+	<field name="cat" class="java.lang.String"/>
+	<field name="item" class="java.lang.String"/>
+	<field name="addr2" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<group name="cat"><groupExpression><![CDATA[$F{cat}]]></groupExpression></group>
+	<title><band height="120">
+		<staticText><reportElement x="0" y="0" width="535" height="22"/><textElement><font size="14" isBold="true"/></textElement><text><![CDATA[Layout features]]></text></staticText>
+		<staticText><reportElement x="0" y="24" width="260" height="90"/><box padding="3"><pen lineWidth="0.5"/></box><textElement textAlignment="Justified"/><text><![CDATA[Justified paragraphs spread the leftover space of each line across its spaces so that both margins line up, which is how most printed statements and contracts look.
+A second paragraph, also justified, shows how the last line behaves.]]></text></staticText>
+		<staticText><reportElement x="275" y="24" width="260" height="90"/><box padding="3"><pen lineWidth="0.5"/></box><textElement textAlignment="Justified"><font fontName="DejaVu Serif" size="10"/><paragraph lineSpacing="1_1_2"/></textElement><text><![CDATA[Serif, larger and with one and a half line spacing: el texto justificado también funciona con acentos y eñes en español.]]></text></staticText>
+	</band></title>
+	<detail><band height="28">
+		<frame><reportElement style="Row" x="0" y="0" width="535" height="28"/></frame>
+		<textField><reportElement x="0" y="0" width="90" height="14" isPrintRepeatedValues="false" isPrintInFirstWholeBand="true" printWhenGroupChanges="cat"/><textElement><font isBold="true"/></textElement><textFieldExpression><![CDATA[$F{cat}]]></textFieldExpression></textField>
+		<textField><reportElement x="100" y="0" width="200" height="14"/><textFieldExpression><![CDATA[$F{item}]]></textFieldExpression></textField>
+		<textField isBlankWhenNull="true"><reportElement x="100" y="14" width="200" height="14" forecolor="#777777" isRemoveLineWhenBlank="true"/><textFieldExpression><![CDATA[$F{addr2}]]></textFieldExpression></textField>
+		<textField pattern="#,##0.00"><reportElement style="Money" x="435" y="0" width="100" height="14"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression></textField>
+	</band></detail>
+	<pageFooter><band height="16"><textField><reportElement x="0" y="2" width="535" height="14" forecolor="#999999"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageFooter>
+</jasperReport>

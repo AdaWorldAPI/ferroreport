@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="order_lines" pageWidth="515" pageHeight="842" columnWidth="515" leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<parameter name="CURRENCY" class="java.lang.String"/>
+	<field name="product" class="java.lang.String"/>
+	<field name="qty" class="java.lang.Integer"/>
+	<field name="price" class="java.lang.Double"/>
+	<variable name="total" class="java.lang.Double" calculation="Sum"><variableExpression><![CDATA[$F{qty} * $F{price}]]></variableExpression></variable>
+	<columnHeader><band height="14">
+		<staticText><reportElement mode="Opaque" x="0" y="0" width="300" height="14" backcolor="#E8EEF6"/><box leftPadding="3"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Product]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="300" y="0" width="60" height="14" backcolor="#E8EEF6"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Qty]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="360" y="0" width="75" height="14" backcolor="#E8EEF6"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Price]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="435" y="0" width="80" height="14" backcolor="#E8EEF6"/><box rightPadding="3"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Amount]]></text></staticText>
+	</band></columnHeader>
+	<detail><band height="13">
+		<textField><reportElement x="0" y="0" width="300" height="13"/><box leftPadding="3"/><textFieldExpression><![CDATA[$F{product}]]></textFieldExpression></textField>
+		<textField><reportElement x="300" y="0" width="60" height="13"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{qty}]]></textFieldExpression></textField>
+		<textField pattern="#,##0.00"><reportElement x="360" y="0" width="75" height="13"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{price}]]></textFieldExpression></textField>
+		<textField pattern="#,##0.00"><reportElement x="435" y="0" width="80" height="13"/><box rightPadding="3"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{qty} * $F{price}]]></textFieldExpression></textField>
+	</band></detail>
+	<summary><band height="16">
+		<textField pattern="#,##0.00"><reportElement x="300" y="2" width="215" height="13"/><box rightPadding="3"><topPen lineWidth="0.5"/></box><textElement textAlignment="Right"><font isBold="true"/></textElement><textFieldExpression><![CDATA[$P{CURRENCY} + " " + new java.text.DecimalFormat("#,##0.00").format($V{total})]]></textFieldExpression></textField>
+	</band></summary>
+</jasperReport>

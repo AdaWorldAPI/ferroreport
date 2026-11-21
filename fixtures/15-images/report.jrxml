@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="images" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="pic" class="java.lang.String"/>
+	<title>
+		<band height="600">
+			<image><reportElement x="0" y="0" width="120" height="48"/><imageExpression><![CDATA["logo.png"]]></imageExpression></image>
+			<staticText><reportElement x="130" y="0" width="300" height="48"/><textElement verticalAlignment="Middle"><font size="16" isBold="true"/></textElement><text><![CDATA[Images: scale modes and alignment]]></text></staticText>
+			<image scaleImage="Clip"><reportElement mode="Opaque" x="0" y="70" width="150" height="100" backcolor="#EEEEEE"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["photo.jpg"]]></imageExpression></image>
+			<image scaleImage="FillFrame"><reportElement x="170" y="70" width="150" height="100"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["photo.jpg"]]></imageExpression></image>
+			<image scaleImage="RetainShape"><reportElement x="340" y="70" width="215" height="100"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["photo.jpg"]]></imageExpression></image>
+			<image scaleImage="RetainShape" hAlign="Center" vAlign="Middle"><reportElement x="0" y="190" width="215" height="120"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["photo.jpg"]]></imageExpression></image>
+			<image scaleImage="RetainShape" hAlign="Right" vAlign="Bottom"><reportElement x="230" y="190" width="100" height="120"/><box padding="5"><pen lineWidth="0.5"/></box><imageExpression><![CDATA["logo.png"]]></imageExpression></image>
+			<image scaleImage="Clip" hAlign="Center" vAlign="Middle"><reportElement x="345" y="190" width="100" height="60"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["photo.jpg"]]></imageExpression></image>
+			<image scaleImage="FillFrame"><reportElement x="460" y="190" width="95" height="40"/><imageExpression><![CDATA["gray.png"]]></imageExpression></image>
+			<image scaleImage="RetainShape"><reportElement mode="Opaque" x="0" y="330" width="200" height="60" backcolor="#FFF3CD"/><imageExpression><![CDATA["logo.png"]]></imageExpression></image>
+		</band>
+	</title>
+	<detail>
+		<band height="60">
+			<textField><reportElement x="0" y="0" width="200" height="20"/><textFieldExpression><![CDATA[$F{name}]]></textFieldExpression></textField>
+			<image><reportElement x="210" y="0" width="100" height="40"/><imageExpression><![CDATA[java.util.Base64.getDecoder().decode($F{pic})]]></imageExpression></image>
+		</band>
+	</detail>
+</jasperReport>

@@ -1,0 +1,177 @@
+[
+ {
+  "employee": "Wilson de la Cruz",
+  "hours": "175.25",
+  "rate": "340",
+  "bonus": "1500",
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Bienvenido Holguín",
+  "hours": "184",
+  "rate": "210",
+  "bonus": "1500",
+  "nickname": ""
+ },
+ {
+  "employee": "Nairobi Severino",
+  "hours": "120",
+  "rate": "340",
+  "bonus": "2750.50",
+  "nickname": null
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "168",
+  "rate": "285.5",
+  "bonus": "2750.50",
+  "nickname": ""
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "168",
+  "rate": "285.5",
+  "bonus": null,
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Altagracia Peralta",
+  "hours": "120",
+  "rate": "285.5",
+  "bonus": "2750.50",
+  "nickname": null
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "168",
+  "rate": "210",
+  "bonus": "1500",
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "152.5",
+  "rate": "412.75",
+  "bonus": null,
+  "nickname": "Mena"
+ },
+ {
+  "employee": "Bienvenido Holguín",
+  "hours": "168",
+  "rate": "340",
+  "bonus": "1500",
+  "nickname": null
+ },
+ {
+  "employee": "Bienvenido Holguín",
+  "hours": "184",
+  "rate": "210",
+  "bonus": "1500",
+  "nickname": null
+ },
+ {
+  "employee": "Wilson de la Cruz",
+  "hours": "168",
+  "rate": "285.5",
+  "bonus": null,
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Wilson de la Cruz",
+  "hours": "184",
+  "rate": "210",
+  "bonus": "2750.50",
+  "nickname": null
+ },
+ {
+  "employee": "Altagracia Peralta",
+  "hours": "175.25",
+  "rate": "285.5",
+  "bonus": null,
+  "nickname": "Mena"
+ },
+ {
+  "employee": "Altagracia Peralta",
+  "hours": "120",
+  "rate": "285.5",
+  "bonus": "2750.50",
+  "nickname": null
+ },
+ {
+  "employee": "Nairobi Severino",
+  "hours": "120",
+  "rate": "412.75",
+  "bonus": "2750.50",
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Wilson de la Cruz",
+  "hours": "120",
+  "rate": "412.75",
+  "bonus": null,
+  "nickname": null
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "175.25",
+  "rate": "285.5",
+  "bonus": null,
+  "nickname": null
+ },
+ {
+  "employee": "Altagracia Peralta",
+  "hours": "160",
+  "rate": "285.5",
+  "bonus": "2750.50",
+  "nickname": "Mena"
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "175.25",
+  "rate": "210",
+  "bonus": null,
+  "nickname": ""
+ },
+ {
+  "employee": "Bienvenido Holguín",
+  "hours": "152.5",
+  "rate": "210",
+  "bonus": "2750.50",
+  "nickname": "Mena"
+ },
+ {
+  "employee": "Fausto Jiménez",
+  "hours": "175.25",
+  "rate": "210",
+  "bonus": "1500",
+  "nickname": null
+ },
+ {
+  "employee": "Nairobi Severino",
+  "hours": "160",
+  "rate": "412.75",
+  "bonus": null,
+  "nickname": ""
+ },
+ {
+  "employee": "Bienvenido Holguín",
+  "hours": "175.25",
+  "rate": "210",
+  "bonus": "1500",
+  "nickname": "Mena"
+ },
+ {
+  "employee": "Altagracia Peralta",
+  "hours": "168",
+  "rate": "210",
+  "bonus": null,
+  "nickname": "Tito"
+ },
+ {
+  "employee": "Wilson de la Cruz",
+  "hours": "160",
+  "rate": "340",
+  "bonus": null,
+  "nickname": "Mena"
+ }
+]

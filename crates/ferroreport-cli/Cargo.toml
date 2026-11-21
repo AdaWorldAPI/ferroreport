@@ -1,0 +1,17 @@
+[package]
+name = "ferroreport-cli"
+description = "Command-line renderer for JasperReports JRXML templates"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ferroreport"
+path = "src/main.rs"
+
+[dependencies]
+ferroreport = { path = "../ferroreport" }
+serde_json = "1"

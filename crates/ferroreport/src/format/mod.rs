@@ -1,0 +1,21 @@
+//! Value formatting: Java `toString`, `DecimalFormat` and `SimpleDateFormat`.
+
+pub mod date;
+pub mod locale;
+pub mod number;
+
+pub use locale::Locale;
+pub use number::NumberPattern;
+
+use crate::value::Value;
+
+/// Formats a value for display in a text field, applying `pattern` when given.
+pub fn format_value(value: &Value, pattern: Option<&str>, locale: &Locale) -> String {
+    match (value, pattern) {
+        (Value::Date(dt), Some(p)) if !p.is_empty() => date::format_date(p, dt, locale).unwrap_or_else(|| value.to_java_string()),
+        (v, Some(p)) if !p.is_empty() && v.is_numeric() => {
+            NumberPattern::parse(p, locale).format(v, locale).unwrap_or_else(|| v.to_java_string())
+        }
+        (v, _) => v.to_java_string(),
+    }
+}

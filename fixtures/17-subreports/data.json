@@ -1,0 +1,561 @@
+[
+ {
+  "order": "ORD-2026000",
+  "customer": "Grupo Ramos",
+  "lines": [
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 26,
+    "price": 65.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 12,
+    "price": 1260.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 6,
+    "price": 1260.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 4,
+    "price": 1260.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 8,
+    "price": 395.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 27,
+    "price": 65.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 9,
+    "price": 65.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 21,
+    "price": 145.25
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026013",
+  "customer": "Ferretería Ochoa",
+  "lines": [
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 5,
+    "price": 395.0
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 5,
+    "price": 1850.0
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026026",
+  "customer": "Grupo Ramos",
+  "lines": [
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 29,
+    "price": 310.5
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 10,
+    "price": 310.5
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 3,
+    "price": 65.0
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026039",
+  "customer": "Ferretería Ochoa",
+  "lines": [
+   {
+    "product": "Bloque 6\"",
+    "qty": 22,
+    "price": 38.75
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 27,
+    "price": 65.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 1,
+    "price": 145.25
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 12,
+    "price": 65.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 29,
+    "price": 395.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 2,
+    "price": 145.25
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 12,
+    "price": 5400.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 28,
+    "price": 395.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 8,
+    "price": 65.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 18,
+    "price": 310.5
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 8,
+    "price": 1850.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 2,
+    "price": 145.25
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 3,
+    "price": 1260.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 7,
+    "price": 1260.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 9,
+    "price": 38.75
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 30,
+    "price": 1260.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 11,
+    "price": 145.25
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 11,
+    "price": 38.75
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 30,
+    "price": 310.5
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 11,
+    "price": 1260.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 2,
+    "price": 395.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 1,
+    "price": 145.25
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 24,
+    "price": 5400.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 16,
+    "price": 1260.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 24,
+    "price": 395.0
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026052",
+  "customer": "Grupo Ramos",
+  "lines": [
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 3,
+    "price": 1260.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 1,
+    "price": 5400.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 13,
+    "price": 38.75
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026065",
+  "customer": "Ferretería Ochoa",
+  "lines": [
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 6,
+    "price": 65.0
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 9,
+    "price": 1850.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 22,
+    "price": 38.75
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 30,
+    "price": 310.5
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 2,
+    "price": 1850.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 26,
+    "price": 1260.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 26,
+    "price": 145.25
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 2,
+    "price": 145.25
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 30,
+    "price": 38.75
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 3,
+    "price": 65.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 27,
+    "price": 1260.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 22,
+    "price": 1260.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 16,
+    "price": 65.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 18,
+    "price": 310.5
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 18,
+    "price": 310.5
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 8,
+    "price": 1850.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 19,
+    "price": 1260.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 26,
+    "price": 38.75
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 2,
+    "price": 1260.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 19,
+    "price": 5400.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 27,
+    "price": 65.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 8,
+    "price": 5400.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 17,
+    "price": 65.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 3,
+    "price": 5400.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 25,
+    "price": 5400.0
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026078",
+  "customer": "Constructora Bávaro",
+  "lines": [
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 11,
+    "price": 5400.0
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 12,
+    "price": 1850.0
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026091",
+  "customer": "Inversiones del Cibao",
+  "lines": [
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 2,
+    "price": 65.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 19,
+    "price": 145.25
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 30,
+    "price": 38.75
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 20,
+    "price": 1850.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 12,
+    "price": 145.25
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 25,
+    "price": 38.75
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 10,
+    "price": 1850.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 12,
+    "price": 65.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 19,
+    "price": 5400.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 17,
+    "price": 310.5
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 17,
+    "price": 310.5
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 7,
+    "price": 395.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 15,
+    "price": 38.75
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 15,
+    "price": 5400.0
+   },
+   {
+    "product": "Bloque 6\"",
+    "qty": 18,
+    "price": 38.75
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 15,
+    "price": 5400.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 10,
+    "price": 395.0
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 6,
+    "price": 1260.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 27,
+    "price": 395.0
+   },
+   {
+    "product": "Malla ciclónica rollo",
+    "qty": 11,
+    "price": 5400.0
+   },
+   {
+    "product": "Tubo PVC 1/2\"",
+    "qty": 7,
+    "price": 145.25
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 9,
+    "price": 395.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 17,
+    "price": 310.5
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 1,
+    "price": 395.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 16,
+    "price": 310.5
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026104",
+  "customer": "Constructora Bávaro",
+  "lines": [
+   {
+    "product": "Arena lavada m3",
+    "qty": 25,
+    "price": 1850.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 25,
+    "price": 310.5
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 15,
+    "price": 395.0
+   },
+   {
+    "product": "Arena lavada m3",
+    "qty": 28,
+    "price": 1850.0
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 28,
+    "price": 395.0
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 26,
+    "price": 65.0
+   },
+   {
+    "product": "Varilla 3/8 x 20'",
+    "qty": 14,
+    "price": 310.5
+   },
+   {
+    "product": "Cemento Portland 42.5kg",
+    "qty": 24,
+    "price": 395.0
+   }
+  ]
+ }
+]

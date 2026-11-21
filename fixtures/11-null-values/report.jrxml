@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="nulls" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+<style name="B" isDefault="true" fontName="DejaVu Sans"/>
+<field name="a" class="java.lang.String"/><field name="n" class="java.lang.Integer"/>
+<detail><band height="20">
+<textField><reportElement x="0" y="0" width="100" height="20"/><textFieldExpression><![CDATA["[" + $F{a} + "]"]]></textFieldExpression></textField>
+<textField><reportElement x="100" y="0" width="100" height="20"/><textFieldExpression><![CDATA[$F{a}]]></textFieldExpression></textField>
+<textField><reportElement x="200" y="0" width="100" height="20"/><textFieldExpression><![CDATA[$F{n}]]></textFieldExpression></textField>
+<textField pattern="#,##0.00"><reportElement x="300" y="0" width="100" height="20"/><textFieldExpression><![CDATA[$F{n}]]></textFieldExpression></textField>
+</band></detail></jasperReport>

@@ -1,0 +1,362 @@
+[
+ {
+  "id": 1,
+  "name": "María Reyes",
+  "department": "Engineering",
+  "salary": 56883.63
+ },
+ {
+  "id": 2,
+  "name": "Miguel Díaz",
+  "department": "Human Resources",
+  "salary": 106449.12
+ },
+ {
+  "id": 3,
+  "name": "Valeria Pérez",
+  "department": "Engineering",
+  "salary": 85982.08
+ },
+ {
+  "id": 4,
+  "name": "Isabel Encarnación",
+  "department": "Human Resources",
+  "salary": 100929.75
+ },
+ {
+  "id": 5,
+  "name": "Valeria García",
+  "department": "Legal",
+  "salary": 80673.4
+ },
+ {
+  "id": 6,
+  "name": "Diego Pérez",
+  "department": "Operations",
+  "salary": 143158.84
+ },
+ {
+  "id": 7,
+  "name": "Isabel Fernández",
+  "department": "Engineering",
+  "salary": 27790.26
+ },
+ {
+  "id": 8,
+  "name": "Elena Santos",
+  "department": "Engineering",
+  "salary": 142393.65
+ },
+ {
+  "id": 9,
+  "name": "Lucía Castillo",
+  "department": "Sales",
+  "salary": 146130.08
+ },
+ {
+  "id": 10,
+  "name": "Diego García",
+  "department": "Operations",
+  "salary": 52711.46
+ },
+ {
+  "id": 11,
+  "name": "Miguel Díaz",
+  "department": "Operations",
+  "salary": 54135.56
+ },
+ {
+  "id": 12,
+  "name": "José Castillo",
+  "department": "Sales",
+  "salary": 120118.47
+ },
+ {
+  "id": 13,
+  "name": "Carmen García",
+  "department": "Human Resources",
+  "salary": 129697.25
+ },
+ {
+  "id": 14,
+  "name": "Sofía Castillo",
+  "department": "Engineering",
+  "salary": 48238.28
+ },
+ {
+  "id": 15,
+  "name": "Diego Gómez",
+  "department": "Engineering",
+  "salary": 117893.33
+ },
+ {
+  "id": 16,
+  "name": "Isabel Núñez",
+  "department": "Legal",
+  "salary": 87599.96
+ },
+ {
+  "id": 17,
+  "name": "Lucía Santos",
+  "department": "Legal",
+  "salary": 48731.22
+ },
+ {
+  "id": 18,
+  "name": "Carmen Reyes",
+  "department": "Human Resources",
+  "salary": 130774.68
+ },
+ {
+  "id": 19,
+  "name": "Sofía Encarnación",
+  "department": "Operations",
+  "salary": 131660.99
+ },
+ {
+  "id": 20,
+  "name": "Miguel Pérez",
+  "department": "Legal",
+  "salary": 124675.53
+ },
+ {
+  "id": 21,
+  "name": "Lucía Castillo",
+  "department": "Sales",
+  "salary": 70890.48
+ },
+ {
+  "id": 22,
+  "name": "Isabel Núñez",
+  "department": "Legal",
+  "salary": 117276.93
+ },
+ {
+  "id": 23,
+  "name": "Luis Díaz",
+  "department": "Legal",
+  "salary": 88553.31
+ },
+ {
+  "id": 24,
+  "name": "Valeria Martínez",
+  "department": "Operations",
+  "salary": 129993.94
+ },
+ {
+  "id": 25,
+  "name": "Pedro Díaz",
+  "department": "Legal",
+  "salary": 28696.87
+ },
+ {
+  "id": 26,
+  "name": "Ana Gómez",
+  "department": "Legal",
+  "salary": 131037.7
+ },
+ {
+  "id": 27,
+  "name": "Juan Reyes",
+  "department": "Operations",
+  "salary": 74199.96
+ },
+ {
+  "id": 28,
+  "name": "María Martínez",
+  "department": "Operations",
+  "salary": 53367.17
+ },
+ {
+  "id": 29,
+  "name": "Ana Pérez",
+  "department": "Operations",
+  "salary": 140010.8
+ },
+ {
+  "id": 30,
+  "name": "Sofía Pérez",
+  "department": "Human Resources",
+  "salary": 89221.46
+ },
+ {
+  "id": 31,
+  "name": "Andrés Reyes",
+  "department": "Finance",
+  "salary": 82391.47
+ },
+ {
+  "id": 32,
+  "name": "Carmen Castillo",
+  "department": "Operations",
+  "salary": 101118.1
+ },
+ {
+  "id": 33,
+  "name": "Diego García",
+  "department": "Human Resources",
+  "salary": 122956.9
+ },
+ {
+  "id": 34,
+  "name": "Andrés Núñez",
+  "department": "Operations",
+  "salary": 126142.49
+ },
+ {
+  "id": 35,
+  "name": "Sofía Santos",
+  "department": "Sales",
+  "salary": 78261.33
+ },
+ {
+  "id": 36,
+  "name": "Ana Díaz",
+  "department": "Finance",
+  "salary": 96249.92
+ },
+ {
+  "id": 37,
+  "name": "José Santos",
+  "department": "Human Resources",
+  "salary": 85615.64
+ },
+ {
+  "id": 38,
+  "name": "Pedro Encarnación",
+  "department": "Finance",
+  "salary": 25198.09
+ },
+ {
+  "id": 39,
+  "name": "Sofía Reyes",
+  "department": "Operations",
+  "salary": 66392.18
+ },
+ {
+  "id": 40,
+  "name": "Juan García",
+  "department": "Sales",
+  "salary": 104421.39
+ },
+ {
+  "id": 41,
+  "name": "Sofía Reyes",
+  "department": "Sales",
+  "salary": 132626.11
+ },
+ {
+  "id": 42,
+  "name": "Valeria Santos",
+  "department": "Finance",
+  "salary": 29057.39
+ },
+ {
+  "id": 43,
+  "name": "Elena Rodríguez",
+  "department": "Engineering",
+  "salary": 133509.76
+ },
+ {
+  "id": 44,
+  "name": "Miguel García",
+  "department": "Finance",
+  "salary": 56194.9
+ },
+ {
+  "id": 45,
+  "name": "Luis Reyes",
+  "department": "Sales",
+  "salary": 68052.86
+ },
+ {
+  "id": 46,
+  "name": "Luis Martínez",
+  "department": "Sales",
+  "salary": 56902.01
+ },
+ {
+  "id": 47,
+  "name": "María Castillo",
+  "department": "Finance",
+  "salary": 106025.35
+ },
+ {
+  "id": 48,
+  "name": "Carmen Díaz",
+  "department": "Legal",
+  "salary": 65250.22
+ },
+ {
+  "id": 49,
+  "name": "Miguel Rodríguez",
+  "department": "Engineering",
+  "salary": 64000.62
+ },
+ {
+  "id": 50,
+  "name": "Pedro Encarnación",
+  "department": "Sales",
+  "salary": 57302.6
+ },
+ {
+  "id": 51,
+  "name": "Carmen Núñez",
+  "department": "Operations",
+  "salary": 147092.28
+ },
+ {
+  "id": 52,
+  "name": "Juan Encarnación",
+  "department": "Engineering",
+  "salary": 53171.75
+ },
+ {
+  "id": 53,
+  "name": "Lucía Martínez",
+  "department": "Engineering",
+  "salary": 114854.43
+ },
+ {
+  "id": 54,
+  "name": "María Díaz",
+  "department": "Legal",
+  "salary": 88288.66
+ },
+ {
+  "id": 55,
+  "name": "Lucía Santos",
+  "department": "Sales",
+  "salary": 147122.02
+ },
+ {
+  "id": 56,
+  "name": "Elena Núñez",
+  "department": "Operations",
+  "salary": 81355.63
+ },
+ {
+  "id": 57,
+  "name": "Sofía Castillo",
+  "department": "Engineering",
+  "salary": 74362.25
+ },
+ {
+  "id": 58,
+  "name": "Juan Fernández",
+  "department": "Legal",
+  "salary": 103868.48
+ },
+ {
+  "id": 59,
+  "name": "Ana Núñez",
+  "department": "Finance",
+  "salary": 40710.42
+ },
+ {
+  "id": 60,
+  "name": "José García",
+  "department": "Finance",
+  "salary": 33840.86
+ }
+]

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="groovy_payroll" language="groovy" pageWidth="842" pageHeight="595" orientation="Landscape" columnWidth="782" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+	<style name="Base" isDefault="true" fontName="DejaVu Serif" fontSize="9"/>
+	<field name="employee" class="java.lang.String"/>
+	<field name="hours" class="java.math.BigDecimal"/>
+	<field name="rate" class="java.math.BigDecimal"/>
+	<field name="bonus" class="java.math.BigDecimal"/>
+	<field name="nickname" class="java.lang.String"/>
+	<variable name="gross" class="java.math.BigDecimal">
+		<variableExpression><![CDATA[$F{hours} * $F{rate} + ($F{bonus} ?: 0)]]></variableExpression>
+	</variable>
+	<variable name="total" class="java.math.BigDecimal" calculation="Sum">
+		<variableExpression><![CDATA[$V{gross}]]></variableExpression>
+	</variable>
+	<title>
+		<band height="40">
+			<staticText>
+				<reportElement x="0" y="0" width="782" height="30"/>
+				<textElement textAlignment="Center"><font size="18" isBold="true" isItalic="true"/></textElement>
+				<text><![CDATA[Payroll - Groovy expressions]]></text>
+			</staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="16">
+			<textField><reportElement x="0" y="0" width="200" height="16"/><textFieldExpression><![CDATA[$F{employee} + " (" + ($F{nickname} ?: "-") + ")"]]></textFieldExpression></textField>
+			<textField pattern="#,##0.0"><reportElement x="200" y="0" width="80" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{hours}]]></textFieldExpression></textField>
+			<textField pattern="#,##0.00"><reportElement x="290" y="0" width="90" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{rate}]]></textFieldExpression></textField>
+			<textField pattern="#,##0.00"><reportElement x="390" y="0" width="110" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$V{gross}]]></textFieldExpression></textField>
+			<textField pattern="0.00"><reportElement x="510" y="0" width="110" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{hours} / 8]]></textFieldExpression></textField>
+			<textField><reportElement x="630" y="0" width="152" height="16"/><textFieldExpression><![CDATA[$F{hours} > 160 ? "overtime" : ($F{bonus} ? "bonus" : "")]]></textFieldExpression></textField>
+		</band>
+	</detail>
+	<summary>
+		<band height="30">
+			<textField pattern="#,##0.00"><reportElement x="300" y="8" width="200" height="18"/><textElement textAlignment="Right"><font size="11" isBold="true"/></textElement><textFieldExpression><![CDATA[$V{total}]]></textFieldExpression></textField>
+		</band>
+	</summary>
+</jasperReport>

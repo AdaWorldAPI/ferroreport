@@ -1,0 +1,1829 @@
+//! The filler: walks the data source, computes variables and groups, paginates bands and
+//! produces a [`PrintDocument`].
+//!
+//! Evaluation follows JasperReports' three modes:
+//! * group footers see the previous record and the variables before the current record;
+//! * page footers printed by a page break see variables without the record being moved to
+//!   the next page;
+//! * detail bands see variables that include the current record.
+
+use crate::data::Record;
+use crate::error::{Error, Result};
+use crate::expr::{eval, truthy, EvalEnv, Expr, Scope};
+use crate::fonts::FontSet;
+use crate::format::format_value;
+use crate::image::{ImageData, ImageStore};
+use crate::model::*;
+use crate::print::*;
+use crate::text::{break_lines, text_after_lines, text_before_line, vertical_metrics, Measure};
+use crate::value::{JavaType, Value};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
+// ---------------------------------------------------------------------------------------------
+// Variables
+
+#[derive(Debug, Clone)]
+struct VarDef {
+    name: String,
+    class: JavaType,
+    calculation: Calculation,
+    reset: ResetType,
+    expression: Option<Expr>,
+    initial: Option<Expr>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct VarState {
+    value: Value,
+    initialized: bool,
+    count: i64,
+    sum: Option<Value>,
+    distinct: HashSet<String>,
+    mean: f64,
+    m2: f64,
+}
+
+fn add_values(a: &Value, b: &Value, class: JavaType) -> Value {
+    match class {
+        JavaType::Integer | JavaType::Short | JavaType::Byte => {
+            Value::Int((a.as_i64().unwrap_or(0) as i32).wrapping_add(b.as_i64().unwrap_or(0) as i32))
+        }
+        JavaType::Long | JavaType::BigInteger => Value::Long(a.as_i64().unwrap_or(0).wrapping_add(b.as_i64().unwrap_or(0))),
+        JavaType::Float => Value::Float(a.as_f64().unwrap_or(0.0) as f32 + b.as_f64().unwrap_or(0.0) as f32),
+        JavaType::BigDecimal => Value::Decimal(a.as_decimal().unwrap_or_default() + b.as_decimal().unwrap_or_default()),
+        _ => Value::Double(a.as_f64().unwrap_or(0.0) + b.as_f64().unwrap_or(0.0)),
+    }
+}
+
+fn update_var(st: &mut VarState, def: &VarDef, ev: Value) {
+    let first = !st.initialized;
+    st.initialized = true;
+    let class = def.class;
+    match def.calculation {
+        Calculation::Nothing => st.value = class.coerce(ev),
+        // Set from outside (subreport return values); the variable keeps its value.
+        Calculation::System => {}
+        Calculation::First => {
+            if first {
+                st.value = class.coerce(ev);
+            }
+        }
+        Calculation::Count => {
+            if first {
+                st.count = 0;
+            }
+            if !ev.is_null() {
+                st.count += 1;
+            }
+            st.value = class.coerce(Value::Long(st.count));
+            if matches!(class, JavaType::Object | JavaType::Number) {
+                st.value = Value::Int(st.count as i32);
+            }
+        }
+        Calculation::DistinctCount => {
+            if !ev.is_null() {
+                st.distinct.insert(ev.to_java_string());
+            }
+            st.value = class.coerce(Value::Long(st.distinct.len() as i64));
+        }
+        Calculation::Sum => {
+            if !ev.is_null() {
+                st.sum = Some(match (&st.sum, first) {
+                    (Some(s), false) => add_values(s, &ev, class),
+                    _ => class.coerce(ev),
+                });
+            } else if first {
+                st.sum = None;
+            }
+            if let Some(s) = &st.sum {
+                st.value = s.clone();
+            } else if first {
+                st.value = Value::Null;
+            }
+        }
+        Calculation::Average => {
+            if first {
+                st.count = 0;
+                st.sum = None;
+            }
+            if !ev.is_null() {
+                st.count += 1;
+                st.sum = Some(match &st.sum {
+                    Some(s) => add_values(s, &ev, class),
+                    None => class.coerce(ev),
+                });
+            }
+            if let Some(s) = &st.sum {
+                st.value = match class {
+                    // Jasper divides with MathContext.DECIMAL64.
+                    JavaType::BigDecimal => crate::value::java_decimal_divide(
+                        s.as_decimal().unwrap_or_default(),
+                        rust_decimal::Decimal::from(st.count),
+                        16,
+                    )
+                    .map(Value::Decimal)
+                    .unwrap_or(Value::Null),
+                    _ => class.coerce(Value::Double(s.as_f64().unwrap_or(0.0) / st.count as f64)),
+                };
+            }
+        }
+        Calculation::Highest | Calculation::Lowest => {
+            if !ev.is_null() {
+                let want =
+                    if def.calculation == Calculation::Highest { std::cmp::Ordering::Greater } else { std::cmp::Ordering::Less };
+                if st.value.is_null() || first || ev.compare(&st.value) == Some(want) {
+                    st.value = class.coerce(ev);
+                }
+            }
+        }
+        Calculation::Variance | Calculation::StandardDeviation => {
+            if first {
+                st.count = 0;
+                st.mean = 0.0;
+                st.m2 = 0.0;
+            }
+            if let Some(x) = ev.as_f64() {
+                st.count += 1;
+                let delta = x - st.mean;
+                st.mean += delta / st.count as f64;
+                st.m2 += delta * (x - st.mean);
+            }
+            if st.count > 0 {
+                // Jasper uses the population variance (divides by n).
+                let var = st.m2 / st.count as f64;
+                let v = if def.calculation == Calculation::Variance { var } else { var.sqrt() };
+                st.value = class.coerce(Value::Double(v));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scope
+
+struct Ctx<'a> {
+    record: Option<&'a Record>,
+    report: &'a Report,
+    params: &'a HashMap<String, Value>,
+    vars: &'a [VarState],
+    var_index: &'a HashMap<String, usize>,
+    page_number: i32,
+}
+
+impl Scope for Ctx<'_> {
+    fn field(&self, name: &str) -> Result<Value> {
+        if self.report.field(name).is_none() {
+            return Err(Error::eval(format!("field `{name}` is not declared")));
+        }
+        Ok(self.record.and_then(|r| r.get(name).cloned()).unwrap_or(Value::Null))
+    }
+    fn param(&self, name: &str) -> Result<Value> {
+        // The JSON data source: its current row, for `subDataSource("path")`.
+        if name == "REPORT_DATA_SOURCE" {
+            if let Some(row) = self.record.and_then(|r| r.get(crate::data::ROW_KEY)) {
+                return Ok(row.clone());
+            }
+        }
+        self.params.get(name).cloned().ok_or_else(|| Error::eval(format!("parameter `{name}` is not declared")))
+    }
+    fn variable(&self, name: &str) -> Result<Value> {
+        match name {
+            "PAGE_NUMBER" => Ok(Value::Int(self.page_number)),
+            "COLUMN_NUMBER" => Ok(Value::Int(1)),
+            _ => self
+                .var_index
+                .get(name)
+                .map(|&i| self.vars[i].value.clone())
+                .ok_or_else(|| Error::eval(format!("variable `{name}` is not declared"))),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Band layout
+
+/// A text element whose value is computed later (evaluationTime other than Now).
+#[derive(Debug, Clone)]
+struct DeferredText {
+    element: TextElement,
+    forecolor: Color,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    time: EvaluationTime,
+    group: Option<String>,
+}
+
+#[derive(Debug)]
+struct Laid {
+    item: PrintItem,
+    deferred: Option<DeferredText>,
+}
+
+#[derive(Debug, Default)]
+struct BandLayout {
+    height: f32,
+    items: Vec<Laid>,
+    has_break: bool,
+    /// When the layout was cut at the available height: what still has to be printed, in the
+    /// container's coordinates (not yet moved up), with expressions already evaluated.
+    rest: Option<Vec<Element>>,
+    /// Values printed by elements with isPrintRepeatedValues="false" (committed on emit).
+    printed_values: Vec<(usize, String)>,
+    /// Subreport return values: (variable, calculation, value), applied on emit.
+    returns: Vec<Returned>,
+}
+
+/// A copy of `el` that will not be evaluated again: print conditions are dropped and a text
+/// field becomes the given (already formatted) text.
+fn freeze(el: &Element, text: Option<String>) -> Element {
+    let mut e = el.clone();
+    e.print_when = None;
+    e.print_repeated_values = true;
+    e.conditional = None;
+    if let (ElementKind::Text(te), Some(t)) = (&mut e.kind, text) {
+        te.content = TextContent::Static(t);
+    }
+    e
+}
+
+/// Moves elements up so the first one starts at the top; returns the offset removed.
+fn move_to_top(elements: &mut [Element]) -> f32 {
+    let first = elements.iter().map(|e| e.y).fold(f32::INFINITY, f32::min);
+    if !first.is_finite() {
+        return 0.0;
+    }
+    for e in elements.iter_mut() {
+        e.y -= first;
+    }
+    first
+}
+
+fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
+    match item {
+        PrintItem::Rect { x, y, .. } | PrintItem::Ellipse { x, y, .. } | PrintItem::Shapes { x, y, .. } => {
+            *x += dx;
+            *y += dy;
+        }
+        PrintItem::Image { x, y, clip, .. } => {
+            *x += dx;
+            *y += dy;
+            if let Some(c) = clip {
+                c[0] += dx;
+                c[1] += dy;
+            }
+        }
+        PrintItem::Line { x1, y1, x2, y2, .. } => {
+            *x1 += dx;
+            *x2 += dx;
+            *y1 += dy;
+            *y2 += dy;
+        }
+        PrintItem::Text(t) => {
+            for l in &mut t.lines {
+                l.x += dx;
+                l.baseline += dy;
+            }
+        }
+    }
+}
+
+struct LayoutEnv<'a> {
+    fonts: &'a mut FontSet,
+    images: &'a mut ImageStore,
+    /// Last value printed by each element with isPrintRepeatedValues="false".
+    repeated: &'a HashMap<usize, String>,
+    /// Nothing but page/column headers has been printed on this page yet.
+    first_on_page: bool,
+    /// Groups that changed with the current record.
+    changed_groups: &'a [String],
+    env: &'a EvalEnv<'a>,
+    scope: &'a dyn Scope,
+}
+
+/// Evaluates the display string of a text element.
+fn text_value(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result<String> {
+    match content {
+        TextContent::Static(s) => Ok(s.clone()),
+        TextContent::Expression { expr, pattern, pattern_expr, blank_when_null, .. } => {
+            let value = match expr {
+                Some(e) => eval(e, scope, env)?,
+                None => Value::Null,
+            };
+            if value.is_null() {
+                // Jasper prints the literal text "null" unless isBlankWhenNull is set.
+                return Ok(if *blank_when_null { String::new() } else { "null".to_string() });
+            }
+            let pattern = match pattern_expr {
+                Some(pe) => Some(eval(pe, scope, env)?.to_java_string()),
+                None => pattern.clone(),
+            };
+            Ok(format_value(&value, pattern.as_deref(), env.locale))
+        }
+    }
+}
+
+/// Lays out text inside a box, returning the text item and the height the text needs.
+#[allow(clippy::too_many_arguments)]
+fn text_item(
+    fonts: &mut FontSet,
+    te: &TextElement,
+    color: Color,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    text: &str,
+    clip: bool,
+) -> (PrintText, f32) {
+    let face_id = fonts.resolve(&te.style.font);
+    let face = fonts.face(face_id);
+    let size = te.style.font.size;
+    let p = te.boxed.padding;
+    let (cx, cy, cw, ch) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), h - p.top - p.bottom);
+    // Like JasperReports: the fill-time measurement decides the height and where the text is
+    // cut; the export-time measurement decides the drawn line breaks.
+    let vm = vertical_metrics(face, size, te.style.line_spacing);
+    let fill_lines = break_lines(text, face, size, cw, Measure::Fill);
+    let needed = p.top + p.bottom + vm.block_height(fill_lines.len());
+    let fit = if clip { vm.lines_that_fit(ch).min(fill_lines.len()) } else { fill_lines.len() };
+    let rendered_text = if fit < fill_lines.len() { text_before_line(text, &fill_lines, fit) } else { text.to_string() };
+    let mut lines = break_lines(&rendered_text, face, size, cw, Measure::Render);
+    if clip {
+        lines.truncate(vm.lines_that_fit(ch));
+    }
+    let block = vm.block_height(lines.len());
+    let advance = vm.advance(lines.len());
+    let voff = match te.style.valign {
+        VAlign::Top => 0.0,
+        VAlign::Middle => (ch - block) / 2.0,
+        VAlign::Bottom => ch - block,
+    };
+    // Justified lines spread the leftover width over their spaces. The last line of a
+    // paragraph keeps the spacing of the line before it (JasperReports 6 behaviour).
+    let face_ref = fonts.face(face_id);
+    let normalized = crate::text::normalize(&rendered_text);
+    let starts: Vec<usize> = lines.iter().map(|l| l.start).collect();
+    let print_lines_next_start = |_: &str, k: usize| starts.get(k + 1).copied();
+    let starts_paragraph = |n: &str, start: usize| start == 0 || n.as_bytes().get(start - 1) == Some(&b'\n');
+    let mut prev_spacing = 0.0f32;
+    let mut print_lines = Vec::with_capacity(lines.len());
+    for (k, l) in lines.into_iter().enumerate() {
+        let mut word_spacing = 0.0;
+        if te.style.halign == HAlign::Justified {
+            let ends_paragraph = match print_lines_next_start(&normalized, k) {
+                Some(next) => normalized.as_bytes().get(next.wrapping_sub(1)) == Some(&b'\n'),
+                None => true,
+            };
+            let spaces = l.text.matches(' ').count();
+            // iText lets 40% of a trailing , . ; or : hang into the margin.
+            let hanging = match l.text.chars().last() {
+                Some(c @ (',' | '.' | ';' | ':')) => 0.4 * face_ref.char_width(c, size),
+                _ => 0.0,
+            };
+            word_spacing = if !ends_paragraph && spaces > 0 {
+                (cw - (l.width - hanging)) / spaces as f32
+            } else if ends_paragraph && k > 0 && !starts_paragraph(&normalized, l.start) {
+                prev_spacing
+            } else {
+                0.0
+            };
+            prev_spacing = word_spacing;
+        }
+        let lx = match te.style.halign {
+            HAlign::Center => cx + (cw - l.width) / 2.0,
+            HAlign::Right => cx + cw - l.width,
+            _ => cx,
+        };
+        let spaces = l.text.matches(' ').count() as f32;
+        print_lines.push(PrintLine {
+            x: lx,
+            baseline: cy + voff + vm.ascent + advance * k as f32,
+            width: l.width + word_spacing * spaces,
+            word_spacing,
+            text: l.text,
+        });
+    }
+    let f = &te.style.font;
+    (PrintText { face: face_id, size, color, underline: f.underline, strike: f.strike, lines: print_lines }, needed)
+}
+
+fn box_items(boxed: &BoxStyle, x: f32, y: f32, w: f32, h: f32, out: &mut Vec<Laid>) {
+    let mut push = |pen: Pen, x1: f32, y1: f32, x2: f32, y2: f32| {
+        if pen.width > 0.0 {
+            out.push(Laid { item: PrintItem::Line { x1, y1, x2, y2, pen }, deferred: None });
+        }
+    };
+    // Like JasperReports, each side extends by half the width of its neighbours so corners
+    // are closed.
+    let (t, l, b, r) = (boxed.top.width / 2.0, boxed.left.width / 2.0, boxed.bottom.width / 2.0, boxed.right.width / 2.0);
+    push(boxed.top, x - l, y, x + w + r, y);
+    push(boxed.left, x, y - t, x, y + h + b);
+    push(boxed.bottom, x - l, y + h, x + w + r, y + h);
+    push(boxed.right, x + w, y - t, x + w, y + h + b);
+}
+
+/// Evaluates an image expression and loads the image it designates.
+fn load_image(le: &mut LayoutEnv, img: &ImageElement) -> Result<Option<Arc<ImageData>>> {
+    let value = match &img.expr {
+        Some(e) => eval(e, le.scope, le.env)?,
+        None => return Ok(None),
+    };
+    let loaded = match &value {
+        Value::Null => return Ok(None),
+        Value::Str(location) => le.images.load_location(location),
+        Value::Bytes(bytes) => le.images.load_bytes(bytes),
+        other => Err(Error::eval(format!("image expression returned {}", other.type_name()))),
+    };
+    match (loaded, img.on_error) {
+        (Ok(data), _) => Ok(Some(data)),
+        (Err(e), OnErrorType::Error) => Err(e),
+        (Err(_), _) => Ok(None),
+    }
+}
+
+/// Positions an image inside its box the way JasperReports' PDF exporter does: natural size
+/// is one point per pixel, alignment offsets are whole points.
+fn place_image(img: &ImageElement, data: Arc<ImageData>, x: f32, y: f32, w: f32, h: f32) -> PrintItem {
+    let p = img.boxed.padding;
+    let (bx, by) = (x + p.left, y + p.top);
+    let (bw, bh) = ((w - p.left - p.right).max(0.0), (h - p.top - p.bottom).max(0.0));
+    let (iw, ih) = (data.width as f32, data.height as f32);
+    let factor = |a: HAlign| match a {
+        HAlign::Center => 0.5,
+        HAlign::Right => 1.0,
+        _ => 0.0,
+    };
+    let vfactor = match img.valign {
+        VAlign::Middle => 0.5,
+        VAlign::Bottom => 1.0,
+        VAlign::Top => 0.0,
+    };
+    let hfactor = factor(img.halign);
+    match img.scale {
+        ScaleImage::FillFrame => PrintItem::Image { x: bx, y: by, w: bw, h: bh, clip: None, image: data },
+        ScaleImage::RetainShape => {
+            let ratio = (bw / iw).min(bh / ih);
+            let (dw, dh) = (iw * ratio, ih * ratio);
+            let ox = (hfactor * (bw - dw)).trunc();
+            let oy = (vfactor * (bh - dh)).trunc();
+            PrintItem::Image { x: bx + ox, y: by + oy, w: dw, h: dh, clip: None, image: data }
+        }
+        ScaleImage::Clip => {
+            let ox = (hfactor * (bw - iw)).trunc();
+            let oy = (vfactor * (bh - ih)).trunc();
+            PrintItem::Image { x: bx + ox, y: by + oy, w: iw, h: ih, clip: Some([bx, by, bw, bh]), image: data }
+        }
+    }
+}
+
+/// Per-element layout result before vertical positioning.
+struct Measured {
+    visible: bool,
+    new_h: f32,
+    /// Not printed or empty (for isRemoveLineWhenBlank).
+    blank: bool,
+    text: Option<String>,
+    children: Option<BandLayout>,
+    image: Option<Arc<ImageData>>,
+    /// Filled subreport content.
+    content: Option<Arc<Vec<Segment>>>,
+    /// Laid-out barcode symbol.
+    symbol: Option<crate::barcode::Symbol>,
+}
+
+/// Lays out `elements` in a container of design height `design_h`. With `avail`, content
+/// below that height is not printed but returned as [`BandLayout::rest`], the way
+/// JasperReports splits a stretching band or frame across pages.
+fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avail: Option<f32>) -> Result<BandLayout> {
+    // 0. Pick each element's conditional-style variant.
+    let mut resolved: Vec<std::borrow::Cow<Element>> = Vec::with_capacity(original.len());
+    for el in original {
+        resolved.push(match &el.conditional {
+            Some(c) => {
+                let mut mask = 0;
+                for (i, cond) in c.conditions.iter().enumerate() {
+                    if truthy(&eval(cond, le.scope, le.env)?, le.env)? {
+                        mask |= 1 << i;
+                    }
+                }
+                let v = &c.variants[mask];
+                let mut e = el.clone();
+                e.conditional = None;
+                e.mode = v.mode;
+                e.forecolor = v.forecolor;
+                e.backcolor = v.backcolor;
+                e.kind = v.kind.clone();
+                std::borrow::Cow::Owned(e)
+            }
+            None => std::borrow::Cow::Borrowed(el),
+        });
+    }
+    let elements: Vec<&Element> = resolved.iter().map(|c| c.as_ref()).collect();
+    let mut printed_values = Vec::new();
+    let mut returns = Vec::new();
+
+    // 1. Evaluate and measure every element at its own size.
+    let mut measured = Vec::with_capacity(elements.len());
+    for (idx, el) in elements.iter().enumerate() {
+        let visible = match &el.print_when {
+            Some(e) => truthy(&eval(e, le.scope, le.env)?, le.env)?,
+            None => true,
+        };
+        let mut m = Measured {
+            visible,
+            blank: !visible,
+            new_h: el.height,
+            text: None,
+            children: None,
+            image: None,
+            content: None,
+            symbol: None,
+        };
+        if visible {
+            match &el.kind {
+                ElementKind::Text(te) => {
+                    let deferred = matches!(&te.content, TextContent::Expression { evaluation_time, .. }
+                        if !matches!(evaluation_time, EvaluationTime::Now | EvaluationTime::Band));
+                    if !deferred {
+                        let text = text_value(&te.content, le.scope, le.env)?;
+                        if te.stretch {
+                            let (_, needed) = text_item(le.fonts, te, el.forecolor, 0.0, 0.0, el.width, el.height, &text, false);
+                            // JasperReports 6 keeps element geometry in whole points.
+                            m.new_h = el.height.max((needed - 1e-3).ceil());
+                        }
+                        m.blank = text.is_empty();
+                        m.text = Some(text);
+                    }
+                }
+                ElementKind::Image(img) => {
+                    m.image = load_image(le, img)?;
+                    m.blank = m.image.is_none();
+                }
+                ElementKind::Frame { children, .. } => {
+                    let inner = layout_elements(le, children, el.height, None)?;
+                    m.new_h = el.height.max(inner.height);
+                    printed_values.extend(inner.printed_values.iter().cloned());
+                    returns.extend(inner.returns.iter().cloned());
+                    m.children = Some(inner);
+                }
+                ElementKind::Subreport(sr) => {
+                    let (segments, values) = run_subreport(le, sr)?;
+                    returns.extend(values);
+                    m.new_h = el.height.max(segments.iter().map(|s| s.height).sum());
+                    m.blank = segments.is_empty();
+                    m.content = Some(Arc::new(segments));
+                }
+                ElementKind::Barcode(bc) => {
+                    m.symbol = barcode_symbol(bc, el, le)?;
+                    m.blank = m.symbol.is_none();
+                }
+                ElementKind::Content(segments) => {
+                    m.new_h = el.height.max(segments.iter().map(|s| s.height).sum());
+                    m.content = Some(segments.clone());
+                }
+                _ => {}
+            }
+            // isPrintRepeatedValues="false": skip when the value is the one printed last time.
+            if !el.print_repeated_values {
+                let key = &original[idx] as *const Element as usize;
+                let value = m.text.clone().unwrap_or_default();
+                let reprint = (el.print_in_first_whole_band && le.first_on_page)
+                    || el.print_when_group_changes.as_ref().is_some_and(|g| le.changed_groups.contains(g));
+                if !reprint && le.repeated.get(&key) == Some(&value) {
+                    m.visible = false;
+                    m.blank = true;
+                } else {
+                    printed_values.push((key, value));
+                }
+            }
+        }
+        measured.push(m);
+    }
+
+    // 1b. isRemoveLineWhenBlank: collapse the vertical range of blank elements when nothing
+    // else printed overlaps it, moving what is below up.
+    let mut ey: Vec<f32> = elements.iter().map(|e| e.y).collect();
+    let mut design_h = design_h;
+    let mut ranges: Vec<(f32, f32)> = Vec::new();
+    for (i, el) in elements.iter().enumerate() {
+        if !(el.remove_line_when_blank && measured[i].blank) {
+            continue;
+        }
+        let (top, bottom) = (el.y, el.y + el.height);
+        let occupied = elements
+            .iter()
+            .enumerate()
+            .any(|(j, other)| j != i && !measured[j].blank && other.y < bottom - 1e-3 && other.y + other.height > top + 1e-3);
+        if !occupied {
+            ranges.push((top, bottom));
+        }
+        measured[i].visible = false;
+    }
+    ranges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    let mut merged: Vec<(f32, f32)> = Vec::new();
+    for r in ranges {
+        match merged.last_mut() {
+            Some(last) if r.0 <= last.1 => last.1 = last.1.max(r.1),
+            _ => merged.push(r),
+        }
+    }
+    for (top, bottom) in &merged {
+        let gap = bottom - top;
+        for (i, el) in elements.iter().enumerate() {
+            if el.y >= *bottom - 1e-3 {
+                ey[i] -= gap;
+            }
+        }
+        design_h -= gap;
+    }
+
+    // 2. Float elements down by the growth of the elements above them.
+    let mut new_y: Vec<f32> = ey.clone();
+    let mut order: Vec<usize> = (0..elements.len()).collect();
+    order.sort_by(|&a, &b| ey[a].partial_cmp(&ey[b]).unwrap_or(std::cmp::Ordering::Equal));
+    for (pos, &i) in order.iter().enumerate() {
+        let el = &elements[i];
+        if el.position_type != PositionType::Float {
+            continue;
+        }
+        let mut shift: f32 = 0.0;
+        for &j in &order[..pos] {
+            let above = &elements[j];
+            let overlaps = above.x < el.x + el.width && el.x < above.x + above.width;
+            if ey[j] + above.height <= ey[i] + 1e-3 && overlaps && measured[j].visible {
+                let growth = new_y[j] + measured[j].new_h - (ey[j] + above.height);
+                shift = shift.max(growth);
+            }
+        }
+        new_y[i] = ey[i] + shift.max(0.0);
+    }
+
+    // 3. Container height: keep the gap below the lowest element.
+    let design_bottom =
+        (0..elements.len()).filter(|&i| measured[i].visible).map(|i| ey[i] + elements[i].height).fold(0.0f32, f32::max);
+    let new_bottom =
+        (0..elements.len()).filter(|&i| measured[i].visible).map(|i| new_y[i] + measured[i].new_h).fold(0.0f32, f32::max);
+    let height = design_h.max(new_bottom + (design_h - design_bottom).max(0.0));
+    let growth = height - design_h;
+
+    // 4. Emit primitives, cutting at `avail` when the content does not fit.
+    let limit = match avail {
+        Some(a) if height > a + 1e-3 => Some(a),
+        _ => None,
+    };
+    let mut out = BandLayout { height: limit.unwrap_or(height), printed_values, returns, ..Default::default() };
+    let mut rest: Vec<Element> = Vec::new();
+    let mut reprint: Vec<Element> = Vec::new();
+    for (i, el) in elements.iter().enumerate() {
+        let m = &mut measured[i];
+        if !m.visible {
+            continue;
+        }
+        let mut h = m.new_h;
+        let mut y = new_y[i];
+        match el.stretch_type {
+            StretchType::RelativeToBandHeight | StretchType::ContainerHeight | StretchType::RelativeToTallestObject => {
+                h = h.max(el.height + growth)
+            }
+            StretchType::ContainerBottom => h = height - y,
+            StretchType::NoStretch => {}
+        }
+        if el.position_type == PositionType::FixRelativeToBottom {
+            y += growth;
+        }
+        let (x, w) = (el.x, el.width);
+        let mut frame_split: Option<(BandLayout, BoxStyle)> = None;
+        if let Some(a) = limit {
+            if y >= a - 1e-3 {
+                // Entirely below the cut: continues on the next page.
+                rest.push(freeze(el, m.text.take()));
+                continue;
+            }
+            if y + h > a + 1e-3 {
+                match &el.kind {
+                    ElementKind::Text(te) if te.stretch && m.text.is_some() => {
+                        let text = m.text.take().unwrap_or_default();
+                        let face = le.fonts.resolve(&te.style.font);
+                        let f = le.fonts.face(face);
+                        let p = te.boxed.padding;
+                        let lines = break_lines(&text, f, te.style.font.size, (w - p.left - p.right).max(0.0), Measure::Fill);
+                        let vm = vertical_metrics(f, te.style.font.size, te.style.line_spacing);
+                        let k = vm.lines_that_fit(a - y - p.top - p.bottom);
+                        if k == 0 {
+                            rest.push(freeze(el, Some(text)));
+                            continue;
+                        }
+                        if k < lines.len() {
+                            rest.push(freeze(el, Some(text_after_lines(&text, &lines, k))));
+                        }
+                        m.text = Some(text);
+                        h = a - y;
+                    }
+                    ElementKind::Frame { children, boxed } => {
+                        let inner = layout_elements(le, children, el.height, Some(a - y))?;
+                        h = a - y;
+                        if let Some(mut pending) = inner.rest.clone() {
+                            // The continuation has no top border, the printed part no bottom one.
+                            // Jasper moves the pending children to the top and keeps the
+                            // frame's declared height.
+                            move_to_top(&mut pending);
+                            let mut cont: Element = (*el).clone();
+                            cont.print_when = None;
+                            let mut cont_box = *boxed;
+                            cont_box.top.width = 0.0;
+                            cont.kind = ElementKind::Frame { children: pending, boxed: cont_box };
+                            rest.push(cont);
+                        }
+                        let mut part_box = *boxed;
+                        part_box.bottom.width = 0.0;
+                        frame_split = Some((inner, part_box));
+                    }
+                    ElementKind::Subreport(_) | ElementKind::Content(_) => {
+                        // Subreport content breaks between its bands; the page and column
+                        // headers of the subreport are printed again where it continues.
+                        let segments = m.content.take().unwrap_or_default();
+                        let room = a - y;
+                        let mut used = 0.0;
+                        let mut k = 0;
+                        while k < segments.len() && used + segments[k].height <= room + 1e-3 {
+                            used += segments[k].height;
+                            k += 1;
+                        }
+                        let only_headers = segments[..k].iter().all(|s| s.header);
+                        if k == 0 || (only_headers && k < segments.len()) {
+                            let mut cont = freeze(el, None);
+                            cont.kind = ElementKind::Content(segments);
+                            rest.push(cont);
+                            continue;
+                        }
+                        if k < segments.len() {
+                            let mut tail: Vec<Segment> = segments.iter().filter(|s| s.header).cloned().collect();
+                            tail.extend(segments[k..].iter().cloned());
+                            let mut cont = freeze(el, None);
+                            cont.kind = ElementKind::Content(Arc::new(tail));
+                            rest.push(cont);
+                        }
+                        m.content = Some(Arc::new(segments[..k].to_vec()));
+                        h = a - y;
+                    }
+                    // Elements stretching with their container end at the cut.
+                    _ if el.stretch_type != StretchType::NoStretch => h = a - y,
+                    _ => {
+                        rest.push(freeze(el, m.text.take()));
+                        continue;
+                    }
+                }
+            }
+            if el.print_when_detail_overflows {
+                reprint.push(freeze(el, m.text.clone()));
+            }
+        }
+        match &el.kind {
+            ElementKind::Text(te) => {
+                if el.mode == Mode::Opaque {
+                    out.items.push(Laid {
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        deferred: None,
+                    });
+                }
+                match m.text.take() {
+                    Some(text) => {
+                        let (t, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
+                        out.items.push(Laid { item: PrintItem::Text(t), deferred: None });
+                    }
+                    None => {
+                        let (time, group) = match &te.content {
+                            TextContent::Expression { evaluation_time, evaluation_group, .. } => {
+                                (*evaluation_time, evaluation_group.clone())
+                            }
+                            _ => (EvaluationTime::Now, None),
+                        };
+                        let placeholder = PrintText {
+                            face: le.fonts.resolve(&te.style.font),
+                            size: te.style.font.size,
+                            color: el.forecolor,
+                            underline: false,
+                            strike: false,
+                            lines: Vec::new(),
+                        };
+                        out.items.push(Laid {
+                            item: PrintItem::Text(placeholder),
+                            deferred: Some(DeferredText {
+                                element: te.clone(),
+                                forecolor: el.forecolor,
+                                x,
+                                y,
+                                w,
+                                h,
+                                time,
+                                group,
+                            }),
+                        });
+                    }
+                }
+                box_items(&te.boxed, x, y, w, h, &mut out.items);
+            }
+            ElementKind::Line { direction, pen } => {
+                // Jasper draws 1pt-thin lines along the element's center edge.
+                let item = if w <= 1.0 && h > 1.0 {
+                    PrintItem::Line { x1: x + 0.5, y1: y, x2: x + 0.5, y2: y + h, pen: *pen }
+                } else if h <= 1.0 {
+                    PrintItem::Line { x1: x, y1: y + 0.5, x2: x + w, y2: y + 0.5, pen: *pen }
+                } else if *direction == LineDirection::TopDown {
+                    PrintItem::Line { x1: x, y1: y, x2: x + w, y2: y + h, pen: *pen }
+                } else {
+                    PrintItem::Line { x1: x, y1: y + h, x2: x + w, y2: y, pen: *pen }
+                };
+                if pen.width > 0.0 {
+                    out.items.push(Laid { item, deferred: None });
+                }
+            }
+            ElementKind::Rectangle { radius, pen } => out.items.push(Laid {
+                item: PrintItem::Rect {
+                    x,
+                    y,
+                    w,
+                    h,
+                    fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
+                    stroke: (pen.width > 0.0).then_some(*pen),
+                    radius: *radius,
+                },
+                deferred: None,
+            }),
+            ElementKind::Ellipse { pen } => out.items.push(Laid {
+                item: PrintItem::Ellipse {
+                    x,
+                    y,
+                    w,
+                    h,
+                    fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
+                    stroke: (pen.width > 0.0).then_some(*pen),
+                },
+                deferred: None,
+            }),
+            ElementKind::Frame { boxed, .. } => {
+                if el.mode == Mode::Opaque {
+                    out.items.push(Laid {
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        deferred: None,
+                    });
+                }
+                let (inner, frame_box) = match frame_split.take() {
+                    Some((inner, b)) => (Some(inner), b),
+                    None => (m.children.take(), *boxed),
+                };
+                if let Some(inner) = inner {
+                    out.has_break |= inner.has_break;
+                    for mut laid in inner.items {
+                        translate(&mut laid.item, x, y);
+                        if let Some(d) = &mut laid.deferred {
+                            d.x += x;
+                            d.y += y;
+                        }
+                        out.items.push(laid);
+                    }
+                }
+                box_items(&frame_box, x, y, w, h, &mut out.items);
+            }
+            ElementKind::Image(img) => {
+                if el.mode == Mode::Opaque {
+                    out.items.push(Laid {
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        deferred: None,
+                    });
+                }
+                if let Some(data) = m.image.take() {
+                    out.items.push(Laid { item: place_image(img, data, x, y, w, h), deferred: None });
+                }
+                box_items(&img.boxed, x, y, w, h, &mut out.items);
+            }
+            ElementKind::Subreport(_) | ElementKind::Content(_) => {
+                let mut top = y;
+                for seg in m.content.take().iter().flat_map(|c| c.iter()) {
+                    for item in &seg.items {
+                        let mut item = item.clone();
+                        translate(&mut item, x, top);
+                        out.items.push(Laid { item, deferred: None });
+                    }
+                    top += seg.height;
+                }
+            }
+            ElementKind::Barcode(bc) => {
+                if el.mode == Mode::Opaque {
+                    out.items.push(Laid {
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        deferred: None,
+                    });
+                }
+                if let Some(sym) = m.symbol.take() {
+                    place_symbol(le.fonts, bc, el, sym, x, y, &mut out.items);
+                }
+                box_items(&bc.boxed, x, y, w, h, &mut out.items);
+            }
+            ElementKind::Break => out.has_break = true,
+            ElementKind::Unsupported(_) => {}
+        }
+    }
+    if limit.is_some() {
+        if !rest.is_empty() {
+            rest.extend(reprint);
+        }
+        out.rest = Some(rest);
+    }
+    Ok(out)
+}
+
+/// Evaluates a barcode element's code and lays out its symbol (`None` for a null code).
+fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Result<Option<crate::barcode::Symbol>> {
+    let code = match &bc.expr {
+        Some(e) => eval(e, le.scope, le.env)?,
+        None => return Ok(None),
+    };
+    if code.is_null() {
+        return Ok(None);
+    }
+    let code = code.to_java_string();
+    let p = bc.boxed.padding;
+    let symbol = match &bc.symbology {
+        Symbology::Qr { level, margin, version } => {
+            // Jasper works on whole points here.
+            let w = el.width as i32 - (p.left + p.right) as i32;
+            let h = el.height as i32 - (p.top + p.bottom) as i32;
+            crate::barcode::qr_symbol(&code, *level, *margin, *version, w, h)
+        }
+        Symbology::Code128 { module_width, text_position, quiet_zone, vertical_quiet_zone } => crate::barcode::code128_symbol(
+            &code,
+            *module_width,
+            el.height as f64,
+            *text_position,
+            bc.font_size.map(|s| s as f64),
+            *quiet_zone,
+            *vertical_quiet_zone,
+        ),
+    };
+    symbol.map(Some).map_err(|e| Error::eval(format!("barcode `{code}`: {e}")))
+}
+
+/// Scales a symbol into its box like Jasper scales the SVG image (RetainShape, top-left).
+fn place_symbol(
+    fonts: &mut FontSet,
+    bc: &BarcodeElement,
+    el: &Element,
+    sym: crate::barcode::Symbol,
+    x: f32,
+    y: f32,
+    out: &mut Vec<Laid>,
+) {
+    let p = bc.boxed.padding;
+    let (bw, bh) = ((el.width - p.left - p.right).max(0.0) as f64, (el.height - p.top - p.bottom).max(0.0) as f64);
+    if sym.width <= 0.0 || sym.height <= 0.0 {
+        return;
+    }
+    let scale = (bw / sym.width).min(bh / sym.height);
+    let (ox, oy) = (x + p.left, y + p.top);
+    // QR codes take the element's color; barcode4j draws black.
+    let color = match bc.symbology {
+        Symbology::Qr { .. } => el.forecolor,
+        Symbology::Code128 { .. } => Color::BLACK,
+    };
+    // Human-readable text: JasperReports draws the SVG text as glyph outlines, centered on
+    // its anchor with fractional advances.
+    let mut path = Vec::new();
+    if let Some(t) = &sym.text {
+        let spec = FontSpec {
+            name: bc.font_name.clone().unwrap_or_else(|| "Helvetica".into()),
+            size: t.size as f32,
+            bold: false,
+            italic: false,
+            underline: false,
+            strike: false,
+        };
+        let id = fonts.resolve(&spec);
+        let face = fonts.face(id);
+        let upem = face.units_per_em as f64;
+        let width: f64 = t.text.chars().map(|c| face.advance(face.glyph(c)) as f64 * t.size / upem).sum();
+        let mut pen = t.x - width / 2.0;
+        for c in t.text.chars() {
+            face.glyph_outline(c, t.size, pen, t.y, &mut path);
+            pen += face.advance(face.glyph(c)) as f64 * t.size / upem;
+        }
+    }
+    out.push(Laid {
+        item: PrintItem::Shapes { x: ox, y: oy, scale, color, rects: Arc::new(sym.rects), path: Arc::new(path) },
+        deferred: None,
+    });
+}
+
+/// Subreports nested deeper than this are reported as an error (a template including itself).
+const MAX_SUBREPORT_DEPTH: usize = 8;
+
+/// A subreport return value to apply: (variable, calculation, value).
+type Returned = (String, Calculation, Value);
+
+/// Fills a subreport element: its content as segments, and its return values.
+fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segment>, Vec<Returned>)> {
+    let location = match &sr.expr {
+        Some(e) => eval(e, le.scope, le.env)?,
+        None => return Ok((Vec::new(), Vec::new())),
+    };
+    let location = match location {
+        Value::Str(s) => s,
+        Value::Null => return Ok((Vec::new(), Vec::new())),
+        other => return Err(Error::eval(format!("subreport expression returned {}", other.type_name()))),
+    };
+    if le.images.depth >= MAX_SUBREPORT_DEPTH {
+        return Err(Error::Unsupported(format!("subreport `{location}`: nested more than {MAX_SUBREPORT_DEPTH} levels")));
+    }
+    let report = le.images.load_report(&location)?;
+
+    let mut params = HashMap::new();
+    if let Some(e) = &sr.parameters_map {
+        if let Value::Json(map) = eval(e, le.scope, le.env)? {
+            if let Some(obj) = map.as_object() {
+                for (k, v) in obj {
+                    let class = report.parameters.iter().find(|p| &p.name == k).map(|p| p.class).unwrap_or(JavaType::Object);
+                    params.insert(k.clone(), crate::data::json_to_value(v, class)?);
+                }
+            }
+        }
+    }
+    for (name, e) in &sr.parameters {
+        params.insert(name.clone(), eval(e, le.scope, le.env)?);
+    }
+    params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
+
+    let rows = match &sr.data_source {
+        Some(e) => match eval(e, le.scope, le.env)? {
+            Value::Json(j) => j,
+            Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
+            other => return Err(Error::eval(format!("subreport data source is a {}, expected a list", other.type_name()))),
+        },
+        None => Arc::new(serde_json::Value::Array(Vec::new())),
+    };
+    let records = crate::data::records_from_json(&report, &rows)?;
+    let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
+
+    le.images.depth += 1;
+    let filled = fill_flow(&report, &records, params, le.fonts, le.images, &env);
+    le.images.depth -= 1;
+    let (segments, vars) = filled?;
+    let returns =
+        sr.returns.iter().map(|r| (r.to.clone(), r.calculation, vars.get(&r.from).cloned().unwrap_or(Value::Null))).collect();
+    Ok((segments, returns))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Filler
+
+/// Options that affect evaluation.
+pub struct FillOptions<'a> {
+    pub env: EvalEnv<'a>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Values {
+    /// Previous record, committed variables (group footers).
+    Old,
+    /// Current record, committed variables.
+    Committed,
+    /// Current record, variables including the current record.
+    Estimated,
+}
+
+struct Pending {
+    page: usize,
+    item: usize,
+    text: DeferredText,
+}
+
+struct Filler<'a> {
+    report: &'a Report,
+    records: &'a [Record],
+    params: HashMap<String, Value>,
+    fonts: &'a mut FontSet,
+    images: &'a mut ImageStore,
+    env: &'a EvalEnv<'a>,
+    defs: Vec<VarDef>,
+    var_index: HashMap<String, usize>,
+    committed: Vec<VarState>,
+    estimated: Option<Vec<VarState>>,
+    current: Option<usize>,
+    pages: Vec<PrintPage>,
+    page_number: i32,
+    offset_y: f32,
+    /// Something other than page/column headers was printed on the current page.
+    page_has_content: bool,
+    pending: Vec<Pending>,
+    group_values: Vec<Option<Value>>,
+    /// Whether the column/page footer of the current page has been printed already.
+    footers_done: bool,
+    /// Groups from this index on are starting: their headers must not be reprinted by a
+    /// page break they cause.
+    starting_group: Option<usize>,
+    /// Last value printed by each element with isPrintRepeatedValues="false".
+    repeated: HashMap<usize, String>,
+    /// Groups that changed with the current record (until its first detail band prints).
+    changed_groups: Vec<String>,
+    /// Subreport return values applied while printing the current record.
+    returned: Vec<(usize, Calculation, Value)>,
+    /// Subreport mode: one unbounded page, with the extent of every band recorded.
+    flow: Option<Vec<FlowMark>>,
+    /// The bands being printed are page or column headers.
+    flow_header: bool,
+}
+
+/// One band printed in subreport mode: its position and its range of page items.
+struct FlowMark {
+    y: f32,
+    height: f32,
+    items: std::ops::Range<usize>,
+    header: bool,
+}
+
+impl<'a> Filler<'a> {
+    fn ctx_vars(&self, mode: Values) -> &[VarState] {
+        match (mode, &self.estimated) {
+            (Values::Estimated, Some(e)) => e,
+            _ => &self.committed,
+        }
+    }
+
+    fn record_for(&self, mode: Values) -> Option<&'a Record> {
+        let idx = match mode {
+            Values::Old => self.current.and_then(|c| c.checked_sub(1)),
+            _ => self.current,
+        };
+        idx.and_then(|i| self.records.get(i)).or_else(|| if self.records.is_empty() { None } else { self.records.last() })
+    }
+
+    fn eval_with(&self, e: &Expr, vars: &[VarState], record: Option<&Record>) -> Result<Value> {
+        let ctx = Ctx {
+            record,
+            report: self.report,
+            params: &self.params,
+            vars,
+            var_index: &self.var_index,
+            page_number: self.page_number,
+        };
+        eval(e, &ctx, self.env)
+    }
+
+    fn reset_var(&self, vars: &mut [VarState], i: usize) -> Result<()> {
+        let initial = match &self.defs[i].initial {
+            Some(e) => {
+                let rec = self.current.and_then(|c| self.records.get(c));
+                self.defs[i].class.coerce(self.eval_with(e, vars, rec)?)
+            }
+            None => Value::Null,
+        };
+        vars[i] = VarState { value: initial, ..Default::default() };
+        Ok(())
+    }
+
+    fn reset_where(&mut self, pred: impl Fn(&ResetType) -> bool) -> Result<()> {
+        let mut vars = std::mem::take(&mut self.committed);
+        for i in 0..self.defs.len() {
+            if pred(&self.defs[i].reset) {
+                self.reset_var(&mut vars, i)?;
+            }
+        }
+        self.committed = vars;
+        Ok(())
+    }
+
+    /// Variables after adding the current record to `base`.
+    fn calculate(&self, base: &[VarState]) -> Result<Vec<VarState>> {
+        let mut vars = base.to_vec();
+        let rec = self.current.and_then(|c| self.records.get(c));
+        for i in 0..self.defs.len() {
+            let ev = match &self.defs[i].expression {
+                Some(e) => self.eval_with(e, &vars, rec)?,
+                None => Value::Null,
+            };
+            update_var(&mut vars[i], &self.defs[i], ev);
+        }
+        Ok(vars)
+    }
+
+    fn layout(&mut self, band: &Band, mode: Values) -> Result<Option<BandLayout>> {
+        let record = self.record_for(mode);
+        let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
+        let ctx = Ctx {
+            record,
+            report: self.report,
+            params: &self.params,
+            vars: &vars,
+            var_index: &self.var_index,
+            page_number: self.page_number,
+        };
+        if let Some(pw) = &band.print_when {
+            if !truthy(&eval(pw, &ctx, self.env)?, self.env)? {
+                return Ok(None);
+            }
+        }
+        let mut le = LayoutEnv {
+            fonts: self.fonts,
+            images: self.images,
+            repeated: &self.repeated,
+            first_on_page: !self.page_has_content,
+            changed_groups: &self.changed_groups,
+            env: self.env,
+            scope: &ctx,
+        };
+        layout_elements(&mut le, &band.elements, band.height, None).map(Some)
+    }
+
+    /// Lays out a list of elements (a band or the continuation of a split band).
+    fn layout_elems(&mut self, elements: &[Element], design_h: f32, mode: Values, avail: Option<f32>) -> Result<BandLayout> {
+        let record = self.record_for(mode);
+        let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
+        let ctx = Ctx {
+            record,
+            report: self.report,
+            params: &self.params,
+            vars: &vars,
+            var_index: &self.var_index,
+            page_number: self.page_number,
+        };
+        let mut le = LayoutEnv {
+            fonts: self.fonts,
+            images: self.images,
+            repeated: &self.repeated,
+            first_on_page: !self.page_has_content,
+            changed_groups: &self.changed_groups,
+            env: self.env,
+            scope: &ctx,
+        };
+        layout_elements(&mut le, elements, design_h, avail)
+    }
+
+    fn emit(&mut self, layout: BandLayout, y: f32) {
+        for (key, value) in &layout.printed_values {
+            self.repeated.insert(*key, value.clone());
+        }
+        for (name, calculation, value) in layout.returns.iter().cloned() {
+            let Some(&i) = self.var_index.get(&name) else { continue };
+            self.apply_return(i, calculation, value.clone());
+            if self.estimated.is_some() {
+                self.returned.push((i, calculation, value));
+            }
+        }
+        let dx = self.report.margins.left;
+        let page = self.pages.len() - 1;
+        let first_item = self.pages[page].items.len();
+        if let Some(marks) = &mut self.flow {
+            marks.push(FlowMark {
+                y,
+                height: layout.height,
+                items: first_item..first_item + layout.items.len(),
+                header: self.flow_header,
+            });
+        }
+        for mut laid in layout.items {
+            translate(&mut laid.item, dx, y);
+            let idx = self.pages[page].items.len();
+            if let Some(mut d) = laid.deferred {
+                d.x += dx;
+                d.y += y;
+                self.pending.push(Pending { page, item: idx, text: d });
+            }
+            self.pages[page].items.push(laid.item);
+        }
+    }
+
+    /// Sets a variable from a subreport return value. The variables seen by the record being
+    /// printed are updated; like JasperReports, other variables computed from it only see the
+    /// new value from the next record on.
+    fn apply_return(&mut self, i: usize, calculation: Calculation, value: Value) {
+        let mut def = self.defs[i].clone();
+        def.calculation = match calculation {
+            Calculation::System => Calculation::Nothing,
+            c => c,
+        };
+        let vars = match &mut self.estimated {
+            Some(est) => est,
+            None => &mut self.committed,
+        };
+        update_var(&mut vars[i], &def, value);
+    }
+
+    fn page_footer_band(&self, last: bool) -> Option<&'a Band> {
+        if last {
+            self.report.last_page_footer.as_ref().or(self.report.page_footer.as_ref())
+        } else {
+            self.report.page_footer.as_ref()
+        }
+    }
+
+    /// Lowest y a body band may reach on the current page.
+    fn body_limit(&self) -> f32 {
+        if self.flow.is_some() {
+            return f32::INFINITY;
+        }
+        let r = self.report;
+        let pf = r.page_footer.as_ref().map(|b| b.height).unwrap_or(0.0);
+        let cf = r.column_footer.as_ref().map(|b| b.height).unwrap_or(0.0);
+        r.page_height - r.margins.bottom - pf - cf
+    }
+
+    fn new_page(&mut self) -> Result<()> {
+        if self.flow.is_some() {
+            // Subreport mode has a single page that grows with the content.
+            if self.pages.is_empty() {
+                self.pages.push(PrintPage::default());
+                self.page_number = 1;
+                self.offset_y = self.report.margins.top;
+            }
+            return Ok(());
+        }
+        self.pages.push(PrintPage::default());
+        self.page_number += 1;
+        self.offset_y = self.report.margins.top;
+        self.page_has_content = false;
+        self.footers_done = false;
+        if self.page_number > 1 {
+            self.reset_where(|r| matches!(r, ResetType::Page | ResetType::Column))?;
+            if let Some(est) = &self.estimated {
+                // Re-estimate the record being moved to this page with page variables reset.
+                let _ = est;
+                self.estimated = Some(self.calculate(&self.committed.clone())?);
+                for (i, calculation, value) in self.returned.clone() {
+                    self.apply_return(i, calculation, value);
+                }
+            }
+        }
+        if let Some(bg) = &self.report.background {
+            if let Some(l) = self.layout(bg, Values::Committed)? {
+                let y = self.report.margins.top;
+                self.emit(l, y);
+            }
+        }
+        Ok(())
+    }
+
+    fn print_band_at_offset(&mut self, band: &Band, mode: Values) -> Result<bool> {
+        if let Some(l) = self.layout(band, mode)? {
+            let h = l.height;
+            let brk = l.has_break;
+            let y = self.offset_y;
+            self.emit(l, y);
+            self.offset_y += h;
+            return Ok(brk);
+        }
+        Ok(false)
+    }
+
+    fn page_headers(&mut self) -> Result<()> {
+        self.flow_header = true;
+        if let Some(b) = &self.report.page_header {
+            self.print_band_at_offset(b, Values::Committed)?;
+        }
+        if let Some(b) = &self.report.column_header {
+            self.print_band_at_offset(b, Values::Committed)?;
+        }
+        self.flow_header = false;
+        if self.page_number > 1 {
+            let limit = self.starting_group.unwrap_or(self.report.groups.len());
+            for gi in 0..limit {
+                if self.report.groups[gi].reprint_header_on_each_page && self.group_values[gi].is_some() {
+                    for b in &self.report.groups[gi].header {
+                        self.print_band_at_offset(b, Values::Committed)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn page_footers(&mut self, last: bool, mode: Values) -> Result<()> {
+        if self.footers_done {
+            return Ok(());
+        }
+        self.footers_done = true;
+        let r = self.report;
+        let footer = self.page_footer_band(last);
+        if self.flow.is_some() {
+            // Subreport mode: footers follow the content.
+            for band in [r.column_footer.as_ref(), footer].into_iter().flatten() {
+                self.print_band_at_offset(band, mode)?;
+            }
+            return self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), mode);
+        }
+        let pf_h = footer.map(|b| b.height).unwrap_or(0.0);
+        if let Some(cf) = &r.column_footer {
+            let y = if r.float_column_footer { self.offset_y } else { r.page_height - r.margins.bottom - pf_h - cf.height };
+            if let Some(l) = self.layout(cf, mode)? {
+                self.emit(l, y);
+            }
+        }
+        if let Some(pf) = footer {
+            if let Some(l) = self.layout(pf, mode)? {
+                let y = r.page_height - r.margins.bottom - pf_h;
+                self.emit(l, y);
+            }
+        }
+        self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), mode)?;
+        Ok(())
+    }
+
+    fn page_break(&mut self, mode: Values) -> Result<()> {
+        if self.flow.is_some() {
+            return Ok(());
+        }
+        self.page_footers(false, mode)?;
+        self.new_page()?;
+        self.page_headers()
+    }
+
+    /// Prints a body band. When it does not fit, it either moves to the next page or, like
+    /// JasperReports' default `splitType="Stretch"`, prints what fits and continues the rest
+    /// on the following pages.
+    fn print_body_band(&mut self, band: &Band, mode: Values) -> Result<()> {
+        let Some(first) = self.layout(band, mode)? else { return Ok(()) };
+        let footer_mode = if mode == Values::Estimated { Values::Committed } else { mode };
+        let mut elements: Vec<Element> = band.elements.clone();
+        let mut design_h = band.height;
+        let mut layout = Some(first);
+        loop {
+            let full = match layout.take() {
+                Some(l) => l,
+                None => self.layout_elems(&elements, design_h, mode, None)?,
+            };
+            let space = self.body_limit() - self.offset_y;
+            if full.height <= space + 1e-3 {
+                let (y, h, brk) = (self.offset_y, full.height, full.has_break);
+                self.emit(full, y);
+                self.offset_y += h;
+                self.page_has_content = true;
+                if brk {
+                    self.page_break(mode)?;
+                }
+                return Ok(());
+            }
+            let may_split = !self.page_has_content
+                || match band.split_type {
+                    SplitType::Prevent => false,
+                    SplitType::Stretch => design_h <= space + 1e-3,
+                    SplitType::Immediate => true,
+                };
+            if !may_split {
+                self.page_break(footer_mode)?;
+                continue;
+            }
+            let part = self.layout_elems(&elements, design_h, mode, Some(space))?;
+            let rest = part.rest.clone().unwrap_or_default();
+            if part.items.is_empty() && !self.page_has_content {
+                // Nothing fits even on an empty page: print it whole rather than loop forever.
+                let (y, h) = (self.offset_y, full.height);
+                self.emit(full, y);
+                self.offset_y += h;
+                self.page_has_content = true;
+                return Ok(());
+            }
+            let y = self.offset_y;
+            self.emit(part, y);
+            self.offset_y = self.body_limit();
+            self.page_has_content = true;
+            self.page_break(footer_mode)?;
+            if rest.is_empty() {
+                return Ok(());
+            }
+            elements = rest;
+            let moved = move_to_top(&mut elements);
+            design_h = (design_h - moved).max(0.0);
+        }
+    }
+
+    fn resolve_pending(&mut self, pred: impl Fn(&DeferredText) -> bool, mode: Values) -> Result<()> {
+        let (ready, rest): (Vec<Pending>, Vec<Pending>) =
+            std::mem::take(&mut self.pending).into_iter().partition(|p| pred(&p.text));
+        self.pending = rest;
+        let record = self.record_for(mode);
+        let vars = self.ctx_vars(mode).to_vec();
+        for p in ready {
+            let ctx = Ctx {
+                record,
+                report: self.report,
+                params: &self.params,
+                vars: &vars,
+                var_index: &self.var_index,
+                page_number: self.page_number,
+            };
+            let d = &p.text;
+            let text = text_value(&d.element.content, &ctx, self.env)?;
+            let (t, _) = text_item(self.fonts, &d.element, d.forecolor, d.x, d.y, d.w, d.h, &text, true);
+            self.pages[p.page].items[p.item] = PrintItem::Text(t);
+        }
+        Ok(())
+    }
+
+    fn group_footers(&mut self, from: usize, mode: Values) -> Result<()> {
+        let r = self.report;
+        for gi in (from..r.groups.len()).rev() {
+            for b in &r.groups[gi].footer {
+                self.print_body_band(b, mode)?;
+            }
+            let name = r.groups[gi].name.clone();
+            self.resolve_pending(|t| t.time == EvaluationTime::Group && t.group.as_deref() == Some(name.as_str()), mode)?;
+        }
+        Ok(())
+    }
+
+    fn group_headers(&mut self, from: usize) -> Result<()> {
+        let r = self.report;
+        for gi in from..r.groups.len() {
+            self.starting_group = Some(gi);
+            let g = &r.groups[gi];
+            let header_h: f32 = g.header.iter().map(|b| b.height).sum();
+            let remaining = self.body_limit() - self.offset_y;
+            if self.page_has_content
+                && (g.start_new_page
+                    || (g.min_height_to_start_new_page > 0.0 && remaining < g.min_height_to_start_new_page)
+                    || remaining < header_h.min(1.0))
+            {
+                self.page_break(Values::Committed)?;
+            }
+            for b in &g.header {
+                self.print_body_band(b, Values::Committed)?;
+            }
+        }
+        self.starting_group = None;
+        Ok(())
+    }
+
+    /// Index of the outermost group whose value changes with the current record.
+    fn group_rupture(&mut self) -> Result<Option<usize>> {
+        let rec = self.current.and_then(|c| self.records.get(c));
+        let mut first = None;
+        for gi in 0..self.report.groups.len() {
+            let v = match &self.report.groups[gi].expression {
+                Some(e) => self.eval_with(e, &self.committed, rec)?,
+                None => Value::Null,
+            };
+            let changed = match &self.group_values[gi] {
+                None => true,
+                Some(prev) => !prev.java_equals(&v),
+            };
+            if changed && first.is_none() {
+                first = Some(gi);
+            }
+            self.group_values[gi] = Some(v);
+        }
+        Ok(first)
+    }
+
+    fn run(&mut self) -> Result<()> {
+        let r = self.report;
+        let no_data = self.records.is_empty();
+        if no_data {
+            match r.when_no_data {
+                WhenNoData::NoPages => return Ok(()),
+                WhenNoData::BlankPage => {
+                    self.pages.push(PrintPage::default());
+                    return Ok(());
+                }
+                WhenNoData::NoDataSection => {
+                    self.new_page()?;
+                    if let Some(b) = &r.no_data {
+                        self.print_band_at_offset(b, Values::Committed)?;
+                    }
+                    return Ok(());
+                }
+                WhenNoData::AllSectionsNoDetail => {}
+            }
+        } else {
+            self.current = Some(0);
+        }
+
+        self.reset_where(|_| true)?;
+        self.new_page()?;
+        if let Some(t) = &r.title {
+            self.print_band_at_offset(t, Values::Committed)?;
+            if r.title_new_page {
+                self.footers_done = true;
+                self.new_page()?;
+            }
+        }
+        self.page_headers()?;
+
+        for idx in 0..self.records.len() {
+            self.current = Some(idx);
+            if let Some(gi) = self.group_rupture()? {
+                if idx > 0 {
+                    self.group_footers(gi, Values::Old)?;
+                }
+                let groups: Vec<String> = r.groups[gi..].iter().map(|g| g.name.clone()).collect();
+                self.changed_groups = groups.clone();
+                self.reset_where(|rt| matches!(rt, ResetType::Group(g) if groups.contains(g)))?;
+                self.group_headers(gi)?;
+            }
+            self.estimated = Some(self.calculate(&self.committed.clone())?);
+            self.returned.clear();
+            for band in &r.detail {
+                self.print_body_band(band, Values::Estimated)?;
+            }
+            self.changed_groups.clear();
+            if let Some(est) = self.estimated.take() {
+                self.committed = est;
+            }
+        }
+
+        // End of data: closing group footers see the last record.
+        if !no_data {
+            self.current = Some(self.records.len() - 1);
+            self.group_footers(0, Values::Committed)?;
+        }
+        self.finish()
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        let r = self.report;
+        match &r.summary {
+            None => self.page_footers(true, Values::Committed)?,
+            Some(summary) => {
+                let layout = self.layout(summary, Values::Committed)?;
+                let h = layout.as_ref().map(|l| l.height).unwrap_or(0.0);
+                if r.summary_new_page || self.offset_y + h > self.body_limit() + 1e-3 {
+                    self.page_footers(false, Values::Committed)?;
+                    self.new_page()?;
+                    if r.summary_with_page_header_and_footer {
+                        self.page_headers()?;
+                    } else {
+                        self.footers_done = true;
+                    }
+                    if let Some(l) = self.layout(summary, Values::Committed)? {
+                        let y = self.offset_y;
+                        let h = l.height;
+                        self.emit(l, y);
+                        self.offset_y += h;
+                    }
+                    if r.summary_with_page_header_and_footer {
+                        self.page_footers(true, Values::Committed)?;
+                    }
+                } else {
+                    if let Some(l) = layout {
+                        let y = self.offset_y;
+                        self.emit(l, y);
+                        self.offset_y += h;
+                    }
+                    self.page_footers(true, Values::Committed)?;
+                }
+            }
+        }
+        self.resolve_pending(|_| true, Values::Committed)
+    }
+}
+
+/// Fills `report` with `records` and `params` into a print document.
+pub fn fill(
+    report: &Report,
+    records: &[Record],
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+) -> Result<PrintDocument> {
+    let mut filler = new_filler(report, records, params, fonts, images, env)?;
+    filler.run()?;
+    Ok(PrintDocument {
+        name: report.name.clone(),
+        page_width: report.page_width,
+        page_height: report.page_height,
+        pages: filler.pages,
+    })
+}
+
+/// Fills a subreport without pagination: its bands as segments, and its final variables.
+fn fill_flow(
+    report: &Report,
+    records: &[Record],
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
+    let mut filler = new_filler(report, records, params, fonts, images, env)?;
+    filler.flow = Some(Vec::new());
+    filler.run()?;
+    let vars = filler.var_index.iter().map(|(name, &i)| (name.clone(), filler.committed[i].value.clone())).collect();
+    let marks = filler.flow.take().unwrap_or_default();
+    let mut items: Vec<Option<PrintItem>> = match filler.pages.first_mut() {
+        Some(p) => std::mem::take(&mut p.items).into_iter().map(Some).collect(),
+        None => Vec::new(),
+    };
+    let mut segments = Vec::with_capacity(marks.len() + 2);
+    if let Some(first) = marks.first() {
+        if first.y > 0.0 {
+            segments.push(Segment { height: first.y, items: Vec::new(), header: false });
+        }
+    }
+    for mark in &marks {
+        let mut seg = Vec::with_capacity(mark.items.len());
+        for slot in &mut items[mark.items.clone()] {
+            if let Some(mut item) = slot.take() {
+                translate(&mut item, 0.0, -mark.y);
+                seg.push(item);
+            }
+        }
+        segments.push(Segment { height: mark.height, items: seg, header: mark.header });
+    }
+    if !marks.is_empty() && report.margins.bottom > 0.0 {
+        segments.push(Segment { height: report.margins.bottom, items: Vec::new(), header: false });
+    }
+    Ok((segments, vars))
+}
+
+fn new_filler<'a>(
+    report: &'a Report,
+    records: &'a [Record],
+    mut params: HashMap<String, Value>,
+    fonts: &'a mut FontSet,
+    images: &'a mut ImageStore,
+    env: &'a EvalEnv<'a>,
+) -> Result<Filler<'a>> {
+    // Built-in variables, in the order Jasper declares them.
+    let count_var = |name: String, reset: ResetType| VarDef {
+        name,
+        class: JavaType::Integer,
+        calculation: Calculation::Count,
+        reset,
+        expression: Some(Expr::Lit(Value::Int(1))),
+        initial: Some(Expr::Lit(Value::Int(0))),
+    };
+    let mut defs = vec![
+        count_var("REPORT_COUNT".into(), ResetType::Report),
+        count_var("PAGE_COUNT".into(), ResetType::Page),
+        count_var("COLUMN_COUNT".into(), ResetType::Column),
+    ];
+    for g in &report.groups {
+        defs.push(count_var(format!("{}_COUNT", g.name), ResetType::Group(g.name.clone())));
+    }
+    for v in &report.variables {
+        defs.push(VarDef {
+            name: v.name.clone(),
+            class: v.class,
+            calculation: v.calculation,
+            reset: v.reset.clone(),
+            expression: v.expression.clone(),
+            initial: v.initial.clone(),
+        });
+    }
+    let var_index = defs.iter().enumerate().map(|(i, d)| (d.name.clone(), i)).collect();
+
+    // Parameters: supplied values, then defaults (which may reference earlier parameters).
+    let builtin_params =
+        ["REPORT_PARAMETERS_MAP", "REPORT_CONNECTION", "REPORT_DATA_SOURCE", "REPORT_SCRIPTLET", "REPORT_MAX_COUNT"];
+    for name in builtin_params {
+        params.entry(name.to_string()).or_insert(Value::Null);
+    }
+    params.entry("REPORT_LOCALE".into()).or_insert_with(|| Value::str(env.locale.tag));
+    params.entry("REPORT_TIME_ZONE".into()).or_insert_with(|| Value::str("UTC"));
+    params.entry("IS_IGNORE_PAGINATION".into()).or_insert(Value::Bool(false));
+    for p in &report.parameters {
+        if params.contains_key(&p.name) {
+            let v = params.remove(&p.name).unwrap_or_default();
+            params.insert(p.name.clone(), p.class.coerce(v));
+            continue;
+        }
+        let v = match &p.default {
+            Some(e) => {
+                let empty = HashMap::new();
+                let ctx = Ctx { record: None, report, params: &params, vars: &[], var_index: &empty, page_number: 1 };
+                eval(e, &ctx, env)?
+            }
+            None => Value::Null,
+        };
+        params.insert(p.name.clone(), v);
+    }
+
+    let committed = vec![VarState::default(); defs.len()];
+    Ok(Filler {
+        report,
+        records,
+        params,
+        fonts,
+        images,
+        env,
+        group_values: vec![None; report.groups.len()],
+        defs,
+        var_index,
+        committed,
+        estimated: None,
+        current: None,
+        pages: Vec::new(),
+        page_number: 0,
+        offset_y: 0.0,
+        page_has_content: false,
+        pending: Vec::new(),
+        footers_done: false,
+        starting_group: None,
+        repeated: HashMap::new(),
+        changed_groups: Vec::new(),
+        returned: Vec::new(),
+        flow: None,
+        flow_header: false,
+    })
+}

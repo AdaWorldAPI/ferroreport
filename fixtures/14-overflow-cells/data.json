@@ -1,0 +1,72 @@
+[
+ {
+  "code": "C-000",
+  "note": "garantia cuota tasa mensual interes pago pago cliente tasa cuenta",
+  "amount": 8262.42
+ },
+ {
+  "code": "C-001",
+  "note": "mora banco cuenta",
+  "amount": 3248.6
+ },
+ {
+  "code": "C-002",
+  "note": "cuota contrato vencido cliente contrato contrato vencido saldo garantia garantia",
+  "amount": 5646.51
+ },
+ {
+  "code": "C-003",
+  "note": "pago aval tasa banco mora saldo mora mensual contrato pago cuenta garantia cliente garantia garantia banco vencido plazo plazo garantia plazo anual saldo mora garantia contrato factura pago factura anual contrato banco cuenta mensual aval interes vencido pago plazo vencido anual contrato saldo fiador plazo aval cuenta vencido aval cuota factura mora contrato mora cuota aval saldo garantia anual cliente",
+  "amount": 394.87
+ },
+ {
+  "code": "C-004",
+  "note": "garantia aval cliente",
+  "amount": 2912.06
+ },
+ {
+  "code": "C-005",
+  "note": "interes plazo pago garantia vencido anual garantia interes contrato tasa saldo aval cliente fiador factura anual saldo fiador fiador garantia cuota anual vencido plazo vencido cuota factura factura factura saldo interes factura cuenta mensual mora aval factura cuota banco garantia plazo vencido mensual vencido mora anual plazo mensual factura mora plazo anual mora plazo vencido mensual vencido factura factura contrato",
+  "amount": 2287.95
+ },
+ {
+  "code": "C-006",
+  "note": "mora plazo contrato interes aval factura aval cuota tasa factura",
+  "amount": 4453.65
+ },
+ {
+  "code": "C-007",
+  "note": "plazo vencido saldo",
+  "amount": 3035.94
+ },
+ {
+  "code": "C-008",
+  "note": "aval plazo banco vencido contrato aval tasa mensual pago contrato vencido factura tasa interes contrato factura saldo anual mensual tasa tasa vencido cliente vencido saldo cliente contrato cuota tasa tasa mora cuenta factura vencido saldo aval cuenta mensual banco anual cliente pago factura cuota mensual cuenta contrato interes factura fiador pago banco cliente garantia fiador pago pago cuenta anual tasa vencido garantia tasa mora mensual tasa cuota pago cuota fiador banco plazo plazo anual pago vencido garantia mensual plazo cuota cuenta saldo fiador saldo saldo interes aval mensual aval contrato cuenta cliente saldo cliente garantia cuota cuenta cuota mensual mensual banco pago banco mora plazo garantia fiador mora saldo cliente factura aval cuenta anual garantia banco anual anual tasa interes contrato fiador aval interes plazo pago interes saldo garantia fiador vencido fiador pago pago tasa saldo aval fiador aval saldo garantia cliente cliente banco pago fiador cuota saldo saldo mensual pago cuota saldo mensual mora garantia tasa mora mensual mora garantia fiador mora aval cuenta banco anual tasa banco tasa aval garantia anual plazo cliente contrato saldo cuenta anual cuenta",
+  "amount": 5536.69
+ },
+ {
+  "code": "C-009",
+  "note": "tasa tasa cliente interes banco pago anual fiador garantia pago contrato mensual mora mensual pago interes mora pago garantia interes factura saldo tasa cuenta cuenta contrato cliente banco mora saldo cuota vencido factura aval pago cuota contrato factura garantia saldo interes plazo interes pago cuenta fiador cliente cuenta interes banco plazo interes vencido garantia mensual banco pago tasa saldo saldo",
+  "amount": 7874.3
+ },
+ {
+  "code": "C-010",
+  "note": "banco tasa cuenta garantia tasa aval saldo tasa factura plazo cliente contrato cliente garantia interes pago saldo cuota cliente mora mora cuenta cliente mensual cuenta saldo anual tasa aval saldo banco vencido cuota mensual fiador garantia plazo factura vencido contrato garantia mensual aval pago mora aval cuota factura aval banco mensual fiador pago saldo factura mensual banco cuenta mora factura",
+  "amount": 1815.63
+ },
+ {
+  "code": "C-011",
+  "note": "aval interes garantia",
+  "amount": 1059.86
+ },
+ {
+  "code": "C-012",
+  "note": "pago mora contrato",
+  "amount": 5604.07
+ },
+ {
+  "code": "C-013",
+  "note": "factura cliente mensual",
+  "amount": 6282.15
+ }
+]

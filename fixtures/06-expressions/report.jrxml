@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="expressions" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans Mono" fontSize="8"/>
+	<parameter name="THRESHOLD" class="java.lang.Integer"><defaultValueExpression><![CDATA[50]]></defaultValueExpression></parameter>
+	<parameter name="PREFIX" class="java.lang.String"><defaultValueExpression><![CDATA["#" + $P{THRESHOLD}]]></defaultValueExpression></parameter>
+	<field name="n" class="java.lang.Integer"/>
+	<field name="x" class="java.lang.Double"/>
+	<field name="label" class="java.lang.String"/>
+	<field name="when" class="java.sql.Timestamp"/>
+	<field name="flag" class="java.lang.Boolean"/>
+	<field name="big" class="java.math.BigDecimal"/>
+	<field name="maybe" class="java.lang.String"/>
+	<variable name="running" class="java.lang.Integer" calculation="Sum"><variableExpression><![CDATA[$F{n}]]></variableExpression></variable>
+	<variable name="first_label" class="java.lang.String" calculation="First"><variableExpression><![CDATA[$F{label}]]></variableExpression></variable>
+	<variable name="min_x" class="java.lang.Double" calculation="Lowest"><variableExpression><![CDATA[$F{x}]]></variableExpression></variable>
+	<variable name="avg_big" class="java.math.BigDecimal" calculation="Average"><variableExpression><![CDATA[$F{big}]]></variableExpression></variable>
+	<variable name="stddev" class="java.lang.Double" calculation="StandardDeviation"><variableExpression><![CDATA[$F{x}]]></variableExpression></variable>
+	<columnHeader>
+		<band height="14">
+			<textField><reportElement x="0" y="0" width="555" height="14"/><textFieldExpression><![CDATA["prefix=" + $P{PREFIX} + " threshold=" + $P{THRESHOLD} + " int-div=" + (7 / 2) + " mod=" + (-7 % 3) + " dbl=" + (1.0 / 3) + " sci=" + (1234567.0 * 100)]]></textFieldExpression></textField>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="12">
+			<textField><reportElement x="0" y="0" width="30" height="12"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$V{REPORT_COUNT}]]></textFieldExpression></textField>
+			<textField><reportElement x="34" y="0" width="120" height="12"/><textFieldExpression><![CDATA[$F{label}.length() > 12 ? $F{label}.substring(0, 12) + "~" : $F{label}.toLowerCase()]]></textFieldExpression></textField>
+			<textField><reportElement x="158" y="0" width="60" height="12"/><textFieldExpression><![CDATA[$F{n} > $P{THRESHOLD} ? "big" : ($F{n} == 0 ? "zero" : "small")]]></textFieldExpression></textField>
+			<textField><reportElement x="222" y="0" width="70" height="12"/><textFieldExpression><![CDATA[String.valueOf($F{x})]]></textFieldExpression></textField>
+			<textField pattern="EEE dd-MMM-yy HH:mm"><reportElement x="296" y="0" width="100" height="12"/><textFieldExpression><![CDATA[$F{when}]]></textFieldExpression></textField>
+			<textField><reportElement x="400" y="0" width="40" height="12"/><textFieldExpression><![CDATA[$F{flag}.booleanValue() ? "yes" : "no"]]></textFieldExpression></textField>
+			<textField isBlankWhenNull="true"><reportElement x="444" y="0" width="40" height="12"/><textFieldExpression><![CDATA[$F{maybe}]]></textFieldExpression></textField>
+			<textField><reportElement x="488" y="0" width="67" height="12"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{big}.setScale(1, java.math.RoundingMode.HALF_EVEN)]]></textFieldExpression></textField>
+		</band>
+	</detail>
+	<summary>
+		<band height="60">
+			<textField><reportElement x="0" y="4" width="555" height="12"/><textFieldExpression><![CDATA["running=" + $V{running} + " first=" + $V{first_label} + " min=" + $V{min_x}]]></textFieldExpression></textField>
+			<textField pattern="0.0000"><reportElement x="0" y="16" width="200" height="12"/><textFieldExpression><![CDATA[$V{stddev}]]></textFieldExpression></textField>
+			<textField><reportElement x="200" y="16" width="355" height="12"/><textFieldExpression><![CDATA["avg=" + $V{avg_big} + " max(3,9)=" + Math.max(3, 9) + " round=" + Math.round(2.5) + " abs=" + Math.abs(-4.25)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="28" width="555" height="12"/><textFieldExpression><![CDATA[String.format("%s has %d rows; pi~%.3f", "this report", $V{REPORT_COUNT}, Math.PI) + " | " + new java.text.DecimalFormat("000.##").format(3.14159)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="40" width="555" height="12"/><textFieldExpression><![CDATA["trim=[" + "  padded  ".trim() + "] idx=" + "abcdef".indexOf("cd") + " rep=" + "a-b-c".replace("-", "+") + " starts=" + "Santo Domingo".startsWith("Santo") + " neg=" + (-$V{running})]]></textFieldExpression></textField>
+		</band>
+	</summary>
+</jasperReport>

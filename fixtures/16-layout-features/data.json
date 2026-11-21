@@ -1,0 +1,290 @@
+[
+ {
+  "cat": "Alimentos",
+  "item": "ALI-00 artículo",
+  "addr2": "Local 12",
+  "amount": 941.44
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-01 artículo",
+  "addr2": "Local 12",
+  "amount": 179.93
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-02 artículo",
+  "addr2": null,
+  "amount": 728.55
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-03 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 213.58
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-04 artículo",
+  "addr2": "",
+  "amount": -469.61
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-05 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 1944.73
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-06 artículo",
+  "addr2": "",
+  "amount": 2355.04
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-07 artículo",
+  "addr2": "Apto. 4B",
+  "amount": -433.45
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-08 artículo",
+  "addr2": "",
+  "amount": 2368.62
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-09 artículo",
+  "addr2": "Apto. 4B",
+  "amount": -438.88
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-10 artículo",
+  "addr2": "",
+  "amount": 1922.91
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-11 artículo",
+  "addr2": null,
+  "amount": 894.19
+ },
+ {
+  "cat": "Alimentos",
+  "item": "ALI-12 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 2456.29
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-00 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 274.71
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-01 artículo",
+  "addr2": null,
+  "amount": 543.34
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-02 artículo",
+  "addr2": "Local 12",
+  "amount": 1050.23
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-03 artículo",
+  "addr2": "",
+  "amount": 2345.15
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-04 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 1236.27
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-05 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 2421.65
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-06 artículo",
+  "addr2": null,
+  "amount": 1070.12
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-07 artículo",
+  "addr2": "",
+  "amount": 969.66
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-08 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 412.71
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-09 artículo",
+  "addr2": "Local 12",
+  "amount": 860.79
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-10 artículo",
+  "addr2": "",
+  "amount": 1597.86
+ },
+ {
+  "cat": "Bebidas",
+  "item": "BEB-11 artículo",
+  "addr2": null,
+  "amount": 835.4
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-00 artículo",
+  "addr2": null,
+  "amount": 2256.3
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-01 artículo",
+  "addr2": "Local 12",
+  "amount": 1597.0
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-02 artículo",
+  "addr2": null,
+  "amount": 862.8
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-03 artículo",
+  "addr2": null,
+  "amount": 997.7
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-04 artículo",
+  "addr2": null,
+  "amount": 2404.25
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-05 artículo",
+  "addr2": "",
+  "amount": 2258.58
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-06 artículo",
+  "addr2": "Apto. 4B",
+  "amount": -400.92
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-07 artículo",
+  "addr2": null,
+  "amount": 1478.1
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-08 artículo",
+  "addr2": "Local 12",
+  "amount": 1311.44
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-09 artículo",
+  "addr2": "Local 12",
+  "amount": 1033.37
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-10 artículo",
+  "addr2": null,
+  "amount": 183.43
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-11 artículo",
+  "addr2": null,
+  "amount": 1622.73
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-12 artículo",
+  "addr2": null,
+  "amount": 229.4
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-13 artículo",
+  "addr2": "Local 12",
+  "amount": 1376.74
+ },
+ {
+  "cat": "Limpieza",
+  "item": "LIM-14 artículo",
+  "addr2": null,
+  "amount": 1713.66
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-00 artículo",
+  "addr2": "Local 12",
+  "amount": -40.46
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-01 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 218.94
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-02 artículo",
+  "addr2": null,
+  "amount": 216.76
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-03 artículo",
+  "addr2": "",
+  "amount": 2256.95
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-04 artículo",
+  "addr2": null,
+  "amount": 1422.71
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-05 artículo",
+  "addr2": "Apto. 4B",
+  "amount": 665.0
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-06 artículo",
+  "addr2": null,
+  "amount": 714.96
+ },
+ {
+  "cat": "Ferretería",
+  "item": "FER-07 artículo",
+  "addr2": "Local 12",
+  "amount": 882.26
+ }
+]

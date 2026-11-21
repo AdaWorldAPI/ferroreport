@@ -1,0 +1,1115 @@
+[
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Rosa Almonte",
+  "date": "2026-10-31",
+  "amount": 35460.76
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Ramón Féliz",
+  "date": "2026-11-06",
+  "amount": 59630.57
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Ana Peña",
+  "date": "2026-02-03",
+  "amount": 86383.34
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Mía Rosario",
+  "date": "2026-08-29",
+  "amount": 52549.15
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Ramón Féliz",
+  "date": "2026-04-09",
+  "amount": 51622.03
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Ramón Féliz",
+  "date": "2026-10-09",
+  "amount": 38029.22
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Julio Tavárez",
+  "date": "2026-03-19",
+  "amount": 60494.33
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Luz Batista",
+  "date": "2026-09-25",
+  "amount": 70548.3
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Carlos Mejía",
+  "date": "2026-12-10",
+  "amount": 15563.29
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Ana Peña",
+  "date": "2026-10-30",
+  "amount": 28969.79
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Este",
+  "seller": "Mía Rosario",
+  "date": "2026-01-16",
+  "amount": 45174.79
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Luz Batista",
+  "date": "2026-08-07",
+  "amount": 69307.9
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Ramón Féliz",
+  "date": "2026-10-23",
+  "amount": 91606.86
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Pedro Ureña",
+  "date": "2026-03-10",
+  "amount": 9709.43
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Ramón Féliz",
+  "date": "2026-03-11",
+  "amount": 21005.27
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Luz Batista",
+  "date": "2026-12-11",
+  "amount": 74112.91
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Luz Batista",
+  "date": "2026-06-04",
+  "amount": 48434.46
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Pedro Ureña",
+  "date": "2026-07-17",
+  "amount": 50972.74
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Julio Tavárez",
+  "date": "2026-07-28",
+  "amount": 85947.07
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Ana Peña",
+  "date": "2026-12-16",
+  "amount": 81429.85
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Rosa Almonte",
+  "date": "2026-11-07",
+  "amount": 66519.2
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Carlos Mejía",
+  "date": "2026-06-17",
+  "amount": 67955.71
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Mía Rosario",
+  "date": "2026-04-19",
+  "amount": 27428.48
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Ramón Féliz",
+  "date": "2026-02-02",
+  "amount": 81197.57
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Carlos Mejía",
+  "date": "2026-09-05",
+  "amount": 33015.58
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Luz Batista",
+  "date": "2026-02-04",
+  "amount": 85275.59
+ },
+ {
+  "region": "Distrito",
+  "city": "Santo Domingo Norte",
+  "seller": "Mía Rosario",
+  "date": "2026-01-11",
+  "amount": 40864.9
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Ana Peña",
+  "date": "2026-03-02",
+  "amount": 57671.41
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Luz Batista",
+  "date": "2026-01-24",
+  "amount": 68392.63
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-06-19",
+  "amount": 48262.23
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-01-19",
+  "amount": 1183.49
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Ana Peña",
+  "date": "2026-02-25",
+  "amount": 90170.62
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-07-28",
+  "amount": 58189.14
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Ana Peña",
+  "date": "2026-03-21",
+  "amount": 93099.25
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Pedro Ureña",
+  "date": "2026-06-23",
+  "amount": 34538.58
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Luz Batista",
+  "date": "2026-03-12",
+  "amount": 36102.99
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Luz Batista",
+  "date": "2026-09-24",
+  "amount": 61347.48
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Carlos Mejía",
+  "date": "2026-11-01",
+  "amount": 59101.92
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-09-17",
+  "amount": 41247.6
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-05-02",
+  "amount": 41838.62
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Mía Rosario",
+  "date": "2026-05-13",
+  "amount": 52326.68
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Luz Batista",
+  "date": "2026-01-06",
+  "amount": 93814.59
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Ana Peña",
+  "date": "2026-06-11",
+  "amount": 36080.82
+ },
+ {
+  "region": "Este",
+  "city": "La Romana",
+  "seller": "Rosa Almonte",
+  "date": "2026-10-29",
+  "amount": 6177.61
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Pedro Ureña",
+  "date": "2026-08-27",
+  "amount": 64692.09
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Mía Rosario",
+  "date": "2026-06-30",
+  "amount": 70244.24
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Ana Peña",
+  "date": "2026-01-12",
+  "amount": 90732.48
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Pedro Ureña",
+  "date": "2026-01-11",
+  "amount": 24231.06
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Mía Rosario",
+  "date": "2026-08-22",
+  "amount": 56507.49
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Rosa Almonte",
+  "date": "2026-06-13",
+  "amount": 34893.76
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Pedro Ureña",
+  "date": "2026-06-10",
+  "amount": 80242.97
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Mía Rosario",
+  "date": "2026-05-16",
+  "amount": 74900.03
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Ana Peña",
+  "date": "2026-02-23",
+  "amount": 92294.89
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Rosa Almonte",
+  "date": "2026-12-17",
+  "amount": 29796.58
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Mía Rosario",
+  "date": "2026-04-24",
+  "amount": 23056.69
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Luz Batista",
+  "date": "2026-04-06",
+  "amount": 61881.43
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Carlos Mejía",
+  "date": "2026-02-19",
+  "amount": 57268.43
+ },
+ {
+  "region": "Este",
+  "city": "Higüey",
+  "seller": "Julio Tavárez",
+  "date": "2026-06-20",
+  "amount": 41931.7
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Pedro Ureña",
+  "date": "2026-02-10",
+  "amount": 70625.6
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Ramón Féliz",
+  "date": "2026-04-22",
+  "amount": 26071.69
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Ana Peña",
+  "date": "2026-03-03",
+  "amount": 50549.81
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Pedro Ureña",
+  "date": "2026-04-08",
+  "amount": 76740.45
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Rosa Almonte",
+  "date": "2026-10-22",
+  "amount": 82122.26
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Carlos Mejía",
+  "date": "2026-06-24",
+  "amount": 76691.37
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Rosa Almonte",
+  "date": "2026-06-26",
+  "amount": 40310.24
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Mía Rosario",
+  "date": "2026-09-23",
+  "amount": 44416.12
+ },
+ {
+  "region": "Este",
+  "city": "San Pedro de Macorís",
+  "seller": "Luz Batista",
+  "date": "2026-11-21",
+  "amount": 27942.68
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-07-29",
+  "amount": 87497.87
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Julio Tavárez",
+  "date": "2026-03-21",
+  "amount": 940.54
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Luz Batista",
+  "date": "2026-11-15",
+  "amount": 53313.36
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-04-24",
+  "amount": 70951.92
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Mía Rosario",
+  "date": "2026-12-06",
+  "amount": 51894.87
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Carlos Mejía",
+  "date": "2026-04-27",
+  "amount": 81579.21
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Carlos Mejía",
+  "date": "2026-05-27",
+  "amount": 77063.13
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-01-24",
+  "amount": 85891.08
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Julio Tavárez",
+  "date": "2026-12-22",
+  "amount": 85225.6
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-08-09",
+  "amount": 1742.15
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Rosa Almonte",
+  "date": "2026-03-03",
+  "amount": 48051.19
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-05-03",
+  "amount": 50109.11
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-07-31",
+  "amount": 89239.51
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Carlos Mejía",
+  "date": "2026-11-10",
+  "amount": 32757.83
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ramón Féliz",
+  "date": "2026-05-10",
+  "amount": 77191.61
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Pedro Ureña",
+  "date": "2026-02-01",
+  "amount": 21365.9
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Carlos Mejía",
+  "date": "2026-03-04",
+  "amount": 16688.06
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Rosa Almonte",
+  "date": "2026-05-21",
+  "amount": 78320.63
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ramón Féliz",
+  "date": "2026-01-04",
+  "amount": 59903.38
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Ana Peña",
+  "date": "2026-07-24",
+  "amount": 71988.2
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Mía Rosario",
+  "date": "2026-05-08",
+  "amount": 58909.42
+ },
+ {
+  "region": "Norte",
+  "city": "Santiago",
+  "seller": "Luz Batista",
+  "date": "2026-09-24",
+  "amount": 5316.94
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Ana Peña",
+  "date": "2026-01-01",
+  "amount": 73760.7
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Carlos Mejía",
+  "date": "2026-01-24",
+  "amount": 5209.25
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Ana Peña",
+  "date": "2026-09-05",
+  "amount": 81245.42
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Ramón Féliz",
+  "date": "2026-02-14",
+  "amount": 30352.2
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Carlos Mejía",
+  "date": "2026-06-11",
+  "amount": 33696.86
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Luz Batista",
+  "date": "2026-11-28",
+  "amount": 55934.94
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Mía Rosario",
+  "date": "2026-07-04",
+  "amount": 18557.25
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Luz Batista",
+  "date": "2026-06-18",
+  "amount": 12194.85
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Ana Peña",
+  "date": "2026-10-12",
+  "amount": 68166.05
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Carlos Mejía",
+  "date": "2026-07-14",
+  "amount": 54056.38
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Pedro Ureña",
+  "date": "2026-01-22",
+  "amount": 44047.29
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Luz Batista",
+  "date": "2026-11-29",
+  "amount": 60665.92
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Luz Batista",
+  "date": "2026-01-23",
+  "amount": 5514.62
+ },
+ {
+  "region": "Norte",
+  "city": "Puerto Plata",
+  "seller": "Ramón Féliz",
+  "date": "2026-11-18",
+  "amount": 72324.12
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Luz Batista",
+  "date": "2026-08-04",
+  "amount": 44049.37
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Julio Tavárez",
+  "date": "2026-05-06",
+  "amount": 51136.63
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Carlos Mejía",
+  "date": "2026-12-22",
+  "amount": 76396.48
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Luz Batista",
+  "date": "2026-04-25",
+  "amount": 12819.58
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Pedro Ureña",
+  "date": "2026-01-15",
+  "amount": 35865.27
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Mía Rosario",
+  "date": "2026-10-14",
+  "amount": 11977.12
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Carlos Mejía",
+  "date": "2026-12-20",
+  "amount": 89241.36
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Luz Batista",
+  "date": "2026-12-06",
+  "amount": 63584.57
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Carlos Mejía",
+  "date": "2026-06-13",
+  "amount": 77198.17
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Ramón Féliz",
+  "date": "2026-01-03",
+  "amount": 14062.49
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Ana Peña",
+  "date": "2026-07-19",
+  "amount": 50321.0
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Carlos Mejía",
+  "date": "2026-10-16",
+  "amount": 62795.06
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Rosa Almonte",
+  "date": "2026-07-12",
+  "amount": 77937.69
+ },
+ {
+  "region": "Norte",
+  "city": "La Vega",
+  "seller": "Carlos Mejía",
+  "date": "2026-06-24",
+  "amount": 2906.67
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Ramón Féliz",
+  "date": "2026-12-11",
+  "amount": 79519.19
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Mía Rosario",
+  "date": "2026-05-26",
+  "amount": 75981.62
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Julio Tavárez",
+  "date": "2026-01-19",
+  "amount": 10587.28
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Ana Peña",
+  "date": "2026-02-21",
+  "amount": 52486.15
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Rosa Almonte",
+  "date": "2026-10-16",
+  "amount": 78751.61
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Rosa Almonte",
+  "date": "2026-05-04",
+  "amount": 61544.44
+ },
+ {
+  "region": "Sur",
+  "city": "Barahona",
+  "seller": "Luz Batista",
+  "date": "2026-08-21",
+  "amount": 24398.68
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Luz Batista",
+  "date": "2026-06-29",
+  "amount": 91816.71
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Julio Tavárez",
+  "date": "2026-07-12",
+  "amount": 92453.84
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Rosa Almonte",
+  "date": "2026-07-31",
+  "amount": 39743.11
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Ramón Féliz",
+  "date": "2026-10-19",
+  "amount": 15258.5
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Rosa Almonte",
+  "date": "2026-07-25",
+  "amount": 15864.13
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Ramón Féliz",
+  "date": "2026-09-12",
+  "amount": 87120.06
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Ramón Féliz",
+  "date": "2026-09-22",
+  "amount": 55921.25
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Rosa Almonte",
+  "date": "2026-04-06",
+  "amount": 25765.27
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Rosa Almonte",
+  "date": "2026-04-12",
+  "amount": 55840.84
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Julio Tavárez",
+  "date": "2026-06-11",
+  "amount": 80965.9
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Mía Rosario",
+  "date": "2026-10-03",
+  "amount": 63945.88
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Mía Rosario",
+  "date": "2026-07-31",
+  "amount": 84549.16
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Ana Peña",
+  "date": "2026-06-07",
+  "amount": 25834.85
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Julio Tavárez",
+  "date": "2026-07-15",
+  "amount": 16777.41
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Julio Tavárez",
+  "date": "2026-07-04",
+  "amount": 30932.98
+ },
+ {
+  "region": "Sur",
+  "city": "Azua",
+  "seller": "Luz Batista",
+  "date": "2026-03-15",
+  "amount": 94170.09
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Julio Tavárez",
+  "date": "2026-12-26",
+  "amount": 44731.0
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ana Peña",
+  "date": "2026-12-01",
+  "amount": 45982.79
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Luz Batista",
+  "date": "2026-02-07",
+  "amount": 74504.38
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ramón Féliz",
+  "date": "2026-01-24",
+  "amount": 86579.37
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Carlos Mejía",
+  "date": "2026-05-01",
+  "amount": 91098.54
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Julio Tavárez",
+  "date": "2026-05-11",
+  "amount": 84621.29
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Rosa Almonte",
+  "date": "2026-05-13",
+  "amount": 18189.05
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ana Peña",
+  "date": "2026-12-27",
+  "amount": 85527.32
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Rosa Almonte",
+  "date": "2026-05-11",
+  "amount": 82251.85
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Rosa Almonte",
+  "date": "2026-06-10",
+  "amount": 40501.4
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Carlos Mejía",
+  "date": "2026-02-13",
+  "amount": 9254.7
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ana Peña",
+  "date": "2026-05-30",
+  "amount": 34204.47
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Pedro Ureña",
+  "date": "2026-10-25",
+  "amount": 1150.51
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Pedro Ureña",
+  "date": "2026-06-21",
+  "amount": 41722.92
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Carlos Mejía",
+  "date": "2026-09-06",
+  "amount": 20354.1
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ramón Féliz",
+  "date": "2026-10-27",
+  "amount": 37441.94
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Pedro Ureña",
+  "date": "2026-10-06",
+  "amount": 11762.2
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Carlos Mejía",
+  "date": "2026-05-21",
+  "amount": 63383.42
+ },
+ {
+  "region": "Sur",
+  "city": "San Cristóbal",
+  "seller": "Ramón Féliz",
+  "date": "2026-02-27",
+  "amount": 84339.36
+ }
+]

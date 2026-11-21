@@ -1,0 +1,272 @@
+[
+ {
+  "n": 51,
+  "x": 0.3333333333333333,
+  "label": "alpha",
+  "when": "2026-03-26T11:16:00",
+  "flag": false,
+  "big": "55.192",
+  "maybe": "ok"
+ },
+ {
+  "n": 17,
+  "x": 0.1,
+  "label": "Foxtrot",
+  "when": "2026-03-28T17:03:00",
+  "flag": true,
+  "big": "-50.685",
+  "maybe": "n/a"
+ },
+ {
+  "n": 49,
+  "x": 0.1,
+  "label": "Delta Force One",
+  "when": "2026-02-10T00:36:00",
+  "flag": true,
+  "big": "-63.585",
+  "maybe": null
+ },
+ {
+  "n": 3,
+  "x": 2.5,
+  "label": "Hotel",
+  "when": "2026-02-14T22:48:00",
+  "flag": true,
+  "big": "-99.645",
+  "maybe": "ok"
+ },
+ {
+  "n": 49,
+  "x": 2.5,
+  "label": "charlie",
+  "when": "2026-02-19T04:49:00",
+  "flag": true,
+  "big": "92.296",
+  "maybe": "n/a"
+ },
+ {
+  "n": 49,
+  "x": 2.5,
+  "label": "Delta Force One",
+  "when": "2026-04-17T02:43:00",
+  "flag": false,
+  "big": "78.748",
+  "maybe": null
+ },
+ {
+  "n": 88,
+  "x": 2.5,
+  "label": "charlie",
+  "when": "2026-02-03T04:23:00",
+  "flag": true,
+  "big": "-33.629",
+  "maybe": "n/a"
+ },
+ {
+  "n": 51,
+  "x": 0.1,
+  "label": "echo",
+  "when": "2026-03-23T08:00:00",
+  "flag": true,
+  "big": "-38.787",
+  "maybe": "n/a"
+ },
+ {
+  "n": 120,
+  "x": 123456.789,
+  "label": "charlie",
+  "when": "2026-02-28T06:11:00",
+  "flag": true,
+  "big": "95.020",
+  "maybe": "ok"
+ },
+ {
+  "n": 51,
+  "x": 0.3333333333333333,
+  "label": "golf course club",
+  "when": "2026-04-23T08:47:00",
+  "flag": true,
+  "big": "57.548",
+  "maybe": null
+ },
+ {
+  "n": 0,
+  "x": 123456.789,
+  "label": "alpha",
+  "when": "2026-03-05T10:37:00",
+  "flag": false,
+  "big": "24.743",
+  "maybe": "ok"
+ },
+ {
+  "n": 49,
+  "x": 0.3333333333333333,
+  "label": "Hotel",
+  "when": "2026-02-11T11:48:00",
+  "flag": true,
+  "big": "-29.041",
+  "maybe": "n/a"
+ },
+ {
+  "n": 120,
+  "x": 0.1,
+  "label": "Foxtrot",
+  "when": "2026-02-22T17:49:00",
+  "flag": false,
+  "big": "-92.674",
+  "maybe": "ok"
+ },
+ {
+  "n": 51,
+  "x": 2.5,
+  "label": "Foxtrot",
+  "when": "2026-02-19T02:21:00",
+  "flag": true,
+  "big": "40.521",
+  "maybe": "ok"
+ },
+ {
+  "n": 51,
+  "x": 10000000.0,
+  "label": "charlie",
+  "when": "2026-02-27T23:43:00",
+  "flag": false,
+  "big": "25.361",
+  "maybe": "n/a"
+ },
+ {
+  "n": 120,
+  "x": 2.5,
+  "label": "alpha",
+  "when": "2026-04-01T03:19:00",
+  "flag": true,
+  "big": "20.130",
+  "maybe": null
+ },
+ {
+  "n": 51,
+  "x": 0.3333333333333333,
+  "label": "echo",
+  "when": "2026-02-04T01:15:00",
+  "flag": true,
+  "big": "-15.649",
+  "maybe": "ok"
+ },
+ {
+  "n": 0,
+  "x": 0.3333333333333333,
+  "label": "Hotel",
+  "when": "2026-04-20T12:40:00",
+  "flag": true,
+  "big": "-58.588",
+  "maybe": "n/a"
+ },
+ {
+  "n": 88,
+  "x": 0.1,
+  "label": "charlie",
+  "when": "2026-03-21T11:08:00",
+  "flag": true,
+  "big": "-70.151",
+  "maybe": null
+ },
+ {
+  "n": 120,
+  "x": 0.000123,
+  "label": "charlie",
+  "when": "2026-02-26T11:09:00",
+  "flag": false,
+  "big": "-9.292",
+  "maybe": null
+ },
+ {
+  "n": 51,
+  "x": 123456.789,
+  "label": "echo",
+  "when": "2026-04-01T02:46:00",
+  "flag": true,
+  "big": "-19.242",
+  "maybe": "ok"
+ },
+ {
+  "n": 17,
+  "x": -3.75,
+  "label": "Hotel",
+  "when": "2026-02-10T22:24:00",
+  "flag": false,
+  "big": "-63.976",
+  "maybe": null
+ },
+ {
+  "n": 51,
+  "x": 0.1,
+  "label": "Foxtrot",
+  "when": "2026-02-24T13:32:00",
+  "flag": false,
+  "big": "32.804",
+  "maybe": null
+ },
+ {
+  "n": 50,
+  "x": 0.3333333333333333,
+  "label": "Hotel",
+  "when": "2026-03-04T08:35:00",
+  "flag": true,
+  "big": "96.191",
+  "maybe": "n/a"
+ },
+ {
+  "n": 17,
+  "x": 0.000123,
+  "label": "alpha",
+  "when": "2026-02-26T09:21:00",
+  "flag": true,
+  "big": "54.743",
+  "maybe": null
+ },
+ {
+  "n": 120,
+  "x": 10000000.0,
+  "label": "Foxtrot",
+  "when": "2026-03-30T15:17:00",
+  "flag": true,
+  "big": "28.813",
+  "maybe": "n/a"
+ },
+ {
+  "n": 88,
+  "x": 10000000.0,
+  "label": "charlie",
+  "when": "2026-04-22T08:53:00",
+  "flag": false,
+  "big": "37.667",
+  "maybe": null
+ },
+ {
+  "n": 17,
+  "x": 0.000123,
+  "label": "charlie",
+  "when": "2026-04-23T22:21:00",
+  "flag": true,
+  "big": "-27.594",
+  "maybe": null
+ },
+ {
+  "n": 3,
+  "x": -3.75,
+  "label": "golf course club",
+  "when": "2026-02-25T11:44:00",
+  "flag": true,
+  "big": "56.074",
+  "maybe": "n/a"
+ },
+ {
+  "n": 88,
+  "x": 10000000.0,
+  "label": "echo",
+  "when": "2026-03-17T09:42:00",
+  "flag": false,
+  "big": "-94.476",
+  "maybe": "ok"
+ }
+]

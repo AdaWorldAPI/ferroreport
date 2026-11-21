@@ -1,0 +1,324 @@
+[
+ {
+  "sku": "FX-1000",
+  "description": "Hydraulic pump 2HP, cast iron housing",
+  "qty": 21,
+  "price": "185.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1007",
+  "description": "Stainless steel valve 3/4\"",
+  "qty": 26,
+  "price": "42.50",
+  "discount": null
+ },
+ {
+  "sku": "FX-1014",
+  "description": "PVC pipe 4\" x 20ft",
+  "qty": 5,
+  "price": "18.75",
+  "discount": null
+ },
+ {
+  "sku": "FX-1021",
+  "description": "Industrial safety gloves, box of 12",
+  "qty": 7,
+  "price": "36.90",
+  "discount": null
+ },
+ {
+  "sku": "FX-1028",
+  "description": "Electric motor 5HP three-phase with mounting bracket and extended warranty coverage for two years",
+  "qty": 4,
+  "price": "920.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1035",
+  "description": "Pressure gauge 0-300 PSI",
+  "qty": 14,
+  "price": "27.30",
+  "discount": "20.00"
+ },
+ {
+  "sku": "FX-1042",
+  "description": "Copper fitting kit",
+  "qty": 27,
+  "price": "64.00",
+  "discount": "5.00"
+ },
+ {
+  "sku": "FX-1049",
+  "description": "Thread sealant tape",
+  "qty": 36,
+  "price": "2.15",
+  "discount": null
+ },
+ {
+  "sku": "FX-1056",
+  "description": "Ball bearing 6205-2RS",
+  "qty": 37,
+  "price": "8.40",
+  "discount": "10.00"
+ },
+ {
+  "sku": "FX-1063",
+  "description": "Welding rods E6013 (5 kg)",
+  "qty": 38,
+  "price": "31.60",
+  "discount": null
+ },
+ {
+  "sku": "FX-1070",
+  "description": "Hydraulic pump 2HP, cast iron housing",
+  "qty": 37,
+  "price": "185.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1077",
+  "description": "Stainless steel valve 3/4\"",
+  "qty": 4,
+  "price": "42.50",
+  "discount": null
+ },
+ {
+  "sku": "FX-1084",
+  "description": "PVC pipe 4\" x 20ft",
+  "qty": 3,
+  "price": "18.75",
+  "discount": null
+ },
+ {
+  "sku": "FX-1091",
+  "description": "Industrial safety gloves, box of 12",
+  "qty": 9,
+  "price": "36.90",
+  "discount": null
+ },
+ {
+  "sku": "FX-1098",
+  "description": "Electric motor 5HP three-phase with mounting bracket and extended warranty coverage for two years",
+  "qty": 10,
+  "price": "920.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1105",
+  "description": "Pressure gauge 0-300 PSI",
+  "qty": 37,
+  "price": "27.30",
+  "discount": null
+ },
+ {
+  "sku": "FX-1112",
+  "description": "Copper fitting kit",
+  "qty": 12,
+  "price": "64.00",
+  "discount": "10.00"
+ },
+ {
+  "sku": "FX-1119",
+  "description": "Thread sealant tape",
+  "qty": 24,
+  "price": "2.15",
+  "discount": "5.00"
+ },
+ {
+  "sku": "FX-1126",
+  "description": "Ball bearing 6205-2RS",
+  "qty": 37,
+  "price": "8.40",
+  "discount": "10.00"
+ },
+ {
+  "sku": "FX-1133",
+  "description": "Welding rods E6013 (5 kg)",
+  "qty": 32,
+  "price": "31.60",
+  "discount": null
+ },
+ {
+  "sku": "FX-1140",
+  "description": "Hydraulic pump 2HP, cast iron housing",
+  "qty": 28,
+  "price": "185.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1147",
+  "description": "Stainless steel valve 3/4\"",
+  "qty": 30,
+  "price": "42.50",
+  "discount": null
+ },
+ {
+  "sku": "FX-1154",
+  "description": "PVC pipe 4\" x 20ft",
+  "qty": 30,
+  "price": "18.75",
+  "discount": null
+ },
+ {
+  "sku": "FX-1161",
+  "description": "Industrial safety gloves, box of 12",
+  "qty": 16,
+  "price": "36.90",
+  "discount": null
+ },
+ {
+  "sku": "FX-1168",
+  "description": "Electric motor 5HP three-phase with mounting bracket and extended warranty coverage for two years",
+  "qty": 16,
+  "price": "920.00",
+  "discount": "12.50"
+ },
+ {
+  "sku": "FX-1175",
+  "description": "Pressure gauge 0-300 PSI",
+  "qty": 34,
+  "price": "27.30",
+  "discount": null
+ },
+ {
+  "sku": "FX-1182",
+  "description": "Copper fitting kit",
+  "qty": 22,
+  "price": "64.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1189",
+  "description": "Thread sealant tape",
+  "qty": 19,
+  "price": "2.15",
+  "discount": null
+ },
+ {
+  "sku": "FX-1196",
+  "description": "Ball bearing 6205-2RS",
+  "qty": 5,
+  "price": "8.40",
+  "discount": "20.00"
+ },
+ {
+  "sku": "FX-1203",
+  "description": "Welding rods E6013 (5 kg)",
+  "qty": 11,
+  "price": "31.60",
+  "discount": null
+ },
+ {
+  "sku": "FX-1210",
+  "description": "Hydraulic pump 2HP, cast iron housing",
+  "qty": 10,
+  "price": "185.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1217",
+  "description": "Stainless steel valve 3/4\"",
+  "qty": 27,
+  "price": "42.50",
+  "discount": "5.00"
+ },
+ {
+  "sku": "FX-1224",
+  "description": "PVC pipe 4\" x 20ft",
+  "qty": 36,
+  "price": "18.75",
+  "discount": null
+ },
+ {
+  "sku": "FX-1231",
+  "description": "Industrial safety gloves, box of 12",
+  "qty": 21,
+  "price": "36.90",
+  "discount": null
+ },
+ {
+  "sku": "FX-1238",
+  "description": "Electric motor 5HP three-phase with mounting bracket and extended warranty coverage for two years",
+  "qty": 23,
+  "price": "920.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1245",
+  "description": "Pressure gauge 0-300 PSI",
+  "qty": 38,
+  "price": "27.30",
+  "discount": null
+ },
+ {
+  "sku": "FX-1252",
+  "description": "Copper fitting kit",
+  "qty": 5,
+  "price": "64.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1259",
+  "description": "Thread sealant tape",
+  "qty": 18,
+  "price": "2.15",
+  "discount": null
+ },
+ {
+  "sku": "FX-1266",
+  "description": "Ball bearing 6205-2RS",
+  "qty": 5,
+  "price": "8.40",
+  "discount": "12.50"
+ },
+ {
+  "sku": "FX-1273",
+  "description": "Welding rods E6013 (5 kg)",
+  "qty": 37,
+  "price": "31.60",
+  "discount": null
+ },
+ {
+  "sku": "FX-1280",
+  "description": "Hydraulic pump 2HP, cast iron housing",
+  "qty": 29,
+  "price": "185.00",
+  "discount": null
+ },
+ {
+  "sku": "FX-1287",
+  "description": "Stainless steel valve 3/4\"",
+  "qty": 25,
+  "price": "42.50",
+  "discount": null
+ },
+ {
+  "sku": "FX-1294",
+  "description": "PVC pipe 4\" x 20ft",
+  "qty": 23,
+  "price": "18.75",
+  "discount": "20.00"
+ },
+ {
+  "sku": "FX-1301",
+  "description": "Industrial safety gloves, box of 12",
+  "qty": 23,
+  "price": "36.90",
+  "discount": "5.00"
+ },
+ {
+  "sku": "FX-1308",
+  "description": "Electric motor 5HP three-phase with mounting bracket and extended warranty coverage for two years",
+  "qty": 32,
+  "price": "920.00",
+  "discount": "12.50"
+ },
+ {
+  "sku": "FX-1315",
+  "description": "Pressure gauge 0-300 PSI",
+  "qty": 9,
+  "price": "27.30",
+  "discount": null
+ }
+]

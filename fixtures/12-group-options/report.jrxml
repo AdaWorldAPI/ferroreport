@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="group_options" pageWidth="595" pageHeight="420" columnWidth="535" leftMargin="30" rightMargin="30" topMargin="25" bottomMargin="25">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<field name="dept" class="java.lang.String"/>
+	<field name="team" class="java.lang.String"/>
+	<field name="person" class="java.lang.String"/>
+	<field name="hours" class="java.lang.Integer"/>
+	<variable name="team_hours" class="java.lang.Integer" resetType="Group" resetGroup="team" calculation="Sum"><variableExpression><![CDATA[$F{hours}]]></variableExpression></variable>
+	<variable name="var_hours" class="java.lang.Double" calculation="Variance"><variableExpression><![CDATA[$F{hours}]]></variableExpression></variable>
+	<group name="dept" isStartNewPage="true" isReprintHeaderOnEachPage="true">
+		<groupExpression><![CDATA[$F{dept}]]></groupExpression>
+		<groupHeader><band height="22">
+			<textField><reportElement mode="Opaque" x="0" y="2" width="535" height="18" forecolor="#FFFFFF" backcolor="#6C3483"/><box leftPadding="4"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><textFieldExpression><![CDATA["Department " + $F{dept}]]></textFieldExpression></textField>
+		</band></groupHeader>
+		<groupFooter><band height="18">
+			<textField evaluationTime="Group" evaluationGroup="dept"><reportElement x="0" y="2" width="535" height="14"/><textElement textAlignment="Right"><font isItalic="true"/></textElement><textFieldExpression><![CDATA["people in " + $F{dept} + ": " + $V{dept_COUNT}]]></textFieldExpression></textField>
+		</band></groupFooter>
+	</group>
+	<group name="team" minHeightToStartNewPage="80">
+		<groupExpression><![CDATA[$F{team}]]></groupExpression>
+		<groupHeader><band height="16">
+			<textField><reportElement x="10" y="1" width="300" height="14" forecolor="#6C3483"/><textElement><font isBold="true"/></textElement><textFieldExpression><![CDATA["Team " + $F{team}]]></textFieldExpression></textField>
+			<textField evaluationTime="Group" evaluationGroup="team"><reportElement x="335" y="1" width="200" height="14"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$V{team_hours} + " h"]]></textFieldExpression></textField>
+		</band></groupHeader>
+	</group>
+	<background><band height="370">
+		<staticText><reportElement x="0" y="300" width="535" height="40" forecolor="#EEEEEE"/><textElement textAlignment="Center"><font size="30" isBold="true"/></textElement><text><![CDATA[CONFIDENTIAL]]></text></staticText>
+	</band></background>
+	<pageHeader><band height="16"><textField><reportElement x="0" y="0" width="535" height="14" forecolor="#999999"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Timesheet - page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageHeader>
+	<detail><band height="14">
+		<textField><reportElement x="20" y="0" width="300" height="14"/><textFieldExpression><![CDATA[$F{person}]]></textFieldExpression></textField>
+		<textField><reportElement x="435" y="0" width="100" height="14"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{hours}]]></textFieldExpression></textField>
+	</band></detail>
+	<pageFooter><band height="16"><staticText><reportElement x="0" y="2" width="535" height="14" forecolor="#999999"/><text><![CDATA[Regular page footer]]></text></staticText></band></pageFooter>
+	<lastPageFooter><band height="16"><textField><reportElement x="0" y="2" width="535" height="14"/><textElement><font isBold="true"/></textElement><textFieldExpression><![CDATA["Last page - variance of hours " + new java.text.DecimalFormat("0.00").format($V{var_hours})]]></textFieldExpression></textField></band></lastPageFooter>
+</jasperReport>
