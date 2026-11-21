@@ -19,6 +19,9 @@ pub struct FaceData {
     pub ascender: f32,
     pub descender: f32,
     pub line_gap: f32,
+    /// OS/2 typographic ascender and descender (both positive), used by iText for backgrounds.
+    pub typo_ascender: f32,
+    pub typo_descender: f32,
     pub cap_height: f32,
     pub italic_angle: f32,
     pub bbox: [f32; 4],
@@ -79,6 +82,8 @@ impl FaceData {
             ascender: face.ascender() as f32,
             descender: -(face.descender() as f32),
             line_gap: face.line_gap() as f32,
+            typo_ascender: face.typographic_ascender().unwrap_or(face.ascender()) as f32,
+            typo_descender: -(face.typographic_descender().unwrap_or(face.descender()) as f32),
             cap_height: face.capital_height().map(|c| c as f32).unwrap_or(0.7 * upem),
             italic_angle: face.italic_angle(),
             bbox: [bb.x_min as f32, bb.y_min as f32, bb.x_max as f32, bb.y_max as f32],
@@ -190,6 +195,11 @@ impl FaceData {
 
     pub fn descent(&self, size: f32) -> f32 {
         self.descender * size / self.units_per_em
+    }
+
+    /// Typographic ascent and descent at `size` (iText's ASCENT and DESCENT).
+    pub fn typo_metrics(&self, size: f32) -> (f32, f32) {
+        (self.typo_ascender * size / self.units_per_em, self.typo_descender * size / self.units_per_em)
     }
 
     /// Single-spaced line height (ascent + descent + leading).

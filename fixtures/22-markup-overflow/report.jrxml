@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="markup_overflow" pageWidth="420" pageHeight="300" columnWidth="360" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<field name="title" class="java.lang.String"/>
+	<field name="body" class="java.lang.String"/>
+	<pageHeader><band height="16"><textField><reportElement x="0" y="0" width="360" height="12" forecolor="#888888"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageHeader>
+	<detail>
+		<band height="40">
+			<textField><reportElement x="0" y="0" width="360" height="14"/><textElement markup="html"><font size="11"/></textElement><textFieldExpression><![CDATA["<b>" + $F{title} + "</b>"]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="16" width="360" height="20"/><box topPadding="2" leftPadding="4" bottomPadding="2"><leftPen lineWidth="1" lineColor="#2B4C7E"/></box><textElement markup="styled"/><textFieldExpression><![CDATA[$F{body}]]></textFieldExpression></textField>
+		</band>
+	</detail>
+</jasperReport>

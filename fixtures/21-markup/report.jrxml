@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="markup" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="40" bottomMargin="40" whenNoDataType="AllSectionsNoDetail">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+	<parameter name="CUSTOMER" class="java.lang.String"><defaultValueExpression><![CDATA["Distribuidora Caribe"]]></defaultValueExpression></parameter>
+	<title>
+		<band height="700">
+			<textField><reportElement x="0" y="0" width="515" height="16"/><textElement markup="styled"/>
+				<textFieldExpression><![CDATA["Customer: <style isBold=\"true\">" + $P{CUSTOMER} + "</style> owes <style isBold=\"true\" forecolor=\"#CC0000\">RD$ 1,180.00</style>, due <style isItalic=\"true\">today</style>."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="24" width="250" height="16"/><textElement markup="styled"/>
+				<textFieldExpression><![CDATA["This paragraph mixes <style isBold=\"true\">bold words</style> with plain ones and <style isItalic=\"true\">italic phrases that keep going</style> so that it wraps over several lines inside a narrow box, with <style isUnderline=\"true\">underlined</style> and <style isStrikeThrough=\"true\">struck</style> text too."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="265" y="24" width="250" height="16"/><textElement markup="html"/>
+				<textFieldExpression><![CDATA["<b>HTML</b> markup: <i>italic</i>, <u>underline</u>, <font color=\"#0066CC\">blue text</font>, <b><i>bold italic</i></b>.<br>A second line after a break, long enough to wrap onto a third line in this box."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="120" width="250" height="16"/><textElement markup="styled"/>
+				<textFieldExpression><![CDATA["Small text with <style size=\"16\" isBold=\"true\">BIG</style> words <style size=\"7\">and tiny ones</style> mixed on lines that wrap across the box width."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="265" y="120" width="250" height="16"/><textElement textAlignment="Center" markup="styled"/>
+				<textFieldExpression><![CDATA["Centered <style isBold=\"true\">styled</style> text\nwith an explicit newline and <style forecolor=\"#008800\" backcolor=\"#FFFF99\">highlighted</style> words."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="220" width="250" height="16"/><textElement textAlignment="Right" markup="html"/>
+				<textFieldExpression><![CDATA["Right aligned <font size=\"4\">larger font</font> and <font face=\"DejaVu Serif\">a serif face</font>, then <sup>sup</sup> and normal."]]></textFieldExpression></textField>
+			<staticText><reportElement x="265" y="220" width="250" height="40"/><textElement markup="styled"/>
+				<text><![CDATA[Static <style isBold="true">styled</style> text &amp; entities: <style isItalic="true">5 &lt; 7</style>.]]></text></staticText>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="300" width="515" height="16"/><textElement textAlignment="Justified" markup="styled"/>
+				<textFieldExpression><![CDATA["Justified paragraph with <style isBold=\"true\">bold segments</style> spread across the full width of the box so that the spaces between the words grow, followed by <style isItalic=\"true\">an italic tail</style> that continues for a while to produce at least two complete lines and a last one."]]></textFieldExpression></textField>
+			<textField isStretchWithOverflow="true"><reportElement x="0" y="360" width="250" height="16"/><textElement markup="styled"><paragraph lineSpacing="1_1_2"/></textElement>
+				<textFieldExpression><![CDATA["One and a half spacing with <style size=\"14\">larger</style> words wrapping over a few lines of text in the box."]]></textFieldExpression></textField>
+		</band>
+	</title>
+</jasperReport>

@@ -31,6 +31,8 @@ pub struct PrintText {
 
 #[derive(Debug, Clone)]
 pub enum PrintItem {
+    /// Several items drawn in order (the runs of a styled text).
+    Group(Vec<PrintItem>),
     /// Filled rectangles drawn in a local drawing scaled by `scale` from `(x, y)` (barcodes).
     Shapes {
         x: f32,

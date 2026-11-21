@@ -14,7 +14,7 @@ plantillas que no escribiste tú.
 - **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
   Importa en CLIs, funciones serverless y contenedores.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 19 comparables salen idénticos.
+  píxel: hoy los 21 comparables salen idénticos.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -68,7 +68,9 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
   dibuja JasperReports: sirven para facturas electrónicas impresas, como el sello del e-CF
   dominicano.
 - Reportes de varias columnas (orden vertical).
-- Aún no: gráficos, crosstabs, tablas, texto con markup HTML, orden horizontal de columnas, conexiones JDBC.
+- Texto con formato (markup `styled` y `html`): negritas, cursivas, fuentes, tamaños, colores,
+  resaltado, superíndices, saltos de línea y listas, también cuando el texto sigue en otra página.
+- Aún no: gráficos, crosstabs, tablas, orden horizontal de columnas, conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -90,8 +92,7 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
 ## Roadmap
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
-  condicionales, texto justificado, códigos QR, Code 128 y multicolumna. Siguiente: texto con formato
-  (markup), más tipos de códigos de barras y memoria constante en reportes enormes.
+  condicionales, texto justificado, códigos QR, Code 128, multicolumna y texto con formato. Siguiente: más tipos de códigos de barras y memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** gráficos, tablas, crosstabs y exportación a Excel.

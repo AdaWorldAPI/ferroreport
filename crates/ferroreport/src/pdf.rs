@@ -144,12 +144,31 @@ fn write_image(pdf: &mut Pdf, ids: &mut Ids, r: Ref, image: &ImageData) {
     }
 }
 
+/// Items in drawing order with groups expanded.
+fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<&'a PrintItem>) {
+    for item in items {
+        match item {
+            PrintItem::Group(inner) => flatten(inner, out),
+            other => out.push(other),
+        }
+    }
+}
+
 /// Serialises a filled document to PDF bytes.
 pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> Result<Vec<u8>> {
+    let flat: Vec<Vec<&PrintItem>> = doc
+        .pages
+        .iter()
+        .map(|p| {
+            let mut v = Vec::with_capacity(p.items.len());
+            flatten(&p.items, &mut v);
+            v
+        })
+        .collect();
     // 1. Which glyphs of which faces are used (and which characters they stand for).
     let mut used: BTreeMap<FaceId, BTreeMap<u16, char>> = BTreeMap::new();
-    for page in &doc.pages {
-        for item in &page.items {
+    for page in &flat {
+        for &item in page {
             if let PrintItem::Text(t) = item {
                 let face = fonts.face(t.face);
                 let entry = used.entry(t.face).or_default();
@@ -248,8 +267,8 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
 
     // 3. Images, written once each.
     let mut image_refs: BTreeMap<usize, (String, Ref)> = BTreeMap::new();
-    for page in &doc.pages {
-        for item in &page.items {
+    for page in &flat {
+        for &item in page {
             if let PrintItem::Image { image, .. } = item {
                 if image_refs.contains_key(&image.id) {
                     continue;
@@ -265,17 +284,17 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
     // 4. Pages.
     let mut page_ids = Vec::new();
     let ph = doc.page_height;
-    let pages: Vec<&crate::print::PrintPage> = doc.pages.iter().collect();
-    let empty = crate::print::PrintPage::default();
-    let pages = if pages.is_empty() { vec![&empty] } else { pages };
+    let empty: Vec<&PrintItem> = Vec::new();
+    let pages: Vec<&Vec<&PrintItem>> = if flat.is_empty() { vec![&empty] } else { flat.iter().collect() };
     for page in pages {
         let page_id = ids.next();
         let content_id = ids.next();
         page_ids.push(page_id);
         let mut c = Content::new();
         c.set_line_cap(LineCapStyle::ButtCap);
-        for item in &page.items {
+        for &item in page.iter() {
             match item {
+                PrintItem::Group(_) => {}
                 PrintItem::Rect { x, y, w, h, fill, stroke, radius } => {
                     let (px, py) = (*x, ph - y - h);
                     if let Some(color) = fill {

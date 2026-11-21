@@ -265,6 +265,11 @@ fn move_to_top(elements: &mut [Element]) -> f32 {
 
 fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
     match item {
+        PrintItem::Group(items) => {
+            for i in items {
+                translate(i, dx, dy);
+            }
+        }
         PrintItem::Rect { x, y, .. } | PrintItem::Ellipse { x, y, .. } | PrintItem::Shapes { x, y, .. } => {
             *x += dx;
             *y += dy;
@@ -327,9 +332,34 @@ fn text_value(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result
     }
 }
 
-/// Lays out text inside a box, returning the text item and the height the text needs.
+/// The base style of a text element's runs.
+fn run_style(te: &TextElement, color: Color) -> crate::rich::RunStyle {
+    crate::rich::RunStyle { font: te.style.font.clone(), color, back: None, script: crate::rich::Script::Normal }
+}
+
+/// Lays out text inside a box, returning what to draw and the height the text needs.
 #[allow(clippy::too_many_arguments)]
 fn text_item(
+    fonts: &mut FontSet,
+    te: &TextElement,
+    color: Color,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    text: &str,
+    clip: bool,
+) -> (PrintItem, f32) {
+    if te.markup != crate::rich::Markup::None {
+        let st = crate::rich::parse(text, &run_style(te, color), te.markup);
+        return crate::rich::layout(fonts, te, &st, x, y, w, h, clip);
+    }
+    let (t, needed) = plain_text_item(fonts, te, color, x, y, w, h, text, clip);
+    (PrintItem::Text(t), needed)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn plain_text_item(
     fonts: &mut FontSet,
     te: &TextElement,
     color: Color,
@@ -706,6 +736,36 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             }
             if y + h > a + 1e-3 {
                 match &el.kind {
+                    ElementKind::Text(te) if te.stretch && m.text.is_some() && te.markup != crate::rich::Markup::None => {
+                        // Styled text continues on the next page as styled markup.
+                        let text = m.text.take().unwrap_or_default();
+                        let base = run_style(te, el.forecolor);
+                        let st = crate::rich::parse(&text, &base, te.markup);
+                        let p = te.boxed.padding;
+                        let (k, total, rest_at) = crate::rich::lines_that_fit(
+                            &st,
+                            le.fonts,
+                            (w - p.left - p.right).max(0.0),
+                            te.style.line_spacing,
+                            a - y - p.top - p.bottom,
+                        );
+                        let cont = |s: String| {
+                            let mut e = freeze(el, Some(s));
+                            if let ElementKind::Text(t) = &mut e.kind {
+                                t.markup = crate::rich::Markup::Styled;
+                            }
+                            e
+                        };
+                        if k == 0 {
+                            rest.push(cont(st.to_styled_markup(&base)));
+                            continue;
+                        }
+                        if k < total {
+                            rest.push(cont(st.tail(rest_at).to_styled_markup(&base)));
+                        }
+                        m.text = Some(text);
+                        h = a - y;
+                    }
                     ElementKind::Text(te) if te.stretch && m.text.is_some() => {
                         let text = m.text.take().unwrap_or_default();
                         let face = le.fonts.resolve(&te.style.font);
@@ -793,8 +853,8 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 }
                 match m.text.take() {
                     Some(text) => {
-                        let (t, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
-                        out.items.push(Laid { item: PrintItem::Text(t), deferred: None });
+                        let (item, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
+                        out.items.push(Laid { item, deferred: None });
                     }
                     None => {
                         let (time, group) = match &te.content {
@@ -1588,8 +1648,8 @@ impl<'a> Filler<'a> {
             };
             let d = &p.text;
             let text = text_value(&d.element.content, &ctx, self.env)?;
-            let (t, _) = text_item(self.fonts, &d.element, d.forecolor, d.x, d.y, d.w, d.h, &text, true);
-            self.pages[p.page].items[p.item] = PrintItem::Text(t);
+            let (item, _) = text_item(self.fonts, &d.element, d.forecolor, d.x, d.y, d.w, d.h, &text, true);
+            self.pages[p.page].items[p.item] = item;
         }
         Ok(())
     }

@@ -26,6 +26,7 @@ pub mod jrxml;
 pub mod model;
 pub mod pdf;
 pub mod print;
+pub mod rich;
 pub mod text;
 pub mod value;
 mod xml;

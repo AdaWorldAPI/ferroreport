@@ -702,11 +702,17 @@ impl Parser {
                     valign: props.valign.unwrap_or(VAlign::Top),
                     line_spacing: props.line_spacing(),
                 };
-                if let Some(m) = attr(n, &["markup"]).or_else(|| n.child("textElement").and_then(|t| t.attr("markup"))) {
-                    if m != "none" && !m.is_empty() {
+                let te_node = n.child("textElement");
+                let markup = match attr(n, &["markup"]).or_else(|| te_node.and_then(|t| t.attr("markup"))) {
+                    Some("styled") => crate::rich::Markup::Styled,
+                    Some("html") => crate::rich::Markup::Html,
+                    Some(m) if m != "none" && !m.is_empty() => {
                         self.warnings.push(format!("markup=\"{m}\" is rendered as plain text"));
+                        crate::rich::Markup::None
                     }
-                }
+                    _ if te_node.and_then(|t| t.attr("isStyledText")).is_some_and(parse_bool) => crate::rich::Markup::Styled,
+                    _ => crate::rich::Markup::None,
+                };
                 if n.child("textElement").and_then(|t| t.attr("rotation")).is_some_and(|r| r != "None")
                     || n.attr("rotation").is_some_and(|r| r != "None")
                 {
@@ -738,7 +744,7 @@ impl Parser {
                         evaluation_group: n.attr("evaluationGroup").map(str::to_string),
                     }
                 };
-                ElementKind::Text(TextElement { content, style, boxed: props.box_style(forecolor), stretch })
+                ElementKind::Text(TextElement { content, style, boxed: props.box_style(forecolor), stretch, markup })
             }
             "line" => ElementKind::Line {
                 direction: if n.attr("direction") == Some("BottomUp") { LineDirection::BottomUp } else { LineDirection::TopDown },

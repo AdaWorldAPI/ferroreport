@@ -240,6 +240,7 @@ pub struct TextElement {
     pub style: TextStyle,
     pub boxed: BoxStyle,
     pub stretch: bool,
+    pub markup: crate::rich::Markup,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
