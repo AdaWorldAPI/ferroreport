@@ -1672,9 +1672,39 @@ impl Scope for CellScope<'_> {
                     }
                 }
             }
-            return Ok(self.filled.cell_values(row, column).get(k).cloned().unwrap_or(Value::Null));
+            let value = self.filled.cell_values(row, column).get(k).cloned().unwrap_or(Value::Null);
+            if m.percentage {
+                let total = self.filled.cell_values(&[], &[]).get(k).cloned().unwrap_or(Value::Null);
+                return Ok(percentage(&value, &total, m.class));
+            }
+            return Ok(value);
         }
         Err(Error::eval(format!("variable `{name}` is not a measure or group of the crosstab")))
+    }
+}
+
+/// `value` as a percentage of `total` (`JRPercentageCalculatorFactory`): `100 * value / total`
+/// in the measure's class (whole numbers divide as integers, BigDecimal rounds half up to the
+/// value's scale), and zero when the total is zero or missing.
+fn percentage(value: &Value, total: &Value, class: JavaType) -> Value {
+    if value.is_null() {
+        return Value::Null;
+    }
+    if total.as_f64().map_or(true, |t| t == 0.0) {
+        return class.zero();
+    }
+    match class {
+        JavaType::BigDecimal => {
+            let (Some(v), Some(t)) = (value.as_decimal(), total.as_decimal()) else { return class.zero() };
+            let scaled = v * rust_decimal::Decimal::from(100);
+            let q = scaled.checked_div(t).unwrap_or_default();
+            Value::Decimal(q.round_dp_with_strategy(scaled.scale(), rust_decimal::RoundingStrategy::MidpointAwayFromZero))
+        }
+        JavaType::Integer | JavaType::Short | JavaType::Byte | JavaType::Long | JavaType::BigInteger => {
+            let (v, t) = (value.as_i64().unwrap_or(0), total.as_i64().unwrap_or(1).max(1));
+            class.coerce(Value::Long(v.wrapping_mul(100) / t))
+        }
+        _ => class.coerce(Value::Double(100.0 * value.as_f64().unwrap_or(0.0) / total.as_f64().unwrap_or(1.0))),
     }
 }
 
@@ -1771,8 +1801,9 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
     // (not the rows again), which decides how floating-point sums round.
     {
         use crate::crosstab::{prefixes, sorted_paths};
-        let rows_sorted = sorted_paths(&row_paths, &order(&ct.row_groups));
-        let columns_sorted = sorted_paths(&column_paths, &order(&ct.column_groups));
+        let natural = HashMap::new();
+        let rows_sorted = sorted_paths(&row_paths, &order(&ct.row_groups), &natural);
+        let columns_sorted = sorted_paths(&column_paths, &order(&ct.column_groups), &natural);
         let cell = |r: &[Value], c: &[Value]| format!("{}|{}", key(r), key(c));
         let merge_into = |target: String, parts: Vec<String>, aggregates: &mut HashMap<String, Vec<VarState>>| {
             let merged: Vec<Option<VarState>> = (0..defs.len())
@@ -1818,19 +1849,8 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
             }
         }
     }
-    let rows = if records.is_empty() { Vec::new() } else { leaves(&row_paths, &totals(&ct.row_groups), &order(&ct.row_groups)) };
-    let columns = if records.is_empty() {
-        Vec::new()
-    } else {
-        leaves(&column_paths, &totals(&ct.column_groups), &order(&ct.column_groups))
-    };
-    let (widths, heights) = sizes(ct);
-    let column_widths: Vec<f32> = columns.iter().map(|c| widths[c.level]).collect();
-    let row_heights: Vec<f32> = rows.iter().map(|r| heights[r.level]).collect();
-    let header_w: f32 = ct.row_groups.iter().map(|g| g.size).sum();
-    let parts = split_parts(&column_widths, header_w, ct.repeat_row_headers, el.width);
     // A cell without data shows zero for sums and counts, nothing for the rest.
-    let empty = ct
+    let empty: Vec<Value> = ct
         .measures
         .iter()
         .map(|m| match m.calculation {
@@ -1838,8 +1858,48 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
             _ => Value::Null,
         })
         .collect();
-    let values = aggregates.into_iter().map(|(k, states)| (k, states.into_iter().map(|s| s.value).collect())).collect();
-    Ok(Arc::new(Filled { crosstab: ct.clone(), rows, columns, row_heights, column_widths, values, empty, params, parts }))
+    let values: HashMap<String, Vec<Value>> =
+        aggregates.into_iter().map(|(k, states)| (k, states.into_iter().map(|s| s.value).collect())).collect();
+    let mut filled = Filled {
+        crosstab: ct.clone(),
+        rows: Vec::new(),
+        columns: Vec::new(),
+        row_heights: Vec::new(),
+        column_widths: Vec::new(),
+        values,
+        empty,
+        params,
+        parts: Vec::new(),
+    };
+    // `orderByExpression`: each bucket's sort value, computed on its totals.
+    let mut row_order = HashMap::new();
+    let mut column_order = HashMap::new();
+    for (row_axis, groups, paths) in [(true, &ct.row_groups, &row_paths), (false, &ct.column_groups, &column_paths)] {
+        for (i, g) in groups.iter().enumerate() {
+            let Some(e) = &g.order_by else { continue };
+            let sorted = crate::crosstab::sorted_paths(paths, &order(groups), &HashMap::new());
+            for prefix in crate::crosstab::prefixes(&sorted, i + 1) {
+                let none: &[Value] = &[];
+                let (row, column) = if row_axis { (&prefix[..], none) } else { (none, &prefix[..]) };
+                let v = eval(e, &CellScope { filled: &filled, row, column, outer: le.scope }, le.env)?;
+                if row_axis {
+                    row_order.insert(key(&prefix), v);
+                } else {
+                    column_order.insert(key(&prefix), v);
+                }
+            }
+        }
+    }
+    if !records.is_empty() {
+        filled.rows = leaves(&row_paths, &totals(&ct.row_groups), &order(&ct.row_groups), &row_order);
+        filled.columns = leaves(&column_paths, &totals(&ct.column_groups), &order(&ct.column_groups), &column_order);
+    }
+    let (widths, heights) = sizes(ct);
+    filled.column_widths = filled.columns.iter().map(|c| widths[c.level]).collect();
+    filled.row_heights = filled.rows.iter().map(|r| heights[r.level]).collect();
+    let header_w: f32 = ct.row_groups.iter().map(|g| g.size).sum();
+    filled.parts = split_parts(&filled.column_widths, header_w, ct.repeat_row_headers, el.width);
+    Ok(Arc::new(filled))
 }
 
 /// Combines the aggregates of several buckets in order, the way JasperReports computes crosstab

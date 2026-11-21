@@ -577,8 +577,8 @@ impl Parser {
                 _ => HeaderPosition::Start,
             };
             let bucket = g.child("bucket");
-            if bucket.is_some_and(|b| b.child("comparatorExpression").is_some() || b.child("orderByExpression").is_some()) {
-                self.warnings.push("crosstab bucket comparators and orderByExpression are ignored (values are sorted)".into());
+            if bucket.is_some_and(|b| b.child("comparatorExpression").is_some()) {
+                self.warnings.push("crosstab bucket comparators are ignored (values are sorted naturally)".into());
             }
             let header_node = |names: &[&str]| {
                 g.children
@@ -609,6 +609,10 @@ impl Parser {
                     None => None,
                 },
                 descending: bucket.and_then(|b| b.attr("order")) == Some("Descending"),
+                order_by: match bucket {
+                    Some(b) => self.child_expr(b, &["orderByExpression"])?,
+                    None => None,
+                },
                 class: JavaType::from_class_name(bucket.and_then(|b| b.attr("class")).unwrap_or("java.lang.String")),
                 header,
                 total_header,
@@ -621,9 +625,6 @@ impl Parser {
         }
         let mut measures = Vec::new();
         for m in n.children_named("measure") {
-            if m.attr("percentageOf").is_some() {
-                self.warnings.push("crosstab measures with percentageOf show the plain value".into());
-            }
             let calculation = match m.attr("calculation") {
                 Some("Count") => Calculation::Count,
                 Some("DistinctCount") => Calculation::DistinctCount,
@@ -641,6 +642,7 @@ impl Parser {
                 class: JavaType::from_class_name(m.attr("class").unwrap_or("java.lang.Object")),
                 calculation,
                 expr: self.child_expr(m, &["measureExpression", "expression"])?,
+                percentage: m.attr("percentageOf") == Some("GrandTotal"),
             });
         }
         let mut cells = Vec::new();

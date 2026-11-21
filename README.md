@@ -13,9 +13,9 @@ that **cannot run code** on your server.
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
 
-> Status: **preview.** All 28 comparable test templates render pixel for pixel like
+> Status: **preview.** All 29 comparable test templates render pixel for pixel like
 > JasperReports 6.20, including band splitting, images, subreports, tables, lists, crosstabs, QR codes and barcodes, styled text and
-> multi-column layouts; charts follow JFreeChart's look closely. All 30 also export the same
+> multi-column layouts; charts follow JFreeChart's look closely. All 31 also export the same
 > Excel and CSV files as Jasper. Some features are still missing; see
 > [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
 
@@ -137,7 +137,7 @@ spreadsheet made from a template looks the way it did with Jasper:
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 element syntax; subdatasets (for tables) | `.jasper` files (by design), scriptlets, style templates, subdataset queries |
 | Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical print order, `isStartNewColumn`, column breaks) | horizontal print order |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical), charts, barcodes (barcode4j components: QR code, Code 128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), page break (applied after its band) | crosstab `percentageOf`, bucket comparators and `orderByExpression`, crosstabs over a group's rows, horizontal lists, UPC-E, EAN-128, PDF417, DataMatrix, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical), charts, barcodes (barcode4j components: QR code, Code 128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, horizontal lists, UPC-E, EAN-128, PDF417, DataMatrix, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled and HTML markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks, lists), also across page breaks; rotation (Left, Right, UpsideDown) | RTF markup |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style, parent styles, element overrides, conditional styles (up to 4 per style) | |
@@ -161,12 +161,12 @@ Run `ferroreport doctor template.jrxml` to get this verdict for a specific templ
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-28 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
+29 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
 (`crates/ferroreport/tests/barcode4j.rs`).
 
 `tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
 XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
-same, and every picture anchored to the same cells. All 30 fixtures pass. Jasper's output for five
+same, and every picture anchored to the same cells. All 31 fixtures pass. Jasper's output for five
 of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 | Fixture | What it exercises | Result |
@@ -202,6 +202,7 @@ of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them withou
 | 29-list | List component: contact cards with stretching notes, an empty list, a list spanning pages | identical |
 | 30-crosstab | Crosstab as Jaspersoft Studio builds it: two row groups and a column group with totals, header cell, styled cells | identical |
 | 31-crosstab-pages | Crosstab per detail row over a subdataset: two column groups, totals at the start, descending order, centered headers, Sum/Count/Average measures, crosstab parameter, column parts and rows across pages | identical |
+| 32-crosstab-percent | Crosstab with percentages of the grand total (BigDecimal and Integer) and regions ordered by their total sales | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.

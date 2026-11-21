@@ -33,20 +33,39 @@ pub(crate) fn key(values: &[Value]) -> String {
 
 /// The leaves of one axis, in print order, from the distinct bucket paths found in the data.
 /// `totals[i]` says where the total of group `i` goes; `descending[i]` how its values sort.
-pub(crate) fn leaves(paths: &[Vec<Value>], totals: &[TotalPosition], descending: &[bool]) -> Vec<Leaf> {
-    let sorted = sorted_paths(paths, descending);
+pub(crate) fn leaves(
+    paths: &[Vec<Value>],
+    totals: &[TotalPosition],
+    descending: &[bool],
+    order_by: &HashMap<String, Value>,
+) -> Vec<Leaf> {
+    let sorted = sorted_paths(paths, descending, order_by);
     let sorted: Vec<&Vec<Value>> = sorted.iter().collect();
     let mut out = Vec::new();
     walk(&sorted, 0, &[], totals, &mut out);
     out
 }
 
-/// Distinct bucket paths in print order.
-pub(crate) fn sorted_paths(paths: &[Vec<Value>], descending: &[bool]) -> Vec<Vec<Value>> {
+/// Distinct bucket paths in print order. `order_by` holds the sort value of the buckets of
+/// groups with an `orderByExpression`, by `key(path prefix)`; ties keep the natural order.
+pub(crate) fn sorted_paths(paths: &[Vec<Value>], descending: &[bool], order_by: &HashMap<String, Value>) -> Vec<Vec<Value>> {
     let n = descending.len();
     let mut sorted: Vec<Vec<Value>> = paths.to_vec();
     sorted.sort_by(|a, b| {
         for i in 0..n {
+            let by = (order_by.get(&key(&a[..=i])), order_by.get(&key(&b[..=i])));
+            if let (Some(x), Some(y)) = by {
+                let ord = compare(x, y);
+                let ord = if descending[i] { ord.reverse() } else { ord };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+                let natural = compare(&a[i], &b[i]);
+                if natural != std::cmp::Ordering::Equal {
+                    return natural;
+                }
+                continue;
+            }
             let ord = compare(&a[i], &b[i]);
             let ord = if descending[i] { ord.reverse() } else { ord };
             if ord != std::cmp::Ordering::Equal {
@@ -416,13 +435,14 @@ mod tests {
     #[test]
     fn leaves_sort_and_place_totals() {
         let paths = vec![vec![s("Sur"), s("Azua")], vec![s("Este"), s("Higuey")], vec![s("Este"), s("Bani")]];
-        let l = leaves(&paths, &[TotalPosition::End, TotalPosition::End], &[false, false]);
+        let none = HashMap::new();
+        let l = leaves(&paths, &[TotalPosition::End, TotalPosition::End], &[false, false], &none);
         let names: Vec<String> = l
             .iter()
             .map(|x| format!("{}:{}", x.level, x.values.iter().map(|v| v.to_java_string()).collect::<Vec<_>>().join("/")))
             .collect();
         assert_eq!(names, ["2:Este/Bani", "2:Este/Higuey", "1:Este", "2:Sur/Azua", "1:Sur", "0:"]);
-        let l = leaves(&paths, &[TotalPosition::Start, TotalPosition::None], &[true, false]);
+        let l = leaves(&paths, &[TotalPosition::Start, TotalPosition::None], &[true, false], &none);
         let names: Vec<String> = l.iter().map(|x| format!("{}", x.level)).collect();
         assert_eq!(names, ["0", "2", "2", "2"]);
         assert_eq!(l[1].values[0].to_java_string(), "Sur");

@@ -376,9 +376,13 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
           the row headers repeated. One taller than the page continues on the next page with the column headers repeated
           (<code>repeatColumnHeaders</code>, <code>repeatRowHeaders</code>).</li>
         <li><code>&lt;crosstabParameter&gt;</code> values are evaluated in the report and read with <code>$P{}</code> inside the crosstab.</li>
+        <li><code>percentageOf="GrandTotal"</code> shows a measure as a percentage of the grand total (<code>100 × value / total</code>, in the
+          measure's class: whole numbers divide as integers, BigDecimal rounds half up).</li>
+        <li><code>orderByExpression</code> sorts a group's buckets by a value computed on each bucket's totals, for example
+          <code>$V{amountMeasure}</code> to list regions by their sales; ties keep the natural order.</li>
       </ul>
-      <p>Not yet: <code>percentageOf</code> measures, bucket comparators and <code>orderByExpression</code>, and crosstabs over the rows of a
-        group only (they use all the rows read so far). <code>ferroreport doctor</code> warns about these.</p>
+      <p>Not yet: bucket comparators (<code>comparatorExpression</code>), and crosstabs over the rows of a group only (they use all the rows
+        read so far). <code>ferroreport doctor</code> warns about these.</p>
 
       <h2 id="excel">Excel and CSV</h2>
       <p>A template that renders to PDF also exports to an Excel workbook (<code>.xlsx</code>) or a CSV file. Both follow JasperReports' own

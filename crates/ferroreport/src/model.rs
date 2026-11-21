@@ -569,6 +569,9 @@ pub struct CrosstabGroup {
     pub header_position: HeaderPosition,
     pub bucket: Option<Expr>,
     pub descending: bool,
+    /// Sorts the buckets by this value, computed on each bucket's totals, instead of by the
+    /// bucket values.
+    pub order_by: Option<Expr>,
     pub class: JavaType,
     /// Header and total header contents, as frames of their design size.
     pub header: Option<Element>,
@@ -582,6 +585,8 @@ pub struct CrosstabMeasure {
     pub class: JavaType,
     pub calculation: Calculation,
     pub expr: Option<Expr>,
+    /// `percentageOf="GrandTotal"`: the value is shown as a percentage of the grand total.
+    pub percentage: bool,
 }
 
 /// The contents of one kind of crosstab cell: detail, or a total of a row and/or column group.
