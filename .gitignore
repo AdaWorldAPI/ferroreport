@@ -2,3 +2,4 @@
 *.pdf
 !fixtures/**/*.pdf
 *.jasper
+!site/examples/*/jasper.pdf
