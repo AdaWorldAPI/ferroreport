@@ -21,8 +21,22 @@ plantillas que no escribiste tú.
   expresiones con una lista cerrada de operaciones: sin reflexión, sin carga de clases, sin
   acceso a la red. Las imágenes y subreportes solo se leen de las carpetas de recursos de la
   plantilla.
-- **Úsalo desde cualquier lenguaje.** Hoy como CLI y librería de Rust; los bindings para Node,
-  Python y WebAssembly están en el roadmap.
+- **Úsalo desde cualquier lenguaje.** Paquetes para JavaScript (Node.js, Deno, Bun y
+  navegadores) y Python, librería de Rust, CLI, y una API HTTP en imagen Docker para todo lo
+  demás (Java, C#, PHP, Go, Ruby...).
+
+## Desde tu lenguaje
+
+- **JavaScript/TypeScript:** `npm install ferroreport` y
+  `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF.
+- **Python:** `pip install ferroreport` y
+  `ferroreport.render("factura.jrxml", filas, parametros, locale="es_DO")`.
+- **Cualquier lenguaje por HTTP:**
+  `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates ghcr.io/cristianencarnacion/ferroreport`
+  y luego `POST /render/factura` con `{"data": [...], "params": {...}}` te devuelve el PDF.
+- **Rust:** `cargo add ferroreport`. **Línea de comandos:** binarios en
+  [Releases](https://github.com/cristianEncarnacion/ferroreport/releases); `-d -` y `-o -` leen
+  las filas de stdin y escriben el PDF en stdout.
 
 ## Inicio rápido
 

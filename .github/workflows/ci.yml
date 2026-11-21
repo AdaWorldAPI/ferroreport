@@ -17,6 +17,62 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --exclude ferroreport-python -- -D warnings
       - run: cargo test
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: cargo clippy -p ferroreport-python -- -D warnings
+      - run: pip install maturin pytest
+      - run: maturin build --release -m bindings/python/Cargo.toml -o dist
+      - run: pip install dist/*.whl && pytest -q bindings/python/tests
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-bindgen-cli matching Cargo.lock
+        run: |
+          V=$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          echo "WASM_BINDGEN=wasm-bindgen-cli@$V" >> "$GITHUB_ENV"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: ${{ env.WASM_BINDGEN }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: bindings/wasm/build.sh
+      - run: node bindings/wasm/tests/smoke.mjs
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t ferroreport:ci .
+      - name: Smoke-test the HTTP API
+        run: |
+          docker run -d --name fr -p 8080:8080 ferroreport:ci
+          for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
+          python3 - <<'EOF'
+          import json, urllib.request
+          tpl = open("fixtures/01-employee-list/report.jrxml").read()
+          data = json.load(open("fixtures/01-employee-list/data.json"))
+          req = urllib.request.Request("http://localhost:8080/render", method="POST",
+              data=json.dumps({"template": tpl, "data": data}).encode(),
+              headers={"Content-Type": "application/json"})
+          pdf = urllib.request.urlopen(req).read()
+          assert pdf.startswith(b"%PDF"), pdf[:200]
+          print("ok", len(pdf))
+          EOF

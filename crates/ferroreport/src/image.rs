@@ -33,6 +33,8 @@ pub struct ImageData {
 #[derive(Debug, Default)]
 pub struct ImageStore {
     roots: Vec<PathBuf>,
+    /// Resources given in memory, by relative path (looked up before the directories).
+    files: HashMap<String, Arc<[u8]>>,
     by_key: HashMap<String, Arc<ImageData>>,
     next_id: usize,
     /// Parsed subreport templates by location.
@@ -51,6 +53,21 @@ impl ImageStore {
         self.roots.push(dir.into());
     }
 
+    /// Adds a resource held in memory under a relative path (`"logo.png"`, `"sub/lines.jrxml"`).
+    pub fn add_file(&mut self, name: &str, data: impl Into<Arc<[u8]>>) {
+        self.files.insert(normalize_name(name), data.into());
+    }
+
+    /// Reads a resource by relative location: in-memory files first, then the directories.
+    fn read(&self, location: &str) -> Result<Vec<u8>> {
+        check_relative(location)?;
+        if let Some(data) = self.files.get(&normalize_name(location)) {
+            return Ok(data.to_vec());
+        }
+        let path = self.resolve(location)?;
+        std::fs::read(&path).map_err(|e| Error::Data(format!("`{location}`: {e}")))
+    }
+
     /// Resolves a location string (a relative path, or a `data:` URI) to an image.
     pub fn load_location(&mut self, location: &str) -> Result<Arc<ImageData>> {
         if let Some(img) = self.by_key.get(location) {
@@ -63,7 +80,7 @@ impl ImageStore {
         } else if location.contains("://") {
             return Err(Error::Unsupported(format!("image `{location}`: remote images are not fetched")));
         } else {
-            std::fs::read(self.resolve(location)?).map_err(|e| Error::Data(format!("image `{location}`: {e}")))?
+            self.read(location)?
         };
         let img = self.decode(&bytes)?;
         self.by_key.insert(location.to_string(), img.clone());
@@ -83,8 +100,8 @@ impl ImageStore {
             Some(stem) => format!("{stem}.jrxml"),
             None => location.to_string(),
         };
-        let path = self.resolve(&source)?;
-        let text = std::fs::read_to_string(&path).map_err(|e| Error::Data(format!("subreport `{source}`: {e}")))?;
+        let bytes = self.read(&source)?;
+        let text = String::from_utf8(bytes).map_err(|_| Error::Data(format!("subreport `{source}` is not UTF-8")))?;
         let report = Arc::new(crate::jrxml::parse_report(&text)?);
         self.reports.insert(location.to_string(), report.clone());
         Ok(report)
@@ -103,13 +120,9 @@ impl ImageStore {
 
     fn resolve(&self, location: &str) -> Result<PathBuf> {
         let rel = Path::new(location);
-        let escapes = rel.is_absolute()
-            || rel.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_)));
-        if escapes {
-            return Err(Error::Unsupported(format!("`{location}`: paths must be relative to the template's resource directory")));
-        }
-        let roots: Vec<PathBuf> = if self.roots.is_empty() { vec![PathBuf::from(".")] } else { self.roots.clone() };
-        roots
+        // Without resource directories nothing is read from disk (not even the working
+        // directory): only in-memory resources are available.
+        self.roots
             .iter()
             .map(|r| r.join(rel))
             .find(|p| p.is_file())
@@ -219,6 +232,24 @@ fn decode_jpeg(bytes: &[u8], id: usize) -> Result<ImageData> {
         i += 2 + len;
     }
     Err(Error::Data("JPEG: no frame header found".into()))
+}
+
+/// Refuses absolute paths and paths that climb out of the resource directories.
+fn check_relative(location: &str) -> Result<()> {
+    let rel = Path::new(location);
+    let escapes = rel.is_absolute()
+        || location.starts_with('/')
+        || location.starts_with('\\')
+        || rel.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || location.split(['/', '\\']).any(|part| part == "..");
+    if escapes {
+        return Err(Error::Unsupported(format!("`{location}`: paths must be relative to the template's resource directory")));
+    }
+    Ok(())
+}
+
+fn normalize_name(name: &str) -> String {
+    name.replace('\\', "/").trim_start_matches("./").to_string()
 }
 
 #[cfg(test)]

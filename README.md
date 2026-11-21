@@ -22,8 +22,46 @@ with templates you did not write.
   (CVE-2025-10492, CVE-2026-6009). ferroreport never deserializes objects and interprets
   expressions from a fixed allow-list: no reflection, no class loading, no network access. Images
   and subreports are only read from the template's resource directories.
-- **Use it from anything.** CLI today; Rust library today; Node, Python and WebAssembly
-  bindings are on the roadmap.
+- **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers) and
+  Python, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (Java,
+  C#, PHP, Go, Ruby...).
+
+## Use it from your language
+
+**JavaScript / TypeScript** (Node.js, Deno, Bun, browsers): `npm install ferroreport`
+
+```js
+import { render } from "ferroreport";
+const pdf = render(jrxmlSource, rows, { CUSTOMER: "Distribuidora Caribe" }, { locale: "es_DO" });
+```
+
+**Python**: `pip install ferroreport`
+
+```python
+import ferroreport
+pdf = ferroreport.render("invoice.jrxml", rows, {"CUSTOMER": "Distribuidora Caribe"}, locale="es_DO")
+```
+
+**Any language, over HTTP** (Java, C#, PHP, Go, Ruby...):
+
+```bash
+docker run -p 8080:8080 -v "$PWD/templates:/templates" -e FERROREPORT_TEMPLATES=/templates \
+  ghcr.io/cristianencarnacion/ferroreport
+
+curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
+  -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf
+```
+
+`POST /render` also accepts the template itself (`{"template": "<jasperReport...", "data": ...,
+"resources": {"logo.png": "<base64>"}}`), `POST /inspect` reports unsupported features, and
+`GET /health` is there for load balancers. Set `FERROREPORT_TOKEN` to require a bearer token.
+
+**Rust**: `cargo add ferroreport` (example below). **Command line**: download a binary from
+[Releases](https://github.com/cristianEncarnacion/ferroreport/releases) or `cargo install
+ferroreport-cli`; `-d -` and `-o -` read rows from stdin and write the PDF to stdout, which
+makes it easy to call from scripts.
+
+Language packages are published by the [release workflow](RELEASING.md).
 
 ## Quick start
 

@@ -1,0 +1,32 @@
+{
+  "name": "ferroreport",
+  "version": "0.1.0",
+  "description": "Render JasperReports JRXML templates to PDF in JavaScript (Node.js, Deno, Bun, browsers). No JVM, pixel-identical output, safe with untrusted templates.",
+  "license": "MIT OR Apache-2.0",
+  "author": "Cristian Encarnacion",
+  "homepage": "https://github.com/cristianEncarnacion/ferroreport#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cristianEncarnacion/ferroreport.git",
+    "directory": "bindings/wasm"
+  },
+  "bugs": "https://github.com/cristianEncarnacion/ferroreport/issues",
+  "keywords": ["jasperreports", "jrxml", "pdf", "report", "invoice", "wasm"],
+  "main": "./node/ferroreport.js",
+  "types": "./node/ferroreport.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./node/ferroreport.d.ts",
+        "default": "./node/ferroreport.js"
+      },
+      "default": {
+        "types": "./web/ferroreport.d.ts",
+        "default": "./web/ferroreport.js"
+      }
+    }
+  },
+  "files": ["node/", "web/", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "sideEffects": false,
+  "engines": { "node": ">=18" }
+}

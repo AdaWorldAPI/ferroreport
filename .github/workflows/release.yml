@@ -1,0 +1,219 @@
+# Publishes a release when a tag like v0.1.0 is pushed:
+#   - CLI binaries (Linux, macOS, Windows) on the GitHub release
+#   - Docker image on ghcr.io/cristianencarnacion/ferroreport
+#   - npm package `ferroreport` (WebAssembly)
+#   - PyPI package `ferroreport` (wheels for Linux, macOS, Windows)
+#   - crates.io crates `ferroreport` and `ferroreport-cli`
+# GitHub release and Docker image need no setup. Each registry job runs once its repository
+# variable (PUBLISH_NPM, PUBLISH_PYPI, PUBLISH_CRATES) is "true"; see RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, name: linux-x86_64, docker: amd64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, name: linux-aarch64, docker: arm64 }
+          - { os: macos-latest, target: x86_64-apple-darwin, name: macos-x86_64 }
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-aarch64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked -p ferroreport-cli --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist pkg/ferroreport-${{ matrix.name }}
+          EXE=ferroreport; [[ "${{ matrix.target }}" == *windows* ]] && EXE=ferroreport.exe
+          cp target/${{ matrix.target }}/release/$EXE README.md LICENSE-MIT LICENSE-APACHE pkg/ferroreport-${{ matrix.name }}/
+          cd pkg
+          if [[ "$EXE" == *.exe ]]; then
+            7z a ../dist/ferroreport-${{ matrix.name }}.zip ferroreport-${{ matrix.name }} >/dev/null
+          else
+            tar czf ../dist/ferroreport-${{ matrix.name }}.tar.gz ferroreport-${{ matrix.name }}
+          fi
+          cd ..
+          if [ -n "${{ matrix.docker }}" ]; then cp target/${{ matrix.target }}/release/ferroreport dist/ferroreport-linux-${{ matrix.docker }}; fi
+      - uses: actions/upload-artifact@v5
+        with:
+          name: bin-${{ matrix.name }}
+          path: dist/*
+
+  github-release:
+    needs: binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: bin-*
+          merge-multiple: true
+          path: dist
+      - run: cd dist && sha256sum ferroreport-*.tar.gz ferroreport-*.zip > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+
+  docker:
+    needs: binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: bin-linux-*
+          merge-multiple: true
+          path: dist
+      - run: chmod +x dist/ferroreport-linux-*
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/ferroreport
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  npm:
+    if: vars.PUBLISH_NPM == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-bindgen-cli matching Cargo.lock
+        run: |
+          V=$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          echo "WASM_BINDGEN=wasm-bindgen-cli@$V" >> "$GITHUB_ENV"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: ${{ env.WASM_BINDGEN }},binaryen
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest
+      - run: bindings/wasm/build.sh && node bindings/wasm/tests/smoke.mjs
+      - name: Publish (trusted publishing, or NPM_TOKEN for the very first release)
+        working-directory: bindings/wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64, manylinux: auto }
+          - { os: ubuntu-24.04-arm, target: aarch64, manylinux: auto }
+          - { os: ubuntu-latest, target: x86_64, manylinux: musllinux_1_2 }
+          - { os: macos-latest, target: x86_64 }
+          - { os: macos-latest, target: aarch64 }
+          - { os: windows-latest, target: x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'auto' }}
+          args: --release --out dist -m bindings/python/Cargo.toml
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}-${{ matrix.manylinux || 'none' }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m bindings/python/Cargo.toml
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wheels-sdist
+          path: dist
+
+  pypi:
+    if: vars.PUBLISH_PYPI == 'true'
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  crates:
+    if: vars.PUBLISH_CRATES == 'true'
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      HAS_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Authenticate (trusted publishing)
+        id: auth
+        if: ${{ env.HAS_TOKEN != 'true' }}
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
+        run: |
+          cargo publish --locked -p ferroreport
+          cargo publish --locked -p ferroreport-cli

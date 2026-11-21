@@ -1,0 +1,23 @@
+[package]
+name = "ferroreport-wasm"
+description = "WebAssembly bindings for ferroreport (Node.js, Deno, Bun and browsers)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ferroreport = { path = "../../crates/ferroreport" }
+serde_json = "1"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+serde = "1"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O2", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

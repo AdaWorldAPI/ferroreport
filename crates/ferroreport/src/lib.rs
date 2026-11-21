@@ -84,6 +84,19 @@ impl Renderer {
         self
     }
 
+    /// Adds a resource (image or subreport template) held in memory, under the relative path
+    /// templates use for it. Useful where there is no file system (WebAssembly) or when
+    /// templates come from a database.
+    pub fn resource(mut self, name: &str, data: impl Into<std::sync::Arc<[u8]>>) -> Renderer {
+        self.images.add_file(name, data);
+        self
+    }
+
+    /// Like [`Renderer::resource`], for a renderer already built.
+    pub fn add_resource(&mut self, name: &str, data: impl Into<std::sync::Arc<[u8]>>) {
+        self.images.add_file(name, data);
+    }
+
     /// Registers an additional TrueType/OpenType font family.
     pub fn register_font(&mut self, family: &str, bold: bool, italic: bool, data: Vec<u8>) -> Result<()> {
         self.fonts.register(family, bold, italic, data)

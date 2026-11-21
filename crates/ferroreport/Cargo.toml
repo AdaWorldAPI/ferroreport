@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+readme = "../../README.md"
+homepage.workspace = true
 keywords = ["jasperreports", "jrxml", "pdf", "report"]
 categories = ["text-processing", "template-engine"]
 

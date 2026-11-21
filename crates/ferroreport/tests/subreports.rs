@@ -90,3 +90,24 @@ fn templates_outside_the_resource_dirs_are_refused() {
         assert!(msg.contains("relative") || msg.contains("remote"), "{location}: {msg}");
     }
 }
+
+#[test]
+fn resources_can_be_given_in_memory() {
+    let template = MAIN
+        .replace(
+            "DATA_SOURCE",
+            r#"((net.sf.jasperreports.engine.data.JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("items")"#,
+        )
+        .replace("LOCATION", r#""sub.jasper""#);
+    let rows = serde_json::json!([{"name": "A", "items": [{"sku": "a1"}]}]);
+    let pdf = Renderer::new()
+        .resource("sub.jrxml", SUB.as_bytes().to_vec())
+        .render_json(&template, &rows, &serde_json::json!({}))
+        .unwrap();
+    assert!(pdf.starts_with(b"%PDF"));
+    // Paths that climb out are refused for in-memory resources too.
+    let escaping = template.replace(r#""sub.jasper""#, r#""../sub.jasper""#);
+    let err =
+        Renderer::new().resource("sub.jrxml", SUB.as_bytes().to_vec()).render_json(&escaping, &rows, &serde_json::json!({}));
+    assert!(err.is_err());
+}

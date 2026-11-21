@@ -1,0 +1,56 @@
+# ferroreport for JavaScript
+
+Render **JasperReports `.jrxml` templates to PDF** from Node.js, Deno, Bun or the browser. No JVM:
+the engine is Rust compiled to WebAssembly. Output is verified pixel by pixel against
+JasperReports 6.20, and templates cannot run code or read files, so they are safe to accept
+from users.
+
+```bash
+npm install ferroreport
+```
+
+```js
+// Node.js, Bun, Deno (npm:ferroreport)
+import { render } from "ferroreport";
+import { readFileSync, writeFileSync } from "node:fs";
+
+const pdf = render(
+  readFileSync("invoice.jrxml", "utf8"),
+  [{ item: "Cemento Portland", qty: 10, price: 395 }],      // rows for the fields
+  { CUSTOMER: "Distribuidora Caribe" },                      // parameters
+  {
+    locale: "es_DO",
+    // Images and subreports referenced by the template, by the path it uses:
+    resources: { "logo.png": readFileSync("logo.png"), "lines.jrxml": readFileSync("lines.jrxml") },
+  },
+);
+writeFileSync("invoice.pdf", pdf);
+```
+
+In browsers (and bundlers that do not pick the Node build), initialise the module first:
+
+```js
+import init, { render } from "ferroreport";
+await init();
+const pdf = render(template, rows, params, { locale: "en_US" });
+const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+```
+
+## API
+
+- `render(template, data?, params?, options?) => Uint8Array`
+  - `template`: the JRXML source text.
+  - `data`: array of row objects (or JSON text). Nested arrays feed subreports.
+  - `params`: object with parameter values (or JSON text).
+  - `options.locale`: `en_US`, `es_DO`, `es_MX`, `es_ES`, ...
+  - `options.resources`: `{ [path]: Uint8Array | string }` images (PNG, JPEG) and subreport
+    templates (a subreport named `lines.jasper` is read from `lines.jrxml`).
+  - `options.now`: value of `new Date()` in expressions (`Date` or ISO string).
+- `inspect(template) => { name, parameters, fields, warnings }`: `warnings` lists what the
+  engine does not support in that template yet.
+- `version() => string`
+
+Throws an `Error` with the reason when a template cannot be rendered.
+
+See the [project README](https://github.com/cristianEncarnacion/ferroreport) for the list of
+supported JasperReports features, benchmarks and other languages.

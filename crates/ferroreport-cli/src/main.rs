@@ -6,17 +6,20 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
+mod serve;
+
 const USAGE: &str = "\
 ferroreport — render JasperReports JRXML templates to PDF, no JVM required
 
 USAGE:
     ferroreport render <template.jrxml> [OPTIONS]
     ferroreport doctor <template.jrxml>
+    ferroreport serve [OPTIONS]
 
 RENDER OPTIONS:
-    -d, --data <file.json>      JSON array of rows (omit for reports without data)
+    -d, --data <file.json>      JSON array of rows (omit for reports without data; - reads stdin)
     -p, --params <file.json>    JSON object with parameter values
-    -o, --output <file.pdf>     Output file (default: <template>.pdf)
+    -o, --output <file.pdf>     Output file (default: <template>.pdf; - writes stdout)
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
@@ -28,6 +31,15 @@ RENDER OPTIONS:
 
 DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
+
+SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect):
+        --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
+    -P, --port <n>              Port (default: 8080)
+    -t, --templates <dir>       Directory of templates for POST /render/<name>
+    -r, --resources <dir>       Extra directory for images and subreports (repeatable)
+        --token <secret>        Require `Authorization: Bearer <secret>` (or FERROREPORT_TOKEN)
+        --max-body <MB>         Largest request accepted (default: 50)
+        --workers <n>           Requests rendered in parallel (default: CPU count)
 ";
 
 fn main() -> ExitCode {
@@ -35,6 +47,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("render") => render(&args[1..]),
         Some("doctor") => doctor(&args[1..]),
+        Some("serve") => serve(&args[1..]),
         Some("-V") | Some("--version") => {
             println!("ferroreport {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -56,7 +69,13 @@ fn main() -> ExitCode {
 type CliResult = Result<(), Box<dyn std::error::Error>>;
 
 fn read_json(path: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    let text = if path == "-" {
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut s).map_err(|e| format!("stdin: {e}"))?;
+        s
+    } else {
+        std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?
+    };
     Ok(serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?)
 }
 
@@ -124,7 +143,13 @@ fn render(args: &[String]) -> CliResult {
     let doc = renderer.fill(&report, &records, params)?;
     let filled = started.elapsed();
     let pdf = renderer.to_pdf(&doc)?;
-    std::fs::write(&output, &pdf).map_err(|e| format!("{}: {e}", output.display()))?;
+    let to_stdout = output.as_os_str() == "-";
+    if to_stdout {
+        std::io::Write::write_all(&mut std::io::stdout(), &pdf).map_err(|e| format!("stdout: {e}"))?;
+        quiet = true;
+    } else {
+        std::fs::write(&output, &pdf).map_err(|e| format!("{}: {e}", output.display()))?;
+    }
     let total = started.elapsed();
 
     for w in &report.warnings {
@@ -146,6 +171,38 @@ fn render(args: &[String]) -> CliResult {
         );
     }
     Ok(())
+}
+
+fn serve(args: &[String]) -> CliResult {
+    let mut host = std::env::var("FERROREPORT_HOST").unwrap_or_else(|_| "127.0.0.1".into());
+    let mut port = std::env::var("FERROREPORT_PORT").unwrap_or_else(|_| "8080".into());
+    let mut templates = std::env::var("FERROREPORT_TEMPLATES").ok().map(PathBuf::from);
+    let mut resources = Vec::new();
+    let mut token = std::env::var("FERROREPORT_TOKEN").ok().filter(|t| !t.is_empty());
+    let mut max_body_mb: usize = 50;
+    let mut workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
+        match a.as_str() {
+            "--host" => host = value(a)?,
+            "-P" | "--port" => port = value(a)?,
+            "-t" | "--templates" => templates = Some(PathBuf::from(value(a)?)),
+            "-r" | "--resources" => resources.push(PathBuf::from(value(a)?)),
+            "--token" => token = Some(value(a)?),
+            "--max-body" => max_body_mb = value(a)?.parse().map_err(|_| "--max-body expects megabytes")?,
+            "--workers" => workers = value(a)?.parse().map_err(|_| "--workers expects a number")?,
+            s => return Err(format!("unknown option {s}").into()),
+        }
+    }
+    serve::run(serve::Config {
+        addr: format!("{host}:{port}"),
+        templates,
+        resources,
+        token,
+        max_body: max_body_mb * 1024 * 1024,
+        workers,
+    })
 }
 
 fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, usize>) {

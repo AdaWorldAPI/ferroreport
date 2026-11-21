@@ -1,14 +1,17 @@
 [workspace]
 resolver = "2"
-members = ["crates/ferroreport", "crates/ferroreport-cli"]
+members = ["crates/ferroreport", "crates/ferroreport-cli", "bindings/python", "bindings/wasm"]
+# Bindings are built by their own tools (maturin, wasm-pack); plain `cargo` commands skip them.
+default-members = ["crates/ferroreport", "crates/ferroreport-cli"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ferroreport/ferroreport"
+repository = "https://github.com/cristianEncarnacion/ferroreport"
 authors = ["Cristian Encarnacion"]
 rust-version = "1.80"
+homepage = "https://github.com/cristianEncarnacion/ferroreport"
 
 [profile.release]
 lto = "thin"

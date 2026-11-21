@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "ferroreport"
+description = "Render JasperReports JRXML templates to PDF without a JVM. Fast, pixel-identical, safe with untrusted templates."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+requires-python = ">=3.9"
+authors = [{ name = "Cristian Encarnacion" }]
+keywords = ["jasperreports", "jrxml", "pdf", "report", "invoice"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Office/Business",
+    "Topic :: Printing",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/cristianEncarnacion/ferroreport"
+Repository = "https://github.com/cristianEncarnacion/ferroreport"
+Issues = "https://github.com/cristianEncarnacion/ferroreport/issues"
+
+[tool.maturin]
+python-source = "python"
+module-name = "ferroreport._ferroreport"
+features = ["pyo3/extension-module"]

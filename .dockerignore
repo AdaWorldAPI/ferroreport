@@ -1,0 +1,4 @@
+target/
+.git/
+bindings/wasm/pkg/
+**/__pycache__/

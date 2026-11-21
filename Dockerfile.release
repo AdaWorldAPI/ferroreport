@@ -1,0 +1,9 @@
+# Used by the release workflow: packages the static binaries it already built.
+FROM scratch
+ARG TARGETARCH
+COPY dist/ferroreport-linux-${TARGETARCH} /ferroreport
+ENV FERROREPORT_HOST=0.0.0.0 FERROREPORT_PORT=8080
+EXPOSE 8080
+USER 65532:65532
+ENTRYPOINT ["/ferroreport"]
+CMD ["serve"]

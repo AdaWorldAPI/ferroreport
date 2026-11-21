@@ -82,6 +82,12 @@ pub fn json_to_value(v: &serde_json::Value, ty: JavaType) -> Result<Value> {
 /// Parses ISO-8601 dates and date-times (`2026-01-15`, `2026-01-15T10:30:00`, with optional
 /// fractional seconds and `Z`).
 pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
+    // With an explicit offset: keep the local date and time it was written with.
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s.trim()) {
+        if !s.trim().ends_with('Z') {
+            return Some(dt.naive_local());
+        }
+    }
     let s = s.trim().trim_end_matches('Z');
     for fmt in ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M"] {
         if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
