@@ -31,6 +31,13 @@ pub struct PrintText {
 
 #[derive(Debug, Clone)]
 pub enum PrintItem {
+    /// A path in page coordinates (charts), filled with the nonzero rule and/or stroked.
+    Path {
+        ops: Arc<Vec<PathOp>>,
+        fill: Option<Color>,
+        stroke: Option<(Color, f32)>,
+        dash: Option<[f32; 2]>,
+    },
     /// Several items drawn in order (the runs of a styled text).
     Group(Vec<PrintItem>),
     /// Items drawn in a local coordinate system: a local point `(u, v)` lands on the page at

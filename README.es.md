@@ -74,7 +74,10 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 - Texto con formato (markup `styled` y `html`): negritas, cursivas, fuentes, tamaños, colores,
   resaltado, superíndices, saltos de línea y listas, también cuando el texto sigue en otra página.
 - Texto rotado (izquierda, derecha, de cabeza).
-- Aún no: gráficos, crosstabs, tablas, orden horizontal de columnas, conexiones JDBC.
+- Gráficos: pastel (también 3D), barras (también 3D y apiladas), líneas, áreas, XY y dispersión, con
+  títulos, leyendas y datasets por registro, grupo o reporte. Siguen el estilo de JFreeChart, aunque
+  no son idénticos píxel por píxel.
+- Aún no: crosstabs, tablas, orden horizontal de columnas, conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -96,10 +99,10 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
 ## Roadmap
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
-  condicionales, texto justificado, códigos QR, Code 128, multicolumna, texto con formato y texto rotado. Siguiente: más tipos de códigos de barras y memoria constante en reportes enormes.
+  condicionales, texto justificado, códigos QR, Code 128, multicolumna, texto con formato, texto rotado y gráficos. Siguiente: más tipos de códigos de barras y memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
-- **Fase 4:** gráficos, tablas, crosstabs y exportación a Excel.
+- **Fase 4:** tablas, crosstabs, más tipos de gráficos y exportación a Excel.
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

@@ -15,6 +15,7 @@
 //! untrusted sources is safe.
 
 pub mod barcode;
+pub mod chart;
 pub mod data;
 pub mod error;
 pub mod expr;

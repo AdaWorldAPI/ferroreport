@@ -305,6 +305,7 @@ pub enum ElementKind {
     Image(ImageElement),
     Subreport(Box<SubreportElement>),
     Barcode(Box<BarcodeElement>),
+    Chart(Box<crate::chart::ChartElement>),
     /// Already filled subreport content still to be printed (the continuation of a subreport
     /// split across pages).
     Content(Arc<Vec<crate::print::Segment>>),

@@ -223,6 +223,7 @@ fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, u
                 ElementKind::Break | ElementKind::ColumnBreak => "break".into(),
                 ElementKind::Image(_) => "image".into(),
                 ElementKind::Subreport(_) | ElementKind::Content(_) => "subreport".into(),
+                ElementKind::Chart(c) => format!("{:?} chart", c.kind),
                 ElementKind::Barcode(b) => match b.symbology {
                     ferroreport::model::Symbology::Qr { .. } => "QRCode".into(),
                     ferroreport::model::Symbology::Code128 { .. } => "Code128".into(),

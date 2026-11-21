@@ -320,6 +320,58 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
             };
             match item {
                 PrintItem::Group(_) | PrintItem::Transform(..) => {}
+                PrintItem::Path { ops, fill, stroke, dash } => {
+                    if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
+                        continue;
+                    }
+                    let y = |v: f64| ph - v as f32;
+                    let mut cur = (0.0f64, 0.0f64);
+                    for op in ops.iter() {
+                        match *op {
+                            PathOp::Move(a, b) => {
+                                c.move_to(a as f32, y(b));
+                                cur = (a, b);
+                            }
+                            PathOp::Line(a, b) => {
+                                c.line_to(a as f32, y(b));
+                                cur = (a, b);
+                            }
+                            PathOp::Quad(qx, qy, ex, ey) => {
+                                // Exact cubic form of the quadratic.
+                                let (c1x, c1y) = (cur.0 + 2.0 / 3.0 * (qx - cur.0), cur.1 + 2.0 / 3.0 * (qy - cur.1));
+                                let (c2x, c2y) = (ex + 2.0 / 3.0 * (qx - ex), ey + 2.0 / 3.0 * (qy - ey));
+                                c.cubic_to(c1x as f32, y(c1y), c2x as f32, y(c2y), ex as f32, y(ey));
+                                cur = (ex, ey);
+                            }
+                            PathOp::Cubic(a, b, cc, d, e, f) => {
+                                c.cubic_to(a as f32, y(b), cc as f32, y(d), e as f32, y(f));
+                                cur = (e, f);
+                            }
+                            PathOp::Close => {
+                                c.close_path();
+                            }
+                        }
+                    }
+                    if let Some(color) = fill {
+                        let (r, g, b) = rgb(*color);
+                        c.set_fill_rgb(r, g, b);
+                    }
+                    if let Some((color, width)) = stroke {
+                        let (r, g, b) = rgb(*color);
+                        c.set_stroke_rgb(r, g, b);
+                        c.set_line_width(*width);
+                        c.set_line_cap(LineCapStyle::ButtCap);
+                        match dash {
+                            Some(d) => c.set_dash_pattern(*d, 0.0),
+                            None => c.set_dash_pattern([], 0.0),
+                        };
+                    }
+                    match (fill.is_some(), stroke.is_some()) {
+                        (true, true) => c.fill_nonzero_and_stroke(),
+                        (true, false) => c.fill_nonzero(),
+                        _ => c.stroke(),
+                    };
+                }
                 PrintItem::Rect { x, y, w, h, fill, stroke, radius } => {
                     let (px, py) = (*x, ph - y - h);
                     if let Some(color) = fill {

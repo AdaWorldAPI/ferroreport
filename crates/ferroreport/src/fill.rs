@@ -204,10 +204,17 @@ impl Scope for Ctx<'_> {
 // ---------------------------------------------------------------------------------------------
 // Band layout
 
-/// A text element whose value is computed later (evaluationTime other than Now).
+/// What a deferred element draws.
+#[derive(Debug, Clone)]
+enum Deferred {
+    Text(Box<TextElement>),
+    Chart(Box<crate::chart::ChartElement>),
+}
+
+/// A text field or chart whose value is computed later (evaluationTime other than Now).
 #[derive(Debug, Clone)]
 struct DeferredText {
-    element: TextElement,
+    what: Deferred,
     forecolor: Color,
     x: f32,
     y: f32,
@@ -270,6 +277,20 @@ fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
                 translate(i, dx, dy);
             }
         }
+        PrintItem::Path { ops, .. } => {
+            let (dx, dy) = (dx as f64, dy as f64);
+            *ops = Arc::new(
+                ops.iter()
+                    .map(|op| match *op {
+                        PathOp::Move(a, b) => PathOp::Move(a + dx, b + dy),
+                        PathOp::Line(a, b) => PathOp::Line(a + dx, b + dy),
+                        PathOp::Quad(a, b, c, d) => PathOp::Quad(a + dx, b + dy, c + dx, d + dy),
+                        PathOp::Cubic(a, b, c, d, e, f) => PathOp::Cubic(a + dx, b + dy, c + dx, d + dy, e + dx, f + dy),
+                        PathOp::Close => PathOp::Close,
+                    })
+                    .collect(),
+            );
+        }
         PrintItem::Transform(m, items) => {
             // Move the local drawing and its anchor together: M' = T(d) · M · T(-d).
             let [a, b, c, d, _, _] = *m;
@@ -317,9 +338,49 @@ struct LayoutEnv<'a> {
     changed_groups: &'a [String],
     env: &'a EvalEnv<'a>,
     scope: &'a dyn Scope,
+    /// Chart datasets collected so far.
+    charts: &'a HashMap<usize, crate::chart::DataState>,
 }
 
-/// Evaluates the display string of a text element.
+/// Evaluates a chart's title, axis labels and range limits.
+fn chart_texts(ch: &crate::chart::ChartElement, scope: &dyn Scope, env: &EvalEnv) -> Result<crate::chart::ChartTexts> {
+    let s = |e: &Option<Expr>| -> Result<Option<String>> {
+        Ok(match e {
+            Some(e) => match eval(e, scope, env)? {
+                Value::Null => None,
+                v => Some(v.to_java_string()),
+            },
+            None => None,
+        })
+    };
+    let n = |e: &Option<Expr>| -> Result<Option<f64>> {
+        Ok(match e {
+            Some(e) => eval(e, scope, env)?.as_f64(),
+            None => None,
+        })
+    };
+    Ok(crate::chart::ChartTexts {
+        title: s(&ch.title)?,
+        subtitle: s(&ch.subtitle)?,
+        category_label: s(&ch.category_axis_label)?,
+        value_label: s(&ch.value_axis_label)?,
+        value_min: n(&ch.value_min)?,
+        value_max: n(&ch.value_max)?,
+    })
+}
+
+/// Charts in a list of elements (frames included).
+fn collect_charts<'a>(elements: &'a [Element], out: &mut Vec<&'a crate::chart::ChartElement>) {
+    for el in elements {
+        match &el.kind {
+            ElementKind::Chart(c) => out.push(c),
+            ElementKind::Frame { children, .. } => collect_charts(children, out),
+            _ => {}
+        }
+    }
+}
+
+/// Evaluates the text displayed by a text element.
 fn text_value(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> Result<String> {
     match content {
         TextContent::Static(s) => Ok(s.clone()),
@@ -912,7 +973,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         out.items.push(Laid {
                             item: PrintItem::Text(placeholder),
                             deferred: Some(DeferredText {
-                                element: te.clone(),
+                                what: Deferred::Text(Box::new(te.clone())),
                                 forecolor: el.forecolor,
                                 x,
                                 y,
@@ -1011,6 +1072,30 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     }
                     top += seg.height;
                 }
+            }
+            ElementKind::Chart(ch) => {
+                if ch.evaluation_time == EvaluationTime::Now {
+                    let texts = chart_texts(ch, le.scope, le.env)?;
+                    let empty = crate::chart::DataState::default();
+                    let data = le.charts.get(&ch.id).unwrap_or(&empty);
+                    let items = crate::chart::render(ch, data, &texts, le.fonts, le.env.locale, x, y, w, h);
+                    out.items.push(Laid { item: PrintItem::Group(items), deferred: None });
+                } else {
+                    out.items.push(Laid {
+                        item: PrintItem::Group(Vec::new()),
+                        deferred: Some(DeferredText {
+                            what: Deferred::Chart(ch.clone()),
+                            forecolor: el.forecolor,
+                            x,
+                            y,
+                            w,
+                            h,
+                            time: ch.evaluation_time,
+                            group: ch.evaluation_group.clone(),
+                        }),
+                    });
+                }
+                box_items(&ch.boxed, x, y, w, h, &mut out.items);
             }
             ElementKind::Barcode(bc) => {
                 if el.mode == Mode::Opaque {
@@ -1229,6 +1314,9 @@ struct Filler<'a> {
     repeated: HashMap<usize, String>,
     /// Groups that changed with the current record (until its first detail band prints).
     changed_groups: Vec<String>,
+    /// Charts of the report and the data collected for each (by chart id).
+    charts: Vec<&'a crate::chart::ChartElement>,
+    chart_data: HashMap<usize, crate::chart::DataState>,
     /// Current column (multi-column reports) and where columns start on this page.
     column: u32,
     column_top: f32,
@@ -1291,7 +1379,75 @@ impl<'a> Filler<'a> {
         Ok(())
     }
 
+    /// Adds the current values to the datasets of charts whose increment matches.
+    fn increment_charts(&mut self, pred: impl Fn(&crate::chart::Increment) -> bool, mode: Values) -> Result<()> {
+        use crate::chart::ChartKind::*;
+        if self.charts.is_empty() {
+            return Ok(());
+        }
+        let record = self.record_for(mode);
+        let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
+        let ctx = Ctx {
+            record,
+            report: self.report,
+            params: &self.params,
+            vars: &vars,
+            var_index: &self.var_index,
+            page_number: self.page_number,
+            column_number: self.column as i32 + 1,
+        };
+        let env = self.env;
+        let ev = |e: &Option<Expr>| -> Result<Value> {
+            match e {
+                Some(e) => eval(e, &ctx, env),
+                None => Ok(Value::Null),
+            }
+        };
+        for ch in self.charts.clone() {
+            let ds = &ch.dataset;
+            if !pred(&ds.increment) {
+                continue;
+            }
+            if let Some(w) = &ds.increment_when {
+                if !truthy(&eval(w, &ctx, env)?, env)? {
+                    continue;
+                }
+            }
+            for s in &ds.series {
+                let state = self.chart_data.entry(ch.id).or_default();
+                match ch.kind {
+                    Pie | Pie3D => {
+                        if let (k, Some(v)) = (ev(&s.key)?, ev(&s.value)?.as_f64()) {
+                            if !k.is_null() {
+                                state.add_pie(k.to_java_string(), v);
+                            }
+                        }
+                    }
+                    XyLine | XyArea | Scatter => {
+                        if let (Some(x), Some(y)) = (ev(&s.x)?.as_f64(), ev(&s.y)?.as_f64()) {
+                            state.add_xy(ev(&s.series)?.to_java_string(), x, y);
+                        }
+                    }
+                    _ => {
+                        let (series, category) = (ev(&s.series)?, ev(&s.category)?);
+                        if let Some(v) = ev(&s.value)?.as_f64() {
+                            if !category.is_null() {
+                                state.add_category(series.to_java_string(), category.to_java_string(), v);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn reset_where(&mut self, pred: impl Fn(&ResetType) -> bool) -> Result<()> {
+        for ch in &self.charts {
+            if pred(&ch.dataset.reset) {
+                self.chart_data.remove(&ch.id);
+            }
+        }
         let mut vars = std::mem::take(&mut self.committed);
         for (i, def) in self.defs.iter().enumerate() {
             if pred(&def.reset) {
@@ -1341,6 +1497,7 @@ impl<'a> Filler<'a> {
             changed_groups: &self.changed_groups,
             env: self.env,
             scope: &ctx,
+            charts: &self.chart_data,
         };
         layout_elements(&mut le, &band.elements, band.height, None).map(Some)
     }
@@ -1366,6 +1523,7 @@ impl<'a> Filler<'a> {
             changed_groups: &self.changed_groups,
             env: self.env,
             scope: &ctx,
+            charts: &self.chart_data,
         };
         layout_elements(&mut le, elements, design_h, avail)
     }
@@ -1514,6 +1672,7 @@ impl<'a> Filler<'a> {
             return Ok(());
         }
         self.footers_done = true;
+        self.increment_charts(|i| *i == crate::chart::Increment::Page, mode)?;
         let r = self.report;
         let footer = self.page_footer_band(last);
         if self.flow.is_some() {
@@ -1685,8 +1844,18 @@ impl<'a> Filler<'a> {
                 column_number: self.column as i32 + 1,
             };
             let d = &p.text;
-            let text = text_value(&d.element.content, &ctx, self.env)?;
-            let (item, _) = text_item(self.fonts, &d.element, d.forecolor, d.x, d.y, d.w, d.h, &text, true);
+            let item = match &d.what {
+                Deferred::Text(te) => {
+                    let text = text_value(&te.content, &ctx, self.env)?;
+                    text_item(self.fonts, te, d.forecolor, d.x, d.y, d.w, d.h, &text, true).0
+                }
+                Deferred::Chart(ch) => {
+                    let texts = chart_texts(ch, &ctx, self.env)?;
+                    let empty = crate::chart::DataState::default();
+                    let data = self.chart_data.get(&ch.id).unwrap_or(&empty);
+                    PrintItem::Group(crate::chart::render(ch, data, &texts, self.fonts, self.env.locale, d.x, d.y, d.w, d.h))
+                }
+            };
             self.pages[p.page].items[p.item] = item;
         }
         Ok(())
@@ -1695,6 +1864,7 @@ impl<'a> Filler<'a> {
     fn group_footers(&mut self, from: usize, mode: Values) -> Result<()> {
         let r = self.report;
         for g in r.groups.iter().skip(from).rev() {
+            self.increment_charts(|i| matches!(i, crate::chart::Increment::Group(n) if *n == g.name), mode)?;
             for b in &g.footer {
                 self.print_body_band(b, mode)?;
             }
@@ -1796,6 +1966,7 @@ impl<'a> Filler<'a> {
             }
             self.estimated = Some(self.calculate(&self.committed.clone())?);
             self.returned.clear();
+            self.increment_charts(|i| *i == crate::chart::Increment::Record, Values::Estimated)?;
             for band in &r.detail {
                 self.print_body_band(band, Values::Estimated)?;
             }
@@ -1815,6 +1986,7 @@ impl<'a> Filler<'a> {
 
     fn finish(&mut self) -> Result<()> {
         let r = self.report;
+        self.increment_charts(|i| *i == crate::chart::Increment::Report, Values::Committed)?;
         match &r.summary {
             None => self.page_footers(true, Values::Committed)?,
             Some(summary) => {
@@ -2000,6 +2172,37 @@ fn new_filler<'a>(
         repeated: HashMap::new(),
         changed_groups: Vec::new(),
         returned: Vec::new(),
+        charts: {
+            let mut charts = Vec::new();
+            let r = report;
+            let mut bands: Vec<&Band> = Vec::new();
+            for b in [
+                &r.background,
+                &r.title,
+                &r.page_header,
+                &r.column_header,
+                &r.column_footer,
+                &r.page_footer,
+                &r.last_page_footer,
+                &r.summary,
+                &r.no_data,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                bands.push(b);
+            }
+            bands.extend(r.detail.iter());
+            for g in &r.groups {
+                bands.extend(g.header.iter());
+                bands.extend(g.footer.iter());
+            }
+            for b in bands {
+                collect_charts(&b.elements, &mut charts);
+            }
+            charts
+        },
+        chart_data: HashMap::new(),
         column: 0,
         column_top: 0.0,
         in_column: false,

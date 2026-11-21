@@ -104,11 +104,12 @@ std::fs::write("invoice.pdf", pdf)?;
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 element syntax | `.jasper` files (by design), scriptlets, subdatasets, style templates |
 | Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical print order, `isStartNewColumn`, column breaks) | horizontal print order |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, QR code and Code 128 barcodes (barcode4j components), page break (applied after its band) | chart, crosstab, table, list, other barcode types, Barbecue barcodes |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, charts, QR code and Code 128 barcodes (barcode4j components), page break (applied after its band) | crosstab, table, list, other barcode types, Barbecue barcodes |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled and HTML markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks, lists), also across page breaks; rotation (Left, Right, UpsideDown) | RTF markup |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style, parent styles, element overrides, conditional styles (up to 4 per style) | |
 | Images | scale modes RetainShape, FillFrame, Clip; alignment; `onErrorType` | remote URLs (by design), SVG and other formats |
+| Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, scatter; titles, legends, axis labels, series colors, range limits, tick formats; datasets by record, group, page or report, with `evaluationTime` | time series, meter, thermometer, Gantt, candlestick, bubble, multi-axis, chart customizers. Charts follow JFreeChart's default look closely but are not pixel-identical |
 | Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), parameters, return values, splitting across pages with reprinted column headers | JDBC connections |
 | Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/group; evaluation time Now/Report/Page/Group | embedded SQL queries (data comes from JSON) |
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules, string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math`, `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding | arbitrary Java classes, `$R{}` resource bundles |
@@ -153,6 +154,8 @@ than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exa
 | 21-markup | styled and HTML markup: mixed fonts, sizes, colors, highlight, superscript, alignment, justification | identical |
 | 22-markup-overflow | styled text that continues on the next page | identical |
 | 23-rotation | rotated text (left, right, upside down) with padding and alignment | identical |
+| 24-charts | pie, 3D pie, bar, stacked horizontal bar, line and area charts | same layout (charts are not compared pixel by pixel) |
+| 25-charts-xy | XY line and scatter charts per group (`evaluationTime="Group"`) | same layout (charts are not compared pixel by pixel) |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -185,11 +188,11 @@ also smaller (1.1 MB instead of 4.5 MB for 09-large).
 ## Roadmap
 
 - **Phase 2 (in progress):** done: band splitting, images, subreports, conditional styles,
-  justified text, QR codes, Code 128, multi-column layout, styled/HTML text and rotated text. Next: more
+  justified text, QR codes, Code 128, multi-column layout, styled/HTML text, rotated text and charts. Next: more
   barcode types, constant memory for huge reports (streaming pages to the PDF).
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.
-- **Phase 4:** charts, tables, crosstabs, Excel export.
+- **Phase 4:** tables, crosstabs, more chart types, Excel export.
 
 ## Contributing
 

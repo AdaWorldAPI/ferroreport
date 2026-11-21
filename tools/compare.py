@@ -6,7 +6,9 @@ For each directory in fixtures/ containing report.jrxml (+ optional data.json, p
   2. renders it with ferroreport                                      -> ferroreport.pdf
   3. rasterizes both at the same DPI and compares them pixel by pixel.
 
-A page "matches" when the share of differing pixels is below the threshold. Diff images
+A page "matches" when the share of differing pixels is below the threshold. Fixtures with an
+APPROXIMATE file (charts, which follow JFreeChart's look without copying it pixel for pixel)
+only need the same page count; they are reported as APPROX. Diff images
 (red = only in Jasper, blue = only in ferroreport) are written next to the PDFs.
 
 Usage: tools/compare.py [--oracle PATH] [--dpi N] [--only NAME] [--out DIR]
@@ -124,17 +126,26 @@ def main() -> int:
                     pages_matching=sum(s <= MATCH_THRESHOLD for s in shares),
                 )
                 row["match"] = len(pa) == len(pb) and all(s <= MATCH_THRESHOLD for s in shares)
+                # Fixtures marked APPROXIMATE (charts) are checked for page count only: they
+                # follow JFreeChart's look but are not drawn pixel for pixel.
+                if (fx / "APPROXIMATE").exists() and not row["match"]:
+                    row["approximate"] = len(pa) == len(pb)
         results.append(row)
-        status = "MATCH" if row.get("match") else ("ERROR" if "error" in row else ("SKIP " if "skipped" in row else "DIFF "))
+        if "approximate" in row:
+            status = "APPROX" if row["approximate"] else "DIFF "
+        else:
+            status = "MATCH" if row.get("match") else ("ERROR" if "error" in row else ("SKIP " if "skipped" in row else "DIFF "))
         detail = row.get("error") or row.get("skipped") or (f"pages {row.get('pages_jasper')}/{row.get('pages_ferroreport')}, worst diff {row.get('worst_page_diff')}")
         print(f"{status}  {fx.name:<32} {detail}")
 
     (out_root / "results.json").write_text(json.dumps(results, indent=2))
     ok = sum(1 for r in results if r.get("match"))
-    compared = sum(1 for r in results if "skipped" not in r)
+    approx = sum(1 for r in results if r.get("approximate"))
+    compared = sum(1 for r in results if "skipped" not in r and "approximate" not in r)
     print(f"\n{ok}/{compared} compared fixtures render identically to JasperReports "
-          f"(threshold {MATCH_THRESHOLD:.2%} of ink pixels; {len(results) - compared} skipped)")
-    return 0 if ok == compared else 1
+          f"(threshold {MATCH_THRESHOLD:.2%} of ink pixels; {approx} approximate charts; "
+          f"{len(results) - compared - approx} skipped)")
+    return 0 if ok == compared and all(r.get("approximate", True) for r in results) else 1
 
 
 if __name__ == "__main__":

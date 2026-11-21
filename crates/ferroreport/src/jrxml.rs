@@ -288,6 +288,7 @@ impl StyleProps {
 // ---------------------------------------------------------------------------------------------
 
 struct Parser {
+    chart_count: usize,
     groovy: bool,
     styles: HashMap<String, StyleProps>,
     default_style: StyleProps,
@@ -328,8 +329,15 @@ impl Parser {
             }
             styles.insert(name.to_string(), props);
         }
-        let mut parser =
-            Parser { groovy, styles, default_style, default_name, conditionals: HashMap::new(), warnings: Vec::new() };
+        let mut parser = Parser {
+            chart_count: 0,
+            groovy,
+            styles,
+            default_style,
+            default_name,
+            conditionals: HashMap::new(),
+            warnings: Vec::new(),
+        };
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
                 parser.conditionals.entry(name).or_default().push((e, props));
@@ -492,6 +500,21 @@ fn barcode_node(n: &Node) -> Option<&Node> {
     })
 }
 
+fn font_from(node: Option<&Node>, base: &FontSpec) -> FontSpec {
+    let mut f = base.clone();
+    if let Some(n) = node.and_then(|n| n.child("font")) {
+        if let Some(v) = n.attr("fontName") {
+            f.name = v.to_string();
+        }
+        if let Some(v) = attr(n, &["size", "fontSize"]).and_then(|v| v.trim().parse().ok()) {
+            f.size = v;
+        }
+        f.bold = attr(n, &["isBold", "bold"]).map(parse_bool).unwrap_or(f.bold);
+        f.italic = attr(n, &["isItalic", "italic"]).map(parse_bool).unwrap_or(f.italic);
+    }
+    f
+}
+
 fn calculation(name: Option<&str>) -> Calculation {
     match name.unwrap_or("Nothing") {
         "Count" => Calculation::Count,
@@ -536,6 +559,150 @@ impl Parser {
         })
     }
 
+    fn chart(&mut self, n: &Node, tag: &str, font: FontSpec, boxed: BoxStyle) -> Result<crate::chart::ChartElement> {
+        use crate::chart::*;
+        let kind = ChartKind::from_tag(tag).expect("checked by the caller");
+        let chart = n.child("chart");
+        let flag = |node: Option<&Node>, names: &[&str], default: bool| {
+            node.and_then(|c| attr(c, names)).map(parse_bool).unwrap_or(default)
+        };
+        let color = |node: Option<&Node>, name: &str| node.and_then(|c| c.attr(name)).and_then(parse_color);
+        let title = chart.and_then(|c| c.child("chartTitle"));
+        let subtitle = chart.and_then(|c| c.child("chartSubtitle"));
+        let legend = chart.and_then(|c| c.child("chartLegend"));
+        let evaluation_time = match chart.and_then(|c| c.attr("evaluationTime")) {
+            Some("Report") | Some("Auto") => EvaluationTime::Report,
+            Some("Page") => EvaluationTime::Page,
+            Some("Column") => EvaluationTime::Column,
+            Some("Group") => EvaluationTime::Group,
+            _ => EvaluationTime::Now,
+        };
+        if chart.and_then(|c| c.attr("customizerClass")).is_some() {
+            self.warnings.push("chart customizers (customizerClass) are ignored".into());
+        }
+
+        // Dataset.
+        let ds_node = n.children.iter().find(|c| c.name.ends_with("Dataset"));
+        let ds = ds_node.and_then(|d| d.child("dataset"));
+        let group_attr = |name: &str| ds.and_then(|d| d.attr(name)).unwrap_or_default().to_string();
+        let reset = match ds.and_then(|d| d.attr("resetType")) {
+            Some("Group") => ResetType::Group(group_attr("resetGroup")),
+            Some("Page") => ResetType::Page,
+            Some("None") => ResetType::None,
+            _ => ResetType::Report,
+        };
+        let increment = match ds.and_then(|d| d.attr("incrementType")) {
+            Some("Group") => Increment::Group(group_attr("incrementGroup")),
+            Some("Page") => Increment::Page,
+            Some("Report") => Increment::Report,
+            _ => Increment::Record,
+        };
+        if ds.and_then(|d| d.child("datasetRun")).is_some() {
+            self.warnings.push("chart datasets run on a subdataset (datasetRun) are empty".into());
+        }
+        let mut series = Vec::new();
+        if let Some(d) = ds_node {
+            let read = |p: &mut Parser, s: &Node| -> Result<SeriesDef> {
+                Ok(SeriesDef {
+                    series: p.child_expr(s, &["seriesExpression"])?,
+                    key: p.child_expr(s, &["keyExpression"])?,
+                    category: p.child_expr(s, &["categoryExpression"])?,
+                    value: p.child_expr(s, &["valueExpression"])?,
+                    x: p.child_expr(s, &["xValueExpression"])?,
+                    y: p.child_expr(s, &["yValueExpression"])?,
+                })
+            };
+            let nested: Vec<&Node> =
+                d.children.iter().filter(|c| matches!(c.name.as_str(), "pieSeries" | "categorySeries" | "xySeries")).collect();
+            if nested.is_empty() {
+                series.push(read(self, d)?);
+            } else {
+                for s in nested {
+                    series.push(read(self, s)?);
+                }
+            }
+        }
+
+        // Plot.
+        let plot_node = n.children.iter().find(|c| c.name.ends_with("Plot"));
+        let plot = plot_node.and_then(|p| p.child("plot"));
+        let mut series_colors: Vec<(i32, Color)> = plot
+            .map(|p| {
+                p.children
+                    .iter()
+                    .filter(|c| c.name == "seriesColor")
+                    .filter_map(|c| Some((c.attr("seriesOrder")?.parse().ok()?, parse_color(c.attr("color")?)?)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        series_colors.sort_by_key(|(o, _)| *o);
+        let value_format = plot_node
+            .and_then(|p| p.child("valueAxisFormat").or_else(|| p.child("rangeAxisFormat")))
+            .and_then(|f| f.child("axisFormat"))
+            .and_then(|f| f.attr("tickLabelMask"))
+            .map(str::to_string);
+        let label = |p: &mut Parser, names: &[&str]| match plot_node {
+            Some(pn) => p.child_expr(pn, names),
+            None => Ok(None),
+        };
+        self.chart_count += 1;
+        Ok(ChartElement {
+            id: self.chart_count,
+            kind,
+            horizontal: plot.and_then(|p| p.attr("orientation")) == Some("Horizontal"),
+            title: match title {
+                Some(t) => self.child_expr(t, &["titleExpression"])?,
+                None => None,
+            },
+            title_font: font_from(title, &font),
+            title_color: color(title, "color").unwrap_or(Color::BLACK),
+            subtitle: match subtitle {
+                Some(t) => self.child_expr(t, &["subtitleExpression"])?,
+                None => None,
+            },
+            subtitle_font: font_from(subtitle, &font),
+            subtitle_color: color(subtitle, "color").unwrap_or(Color::BLACK),
+            show_legend: flag(chart, &["isShowLegend", "showLegend"], true),
+            legend_font: font_from(legend, &font),
+            legend_color: color(legend, "textColor").unwrap_or(Color::BLACK),
+            legend_back: color(legend, "backgroundColor"),
+            legend_position: match legend.and_then(|l| l.attr("position")) {
+                Some("Top") => Edge::Top,
+                Some("Left") => Edge::Left,
+                Some("Right") => Edge::Right,
+                _ => Edge::Bottom,
+            },
+            font,
+            evaluation_time,
+            evaluation_group: chart.and_then(|c| c.attr("evaluationGroup")).map(str::to_string),
+            dataset: DatasetDef {
+                reset,
+                increment,
+                increment_when: match ds {
+                    Some(d) => self.child_expr(d, &["incrementWhenExpression"])?,
+                    None => None,
+                },
+                series,
+            },
+            category_axis_label: label(
+                self,
+                &["categoryAxisLabelExpression", "xAxisLabelExpression", "timeAxisLabelExpression"],
+            )?,
+            value_axis_label: label(self, &["valueAxisLabelExpression", "yAxisLabelExpression"])?,
+            value_min: label(self, &["rangeAxisMinValueExpression"])?,
+            value_max: label(self, &["rangeAxisMaxValueExpression"])?,
+            series_colors: series_colors.into_iter().map(|(_, c)| c).collect(),
+            show_labels: flag(plot_node, &["isShowLabels", "showLabels"], true),
+            show_lines: flag(plot_node, &["isShowLines", "showLines"], true),
+            show_shapes: flag(plot_node, &["isShowShapes", "showShapes"], true),
+            backcolor: color(chart.and_then(|c| c.child("reportElement")), "backcolor")
+                .filter(|_| chart.and_then(|c| c.child("reportElement")).and_then(|r| r.attr("mode")) == Some("Opaque")),
+            plot_backcolor: color(plot, "backcolor"),
+            value_format,
+            boxed,
+        })
+    }
+
     fn elements(&mut self, container: &Node) -> Result<Vec<Element>> {
         const ELEMENT_TAGS: &[&str] = &[
             "staticText",
@@ -571,7 +738,8 @@ impl Parser {
 
     fn element(&mut self, n: &Node, kind: &str) -> Result<Element> {
         // JRXML 6 keeps geometry in <reportElement>; JRXML 7 puts it on <element>.
-        let re = n.child("reportElement").unwrap_or(n);
+        // Charts keep their geometry in <chart><reportElement>.
+        let re = n.child("reportElement").or_else(|| n.child("chart").and_then(|c| c.child("reportElement"))).unwrap_or(n);
         let num = |name: &str| -> Result<f32> { re.attr(name).map(|v| parse_f32(v, name)).transpose().map(|v| v.unwrap_or(0.0)) };
 
         // Style chain: named style, else the report default style.
@@ -603,7 +771,7 @@ impl Parser {
                 own.read_paragraph(p);
             }
         }
-        if let Some(b) = n.child("box") {
+        if let Some(b) = n.child("box").or_else(|| n.child("chart").and_then(|c| c.child("box"))) {
             own.read_box(b);
         }
         if let Some(v) = n.attr("pattern") {
@@ -826,6 +994,17 @@ impl Parser {
                     connection,
                     returns,
                 }))
+            }
+            tag if crate::chart::ChartKind::from_tag(tag).is_some() => {
+                let base_font = FontSpec {
+                    name: props.font_name.clone().unwrap_or_else(|| "SansSerif".into()),
+                    size: props.font_size.unwrap_or(10.0),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    strike: false,
+                };
+                ElementKind::Chart(Box::new(self.chart(n, tag, base_font, props.box_style(forecolor))?))
             }
             "componentElement" | "component" if barcode_node(n).is_some() => {
                 let c = barcode_node(n).unwrap_or(n);
