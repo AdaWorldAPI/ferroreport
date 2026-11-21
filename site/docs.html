@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ferroreport documentation</title>
+<meta name="description" content="How to render JasperReports JRXML templates to PDF with ferroreport: command line, HTTP API, JavaScript, Python and Rust, with every option.">
+<link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./">ferro<span>report</span></a>
+    <nav>
+      <a class="wide" href="./#playground">Playground</a>
+      <a href="docs.html" aria-current="page">Docs</a>
+      <a href="https://github.com/cristianEncarnacion/ferroreport">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="docs">
+    <nav class="toc" aria-label="Documentation sections">
+      <b>Start</b>
+      <a href="#first">Your first PDF</a>
+      <a href="#install">Install</a>
+      <a href="#inputs">Template, data, parameters</a>
+      <b>Ways to call it</b>
+      <a href="#cli">Command line</a>
+      <a href="#http">HTTP API (any language)</a>
+      <a href="#js">JavaScript</a>
+      <a href="#python">Python</a>
+      <a href="#rust">Rust</a>
+      <b>Reports</b>
+      <a href="#resources">Images and subreports</a>
+      <a href="#fonts">Fonts</a>
+      <a href="#locale">Locale and dates</a>
+      <a href="#check">Check a template</a>
+      <a href="#errors">Errors</a>
+      <a href="#support">What is supported</a>
+    </nav>
+
+    <article class="doc">
+      <h1>Documentation</h1>
+      <p>ferroreport takes a JasperReports template (<code>.jrxml</code>), your rows as JSON and your parameters, and returns a PDF.
+        Every way of calling it, from the command line to Python, uses the same engine and produces the same bytes.</p>
+
+      <h2 id="first">Your first PDF</h2>
+      <p>You need three files: the template you designed in Jaspersoft Studio, the rows, and the parameters.</p>
+<pre>ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf</pre>
+<pre># rows.json: one object per detail row; keys are the template's &lt;field&gt; names
+[
+  { "sku": "FX-1000", "description": "Hydraulic pump 2HP", "qty": 21, "price": "185.00" },
+  { "sku": "FX-1007", "description": "Stainless steel valve", "qty": 26, "price": "42.50" }
+]
+
+# params.json: one key per &lt;parameter&gt;
+{ "CUSTOMER": "Distribuidora Caribe, S.A.", "ISSUED": "2026-03-05", "TAX_RATE": "0.18" }</pre>
+      <p>The same render from code:</p>
+<pre>// JavaScript
+import { render } from "ferroreport";
+const pdf = render(jrxml, rows, params, { locale: "es_DO" });
+
+# Python
+import ferroreport
+pdf = ferroreport.render("invoice.jrxml", rows, params, locale="es_DO")
+
+# Any language, over HTTP
+curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
+  -d '{"data": [...], "params": {...}, "locale": "es_DO"}' -o invoice.pdf</pre>
+
+      <h2 id="install">Install</h2>
+      <table>
+        <tr><th>You use</th><th>Install</th></tr>
+        <tr><td>Command line</td><td>Download the binary for Linux, macOS or Windows from <a href="https://github.com/cristianEncarnacion/ferroreport/releases">GitHub Releases</a>, or <code>cargo install ferroreport-cli</code></td></tr>
+        <tr><td>Docker, HTTP</td><td><code>docker pull ghcr.io/cristianencarnacion/ferroreport</code></td></tr>
+        <tr><td>JavaScript</td><td><code>npm install ferroreport</code></td></tr>
+        <tr><td>Python</td><td><code>pip install ferroreport</code></td></tr>
+        <tr><td>Rust</td><td><code>cargo add ferroreport</code></td></tr>
+      </table>
+      <p class="note">The npm, PyPI and crates.io packages are published with release 0.2.0, which is on its way. The binaries and the Docker image work today.</p>
+
+      <h2 id="inputs">Template, data, parameters</h2>
+      <h3>Template</h3>
+      <p>The JRXML source, exactly as Jaspersoft Studio saves it (JRXML 6 and the JRXML 7 element syntax). Compiled <code>.jasper</code> files are
+        never loaded: if a template names <code>lines.jasper</code>, ferroreport reads <code>lines.jrxml</code> instead.</p>
+
+      <h3>Data</h3>
+      <p>A JSON array with one object per row. Keys match the <code>&lt;field name="..."&gt;</code> entries; a field named
+        <code>customer.name</code> reads <code>{"customer": {"name": ...}}</code>. A missing key or <code>null</code> gives a null field.
+        Each value is converted to the class the field declares:</p>
+      <table>
+        <tr><th>Field class</th><th>JSON you send</th></tr>
+        <tr><td><code>String</code></td><td>A string (other values are written as text)</td></tr>
+        <tr><td><code>Integer</code>, <code>Long</code>, <code>Double</code>, <code>Float</code></td><td>A number, or a numeric string</td></tr>
+        <tr><td><code>BigDecimal</code></td><td>A number or a string. Use a string such as <code>"185.00"</code> to keep the exact digits</td></tr>
+        <tr><td><code>Boolean</code></td><td><code>true</code> / <code>false</code>, or <code>"true"</code></td></tr>
+        <tr><td><code>Date</code>, <code>Timestamp</code>, <code>Time</code></td><td>ISO-8601 text (<code>"2026-03-05"</code>, <code>"2026-03-05T10:30:00"</code>, with or without offset) or epoch milliseconds</td></tr>
+        <tr><td><code>byte[]</code> (images)</td><td>Base64 text or a <code>data:</code> URI</td></tr>
+        <tr><td><code>List</code>, <code>Collection</code></td><td>A nested array, usually the rows of a subreport</td></tr>
+      </table>
+      <p>Reports without a data source can omit the data. Templates with an embedded SQL query do not run it: send the rows.</p>
+
+      <h3>Parameters</h3>
+      <p>A JSON object with one key per <code>&lt;parameter&gt;</code>, converted with the same rules. Parameters you leave out take
+        their <code>defaultValueExpression</code>.</p>
+
+      <h2 id="cli">Command line</h2>
+<pre>ferroreport render &lt;template.jrxml&gt; [options]
+ferroreport doctor &lt;template.jrxml&gt;
+ferroreport serve [options]</pre>
+      <h3>render</h3>
+      <table>
+        <tr><th>Option</th><th>Meaning</th></tr>
+        <tr><td><code>-d, --data &lt;file.json&gt;</code></td><td>Rows. <code>-</code> reads them from standard input. Omit for reports without data</td></tr>
+        <tr><td><code>-p, --params &lt;file.json&gt;</code></td><td>Parameter values</td></tr>
+        <tr><td><code>-o, --output &lt;file.pdf&gt;</code></td><td>Output file (default: the template name with <code>.pdf</code>). <code>-</code> writes the PDF to standard output</td></tr>
+        <tr><td><code>-l, --locale &lt;tag&gt;</code></td><td>Number and date formatting: <code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
+        <tr><td><code>--font Family=file.ttf[:bold][:italic]</code></td><td>Registers an extra font. Repeat it for each style</td></tr>
+        <tr><td><code>-r, --resources &lt;dir&gt;</code></td><td>Extra directory for images and subreports. The template's own directory is always searched</td></tr>
+        <tr><td><code>--now &lt;YYYY-MM-DDTHH:MM:SS&gt;</code></td><td>Fixes the value of <code>new Date()</code>, for reproducible output</td></tr>
+        <tr><td><code>-q, --quiet</code></td><td>Does not print the timing line</td></tr>
+      </table>
+<pre># From a script or another program: rows in, PDF out
+cat rows.json | ferroreport render invoice.jrxml -d - -p params.json -o - -q &gt; invoice.pdf
+
+# With a company font and a shared images folder
+ferroreport render invoice.jrxml -d rows.json \
+  --font "Montserrat=fonts/Montserrat-Regular.ttf" --font "Montserrat=fonts/Montserrat-Bold.ttf:bold" \
+  --resources ./brand</pre>
+      <h3>doctor</h3>
+      <p>Lists what a template uses and whether ferroreport can render it. Run it on a template before you rely on it. See
+        <a href="#check">Check a template</a>.</p>
+      <h3>serve</h3>
+      <p>Starts the <a href="#http">HTTP API</a>.</p>
+      <table>
+        <tr><th>Option</th><th>Environment variable</th><th>Meaning</th></tr>
+        <tr><td><code>--host &lt;addr&gt;</code></td><td><code>FERROREPORT_HOST</code></td><td>Address to listen on. Default <code>127.0.0.1</code>; the Docker image uses <code>0.0.0.0</code></td></tr>
+        <tr><td><code>-P, --port &lt;n&gt;</code></td><td><code>FERROREPORT_PORT</code></td><td>Port. Default <code>8080</code></td></tr>
+        <tr><td><code>-t, --templates &lt;dir&gt;</code></td><td><code>FERROREPORT_TEMPLATES</code></td><td>Directory of templates for <code>POST /render/&lt;name&gt;</code></td></tr>
+        <tr><td><code>-r, --resources &lt;dir&gt;</code></td><td></td><td>Extra directory for images and subreports. Repeatable</td></tr>
+        <tr><td><code>--token &lt;secret&gt;</code></td><td><code>FERROREPORT_TOKEN</code></td><td>Requires <code>Authorization: Bearer &lt;secret&gt;</code> on every request</td></tr>
+        <tr><td><code>--max-body &lt;MB&gt;</code></td><td></td><td>Largest request accepted. Default 50</td></tr>
+        <tr><td><code>--workers &lt;n&gt;</code></td><td></td><td>Requests rendered in parallel. Default: the number of CPUs</td></tr>
+      </table>
+
+      <h2 id="http">HTTP API (any language)</h2>
+      <p>For Java, C#, PHP, Go, Ruby and anything else that can make an HTTP request. Run the server next to your application:</p>
+<pre>docker run -p 8080:8080 \
+  -v "$PWD/templates:/templates" -e FERROREPORT_TEMPLATES=/templates \
+  -e FERROREPORT_TOKEN=change-me \
+  ghcr.io/cristianencarnacion/ferroreport</pre>
+      <table>
+        <tr><th>Request</th><th>Does</th><th>Returns</th></tr>
+        <tr><td><code>POST /render/&lt;name&gt;</code></td><td>Renders <code>&lt;name&gt;.jrxml</code> from the templates directory (subfolders allowed: <code>/render/sales/invoice</code>)</td><td><code>application/pdf</code></td></tr>
+        <tr><td><code>POST /render</code></td><td>Renders the template sent in the request</td><td><code>application/pdf</code></td></tr>
+        <tr><td><code>POST /inspect</code></td><td>Reports a template's parameters, fields and unsupported features</td><td>JSON</td></tr>
+        <tr><td><code>GET /health</code></td><td>For load balancers</td><td><code>{"status": "ok", "version": "0.2.0"}</code></td></tr>
+      </table>
+      <p>The request body is JSON:</p>
+      <table>
+        <tr><th>Key</th><th>Meaning</th></tr>
+        <tr><td><code>data</code></td><td>Array of rows</td></tr>
+        <tr><td><code>params</code></td><td>Object of parameter values</td></tr>
+        <tr><td><code>locale</code></td><td><code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
+        <tr><td><code>now</code></td><td>Fixed value of <code>new Date()</code>, ISO-8601</td></tr>
+        <tr><td><code>resources</code></td><td>Images and subreport templates as base64, by the path the template uses: <code>{"logo.png": "iVBOR..."}</code></td></tr>
+        <tr><td><code>template</code></td><td><code>POST /render</code> and <code>/inspect</code> only: the JRXML source text</td></tr>
+        <tr><td><code>templateName</code></td><td><code>POST /render</code> only: a template from the templates directory, instead of <code>template</code></td></tr>
+      </table>
+      <p>Errors come back as <code>{"error": "what went wrong"}</code> with one of these statuses: <code>400</code> the request is malformed,
+        <code>401</code> the token is missing or wrong, <code>404</code> the template does not exist, <code>413</code> the body is too large,
+        <code>422</code> the template or its data cannot be rendered.</p>
+<pre># curl
+curl -X POST localhost:8080/render/invoice \
+  -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \
+  -d '{"data": [{"sku": "FX-1000", "qty": 21, "price": "185.00"}], "params": {"CUSTOMER": "Caribe"}}' \
+  -o invoice.pdf</pre>
+<pre>// Java 11+
+HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:8080/render/invoice"))
+    .header("Content-Type", "application/json")
+    .header("Authorization", "Bearer change-me")
+    .POST(HttpRequest.BodyPublishers.ofString(json))   // {"data": [...], "params": {...}}
+    .build();
+byte[] pdf = HttpClient.newHttpClient()
+    .send(request, HttpResponse.BodyHandlers.ofByteArray()).body();</pre>
+<pre>// C#
+using var http = new HttpClient();
+http.DefaultRequestHeaders.Authorization = new("Bearer", "change-me");
+var response = await http.PostAsJsonAsync("http://localhost:8080/render/invoice", new { data = rows, @params = parameters });
+response.EnsureSuccessStatusCode();
+byte[] pdf = await response.Content.ReadAsByteArrayAsync();</pre>
+<pre>// PHP
+$ch = curl_init("http://localhost:8080/render/invoice");
+curl_setopt_array($ch, [
+    CURLOPT_POSTFIELDS => json_encode(["data" => $rows, "params" => $params]),
+    CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Authorization: Bearer change-me"],
+    CURLOPT_RETURNTRANSFER => true,
+]);
+$pdf = curl_exec($ch);</pre>
+
+      <h2 id="js">JavaScript</h2>
+      <p>For Node.js 18+, Deno, Bun and browsers. The engine is WebAssembly: no native build step, no JVM.</p>
+<pre>import { render, inspect, version } from "ferroreport";
+import { readFileSync, writeFileSync } from "node:fs";
+
+const pdf = render(
+  readFileSync("invoice.jrxml", "utf8"),      // template: the JRXML text
+  rows,                                        // data: array of objects, or JSON text
+  { CUSTOMER: "Distribuidora Caribe" },        // params: object, or JSON text
+  {
+    locale: "es_DO",
+    now: new Date("2026-03-05T10:00:00"),      // optional: value of new Date() in expressions
+    resources: {                               // optional: images and subreports, by the path the template uses
+      "logo.png": readFileSync("logo.png"),
+      "lines.jrxml": readFileSync("lines.jrxml", "utf8"),
+    },
+  },
+);
+writeFileSync("invoice.pdf", pdf);             // pdf is a Uint8Array</pre>
+      <table>
+        <tr><th>Function</th><th>Returns</th></tr>
+        <tr><td><code>render(template, data?, params?, options?)</code></td><td><code>Uint8Array</code> with the PDF. Throws an <code>Error</code> with the reason if the template cannot be rendered</td></tr>
+        <tr><td><code>inspect(template)</code></td><td><code>{ name, parameters, fields, warnings }</code>. <code>warnings</code> lists what the engine does not support in that template</td></tr>
+        <tr><td><code>version()</code></td><td>The engine version</td></tr>
+      </table>
+      <p>In a browser, or with a bundler that picks the web build, load the engine once before the first render:</p>
+<pre>import init, { render } from "ferroreport";
+await init();
+const pdf = render(template, rows, params);
+window.open(URL.createObjectURL(new Blob([pdf], { type: "application/pdf" })));</pre>
+<pre>// Express: send a PDF
+app.get("/invoices/:id.pdf", async (req, res) => {
+  const { rows, params } = await loadInvoice(req.params.id);
+  res.type("application/pdf").send(Buffer.from(render(template, rows, params, { locale: "es_DO" })));
+});</pre>
+      <p>Templates read files only from <code>options.resources</code>, so the JavaScript build never touches the disk on its own.</p>
+
+      <h2 id="python">Python</h2>
+<pre>import ferroreport
+
+pdf = ferroreport.render(
+    "invoice.jrxml",                       # a path, or the JRXML text itself
+    data=rows,                             # list of dicts or objects, or JSON text
+    params={"CUSTOMER": "Distribuidora Caribe"},
+    locale="es_DO",
+    resource_dirs=["./brand"],             # optional: extra folders for images and subreports
+    resources={"logo.png": logo_bytes},    # optional: images and subreports held in memory
+    now=datetime(2026, 3, 5, 10, 0),       # optional: value of new Date() in expressions
+)                                          # returns bytes</pre>
+      <table>
+        <tr><th>Function</th><th>Does</th></tr>
+        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now)</code></td><td>Returns the PDF as <code>bytes</code></td></tr>
+        <tr><td><code>render_to_file(template, output, ...)</code></td><td>Same arguments; writes the PDF to <code>output</code></td></tr>
+        <tr><td><code>inspect(template)</code></td><td>Returns a dict with <code>name</code>, <code>parameters</code>, <code>fields</code> and <code>warnings</code></td></tr>
+        <tr><td><code>FerroreportError</code></td><td>Raised when a template cannot be parsed, filled or exported</td></tr>
+      </table>
+      <p>Python values are converted for you: <code>datetime</code> and <code>date</code> become dates, <code>Decimal</code> keeps its exact
+        digits, <code>bytes</code> become images, and plain objects are read through their attributes. When the template is a path, its
+        folder is searched for images and subreports. Rendering releases the GIL, so threads render in parallel.</p>
+<pre># Django
+def invoice_pdf(request, pk):
+    invoice = Invoice.objects.get(pk=pk)
+    pdf = ferroreport.render("reports/invoice.jrxml", list(invoice.lines.values()),
+                             {"CUSTOMER": invoice.customer.name}, locale="es_DO")
+    return HttpResponse(pdf, content_type="application/pdf")
+
+# FastAPI
+@app.get("/invoices/{pk}.pdf")
+def invoice_pdf(pk: int):
+    rows, params = load_invoice(pk)
+    return Response(ferroreport.render("reports/invoice.jrxml", rows, params), media_type="application/pdf")</pre>
+
+      <h2 id="rust">Rust</h2>
+<pre>use ferroreport::Renderer;
+
+let template = std::fs::read_to_string("invoice.jrxml")?;
+let rows: serde_json::Value = serde_json::from_str(&amp;std::fs::read_to_string("rows.json")?)?;
+let params = serde_json::json!({ "CUSTOMER": "Distribuidora Caribe" });
+
+let pdf: Vec&lt;u8&gt; = Renderer::new()
+    .locale("es_DO")
+    .resource_dir("reports")                 // images and subreports are read from here
+    .render_json(&amp;template, &amp;rows, &amp;params)?;
+std::fs::write("invoice.pdf", pdf)?;</pre>
+      <table>
+        <tr><th>Method</th><th>Does</th></tr>
+        <tr><td><code>Renderer::new()</code></td><td>A renderer with the bundled fonts and the <code>en_US</code> locale</td></tr>
+        <tr><td><code>.locale(tag)</code></td><td>Number and date formatting</td></tr>
+        <tr><td><code>.now(datetime)</code></td><td>Fixes the value of <code>new Date()</code></td></tr>
+        <tr><td><code>.resource_dir(dir)</code></td><td>Adds a folder for images and subreports. Templates cannot read outside these folders</td></tr>
+        <tr><td><code>.resource(name, bytes)</code>, <code>add_resource(name, bytes)</code></td><td>Adds an image or subreport held in memory</td></tr>
+        <tr><td><code>register_font(family, bold, italic, data)</code></td><td>Registers a TrueType or OpenType font</td></tr>
+        <tr><td><code>render_json(template, rows, params)</code></td><td>Parses, fills and exports in one call</td></tr>
+        <tr><td><code>ferroreport::parse</code>, <code>fill</code>, <code>to_pdf</code> on the renderer</td><td>The three steps separately, to parse a template once and fill it many times</td></tr>
+        <tr><td><code>font_substitutions()</code></td><td>Font families the last renders had to replace</td></tr>
+      </table>
+
+      <h2 id="resources">Images and subreports</h2>
+      <p>A template refers to other files by relative path: <code>"logo.png"</code> in an image expression, <code>"lines.jasper"</code> in a
+        subreport expression. ferroreport looks for them in the template's folder, then in the resource folders you add, then among the
+        resources you pass in memory. A path can never leave those folders, and remote URLs are not fetched.</p>
+      <p>Images are PNG or JPEG. They can also come from the data: a <code>byte[]</code> field with base64 content, or a string field with a
+        base64 expression.</p>
+      <p>A subreport gets its rows from a nested array in the parent row:</p>
+<pre># Parent row
+{ "order": "ORD-2026000", "customer": "Grupo Ramos",
+  "lines": [ { "product": "Clavos 3\"", "qty": 26, "price": 65.0 }, ... ] }
+
+# In the parent template: a field of class java.util.List, and
+&lt;dataSourceExpression&gt;&lt;![CDATA[new JRMapCollectionDataSource($F{lines})]]&gt;&lt;/dataSourceExpression&gt;
+&lt;subreportExpression&gt;&lt;![CDATA["lines.jasper"]]&gt;&lt;/subreportExpression&gt;    # read from lines.jrxml</pre>
+      <p><code>JRBeanCollectionDataSource</code>, <code>((JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("lines")</code> and
+        <code>JREmptyDataSource</code> work the same way. Subreport parameters and return values are supported.</p>
+
+      <h2 id="fonts">Fonts</h2>
+      <p>DejaVu Sans, DejaVu Serif and DejaVu Sans Mono are built in. They are the families of the <code>jasperreports-fonts</code>
+        extension, so templates that use them match JasperReports exactly. A family the engine does not have is replaced by a built-in one.</p>
+      <p>Add your own TrueType or OpenType fonts with <code>--font</code> on the command line or <code>register_font</code> in Rust. The
+        JavaScript and Python packages use the built-in families for now.</p>
+
+      <h2 id="locale">Locale and dates</h2>
+      <p>The locale decides how patterns such as <code>#,##0.00</code> and <code>dd MMMM yyyy</code> are written: decimal and grouping
+        separators, month and day names. Supported: <code>en_US</code>, <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code>.</p>
+      <p>Dates are kept as written, without time zone conversion. <code>new Date()</code> in an expression is the current time, unless you
+        fix it with <code>now</code>, which makes the output byte-for-byte reproducible.</p>
+
+      <h2 id="check">Check a template</h2>
+      <p>Before you depend on a template, ask the engine what it thinks of it:</p>
+<pre>$ ferroreport doctor invoice.jrxml
+invoice.jrxml: report `invoice`
+  page 595x842 pt, margins 30/40/30/40, language Java
+  5 parameters, 5 fields, 3 variables, 0 groups
+  elements: line ×1, rectangle ×1, staticText ×9, textField ×17
+✓ every feature used by this template is supported</pre>
+      <p>From code, <code>inspect(template)</code> (JavaScript, Python) and <code>POST /inspect</code> return the same verdict as data:
+        an empty <code>warnings</code> list means every feature in the template is supported.</p>
+
+      <h2 id="errors">Errors</h2>
+      <p>A render either returns a complete PDF or fails with a message that names the cause. The usual ones:</p>
+      <table>
+        <tr><th>Message</th><th>What to do</th></tr>
+        <tr><td><code>invalid report template</code></td><td>The text is not JRXML. Send the <code>.jrxml</code> source, not a compiled <code>.jasper</code> file</td></tr>
+        <tr><td><code>cannot convert ... to ...</code></td><td>A value does not fit the class its field declares. See the table in <a href="#inputs">Data</a></td></tr>
+        <tr><td>An expression error</td><td>The expression uses a Java class or method outside the supported subset. <code>doctor</code> points at it</td></tr>
+        <tr><td>An image or subreport is not found</td><td>Add its folder as a resource directory, or pass the file in <code>resources</code></td></tr>
+      </table>
+      <p>Templates cannot run code, read files outside the resource folders or open network connections, so it is safe to render
+        templates your users upload.</p>
+
+      <h2 id="support">What is supported</h2>
+      <p>Bands and page breaks, groups and variables, frames, images, subreports, charts, QR codes and Code 128, styled and HTML text,
+        rotation, multi-column layouts and conditional styles. Crosstabs, tables and lists are next. The
+        <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
+        feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
+    </article>
+  </div>
+
+  <footer>
+    ferroreport is independent and not affiliated with Jaspersoft or Cloud Software Group. JasperReports is a trademark of Cloud Software Group, Inc.
+    <a href="https://github.com/cristianEncarnacion/ferroreport">Source on GitHub</a>, MIT or Apache-2.0.
+  </footer>
+</div>
+</body>
+</html>

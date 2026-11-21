@@ -7,202 +7,19 @@
 <meta name="description" content="Render JasperReports JRXML templates to PDF in milliseconds, without a JVM. Pixel-identical output, about 300× faster from process start, a tenth of the memory. Rust, JavaScript, Python, Docker.">
 <meta property="og:title" content="ferroreport: your JasperReports, 300× faster">
 <meta property="og:description" content="Same .jrxml, same PDF, no JVM. Watch it race JasperReports.">
-<style>
-  @font-face {
-    font-family: "Bricolage";
-    src: url("fonts/bricolage-grotesque.woff2") format("woff2");
-    font-weight: 200 800; font-stretch: 75% 100%; font-display: swap;
-  }
-  :root {
-    --night: #1d1633; --night-2: #2a2147; --night-3: #3a2f5e;
-    --paper: #f6f5fb; --ink: #1d1633; --muted: #5f5a78; --line: #e2dff0;
-    --molten: #ff6a13; --molten-2: #ffc53d; --spark: #ffe08a;
-    --steel: #8d95a8; --steel-2: #c6cbd8;
-    --good: #2f9e44;
-    --display: "Bricolage", "Segoe UI", system-ui, sans-serif;
-    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body { margin: 0; font: 17px/1.6 var(--body); color: var(--ink); background: var(--paper); }
-  a { color: inherit; }
-  :focus-visible { outline: 3px solid var(--molten-2); outline-offset: 3px; border-radius: 6px; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
-
-  /* ---------- hero ---------- */
-  .hero {
-    background:
-      radial-gradient(900px 420px at 78% 108%, rgba(255,106,19,.30), transparent 70%),
-      radial-gradient(700px 380px at 8% -10%, rgba(120,90,220,.35), transparent 70%),
-      var(--night);
-    color: #fff; overflow: hidden; position: relative;
-  }
-  header { display: flex; justify-content: space-between; align-items: center; padding: 22px 0; }
-  .brand { font: 750 22px/1 var(--display); letter-spacing: -.02em; text-decoration: none; }
-  .brand span { color: var(--molten); }
-  nav a { margin-left: 22px; text-decoration: none; color: #cfc8ea; font-weight: 500; font-size: 15px; }
-  nav a:hover { color: #fff; }
-  .headline { text-align: center; padding: 18px 0 4px; }
-  h1 {
-    font: 800 clamp(42px, 6.6vw, 84px)/.95 var(--display); font-stretch: 78%;
-    letter-spacing: -.035em; margin: 0;
-  }
-  h1 .hot {
-    background: linear-gradient(92deg, var(--molten) 10%, var(--molten-2) 90%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .lead { max-width: 40em; margin: 16px auto 0; color: #d9d3f0; font-size: 19px; }
-  .lead code { color: #fff; }
-  .cta { margin: 28px 0 0; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px;
-    font-weight: 650; text-decoration: none; font-size: 16px; cursor: pointer; border: 0;
-  }
-  .btn.hot { background: linear-gradient(92deg, var(--molten), #ff8f1f); color: #1d1100; box-shadow: 0 8px 30px rgba(255,106,19,.45); }
-  .btn.hot:hover { box-shadow: 0 10px 38px rgba(255,106,19,.65); }
-  .btn.quiet { background: rgba(255,255,255,.08); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
-  .btn.quiet:hover { background: rgba(255,255,255,.14); }
-
-  /* the race */
-  .race { margin: 36px auto 0; padding-bottom: 64px; }
-  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-  .lane {
-    border-radius: 18px; padding: 16px; position: relative;
-    background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
-  }
-  .lane.ferro { box-shadow: inset 0 0 0 1px rgba(255,140,40,.35), 0 0 0 0 rgba(255,106,19,0); }
-  .lane-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 4px 12px; }
-  .who { font: 650 16px/1.2 var(--display); }
-  .who small { display: block; font: 400 13px/1.4 var(--body); color: #a99fcc; margin-top: 3px; }
-  .clock { font: 750 clamp(30px, 4vw, 46px)/1 var(--display); font-stretch: 80%; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-  .jasper .clock { color: var(--steel-2); }
-  .ferro .clock { color: var(--molten-2); }
-  .screen {
-    height: 300px; border-radius: 12px; position: relative; overflow: hidden;
-    background: #140f26; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
-  }
-  .log { list-style: none; margin: 0; padding: 16px 18px; font: 14px/1.9 var(--code); color: #b9b2d6; }
-  .log li { opacity: 0; transform: translateY(6px); display: flex; justify-content: space-between; gap: 10px; }
-  .log li .t { color: #7d74a3; }
-  .log li.on { opacity: 1; transform: none; transition: opacity .18s, transform .18s; }
-  .log li span:first-child::before { content: "✓"; display: inline-block; width: 1.4em; color: transparent; }
-  .log li.done span:first-child::before { color: var(--good); }
-  .ferro .log li.done span:first-child::before { color: var(--molten-2); }
-  .meter { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin: 14px 4px 2px; overflow: hidden; }
-  .meter i { display: block; height: 100%; width: 0; border-radius: 3px; }
-  .jasper .meter i { background: var(--steel); }
-  .ferro .meter i { background: linear-gradient(90deg, var(--molten), var(--molten-2)); }
-
-  .sheet {
-    position: absolute; width: 132px; aspect-ratio: 595 / 842; border-radius: 3px; background: #fff center / cover no-repeat;
-    background-image: url("img/invoice.png"); box-shadow: 0 10px 24px rgba(0,0,0,.45);
-    left: 50%; top: 64%; opacity: 0; will-change: transform, opacity;
-  }
-  .jasper .sheet { transform: translate(-50%, -50%) scale(.85); }
-  .pile { position: absolute; inset: 0; }
-  .glow {
-    position: absolute; inset: -40%; pointer-events: none; opacity: 0;
-    background: radial-gradient(circle at 50% 55%, rgba(255,170,60,.55), transparent 45%);
-  }
-  .counter {
-    position: absolute; right: 14px; bottom: 12px; text-align: right; z-index: 30;
-    font: 800 64px/1 var(--display); font-stretch: 75%; font-variant-numeric: tabular-nums; color: #fff;
-    text-shadow: 0 4px 24px rgba(0,0,0,.6); opacity: 0;
-  }
-  .counter small { display: block; font: 600 14px/1.3 var(--body); color: var(--spark); }
-  .verdict {
-    text-align: center; margin: 26px auto 0; max-width: 34em; min-height: 3.4em;
-    font: 650 clamp(20px, 2.6vw, 28px)/1.3 var(--display); letter-spacing: -.01em; opacity: 0;
-  }
-  .verdict b { color: var(--molten-2); }
-  .race-foot { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 14px; color: #a99fcc; font-size: 14px; flex-wrap: wrap; }
-  .replay { background: none; border: 0; color: #fff; font: 600 14px var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-
-  /* ---------- body sections ---------- */
-  section { padding: 84px 0 0; }
-  h2 { font: 780 clamp(34px, 4.4vw, 52px)/1.02 var(--display); font-stretch: 82%; letter-spacing: -.03em; margin: 0 0 12px; }
-  .sub { color: var(--muted); margin: 0 0 30px; max-width: 42em; }
-
-  .numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 2px solid var(--ink); }
-  .num { padding: 22px 22px 6px 0; }
-  .num + .num { padding-left: 22px; border-left: 1px solid var(--line); }
-  .num b { display: block; font: 800 clamp(42px, 5vw, 64px)/1 var(--display); font-stretch: 75%; letter-spacing: -.03em; }
-  .num:first-child b { color: var(--molten); }
-  .num span { color: var(--muted); font-size: 15px; }
-
-  .bench { display: grid; gap: 26px; }
-  .bench-row h3 { margin: 0 0 10px; font: 650 19px/1.2 var(--display); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .bench-row h3 span { color: var(--molten); }
-  .track { display: grid; grid-template-columns: 150px 1fr 80px; align-items: center; gap: 12px; font-size: 15px; margin: 6px 0; }
-  .track .bar { height: 16px; border-radius: 8px; background: #ece9f5; overflow: hidden; }
-  .track .bar i { display: block; height: 100%; border-radius: 8px; min-width: 6px; }
-  .track.j .bar i { background: var(--steel); }
-  .track.f .bar i { background: linear-gradient(90deg, var(--molten), var(--molten-2)); }
-  .track .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .fine { color: var(--muted); font-size: 15px; max-width: 46em; }
-
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px 36px; }
-  .feature h3 { font: 700 21px/1.2 var(--display); margin: 0 0 8px; letter-spacing: -.01em; }
-  .feature h3::before { content: ""; display: block; width: 28px; height: 4px; border-radius: 2px; margin-bottom: 14px; background: linear-gradient(90deg, var(--molten), var(--molten-2)); }
-  .feature p { margin: 0; color: var(--muted); font-size: 16px; }
-
-  .play-shell { background: var(--night); color: #fff; border-radius: 22px; padding: 24px; }
-  .toolbar { display: flex; gap: 10px; align-items: center; margin: 0 0 16px; flex-wrap: wrap; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chips button { border: 0; padding: 9px 15px; border-radius: 999px; cursor: pointer; font: 600 14px var(--body); background: rgba(255,255,255,.08); color: #ddd6f5; }
-  .chips button[aria-pressed="true"] { background: #fff; color: var(--night); }
-  .toolbar .btn { padding: 9px 18px; font-size: 14px; margin-left: auto; }
-  #status { font-size: 14px; color: #a99fcc; width: 100%; }
-  #status.ok { color: var(--spark); }
-  #status.err { color: #ff8787; }
-  .play { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .play label { font: 600 13px var(--body); color: #a99fcc; display: block; margin: 0 0 6px; }
-  .play textarea {
-    width: 100%; height: 310px; font: 12.5px/1.5 var(--code); border: 0; border-radius: 10px; padding: 12px;
-    background: #140f26; color: #e7e2fb; resize: vertical; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
-  }
-  .play .small textarea { height: 140px; }
-  .play .small { margin-top: 12px; }
-  .play iframe { width: 100%; height: 660px; border: 0; border-radius: 10px; background: #514a6b; }
-
-  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-  .tabs button { border: 1px solid var(--line); background: #fff; padding: 8px 15px; border-radius: 999px; cursor: pointer; font: 600 14px var(--body); color: var(--ink); }
-  .tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  pre { background: var(--night); color: #ece8fb; border-radius: 14px; padding: 18px 20px; overflow: auto; font: 14px/1.6 var(--code); margin: 0; }
-  footer { padding: 70px 0 60px; color: var(--muted); font-size: 14px; }
-
-  @media (max-width: 880px) {
-    .play, .features { grid-template-columns: 1fr; }
-    .lanes { gap: 10px; }
-    .lane { padding: 10px; border-radius: 14px; }
-    .lane-head { flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 2px 8px; }
-    .who small, .log .t { display: none; }
-    .clock { font-size: 26px; }
-    .log { padding: 10px; font-size: 10.5px; line-height: 1.7; }
-    .log li span:first-child::before { width: 1.2em; }
-    .sheet { width: 78px; }
-    .counter { font-size: 40px; right: 8px; bottom: 6px; }
-    .counter small { font-size: 11px; }
-    .numbers { grid-template-columns: 1fr 1fr; }
-    .num:nth-child(3) { padding-left: 0; border-left: 0; }
-    .screen { height: 230px; }
-    nav a:not(:last-child) { display: none; }
-    .track { grid-template-columns: 110px 1fr 70px; }
-  }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-</style>
+<link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
 <div class="hero">
+  <canvas id="heat" aria-hidden="true"></canvas>
   <div class="wrap">
-    <header>
-      <a class="brand" href="#">ferro<span>report</span></a>
+    <header class="top">
+      <a class="brand" href="./">ferro<span>report</span></a>
       <nav>
-        <a href="#benchmarks">Benchmarks</a>
-        <a href="#playground">Playground</a>
-        <a href="#install">Install</a>
+        <a class="wide" href="#benchmarks">Benchmarks</a>
+        <a class="wide" href="#playground">Playground</a>
+        <a href="docs.html">Docs</a>
         <a href="https://github.com/cristianEncarnacion/ferroreport">GitHub</a>
       </nav>
     </header>
@@ -212,8 +29,8 @@
       <p class="lead">Keep the <code>.jrxml</code> templates you already have. ferroreport turns them into the same PDF,
         pixel for pixel, in milliseconds and without a JVM.</p>
       <div class="cta">
-        <a class="btn hot" href="#playground">Render a report in your browser</a>
-        <a class="btn quiet" href="https://github.com/cristianEncarnacion/ferroreport">Star on GitHub</a>
+        <a class="btn solid" href="#playground">Render a report in your browser</a>
+        <a class="btn quiet" href="docs.html">Read the docs</a>
       </div>
     </div>
 
@@ -255,7 +72,7 @@
           <div class="meter"><i id="fbar"></i></div>
         </div>
       </div>
-      <p class="verdict" id="verdict">JasperReports delivered <b>1 invoice</b>.<br>In the same 3 seconds, ferroreport delivered <b>301</b>.</p>
+      <p class="verdict" id="verdict">JasperReports delivered 1 invoice.<br>In the same 3 seconds, ferroreport delivered <b>301</b>.</p>
       <div class="race-foot">
         <span>Real timings: the 2-page invoice benchmark below, measured from process start. Jasper's phase split is approximate.</span>
         <button class="replay" id="replay" type="button">Run the race again</button>
@@ -266,7 +83,7 @@
 </div>
 
 <main class="wrap">
-  <section id="numbers" style="padding-top:64px">
+  <section id="numbers" style="padding-top:56px">
     <div class="numbers">
       <div class="num"><b>~300×</b><span>faster on small reports, end to end</span></div>
       <div class="num"><b>19×</b><span>faster on 20,000 rows and 477 pages</span></div>
@@ -314,34 +131,82 @@
   </section>
 
   <section id="playground">
-    <h2>Try it in your browser</h2>
-    <p class="sub">The engine runs here as WebAssembly: nothing is uploaded. Pick an example, edit the template or the data, and render again.</p>
-    <div class="play-shell">
-      <div class="toolbar">
-        <div class="chips" id="examples">
+    <h2>Same template, both engines</h2>
+    <p class="sub">ferroreport renders live in this page, as WebAssembly. JasperReports needs a JVM and cannot run in a browser,
+      so its side shows the PDF it produced from the same template on a server, with the time it took. Switch between the two and compare.</p>
+
+    <div class="pg">
+      <div class="pg-bar">
+        <div class="chips" id="examples" role="group" aria-label="Example report">
           <button type="button" data-ex="02-invoice" aria-pressed="true">Invoice</button>
           <button type="button" data-ex="dashboard" aria-pressed="false">Charts</button>
           <button type="button" data-ex="18-barcodes" aria-pressed="false">QR codes and barcodes</button>
           <button type="button" data-ex="21-markup" aria-pressed="false">Styled text</button>
         </div>
-        <button class="btn hot" id="run" type="button">Render PDF</button>
-        <span id="status" role="status">Loading the engine…</span>
       </div>
-      <div class="play">
-        <div>
-          <label for="tpl">Template (JRXML)</label>
-          <textarea id="tpl" spellcheck="false"></textarea>
-          <div class="small"><label for="data">Data (JSON rows)</label><textarea id="data" spellcheck="false"></textarea></div>
-          <div class="small"><label for="params">Parameters (JSON)</label><textarea id="params" spellcheck="false">{}</textarea></div>
+
+      <div class="duel" role="tablist" aria-label="Engine to show">
+        <button class="side ferro" role="tab" id="tab-ferro" aria-selected="true" aria-controls="viewer" type="button">
+          <span class="name">ferroreport</span>
+          <span class="where">Rendered just now, in your browser</span>
+          <span class="time" id="ftime">…</span>
+          <span class="size" id="fsize"></span>
+        </button>
+        <button class="side jasper" role="tab" id="tab-jasper" aria-selected="false" aria-controls="viewer" type="button">
+          <span class="name">JasperReports 6.20</span>
+          <span class="where">Rendered on a server with Java 21</span>
+          <span class="time" id="jtime">…</span>
+          <span class="size" id="jsize"></span>
+        </button>
+      </div>
+
+      <div class="pg-grid">
+        <div class="editor">
+          <div class="etabs" role="tablist" aria-label="Report input">
+            <button type="button" role="tab" aria-selected="true" aria-controls="tpl" data-pane="tpl">Template</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="data" data-pane="data">Data</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="params" data-pane="params">Parameters</button>
+          </div>
+          <textarea id="tpl" spellcheck="false" aria-label="Template (JRXML)"></textarea>
+          <textarea id="data" spellcheck="false" aria-label="Data (JSON rows)" hidden></textarea>
+          <textarea id="params" spellcheck="false" aria-label="Parameters (JSON)" hidden>{}</textarea>
+          <p id="status" role="status">Loading the engine…</p>
         </div>
-        <div><iframe id="pdf" title="Rendered PDF"></iframe></div>
+        <div class="viewer" id="viewer" role="tabpanel">
+          <iframe id="pdf" title="Rendered PDF"></iframe>
+          <p class="caption"><span id="caption"></span> <a id="download" download="report.pdf" href="#">Download this PDF</a></p>
+        </div>
       </div>
+    </div>
+
+    <div class="codes">
+      <figure>
+        <figcaption>With JasperReports <span>Java, a JVM and its jar dependencies</span></figcaption>
+<pre>JasperReport report =
+    JasperCompileManager.compileReport("invoice.jrxml");
+JsonDataSource rows =
+    new JsonDataSource(new FileInputStream("rows.json"));
+Map&lt;String, Object&gt; params = new HashMap&lt;&gt;();
+params.put("CUSTOMER", "Distribuidora Caribe");
+
+JasperPrint print =
+    JasperFillManager.fillReport(report, params, rows);
+JasperExportManager.exportReportToPdfFile(print, "invoice.pdf");</pre>
+      </figure>
+      <figure class="ours">
+        <figcaption>With ferroreport <span>one call, in the language you already use</span></figcaption>
+<pre>import { render } from "ferroreport";
+
+const pdf = render(jrxml, rows, { CUSTOMER: "Distribuidora Caribe" });</pre>
+        <p>The same call exists for Python, Rust, the command line and HTTP. <a href="docs.html">See every option in the docs.</a></p>
+      </figure>
     </div>
   </section>
 
   <section id="install">
     <h2>Install</h2>
     <p class="sub">Pick the way you want to call it. Every option uses the same engine and produces the same PDF.</p>
+    <p class="note">The npm, PyPI and crates.io packages are published with release 0.2.0, which is on its way. The binaries and the Docker image work today. Every function and option is described in the <a href="docs.html">documentation</a>.</p>
     <div class="tabs" id="langs">
       <button type="button" aria-pressed="true" data-l="cli">CLI</button><button type="button" aria-pressed="false" data-l="docker">Docker and HTTP</button><button type="button" aria-pressed="false" data-l="js">JavaScript</button><button type="button" aria-pressed="false" data-l="py">Python</button><button type="button" aria-pressed="false" data-l="rust">Rust</button>
     </div>
@@ -357,6 +222,36 @@
 <script>
 /* ---------- the race: a pure function of time, so it can also be filmed frame by frame ---------- */
 (() => {
+  const filming = location.search.includes("film");
+  if (filming) document.body.classList.add("film");
+
+  // The backdrop: slow molten light, drawn small and scaled up. Also a pure function of time.
+  const heat = document.getElementById("heat"), hx = heat.getContext("2d");
+  const HW = 320, HH = 200;
+  heat.width = HW; heat.height = HH;
+  const BLOBS = [ // x, y in the hero, y when it floods the frame, radius, color, sway x/y, speed x/y, phase
+    [.50, 1.14, .66, .80, "255,106,0", .05, .03, .31, .23, 0],
+    [.18, .88, .34, .46, "255,180,58", .10, .06, .27, .35, 1.3],
+    [.84, .84, .28, .44, "255,61,87", .09, .07, .25, .41, 2.1],
+    [.50, .68, .86, .36, "255,214,128", .22, .05, .19, .45, 4.0],
+    [.62, 1.04, .08, .34, "224,36,94", .28, .04, .17, .37, 1.0],
+  ];
+  function heatFrame(t, flood = 0) {
+    hx.fillStyle = "#fbf6ee";
+    hx.fillRect(0, 0, HW, HH);
+    for (const [x, y0, y1, r, c, ax, ay, fx, fy, ph] of BLOBS) {
+      const cx = (x + ax * Math.sin(t * fx + ph)) * HW;
+      const cy = (y0 + (y1 - y0) * flood + ay * Math.sin(t * fy + ph * 1.7)) * HH;
+      const rr = r * HW * (1 + .08 * Math.sin(t * .4 + ph));
+      const g = hx.createRadialGradient(cx, cy, 0, cx, cy, rr);
+      g.addColorStop(0, `rgba(${c},.95)`); g.addColorStop(.45, `rgba(${c},.5)`); g.addColorStop(1, `rgba(${c},0)`);
+      hx.fillStyle = g;
+      hx.fillRect(0, 0, HW, HH);
+    }
+  }
+  window.heatFrame = heatFrame;
+  heatFrame(0);
+
   const J_END = 3.01, F_END = 0.010, START = 0.6, HOLD = 4.2;
   const CYCLE = START + J_END + HOLD;
   const $ = (id) => document.getElementById(id);
@@ -412,7 +307,7 @@
     $("counter").style.opacity = n > 0 ? 1 : 0;
     $("count").textContent = n;
     $("flane").style.boxShadow = n > 0
-      ? `inset 0 0 0 1px rgba(255,140,40,.6), 0 0 ${40 + 20 * Math.sin(el * 9)}px rgba(255,106,19,.35)`
+      ? `inset 0 0 0 2px rgba(255,90,10,.75), 0 30px ${80 + 20 * Math.sin(el * 9)}px rgba(200,50,0,.38)`
       : "";
 
     // Jasper's single invoice lands at 3.01 s.
@@ -426,12 +321,14 @@
 
   window.raceFrame = frame;                    // used to film the race frame by frame
   window.raceLength = CYCLE;
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches || location.search.includes("film");
-  let t0 = performance.now(), visible = true;
-  if (still) { if (!location.search.includes("film")) frame(START + J_END + 1); return; }
+  if (filming) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { frame(START + J_END + 1); return; }
+  let t0 = performance.now(), visible = true, heroVisible = true;
   new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe($("race"));
+  new IntersectionObserver(([e]) => (heroVisible = e.isIntersecting)).observe(heat);
   function tick(now) {
     if (visible) frame(((now - t0) / 1000) % CYCLE);
+    if (heroVisible) heatFrame(now / 1000);
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
@@ -467,44 +364,79 @@ code.textContent = snippets.cli;
 const langs = document.getElementById("langs");
 langs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { pick(langs, b); code.textContent = snippets[b.dataset.l]; }));
 
-const status = document.getElementById("status");
+const $ = (id) => document.getElementById(id);
+const status = $("status");
 const set = (text, cls = "") => { status.textContent = text; status.className = cls; };
-let engine;
+const JASPER_SECONDS = { "02-invoice": 3.01, "dashboard": 2.80, "18-barcodes": 3.49, "21-markup": 2.68 };
+const VIEW = "#toolbar=0&navpanes=0&view=FitH";
+const kb = (n) => (n / 1024).toFixed(1) + " KB";
+let engine, example = "02-invoice", showing = "ferro", ferroUrl, edited = false;
 try {
   engine = await import("./pkg/ferroreport.js");
   await engine.default();
-  set(`Engine ${engine.version()} ready`, "ok");
 } catch (e) {
   set("Could not load the WebAssembly engine: " + e, "err");
 }
 
-async function load(name) {
-  const get = (f) => fetch(`examples/${name}/${f}`).then((r) => (r.ok ? r.text() : ""));
-  document.getElementById("tpl").value = await get("report.jrxml");
-  document.getElementById("data").value = (await get("data.json")) || "[]";
-  document.getElementById("params").value = (await get("params.json")) || "{}";
-  if (engine) run();
+function show(which) {
+  showing = which;
+  $("tab-ferro").setAttribute("aria-selected", String(which === "ferro"));
+  $("tab-jasper").setAttribute("aria-selected", String(which === "jasper"));
+  const jasperUrl = `examples/${example}/jasper.pdf`;
+  const url = which === "ferro" ? ferroUrl : jasperUrl;
+  if (!url) return;
+  $("pdf").src = url + VIEW;
+  $("download").href = url;
+  $("download").download = which === "ferro" ? "ferroreport.pdf" : "jasperreports.pdf";
+  $("caption").textContent = which === "ferro"
+    ? "Showing the PDF ferroreport rendered in this page."
+    : "Showing the PDF JasperReports produced for this example" + (edited ? ", before your edits." : ".");
 }
 
-let lastUrl;
 function run() {
   if (!engine) return;
   try {
     const t0 = performance.now();
-    const pdf = engine.render(document.getElementById("tpl").value, document.getElementById("data").value,
-      document.getElementById("params").value, { locale: "en_US" });
+    const pdf = engine.render($("tpl").value, $("data").value, $("params").value, { locale: "en_US" });
     const ms = performance.now() - t0;
-    if (lastUrl) URL.revokeObjectURL(lastUrl);
-    lastUrl = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
-    document.getElementById("pdf").src = lastUrl;
-    set(`Rendered in ${ms.toFixed(1)} ms (${(pdf.length / 1024).toFixed(1)} KB), right here in your browser`, "ok");
+    if (ferroUrl) URL.revokeObjectURL(ferroUrl);
+    ferroUrl = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+    $("ftime").textContent = ms.toFixed(1) + " ms";
+    $("fsize").textContent = kb(pdf.length);
+    const times = Math.round(JASPER_SECONDS[example] * 1000 / ms);
+    set(edited ? `Rendered your changes in ${ms.toFixed(1)} ms.` : `Rendered in ${ms.toFixed(1)} ms, about ${times}× faster than the JasperReports run. Edit anything and it renders again.`, "ok");
+    show("ferro");
   } catch (e) {
     set(String(e.message || e), "err");
   }
 }
-document.getElementById("run").addEventListener("click", run);
-const examples = document.getElementById("examples");
+
+async function load(name) {
+  example = name; edited = false;
+  const get = (f) => fetch(`examples/${name}/${f}`).then((r) => (r.ok ? r.text() : ""));
+  [$("tpl").value, $("data").value, $("params").value] =
+    [await get("report.jrxml"), (await get("data.json")) || "[]", (await get("params.json")) || "{}"];
+  $("jtime").textContent = JASPER_SECONDS[name].toFixed(2) + " s";
+  fetch(`examples/${name}/jasper.pdf`, { method: "HEAD" })
+    .then((r) => ($("jsize").textContent = r.ok ? kb(+r.headers.get("content-length")) : ""));
+  run();
+}
+
+$("tab-ferro").addEventListener("click", () => show("ferro"));
+$("tab-jasper").addEventListener("click", () => show("jasper"));
+const examples = $("examples");
 examples.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { pick(examples, b); load(b.dataset.ex); }));
+const etabs = document.querySelectorAll(".etabs button");
+etabs.forEach((b) => b.addEventListener("click", () => etabs.forEach((x) => {
+  x.setAttribute("aria-selected", String(x === b));
+  $(x.dataset.pane).hidden = x !== b;
+})));
+let timer;
+["tpl", "data", "params"].forEach((id) => $(id).addEventListener("input", () => {
+  edited = true;
+  clearTimeout(timer);
+  timer = setTimeout(run, 350);
+}));
 load("02-invoice");
 </script>
 </body>
