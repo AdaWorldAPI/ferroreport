@@ -249,9 +249,9 @@ impl<'a> Layout<'a, '_> {
         };
         let (rows, cols) = if self.nature.span { (r2 - r1, c2 - c1) } else { (1, 1) };
         if self.nature.span {
-            for r in r1..r2 {
-                for c in c1..c2 {
-                    self.cells[r][c] = Cell::Occupied(r1, c1);
+            for row in &mut self.cells[r1..r2] {
+                for cell in &mut row[c1..c2] {
+                    *cell = Cell::Occupied(r1, c1);
                 }
             }
         }
@@ -264,9 +264,9 @@ impl<'a> Layout<'a, '_> {
             Some(b) => sides(b),
             None => [Pen { color: frame.fore, ..NO_PEN }; 4],
         };
-        for r in r1..r2 {
-            for c in c1..c2 {
-                let (style, rows, cols) = match &mut self.cells[r][c] {
+        for (r, row) in self.cells.iter_mut().enumerate().take(r2).skip(r1) {
+            for (c, cell) in row.iter_mut().enumerate().take(c2).skip(c1) {
+                let (style, rows, cols) = match cell {
                     Cell::Empty(s) => (s, 1, 1),
                     Cell::Element { style, rows, cols, .. } => (style, *rows, *cols),
                     Cell::Occupied(..) => continue,
