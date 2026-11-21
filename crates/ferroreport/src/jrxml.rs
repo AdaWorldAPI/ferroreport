@@ -696,11 +696,18 @@ impl Parser {
                     underline: props.underline.unwrap_or(false),
                     strike: props.strike.unwrap_or(false),
                 };
+                let rotation = match n.child("textElement").and_then(|t| t.attr("rotation")).or_else(|| n.attr("rotation")) {
+                    Some("Left") => Rotation::Left,
+                    Some("Right") => Rotation::Right,
+                    Some("UpsideDown") => Rotation::UpsideDown,
+                    _ => Rotation::None,
+                };
                 let style = TextStyle {
                     font,
                     halign: props.halign.unwrap_or(HAlign::Left),
                     valign: props.valign.unwrap_or(VAlign::Top),
                     line_spacing: props.line_spacing(),
+                    rotation,
                 };
                 let te_node = n.child("textElement");
                 let markup = match attr(n, &["markup"]).or_else(|| te_node.and_then(|t| t.attr("markup"))) {
@@ -713,11 +720,6 @@ impl Parser {
                     _ if te_node.and_then(|t| t.attr("isStyledText")).is_some_and(parse_bool) => crate::rich::Markup::Styled,
                     _ => crate::rich::Markup::None,
                 };
-                if n.child("textElement").and_then(|t| t.attr("rotation")).is_some_and(|r| r != "None")
-                    || n.attr("rotation").is_some_and(|r| r != "None")
-                {
-                    self.warnings.push("rotated text is rendered unrotated".into());
-                }
                 let stretch = attr(n, &["isStretchWithOverflow"]).is_some_and(parse_bool)
                     || attr(n, &["textAdjust"]).is_some_and(|v| v == "StretchHeight");
                 let content = if kind == "staticText" {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="rotation" pageWidth="595" pageHeight="400" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="30" bottomMargin="30" whenNoDataType="AllSectionsNoDetail">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+	<title>
+		<band height="300">
+			<staticText><reportElement mode="Opaque" x="0" y="0" width="30" height="140" backcolor="#E8EEF6"/><box><pen lineWidth="0.5"/></box><textElement rotation="Left"><font isBold="true"/></textElement><text><![CDATA[Rotated left]]></text></staticText>
+			<staticText><reportElement mode="Opaque" x="40" y="0" width="30" height="140" backcolor="#F6EEE8"/><box><pen lineWidth="0.5"/></box><textElement textAlignment="Center" verticalAlignment="Middle" rotation="Right"/><text><![CDATA[Rotated right, centered]]></text></staticText>
+			<staticText><reportElement x="80" y="0" width="150" height="40"/><box><pen lineWidth="0.5"/></box><textElement textAlignment="Right" rotation="UpsideDown"/><text><![CDATA[Upside down text]]></text></staticText>
+			<textField><reportElement x="240" y="0" width="45" height="140"/><box leftPadding="3" topPadding="5" rightPadding="2" bottomPadding="8"><pen lineWidth="0.5"/></box><textElement verticalAlignment="Bottom" rotation="Left"><font size="9"/></textElement><textFieldExpression><![CDATA["A longer rotated text that wraps onto a second line"]]></textFieldExpression></textField>
+			<staticText><reportElement x="300" y="0" width="200" height="30"/><textElement rotation="None"/><text><![CDATA[Not rotated]]></text></staticText>
+		</band>
+	</title>
+</jasperReport>

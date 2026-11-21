@@ -270,6 +270,15 @@ fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
                 translate(i, dx, dy);
             }
         }
+        PrintItem::Transform(m, items) => {
+            // Move the local drawing and its anchor together: M' = T(d) · M · T(-d).
+            let [a, b, c, d, _, _] = *m;
+            m[4] += dx - (a * dx + c * dy);
+            m[5] += dy - (b * dx + d * dy);
+            for i in items {
+                translate(i, dx, dy);
+            }
+        }
         PrintItem::Rect { x, y, .. } | PrintItem::Ellipse { x, y, .. } | PrintItem::Shapes { x, y, .. } => {
             *x += dx;
             *y += dy;
@@ -350,6 +359,35 @@ fn text_item(
     text: &str,
     clip: bool,
 ) -> (PrintItem, f32) {
+    if te.style.rotation != Rotation::None {
+        // Lay the text out in the rotated box at the origin, then turn it into place, like
+        // JasperReports' PDF exporter (padding turns with the text).
+        let mut r = te.clone();
+        r.style.rotation = Rotation::None;
+        let p = te.boxed.padding;
+        // The rotated box is laid out with its top-left corner on the anchor, a corner of the
+        // element, and turned around that point (the same transform Jasper writes).
+        let (lw, lh, (ax, ay), m) = match te.style.rotation {
+            Rotation::Left => {
+                r.boxed.padding = Padding { top: p.left, left: p.bottom, bottom: p.right, right: p.top };
+                let (ax, ay) = (x, y + h);
+                (h, w, (ax, ay), [0.0, -1.0, 1.0, 0.0, ax - ay, ay + ax])
+            }
+            Rotation::Right => {
+                r.boxed.padding = Padding { top: p.right, right: p.bottom, bottom: p.left, left: p.top };
+                let (ax, ay) = (x + w, y);
+                (h, w, (ax, ay), [0.0, 1.0, -1.0, 0.0, ax + ay, ay - ax])
+            }
+            _ => {
+                r.boxed.padding = Padding { top: p.bottom, bottom: p.top, left: p.right, right: p.left };
+                let (ax, ay) = (x + w, y + h);
+                (w, h, (ax, ay), [-1.0, 0.0, 0.0, -1.0, 2.0 * ax, 2.0 * ay])
+            }
+        };
+        let (item, _) = text_item(fonts, &r, color, ax, ay, lw, lh, text, clip);
+        // Rotated text does not stretch the element.
+        return (PrintItem::Transform(m, vec![item]), h);
+    }
     if te.markup != crate::rich::Markup::None {
         let st = crate::rich::parse(text, &run_style(te, color), te.markup);
         return crate::rich::layout(fonts, te, &st, x, y, w, h, clip);

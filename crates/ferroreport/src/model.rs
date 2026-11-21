@@ -208,6 +208,17 @@ pub struct TextStyle {
     pub halign: HAlign,
     pub valign: VAlign,
     pub line_spacing: LineSpacing,
+    pub rotation: Rotation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rotation {
+    None,
+    /// 90° counter-clockwise: reads bottom to top.
+    Left,
+    /// 90° clockwise: reads top to bottom.
+    Right,
+    UpsideDown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

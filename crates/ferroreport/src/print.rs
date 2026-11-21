@@ -33,6 +33,9 @@ pub struct PrintText {
 pub enum PrintItem {
     /// Several items drawn in order (the runs of a styled text).
     Group(Vec<PrintItem>),
+    /// Items drawn in a local coordinate system: a local point `(u, v)` lands on the page at
+    /// `(a·u + c·v + e, b·u + d·v + f)` (points, y down). Used for rotated text.
+    Transform([f32; 6], Vec<PrintItem>),
     /// Filled rectangles drawn in a local drawing scaled by `scale` from `(x, y)` (barcodes).
     Shapes {
         x: f32,

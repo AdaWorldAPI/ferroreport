@@ -144,19 +144,31 @@ fn write_image(pdf: &mut Pdf, ids: &mut Ids, r: Ref, image: &ImageData) {
     }
 }
 
+/// One drawing step: an item, or entering/leaving a transformed coordinate system.
+enum Draw<'a> {
+    Item(&'a PrintItem),
+    Push([f32; 6]),
+    Pop,
+}
+
 /// Items in drawing order with groups expanded.
-fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<&'a PrintItem>) {
+fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<Draw<'a>>) {
     for item in items {
         match item {
             PrintItem::Group(inner) => flatten(inner, out),
-            other => out.push(other),
+            PrintItem::Transform(m, inner) => {
+                out.push(Draw::Push(*m));
+                flatten(inner, out);
+                out.push(Draw::Pop);
+            }
+            other => out.push(Draw::Item(other)),
         }
     }
 }
 
 /// Serialises a filled document to PDF bytes.
 pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> Result<Vec<u8>> {
-    let flat: Vec<Vec<&PrintItem>> = doc
+    let flat: Vec<Vec<Draw>> = doc
         .pages
         .iter()
         .map(|p| {
@@ -168,8 +180,8 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
     // 1. Which glyphs of which faces are used (and which characters they stand for).
     let mut used: BTreeMap<FaceId, BTreeMap<u16, char>> = BTreeMap::new();
     for page in &flat {
-        for &item in page {
-            if let PrintItem::Text(t) = item {
+        for draw in page {
+            if let Draw::Item(PrintItem::Text(t)) = draw {
                 let face = fonts.face(t.face);
                 let entry = used.entry(t.face).or_default();
                 for line in &t.lines {
@@ -268,8 +280,8 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
     // 3. Images, written once each.
     let mut image_refs: BTreeMap<usize, (String, Ref)> = BTreeMap::new();
     for page in &flat {
-        for &item in page {
-            if let PrintItem::Image { image, .. } = item {
+        for draw in page {
+            if let Draw::Item(PrintItem::Image { image, .. }) = draw {
                 if image_refs.contains_key(&image.id) {
                     continue;
                 }
@@ -284,17 +296,30 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
     // 4. Pages.
     let mut page_ids = Vec::new();
     let ph = doc.page_height;
-    let empty: Vec<&PrintItem> = Vec::new();
-    let pages: Vec<&Vec<&PrintItem>> = if flat.is_empty() { vec![&empty] } else { flat.iter().collect() };
+    let empty: Vec<Draw> = Vec::new();
+    let pages: Vec<&Vec<Draw>> = if flat.is_empty() { vec![&empty] } else { flat.iter().collect() };
     for page in pages {
         let page_id = ids.next();
         let content_id = ids.next();
         page_ids.push(page_id);
         let mut c = Content::new();
         c.set_line_cap(LineCapStyle::ButtCap);
-        for &item in page.iter() {
+        for draw in page.iter() {
+            let item = match draw {
+                Draw::Item(item) => *item,
+                Draw::Push([a, b, cc, d, e, f]) => {
+                    // Local items are written as if on the page; map them into place.
+                    c.save_state();
+                    c.transform([*a, -*b, -*cc, *d, *cc * ph + *e, ph - *d * ph - *f]);
+                    continue;
+                }
+                Draw::Pop => {
+                    c.restore_state();
+                    continue;
+                }
+            };
             match item {
-                PrintItem::Group(_) => {}
+                PrintItem::Group(_) | PrintItem::Transform(..) => {}
                 PrintItem::Rect { x, y, w, h, fill, stroke, radius } => {
                     let (px, py) = (*x, ph - y - h);
                     if let Some(color) = fill {
