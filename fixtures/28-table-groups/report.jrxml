@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" name="sales_by_region" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="30" bottomMargin="30">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<style name="Head" mode="Opaque" backcolor="#2F4858" forecolor="#FFFFFF">
+		<box>
+			<pen lineWidth="0.5" lineColor="#2F4858"/>
+		</box>
+	</style>
+	<style name="Group" mode="Opaque" backcolor="#F2E8CF">
+		<box>
+			<bottomPen lineWidth="0.75" lineColor="#BC6C25"/>
+		</box>
+	</style>
+	<style name="Cell">
+		<box>
+			<bottomPen lineWidth="0.25" lineColor="#999999"/>
+		</box>
+	</style>
+	<subDataset name="sales">
+		<parameter name="SHOW_COST" class="java.lang.Boolean"/>
+		<field name="region" class="java.lang.String"/>
+		<field name="rep" class="java.lang.String"/>
+		<field name="units" class="java.lang.Integer"/>
+		<field name="revenue" class="java.lang.Double"/>
+		<field name="cost" class="java.lang.Double"/>
+		<variable name="region_revenue" class="java.lang.Double" resetType="Group" resetGroup="region" calculation="Sum">
+			<variableExpression><![CDATA[$F{revenue}]]></variableExpression>
+		</variable>
+		<variable name="region_units" class="java.lang.Integer" resetType="Group" resetGroup="region" calculation="Sum">
+			<variableExpression><![CDATA[$F{units}]]></variableExpression>
+		</variable>
+		<group name="region">
+			<groupExpression><![CDATA[$F{region}]]></groupExpression>
+		</group>
+	</subDataset>
+	<parameter name="SHOW_COST" class="java.lang.Boolean">
+		<defaultValueExpression><![CDATA[Boolean.FALSE]]></defaultValueExpression>
+	</parameter>
+	<field name="title" class="java.lang.String"/>
+	<field name="sales" class="java.util.List"/>
+	<detail>
+		<band height="120">
+			<textField>
+				<reportElement x="0" y="0" width="555" height="20"/>
+				<textElement>
+					<font size="13" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{title}]]></textFieldExpression>
+			</textField>
+			<componentElement>
+				<reportElement x="0" y="24" width="555" height="80"/>
+				<jr:table whenNoDataType="NoDataCell">
+					<datasetRun subDataset="sales">
+						<datasetParameter name="SHOW_COST">
+							<datasetParameterExpression><![CDATA[$P{SHOW_COST}]]></datasetParameterExpression>
+						</datasetParameter>
+						<dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($F{sales})]]></dataSourceExpression>
+					</datasetRun>
+					<jr:column width="160">
+						<jr:groupHeader groupName="region">
+							<jr:cell style="Group" height="18">
+								<textField>
+									<reportElement x="4" y="0" width="152" height="18"/>
+									<textElement verticalAlignment="Middle">
+										<font isBold="true"/>
+									</textElement>
+									<textFieldExpression><![CDATA[$F{region}]]></textFieldExpression>
+								</textField>
+							</jr:cell>
+						</jr:groupHeader>
+						<jr:groupFooter groupName="region">
+							<jr:cell height="16">
+								<textField>
+									<reportElement x="4" y="0" width="152" height="16"/>
+									<textElement verticalAlignment="Middle">
+										<font isItalic="true"/>
+									</textElement>
+									<textFieldExpression><![CDATA["Subtotal " + $F{region}]]></textFieldExpression>
+								</textField>
+							</jr:cell>
+						</jr:groupFooter>
+						<jr:columnHeader style="Head" height="30" rowSpan="2">
+							<staticText>
+								<reportElement x="4" y="0" width="152" height="30"/>
+								<textElement verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Sales rep]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Cell" height="15">
+							<textField>
+								<reportElement x="4" y="0" width="152" height="15"/>
+								<textElement verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[$F{rep}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+					<jr:columnGroup width="395">
+						<jr:groupHeader groupName="region">
+							<jr:cell style="Group" height="18"/>
+						</jr:groupHeader>
+						<jr:columnHeader style="Head" height="15">
+							<staticText>
+								<reportElement x="0" y="0" width="395" height="15"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Results]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:column width="95">
+							<jr:groupFooter groupName="region">
+								<jr:cell height="16">
+									<textField>
+										<reportElement x="0" y="0" width="91" height="16"/>
+										<textElement textAlignment="Right" verticalAlignment="Middle">
+											<font isItalic="true"/>
+										</textElement>
+										<textFieldExpression><![CDATA[$V{region_units}]]></textFieldExpression>
+									</textField>
+								</jr:cell>
+							</jr:groupFooter>
+							<jr:columnHeader style="Head" height="15">
+								<staticText>
+									<reportElement x="0" y="0" width="91" height="15"/>
+									<textElement textAlignment="Right" verticalAlignment="Middle"/>
+									<text><![CDATA[Units]]></text>
+								</staticText>
+							</jr:columnHeader>
+							<jr:detailCell style="Cell" height="15">
+								<textField>
+									<reportElement x="0" y="0" width="91" height="15"/>
+									<textElement textAlignment="Right" verticalAlignment="Middle"/>
+									<textFieldExpression><![CDATA[$F{units}]]></textFieldExpression>
+								</textField>
+							</jr:detailCell>
+						</jr:column>
+						<jr:columnGroup width="300">
+							<jr:columnHeader style="Head" height="15"/>
+							<jr:column width="150">
+								<jr:groupFooter groupName="region">
+									<jr:cell height="16">
+										<textField pattern="#,##0.00">
+											<reportElement x="0" y="0" width="146" height="16"/>
+											<textElement textAlignment="Right" verticalAlignment="Middle">
+												<font isItalic="true"/>
+											</textElement>
+											<textFieldExpression><![CDATA[$V{region_revenue}]]></textFieldExpression>
+										</textField>
+									</jr:cell>
+								</jr:groupFooter>
+								<jr:columnHeader style="Head" height="15">
+									<staticText>
+										<reportElement x="0" y="0" width="146" height="15"/>
+										<textElement textAlignment="Right" verticalAlignment="Middle"/>
+										<text><![CDATA[Revenue]]></text>
+									</staticText>
+								</jr:columnHeader>
+								<jr:detailCell style="Cell" height="15">
+									<textField pattern="#,##0.00">
+										<reportElement x="0" y="0" width="146" height="15"/>
+										<textElement textAlignment="Right" verticalAlignment="Middle"/>
+										<textFieldExpression><![CDATA[$F{revenue}]]></textFieldExpression>
+									</textField>
+								</jr:detailCell>
+							</jr:column>
+							<jr:column width="150">
+								<printWhenExpression><![CDATA[$P{SHOW_COST}]]></printWhenExpression>
+								<jr:columnHeader style="Head" height="15">
+									<staticText>
+										<reportElement x="0" y="0" width="146" height="15"/>
+										<textElement textAlignment="Right" verticalAlignment="Middle"/>
+										<text><![CDATA[Cost]]></text>
+									</staticText>
+								</jr:columnHeader>
+								<jr:detailCell style="Cell" height="15">
+									<textField pattern="#,##0.00">
+										<reportElement x="0" y="0" width="146" height="15"/>
+										<textElement textAlignment="Right" verticalAlignment="Middle"/>
+										<textFieldExpression><![CDATA[$F{cost}]]></textFieldExpression>
+									</textField>
+								</jr:detailCell>
+							</jr:column>
+						</jr:columnGroup>
+					</jr:columnGroup>
+					<jr:noData height="24">
+						<staticText>
+							<reportElement x="0" y="0" width="555" height="24"/>
+							<box>
+								<pen lineWidth="0.5" lineStyle="Dashed" lineColor="#999999"/>
+							</box>
+							<textElement textAlignment="Center" verticalAlignment="Middle">
+								<font isItalic="true"/>
+							</textElement>
+							<text><![CDATA[No sales this period]]></text>
+						</staticText>
+					</jr:noData>
+				</jr:table>
+			</componentElement>
+		</band>
+	</detail>
+</jasperReport>

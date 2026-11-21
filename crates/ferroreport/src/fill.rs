@@ -703,7 +703,13 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 ElementKind::Subreport(sr) => {
                     let (segments, values) = run_subreport(le, sr)?;
                     returns.extend(values);
-                    m.new_h = el.height.max(segments.iter().map(|s| s.height).sum());
+                    m.new_h = el.height.max(Segment::flow_height(&segments));
+                    m.blank = segments.is_empty();
+                    m.content = Some(Arc::new(segments));
+                }
+                ElementKind::Table(t) => {
+                    let segments = run_table(le, t, el.width)?;
+                    m.new_h = el.height.max(Segment::flow_height(&segments));
                     m.blank = segments.is_empty();
                     m.content = Some(Arc::new(segments));
                 }
@@ -712,7 +718,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     m.blank = m.symbol.is_none();
                 }
                 ElementKind::Content(segments) => {
-                    m.new_h = el.height.max(segments.iter().map(|s| s.height).sum());
+                    m.new_h = el.height.max(Segment::flow_height(segments));
                     m.content = Some(segments.clone());
                 }
                 _ => {}
@@ -902,32 +908,42 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         part_box.bottom.width = 0.0;
                         frame_split = Some((inner, part_box));
                     }
-                    ElementKind::Subreport(_) | ElementKind::Content(_) => {
+                    ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::Content(_) => {
                         // Subreport content breaks between its bands; the page and column
                         // headers of the subreport are printed again where it continues.
-                        let segments = m.content.take().unwrap_or_default();
+                        let all = m.content.take().unwrap_or_default();
+                        let footers: Vec<Segment> = all.iter().filter(|s| s.footer).cloned().collect();
+                        let segments: Vec<Segment> = all.iter().filter(|s| !s.footer).cloned().collect();
                         let room = a - y;
+                        let fits_whole = Segment::flow_height(&segments) <= room + 1e-3;
+                        // When the content continues on the next page, its page footer prints on
+                        // this page too, so leave room for it.
+                        let footer_h = if fits_whole { 0.0 } else { footers.iter().map(|f| f.height).sum() };
                         let mut used = 0.0;
                         let mut k = 0;
-                        while k < segments.len() && used + segments[k].height <= room + 1e-3 {
+                        while k < segments.len() && used + segments[k].height + footer_h <= room + 1e-3 {
                             used += segments[k].height;
                             k += 1;
                         }
                         let only_headers = segments[..k].iter().all(|s| s.header);
                         if k == 0 || (only_headers && k < segments.len()) {
                             let mut cont = freeze(el, None);
-                            cont.kind = ElementKind::Content(segments);
+                            cont.kind = ElementKind::Content(all);
                             rest.push(cont);
                             continue;
                         }
+                        let mut part = segments[..k].to_vec();
                         if k < segments.len() {
                             let mut tail: Vec<Segment> = segments.iter().filter(|s| s.header).cloned().collect();
                             tail.extend(segments[k..].iter().cloned());
+                            tail.extend(footers.iter().cloned());
                             let mut cont = freeze(el, None);
                             cont.kind = ElementKind::Content(Arc::new(tail));
                             rest.push(cont);
+                            // Jasper prints it right after the last band that fits.
+                            part.extend(footers.iter().map(|f| Segment { footer: false, ..f.clone() }));
                         }
-                        m.content = Some(Arc::new(segments[..k].to_vec()));
+                        m.content = Some(Arc::new(part));
                         h = a - y;
                     }
                     // Elements stretching with their container end at the cut.
@@ -1062,9 +1078,9 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 }
                 box_items(&img.boxed, x, y, w, h, &mut out.items);
             }
-            ElementKind::Subreport(_) | ElementKind::Content(_) => {
+            ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::Content(_) => {
                 let mut top = y;
-                for seg in m.content.take().iter().flat_map(|c| c.iter()) {
+                for seg in m.content.take().iter().flat_map(|c| c.iter()).filter(|s| !s.footer) {
                     for item in &seg.items {
                         let mut item = item.clone();
                         translate(&mut item, x, top);
@@ -1308,6 +1324,50 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
     let returns =
         sr.returns.iter().map(|r| (r.to.clone(), r.calculation, vars.get(&r.from).cloned().unwrap_or(Value::Null))).collect();
     Ok((segments, returns))
+}
+
+/// Fills a table component: the report Jasper builds from the printed columns, run like a
+/// subreport over the rows of the table's data source.
+fn run_table(le: &mut LayoutEnv, t: &TableElement, width: f32) -> Result<Vec<Segment>> {
+    if le.images.depth >= MAX_SUBREPORT_DEPTH {
+        return Err(Error::Unsupported(format!("table: nested more than {MAX_SUBREPORT_DEPTH} levels")));
+    }
+    let (scope, env) = (le.scope, le.env);
+    let columns = crate::table::fill_columns(&t.columns, &mut |e| Ok(matches!(eval(e, scope, env)?, Value::Bool(true))))?;
+    if columns.is_empty() {
+        return Ok(Vec::new());
+    }
+    let report = crate::table::report(t, &columns, width);
+
+    let mut params = HashMap::new();
+    if let Some(e) = &t.parameters_map {
+        if let Value::Json(map) = eval(e, le.scope, le.env)? {
+            if let Some(obj) = map.as_object() {
+                for (k, v) in obj {
+                    let class = report.parameters.iter().find(|p| &p.name == k).map(|p| p.class).unwrap_or(JavaType::Object);
+                    params.insert(k.clone(), crate::data::json_to_value(v, class)?);
+                }
+            }
+        }
+    }
+    for (name, e) in &t.parameters {
+        params.insert(name.clone(), eval(e, le.scope, le.env)?);
+    }
+    params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
+    let rows = match &t.data_source {
+        Some(e) => match eval(e, le.scope, le.env)? {
+            Value::Json(j) => j,
+            Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
+            other => return Err(Error::eval(format!("table data source is a {}, expected a list", other.type_name()))),
+        },
+        None => Arc::new(serde_json::Value::Array(Vec::new())),
+    };
+    let records = crate::data::records_from_json(&report, &rows)?;
+    let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
+    le.images.depth += 1;
+    let filled = fill_flow(&report, &records, params, le.fonts, le.images, &env);
+    le.images.depth -= 1;
+    Ok(filled?.0)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2113,7 +2173,7 @@ fn fill_flow(
     let mut segments = Vec::with_capacity(marks.len() + 2);
     if let Some(first) = marks.first() {
         if first.y > 0.0 {
-            segments.push(Segment { height: first.y, items: Vec::new(), header: false });
+            segments.push(Segment { height: first.y, items: Vec::new(), header: false, footer: false });
         }
     }
     for mark in &marks {
@@ -2124,10 +2184,25 @@ fn fill_flow(
                 seg.push(item);
             }
         }
-        segments.push(Segment { height: mark.height, items: seg, header: mark.header });
+        segments.push(Segment { height: mark.height, items: seg, header: mark.header, footer: false });
     }
     if !marks.is_empty() && report.margins.bottom > 0.0 {
-        segments.push(Segment { height: report.margins.bottom, items: Vec::new(), header: false });
+        segments.push(Segment { height: report.margins.bottom, items: Vec::new(), header: false, footer: false });
+    }
+    // The page footer for the pages this content continues past (see `Segment::footer`).
+    if let Some(pf) = &report.page_footer {
+        if let Some(l) = filler.layout(pf, Values::Committed)? {
+            let items = l
+                .items
+                .into_iter()
+                .map(|laid| {
+                    let mut item = laid.item;
+                    translate(&mut item, report.margins.left, 0.0);
+                    item
+                })
+                .collect();
+            segments.push(Segment { height: l.height, items, header: false, footer: true });
+        }
     }
     Ok((segments, vars))
 }

@@ -296,6 +296,9 @@ struct Parser {
     /// Conditional styles per style name: (condition, properties of the inner style).
     conditionals: HashMap<String, Vec<(Expr, StyleProps)>>,
     warnings: Vec<String>,
+    /// `<subDataset>`s by name, parsed before the bands so tables can use them.
+    datasets: HashMap<String, Dataset>,
+    page_height: f32,
 }
 
 /// Most conditional styles one element may combine (variants are precomputed per subset).
@@ -337,6 +340,8 @@ impl Parser {
             default_name,
             conditionals: HashMap::new(),
             warnings: Vec::new(),
+            datasets: HashMap::new(),
+            page_height: attr(root, &["pageHeight"]).and_then(|v| v.trim().parse().ok()).unwrap_or(842.0),
         };
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
@@ -377,40 +382,19 @@ impl Parser {
         let page_width = num(&["pageWidth"], 595.0)?;
         let left = num(&["leftMargin"], 20.0)?;
         let right = num(&["rightMargin"], 20.0)?;
-        let mut parameters = Vec::new();
-        for p in root.children_named("parameter") {
-            parameters.push(Parameter {
-                name: p.attr("name").unwrap_or_default().to_string(),
-                class: JavaType::from_class_name(p.attr("class").unwrap_or("java.lang.String")),
-                default: self.child_expr(p, &["defaultValueExpression"])?,
-            });
+        // Subdatasets first: tables in the bands refer to them.
+        for d in root.children_named("subDataset").chain(root.children_named("dataset")) {
+            let dataset = self.dataset(d)?;
+            if d.child("queryString").is_some() || d.child("query").is_some() {
+                self.warnings.push(format!(
+                    "subdataset `{}`: its query is ignored; tables get rows from their dataSourceExpression",
+                    dataset.name
+                ));
+            }
+            self.datasets.insert(dataset.name.clone(), dataset);
         }
-        let fields = root
-            .children_named("field")
-            .map(|f| Field {
-                name: f.attr("name").unwrap_or_default().to_string(),
-                class: JavaType::from_class_name(f.attr("class").unwrap_or("java.lang.String")),
-            })
-            .collect();
-        let mut variables = Vec::new();
-        for v in root.children_named("variable") {
-            variables.push(self.variable(v)?);
-        }
-        let mut groups = Vec::new();
-        for g in root.children_named("group") {
-            groups.push(Group {
-                name: g.attr("name").unwrap_or_default().to_string(),
-                expression: self.child_expr(g, &["groupExpression", "expression"])?,
-                start_new_page: attr(g, &["isStartNewPage", "startNewPage"]).is_some_and(parse_bool),
-                start_new_column: attr(g, &["isStartNewColumn", "startNewColumn"]).is_some_and(parse_bool),
-                reprint_header_on_each_page: attr(g, &["isReprintHeaderOnEachPage", "reprintHeaderOnEachPage"])
-                    .is_some_and(parse_bool),
-                min_height_to_start_new_page: attr(g, &["minHeightToStartNewPage"]).and_then(|v| v.parse().ok()).unwrap_or(0.0),
-                header: self.section_bands(g.child("groupHeader"))?,
-                footer: self.section_bands(g.child("groupFooter"))?,
-            });
-        }
-        for unsupported in ["scriptlet", "subDataset", "template"] {
+        let Dataset { parameters, fields, variables, groups, .. } = self.dataset(root)?;
+        for unsupported in ["scriptlet", "template"] {
             if root.child(unsupported).is_some() {
                 self.warnings.push(format!("<{unsupported}> is not supported yet"));
             }
@@ -457,6 +441,7 @@ impl Parser {
             last_page_footer: band(&mut self, "lastPageFooter")?,
             summary: band(&mut self, "summary")?,
             no_data: band(&mut self, "noData")?,
+            datasets: Vec::new(),
             uses_data_source: false,
             warnings: Vec::new(),
         };
@@ -464,9 +449,197 @@ impl Parser {
             self.warnings.push("printOrder=\"Horizontal\" is rendered as \"Vertical\"".into());
         }
         let mut report = report;
+        let mut datasets: Vec<Dataset> = self.datasets.drain().map(|(_, d)| d).collect();
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        report.datasets = datasets;
         self.warnings.dedup();
         report.warnings = self.warnings;
         Ok(report)
+    }
+
+    /// Parameters, fields, variables and groups of the report or of a `<subDataset>`.
+    fn dataset(&mut self, node: &Node) -> Result<Dataset> {
+        let mut parameters = Vec::new();
+        for p in node.children_named("parameter") {
+            parameters.push(Parameter {
+                name: p.attr("name").unwrap_or_default().to_string(),
+                class: JavaType::from_class_name(p.attr("class").unwrap_or("java.lang.String")),
+                default: self.child_expr(p, &["defaultValueExpression"])?,
+            });
+        }
+        let fields = node
+            .children_named("field")
+            .map(|f| Field {
+                name: f.attr("name").unwrap_or_default().to_string(),
+                class: JavaType::from_class_name(f.attr("class").unwrap_or("java.lang.String")),
+            })
+            .collect();
+        let mut variables = Vec::new();
+        for v in node.children_named("variable") {
+            variables.push(self.variable(v)?);
+        }
+        let mut groups = Vec::new();
+        for g in node.children_named("group") {
+            groups.push(Group {
+                name: g.attr("name").unwrap_or_default().to_string(),
+                expression: self.child_expr(g, &["groupExpression", "expression"])?,
+                start_new_page: attr(g, &["isStartNewPage", "startNewPage"]).is_some_and(parse_bool),
+                start_new_column: attr(g, &["isStartNewColumn", "startNewColumn"]).is_some_and(parse_bool),
+                reprint_header_on_each_page: attr(g, &["isReprintHeaderOnEachPage", "reprintHeaderOnEachPage"])
+                    .is_some_and(parse_bool),
+                min_height_to_start_new_page: attr(g, &["minHeightToStartNewPage"]).and_then(|v| v.parse().ok()).unwrap_or(0.0),
+                header: self.section_bands(g.child("groupHeader"))?,
+                footer: self.section_bands(g.child("groupFooter"))?,
+            });
+        }
+        Ok(Dataset { name: node.attr("name").unwrap_or_default().to_string(), parameters, fields, variables, groups })
+    }
+
+    /// A table component (`jr:table`, or `<component kind="table">` in JRXML 7).
+    fn table(&mut self, t: &Node, element_width: f32) -> Result<TableElement> {
+        let run = t.child("datasetRun");
+        let dataset = match run.and_then(|r| r.attr("subDataset")) {
+            Some(name) => match self.datasets.get(name) {
+                Some(d) => Some(d.clone()),
+                None => {
+                    self.warnings.push(format!("table: unknown subdataset `{name}`"));
+                    None
+                }
+            },
+            None => None,
+        };
+        let mut parameters = Vec::new();
+        if let Some(r) = run {
+            for c in r.children.iter().filter(|c| c.name == "datasetParameter" || c.name == "parameter") {
+                if let Some(e) = self.child_expr(c, &["datasetParameterExpression", "expression"])? {
+                    parameters.push((c.attr("name").unwrap_or_default().to_string(), e));
+                }
+            }
+            if r.child("connectionExpression").is_some() && r.child("dataSourceExpression").is_none() {
+                self.warnings.push("tables with a connectionExpression get no rows (only data sources are supported)".into());
+            }
+        }
+        let mut columns = Vec::new();
+        for c in &t.children {
+            if let Some(col) = self.table_column(c)? {
+                columns.push(col);
+            }
+        }
+        let no_data = match t.child("noData") {
+            Some(n) => Some(self.table_cell(n, element_width)?),
+            None => None,
+        };
+        Ok(TableElement {
+            dataset,
+            parameters,
+            parameters_map: match run {
+                Some(r) => self.child_expr(r, &["parametersMapExpression"])?,
+                None => None,
+            },
+            data_source: match run {
+                Some(r) => self.child_expr(r, &["dataSourceExpression"])?,
+                None => None,
+            },
+            columns,
+            when_no_data: match t.attr("whenNoDataType") {
+                Some("AllSectionsNoDetail") => WhenNoData::AllSectionsNoDetail,
+                Some("NoDataCell") => WhenNoData::NoDataSection,
+                _ => WhenNoData::NoPages,
+            },
+            no_data,
+            page_height: self.page_height,
+            language: if self.groovy { Language::Groovy } else { Language::Java },
+        })
+    }
+
+    /// `<jr:column>` / `<jr:columnGroup>` (JRXML 6) or `<column kind="single|group">` (JRXML 7).
+    fn table_column(&mut self, c: &Node) -> Result<Option<TableColumn>> {
+        let is_group = match (c.name.as_str(), c.attr("kind")) {
+            ("columnGroup", _) | ("column", Some("group")) => true,
+            ("column", _) => false,
+            _ => return Ok(None),
+        };
+        let width = c.attr("width").map(|w| parse_f32(w, "column width")).transpose()?.unwrap_or(0.0);
+        let mut children = Vec::new();
+        if is_group {
+            for sub in &c.children {
+                if let Some(col) = self.table_column(sub)? {
+                    children.push(col);
+                }
+            }
+        }
+        let cell = |p: &mut Parser, name: &str| -> Result<Option<TableCell>> {
+            match c.child(name) {
+                Some(n) => p.table_cell(n, width).map(Some),
+                None => Ok(None),
+            }
+        };
+        let table_header = cell(self, "tableHeader")?;
+        let table_footer = cell(self, "tableFooter")?;
+        let column_header = cell(self, "columnHeader")?;
+        let column_footer = cell(self, "columnFooter")?;
+        let detail = cell(self, "detailCell")?;
+        let group_cells = |p: &mut Parser, name: &str| -> Result<Vec<(String, TableCell)>> {
+            let mut out = Vec::new();
+            for g in c.children_named(name) {
+                // JRXML 6 wraps the cell: <groupHeader groupName><cell>; JRXML 7 may not.
+                let node = g.child("cell").unwrap_or(g);
+                out.push((g.attr("groupName").unwrap_or_default().to_string(), p.table_cell(node, width)?));
+            }
+            Ok(out)
+        };
+        let group_headers = group_cells(self, "groupHeader")?;
+        let group_footers = group_cells(self, "groupFooter")?;
+        Ok(Some(TableColumn {
+            width,
+            print_when: self.child_expr(c, &["printWhenExpression"])?,
+            children,
+            is_group,
+            table_header,
+            table_footer,
+            column_header,
+            column_footer,
+            detail,
+            group_headers,
+            group_footers,
+        }))
+    }
+
+    /// A cell becomes a frame with the cell's style and box, holding the cell's elements, as in
+    /// Jasper's `TableReport.createCell`. A cell holding only a text element that fills it,
+    /// with no box and no background of its own, is that text element (`createCellElement`).
+    fn table_cell(&mut self, c: &Node, width: f32) -> Result<TableCell> {
+        let height = c.attr("height").map(|h| parse_f32(h, "cell height")).transpose()?.unwrap_or(0.0);
+        let mut re_attrs = vec![
+            ("x".to_string(), "0".to_string()),
+            ("y".to_string(), "0".to_string()),
+            ("width".to_string(), width.to_string()),
+            ("height".to_string(), height.to_string()),
+            ("positionType".to_string(), "Float".to_string()),
+            ("stretchType".to_string(), "RelativeToTallestObject".to_string()),
+        ];
+        if let Some(style) = c.attr("style") {
+            re_attrs.push(("style".to_string(), style.to_string()));
+        }
+        let mut children =
+            vec![Node { name: "reportElement".into(), attrs: re_attrs, children: Vec::new(), text: String::new() }];
+        children.extend(c.children.iter().filter(|k| k.name != "printWhenExpression").cloned());
+        let frame_node = Node { name: "frame".into(), attrs: Vec::new(), children, text: String::new() };
+        let frame = self.element(&frame_node, "frame")?;
+        if let ElementKind::Frame { children, boxed } = &frame.kind {
+            let no_box = [boxed.top, boxed.left, boxed.bottom, boxed.right].iter().all(|p| p.width <= 0.0)
+                && boxed.padding == Padding::default();
+            if let [only] = children.as_slice() {
+                let fills = only.x == 0.0 && only.y == 0.0 && only.width == width && only.height == height;
+                let cell_transparent = frame.mode == Mode::Transparent;
+                if fills && no_box && cell_transparent && matches!(only.kind, ElementKind::Text(_)) {
+                    let mut el = only.clone();
+                    el.stretch_type = StretchType::RelativeToTallestObject;
+                    return Ok(TableCell { height, element: el });
+                }
+            }
+        }
+        Ok(TableCell { height, element: frame })
     }
 
     fn variable(&self, v: &Node) -> Result<Variable> {
@@ -498,6 +671,12 @@ fn barcode_node(n: &Node) -> Option<&Node> {
         SUPPORTED.contains(&c.name.as_str())
             || (c.name == "component" && c.attr("kind").is_some_and(|k| SUPPORTED.contains(&k.rsplit(':').next().unwrap_or(k))))
     })
+}
+
+/// The table component inside a `componentElement` (JRXML 6) or a `<element kind="component">`
+/// (JRXML 7).
+fn table_node(n: &Node) -> Option<&Node> {
+    n.children.iter().find(|c| c.name == "table" || (c.name == "component" && c.attr("kind") == Some("table")))
 }
 
 fn font_from(node: Option<&Node>, base: &FontSpec) -> FontSpec {
@@ -1005,6 +1184,12 @@ impl Parser {
                     strike: false,
                 };
                 ElementKind::Chart(Box::new(self.chart(n, tag, base_font, props.box_style(forecolor))?))
+            }
+            "componentElement" | "component" if table_node(n).is_some() => {
+                let t = table_node(n).unwrap_or(n);
+                let re = n.child("reportElement").unwrap_or(n);
+                let width = re.attr("width").and_then(|w| w.trim().parse().ok()).unwrap_or(0.0);
+                ElementKind::Table(Box::new(self.table(t, width)?))
             }
             "componentElement" | "component" if barcode_node(n).is_some() => {
                 let c = barcode_node(n).unwrap_or(n);

@@ -33,6 +33,7 @@
       <a href="#rust">Rust</a>
       <b>Reports</b>
       <a href="#resources">Images and subreports</a>
+      <a href="#tables">Tables</a>
       <a href="#fonts">Fonts</a>
       <a href="#locale">Locale and dates</a>
       <a href="#check">Check a template</a>
@@ -313,6 +314,28 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p><code>JRBeanCollectionDataSource</code>, <code>((JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("lines")</code> and
         <code>JREmptyDataSource</code> work the same way. Subreport parameters and return values are supported.</p>
 
+      <h2 id="tables">Tables</h2>
+      <p>Tables (<code>jr:table</code>) work as they do in JasperReports: the table iterates over a <code>&lt;subDataset&gt;</code>
+        whose rows come from the <code>dataSourceExpression</code> of its <code>datasetRun</code>, usually a nested array of the
+        current row, and its <code>datasetParameter</code>s pass values in. Fields of the main report are not visible inside the
+        table; pass them as parameters.</p>
+<pre>&lt;subDataset name="lines"&gt;
+  &lt;parameter name="ORDER" class="java.lang.String"/&gt;
+  &lt;field name="product" class="java.lang.String"/&gt; ...
+&lt;/subDataset&gt;
+...
+&lt;jr:table&gt;
+  &lt;datasetRun subDataset="lines"&gt;
+    &lt;datasetParameter name="ORDER"&gt;&lt;datasetParameterExpression&gt;&lt;![CDATA[$F{order}]]&gt;&lt;/datasetParameterExpression&gt;&lt;/datasetParameter&gt;
+    &lt;dataSourceExpression&gt;&lt;![CDATA[new JRMapCollectionDataSource($F{lines})]]&gt;&lt;/dataSourceExpression&gt;
+  &lt;/datasetRun&gt;
+  &lt;jr:column width="235"&gt; ... &lt;/jr:column&gt;
+&lt;/jr:table&gt;</pre>
+      <p>Supported: columns and nested column groups, table header and footer, column headers (printed again on every page
+        the table continues on), column footers, detail cells, group header and footer cells for the subdataset's groups,
+        <code>printWhenExpression</code> on columns, the no-data cell (<code>whenNoDataType="NoDataCell"</code>) and
+        subdataset variables. The SQL query of a subdataset is not run: the rows come from the data source expression.</p>
+
       <h2 id="fonts">Fonts</h2>
       <p>DejaVu Sans, DejaVu Serif and DejaVu Sans Mono are built in. They are the families of the <code>jasperreports-fonts</code>
         extension, so templates that use them match JasperReports exactly. A family the engine does not have is replaced by a built-in one.</p>
@@ -349,8 +372,8 @@ invoice.jrxml: report `invoice`
         templates your users upload.</p>
 
       <h2 id="support">What is supported</h2>
-      <p>Bands and page breaks, groups and variables, frames, images, subreports, charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
-        rotation, multi-column layouts and conditional styles. Crosstabs, tables and lists are next. The
+      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
+        rotation, multi-column layouts and conditional styles. Crosstabs and lists are next. The
         <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
         feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
     </article>

@@ -304,6 +304,8 @@ pub enum ElementKind {
     },
     Image(ImageElement),
     Subreport(Box<SubreportElement>),
+    /// A table component (`jr:table`), filled like a subreport over a subdataset.
+    Table(Box<TableElement>),
     Barcode(Box<BarcodeElement>),
     Chart(Box<crate::chart::ChartElement>),
     /// Already filled subreport content still to be printed (the continuation of a subreport
@@ -399,6 +401,8 @@ pub struct Report {
     pub last_page_footer: Option<Band>,
     pub summary: Option<Band>,
     pub no_data: Option<Band>,
+    /// `<subDataset>` definitions, used by tables.
+    pub datasets: Vec<Dataset>,
     /// Features found in the template that are not rendered (yet).
     /// Expressions read `$P{REPORT_DATA_SOURCE}` (records then keep their source JSON row).
     pub uses_data_source: bool,
@@ -469,4 +473,57 @@ pub struct ReturnValue {
     pub from: String,
     pub to: String,
     pub calculation: Calculation,
+}
+
+/// A `<subDataset>`: the parameters, fields, variables and groups of a data source other than
+/// the report's own (tables iterate over one).
+#[derive(Debug, Clone)]
+pub struct Dataset {
+    pub name: String,
+    pub parameters: Vec<Parameter>,
+    pub fields: Vec<Field>,
+    pub variables: Vec<Variable>,
+    pub groups: Vec<Group>,
+}
+
+/// A table component. JasperReports fills a table as a subreport built from its columns
+/// (`TableReport`); [`crate::table`] builds the same report.
+#[derive(Debug, Clone)]
+pub struct TableElement {
+    /// The subdataset the table iterates over (`None`: a dataset with no fields).
+    pub dataset: Option<Dataset>,
+    pub parameters: Vec<(String, Expr)>,
+    pub parameters_map: Option<Expr>,
+    pub data_source: Option<Expr>,
+    pub columns: Vec<TableColumn>,
+    pub when_no_data: WhenNoData,
+    pub no_data: Option<TableCell>,
+    /// Page height of the containing report (the table report uses it).
+    pub page_height: f32,
+    /// Expression language of the containing report.
+    pub language: Language,
+}
+
+/// A table column, or a column group with `children`.
+#[derive(Debug, Clone)]
+pub struct TableColumn {
+    pub width: f32,
+    pub print_when: Option<Expr>,
+    pub children: Vec<TableColumn>,
+    pub is_group: bool,
+    pub table_header: Option<TableCell>,
+    pub table_footer: Option<TableCell>,
+    pub column_header: Option<TableCell>,
+    pub column_footer: Option<TableCell>,
+    pub detail: Option<TableCell>,
+    pub group_headers: Vec<(String, TableCell)>,
+    pub group_footers: Vec<(String, TableCell)>,
+}
+
+/// A table cell: its content as one element at (0, 0), a frame carrying the cell's style and
+/// borders, or the cell's only text element when Jasper uses it directly.
+#[derive(Debug, Clone)]
+pub struct TableCell {
+    pub height: f32,
+    pub element: Element,
 }

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" name="orders_table" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="30" bottomMargin="30">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<style name="Table_TH" mode="Opaque" backcolor="#F0F8FF">
+		<box><pen lineWidth="0.5" lineColor="#000000"/></box>
+	</style>
+	<style name="Table_CH" mode="Opaque" backcolor="#BFE1FF">
+		<box><pen lineWidth="0.5" lineColor="#000000"/></box>
+	</style>
+	<style name="Table_TD" mode="Opaque" backcolor="#FFFFFF">
+		<box><pen lineWidth="0.5" lineColor="#000000"/></box>
+	</style>
+	<subDataset name="lines">
+		<parameter name="ORDER" class="java.lang.String"/>
+		<field name="product" class="java.lang.String"/>
+		<field name="qty" class="java.lang.Integer"/>
+		<field name="price" class="java.lang.Double"/>
+		<variable name="total" class="java.lang.Double" calculation="Sum">
+			<variableExpression><![CDATA[$F{qty} * $F{price}]]></variableExpression>
+		</variable>
+	</subDataset>
+	<field name="order" class="java.lang.String"/>
+	<field name="customer" class="java.lang.String"/>
+	<field name="lines" class="java.util.List"/>
+	<title>
+		<band height="30">
+			<staticText><reportElement x="0" y="0" width="515" height="22"/><textElement><font size="15" isBold="true"/></textElement><text><![CDATA[Orders]]></text></staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="100">
+			<textField><reportElement x="0" y="4" width="515" height="16"/><textElement><font size="11" isBold="true"/></textElement><textFieldExpression><![CDATA[$F{order} + " · " + $F{customer}]]></textFieldExpression></textField>
+			<componentElement>
+				<reportElement x="0" y="24" width="515" height="70"/>
+				<jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd">
+					<datasetRun subDataset="lines">
+						<datasetParameter name="ORDER"><datasetParameterExpression><![CDATA[$F{order}]]></datasetParameterExpression></datasetParameter>
+						<dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($F{lines})]]></dataSourceExpression>
+					</datasetRun>
+					<jr:columnGroup width="515">
+						<jr:tableHeader style="Table_TH" height="22">
+							<textField>
+								<reportElement x="6" y="0" width="503" height="22"/>
+								<textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+								<textFieldExpression><![CDATA["Lines of " + $P{ORDER}]]></textFieldExpression>
+							</textField>
+						</jr:tableHeader>
+						<jr:column width="235">
+							<jr:tableFooter style="Table_TH" height="20">
+								<staticText><reportElement x="6" y="0" width="223" height="20"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Total]]></text></staticText>
+							</jr:tableFooter>
+							<jr:columnHeader style="Table_CH" height="20">
+								<staticText><reportElement x="6" y="0" width="223" height="20"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Product]]></text></staticText>
+							</jr:columnHeader>
+							<jr:columnFooter style="Table_CH" height="6"/>
+							<jr:detailCell style="Table_TD" height="18">
+								<textField isStretchWithOverflow="true">
+									<reportElement x="6" y="0" width="223" height="18"/>
+									<box topPadding="3" bottomPadding="3"/>
+									<textFieldExpression><![CDATA[$F{product}]]></textFieldExpression>
+								</textField>
+							</jr:detailCell>
+						</jr:column>
+						<jr:column width="80">
+							<jr:tableFooter style="Table_TH" height="20"/>
+							<jr:columnHeader style="Table_CH" height="20">
+								<staticText><reportElement x="0" y="0" width="74" height="20"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Qty]]></text></staticText>
+							</jr:columnHeader>
+							<jr:columnFooter style="Table_CH" height="6"/>
+							<jr:detailCell style="Table_TD" height="18">
+								<textField><reportElement x="0" y="0" width="74" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{qty}]]></textFieldExpression></textField>
+							</jr:detailCell>
+						</jr:column>
+						<jr:column width="100">
+							<jr:tableFooter style="Table_TH" height="20"/>
+							<jr:columnHeader style="Table_CH" height="20">
+								<staticText><reportElement x="0" y="0" width="94" height="20"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Price]]></text></staticText>
+							</jr:columnHeader>
+							<jr:columnFooter style="Table_CH" height="6"/>
+							<jr:detailCell style="Table_TD" height="18">
+								<textField pattern="#,##0.00"><reportElement x="0" y="0" width="94" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{price}]]></textFieldExpression></textField>
+							</jr:detailCell>
+						</jr:column>
+						<jr:column width="100">
+							<jr:tableFooter style="Table_TH" height="20">
+								<textField pattern="#,##0.00"><reportElement x="0" y="0" width="94" height="20"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><textFieldExpression><![CDATA[$V{total}]]></textFieldExpression></textField>
+							</jr:tableFooter>
+							<jr:columnHeader style="Table_CH" height="20">
+								<staticText><reportElement x="0" y="0" width="94" height="20"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Amount]]></text></staticText>
+							</jr:columnHeader>
+							<jr:columnFooter style="Table_CH" height="6"/>
+							<jr:detailCell style="Table_TD" height="18">
+								<textField pattern="#,##0.00"><reportElement x="0" y="0" width="94" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{qty} * $F{price}]]></textFieldExpression></textField>
+							</jr:detailCell>
+						</jr:column>
+					</jr:columnGroup>
+				</jr:table>
+			</componentElement>
+		</band>
+	</detail>
+</jasperReport>

@@ -223,6 +223,7 @@ fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, u
                 ElementKind::Break | ElementKind::ColumnBreak => "break".into(),
                 ElementKind::Image(_) => "image".into(),
                 ElementKind::Subreport(_) | ElementKind::Content(_) => "subreport".into(),
+                ElementKind::Table(_) => "table".into(),
                 ElementKind::Chart(c) => format!("{:?} chart", c.kind),
                 ElementKind::Barcode(b) => b.symbology.component().into(),
                 ElementKind::Unsupported(n) => format!("{n} (unsupported)"),

@@ -1,0 +1,81 @@
+[
+ {
+  "title": "Sales by region — Q3",
+  "sales": [
+   {
+    "region": "Santo Domingo",
+    "rep": "Marta Díaz",
+    "units": 385,
+    "revenue": 72110.03,
+    "cost": 51459.7
+   },
+   {
+    "region": "Santo Domingo",
+    "rep": "José Rosario",
+    "units": 120,
+    "revenue": 22637.68,
+    "cost": 16505.07
+   },
+   {
+    "region": "Santiago",
+    "rep": "Luis Mejía",
+    "units": 114,
+    "revenue": 22610.65,
+    "cost": 17018.57
+   },
+   {
+    "region": "Santiago",
+    "rep": "Luis Mejía",
+    "units": 72,
+    "revenue": 41561.99,
+    "cost": 21127.58
+   },
+   {
+    "region": "La Romana",
+    "rep": "Carla Núñez",
+    "units": 40,
+    "revenue": 6315.51,
+    "cost": 4477.43
+   },
+   {
+    "region": "La Romana",
+    "rep": "Marta Díaz",
+    "units": 71,
+    "revenue": 15949.47,
+    "cost": 10461.54
+   },
+   {
+    "region": "Puerto Plata",
+    "rep": "Marta Díaz",
+    "units": 344,
+    "revenue": 252431.5,
+    "cost": 143826.91
+   },
+   {
+    "region": "Puerto Plata",
+    "rep": "Luis Mejía",
+    "units": 352,
+    "revenue": 157744.18,
+    "cost": 79498.36
+   },
+   {
+    "region": "Puerto Plata",
+    "rep": "Carla Núñez",
+    "units": 399,
+    "revenue": 124937.73,
+    "cost": 65417.09
+   },
+   {
+    "region": "Puerto Plata",
+    "rep": "Carla Núñez",
+    "units": 278,
+    "revenue": 229663.86,
+    "cost": 164828.58
+   }
+  ]
+ },
+ {
+  "title": "Sales by region — Q4 (not closed)",
+  "sales": []
+ }
+]

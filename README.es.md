@@ -11,9 +11,9 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 23 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 25 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
-> subreportes, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
+> subreportes, tablas, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
 > estilo de JFreeChart. Todavía faltan algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
@@ -22,7 +22,7 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 - **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
   Importa en CLIs, funciones serverless y contenedores.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 23 comparables salen idénticos.
+  píxel: hoy los 25 comparables salen idénticos.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -88,7 +88,10 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 - Gráficos: pastel (también 3D), barras (también 3D y apiladas), líneas, áreas, XY y dispersión, con
   títulos, leyendas y datasets por registro, grupo o reporte. Siguen el estilo de JFreeChart, aunque
   no son idénticos píxel por píxel.
-- Aún no: crosstabs, tablas, orden horizontal de columnas, conexiones JDBC.
+- Tablas (`jr:table`) como las crea el asistente de Jaspersoft Studio: grupos de columnas, encabezados
+  y pies de tabla, de columna y de grupo, columnas ocultas, celda sin datos, y encabezados que se
+  repiten en cada página.
+- Aún no: crosstabs, listas, orden horizontal de columnas, conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -110,10 +113,11 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
 ## Roadmap
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
-  condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado y gráficos. Siguiente: memoria constante en reportes enormes.
+  condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado, gráficos
+  y tablas. Siguiente: crosstabs, listas y memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
-- **Fase 4:** tablas, crosstabs, más tipos de gráficos y exportación a Excel.
+- **Fase 4:** más tipos de gráficos y exportación a Excel.
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

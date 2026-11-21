@@ -1,0 +1,264 @@
+[
+ {
+  "order": "ORD-2026101",
+  "customer": "Grupo Ramos",
+  "lines": [
+   {
+    "product": "Cemento Portland 42.5 kg",
+    "qty": 40,
+    "price": 445.0
+   },
+   {
+    "product": "Impermeabilizante acrílico blanco para techos, cubeta de 5 galones con garantía de 5 años",
+    "qty": 3,
+    "price": 7850.0
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 120,
+    "price": 215.5
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026102",
+  "customer": "Constructora del Cibao",
+  "lines": [
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 90,
+    "price": 707.5
+   },
+   {
+    "product": "Tubo PVC 1/2\" x 19'",
+    "qty": 26,
+    "price": 203.39
+   },
+   {
+    "product": "Tubo PVC 1/2\" x 19'",
+    "qty": 70,
+    "price": 846.01
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 52,
+    "price": 474.67
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 63,
+    "price": 2056.93
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 79,
+    "price": 2099.68
+   },
+   {
+    "product": "Arena lavada (metro)",
+    "qty": 7,
+    "price": 1650.67
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 2,
+    "price": 2115.64
+   },
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 33,
+    "price": 361.07
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 79,
+    "price": 1632.78
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 13,
+    "price": 2439.77
+   },
+   {
+    "product": "Tubo PVC 1/2\" x 19'",
+    "qty": 5,
+    "price": 1943.62
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 22,
+    "price": 1159.74
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 34,
+    "price": 1359.9
+   },
+   {
+    "product": "Cemento Portland 42.5 kg",
+    "qty": 23,
+    "price": 2439.2
+   },
+   {
+    "product": "Cemento Portland 42.5 kg",
+    "qty": 58,
+    "price": 1953.68
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 74,
+    "price": 1445.16
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 40,
+    "price": 2491.61
+   },
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 46,
+    "price": 51.46
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 34,
+    "price": 460.72
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 67,
+    "price": 172.47
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 22,
+    "price": 535.73
+   },
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 72,
+    "price": 246.79
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 8,
+    "price": 994.84
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 39,
+    "price": 650.79
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 39,
+    "price": 1152.32
+   },
+   {
+    "product": "Tubo PVC 1/2\" x 19'",
+    "qty": 66,
+    "price": 311.04
+   },
+   {
+    "product": "Cemento Portland 42.5 kg",
+    "qty": 37,
+    "price": 557.17
+   },
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 71,
+    "price": 1365.7
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 1,
+    "price": 1489.48
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 25,
+    "price": 754.48
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 5,
+    "price": 1414.14
+   },
+   {
+    "product": "Arena lavada (metro)",
+    "qty": 59,
+    "price": 1846.67
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 46,
+    "price": 1860.5
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 30,
+    "price": 964.82
+   },
+   {
+    "product": "Block de hormigón 6\"",
+    "qty": 50,
+    "price": 2069.25
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 45,
+    "price": 2463.12
+   },
+   {
+    "product": "Cemento Portland 42.5 kg",
+    "qty": 24,
+    "price": 175.13
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 38,
+    "price": 597.18
+   },
+   {
+    "product": "Alambre dulce (libra)",
+    "qty": 78,
+    "price": 2064.64
+   },
+   {
+    "product": "Varilla corrugada 3/8\"",
+    "qty": 30,
+    "price": 1495.28
+   },
+   {
+    "product": "Tubo PVC 1/2\" x 19'",
+    "qty": 4,
+    "price": 1654.34
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 40,
+    "price": 1346.7
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 56,
+    "price": 2015.46
+   },
+   {
+    "product": "Pintura acrílica galón",
+    "qty": 66,
+    "price": 2045.93
+   },
+   {
+    "product": "Clavos 3\" (libra)",
+    "qty": 43,
+    "price": 2489.12
+   }
+  ]
+ },
+ {
+  "order": "ORD-2026103",
+  "customer": "Ferretería Ochoa",
+  "lines": []
+ }
+]

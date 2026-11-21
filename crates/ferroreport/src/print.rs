@@ -122,4 +122,14 @@ pub struct Segment {
     pub items: Vec<PrintItem>,
     /// Page or column header: printed again at the top of each page the content continues on.
     pub header: bool,
+    /// The page footer for pages the content continues past: not part of the flow, printed
+    /// after the last band that fits on each such page.
+    pub footer: bool,
+}
+
+impl Segment {
+    /// Height of content made of `segments`, leaving out page-footer templates.
+    pub fn flow_height(segments: &[Segment]) -> f32 {
+        segments.iter().filter(|s| !s.footer).map(|s| s.height).sum()
+    }
 }
