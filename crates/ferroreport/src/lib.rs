@@ -294,10 +294,23 @@ impl Renderer {
         format: Format,
     ) -> Result<Vec<u8>> {
         let report = parse(template)?;
-        let records = data::records_from_json(&report, rows)?;
-        let params = params_from_json(&report, params)?;
-        let doc = self.fill(&report, &records, params)?;
-        self.export(&doc, format)
+        self.render_report_json(&report, rows, params, format)
+    }
+
+    /// Like [`Renderer::render_json_as`], with a template already parsed: parse a template
+    /// once with [`parse`] and render it as many times as needed.
+    pub fn render_report_json(
+        &mut self,
+        report: &Report,
+        rows: &serde_json::Value,
+        params: &serde_json::Value,
+        format: Format,
+    ) -> Result<Vec<u8>> {
+        let records = data::records_from_json(report, rows)?;
+        let params = params_from_json(report, params)?;
+        let mut out = Vec::new();
+        self.render_to(report, Box::new(records.into_iter().map(Ok)), params, format, &mut out)?;
+        Ok(out)
     }
 
     /// Font families that were substituted during the last fills.

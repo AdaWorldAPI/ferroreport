@@ -32,13 +32,22 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
-///   format?: "pdf" | "xlsx" | "csv" }`.
+///   format?: "pdf" | "xlsx" | "csv", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean }`.
+///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
+///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
+///   numbers in Excel instead of formatted text.
 #[wasm_bindgen]
 pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) -> Result<Vec<u8>, JsError> {
     let rows = to_json(&data, serde_json::Value::Array(Vec::new()))?;
     let params = to_json(&params, serde_json::Value::Object(Default::default()))?;
     let locale = get(&options, "locale").as_string().unwrap_or_else(|| "en_US".into());
-    let mut r = ferroreport::Renderer::new().locale(&locale);
+    let limits =
+        ferroreport::Limits { max_pages: get(&options, "maxPages").as_f64().map(|n| n.max(0.0) as usize), timeout: None };
+    let mut r = ferroreport::Renderer::new()
+        .locale(&locale)
+        .limits(limits)
+        .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: get(&options, "xlsxNumbers").is_truthy() })
+        .csv_options(ferroreport::csv::CsvOptions { guard_formulas: get(&options, "csvSafe").is_truthy(), ..Default::default() });
 
     // `new Date()` in expressions: the given value, or the current time from JavaScript.
     let now = get(&options, "now");

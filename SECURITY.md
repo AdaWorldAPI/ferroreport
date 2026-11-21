@@ -35,9 +35,35 @@ A template or its data cannot make a render use unbounded stack, memory or time:
 | Image size | 64 million pixels, checked before decoding |
 | Subreport nesting | 8 levels |
 | Subreports, tables and lists filled in one render | 500,000 |
+| Sizes in a template (widths, heights, font sizes) | finite numbers up to 10 million; `inf`, `NaN` and the like are refused |
+| Pages in a report | yours to set: `--max-pages`, `Limits::max_pages`, `max_pages=`, `maxPages` |
+| Time for a render | yours to set: `--timeout`, `Limits::timeout`, `timeout=`; 60 s by default in `ferroreport serve` |
 | HTTP request body (`ferroreport serve`) | 50 MB by default (`--max-body`) |
 
-Other inputs grow the work in proportion to their size: pages follow the rows of the data.
+Other inputs grow the work in proportion to their size: pages follow the rows of the data. That
+is what the page and time limits are for: set them whenever templates or data come from other
+people. The time limit is checked on every page, every few hundred rows and at every
+subreport, table and list, so it also stops work that happens inside them. (In the browser
+build there is no clock to check: use `maxPages` there.)
+
+Memory does not grow with the report for PDF and CSV: rows are read as they are needed and
+pages are written as they are finished. Excel workbooks are built in memory, in proportion to
+their size.
+
+## How this is tested
+
+- **Mutation tests on every push.** Each test template and its data are damaged thousands of
+  ways (bytes flipped, pieces cut, repeated and swapped, numbers blown up, markup injected) and
+  rendered to PDF, Excel and CSV on a 1 MB stack under a page and time limit. The engine must
+  answer with a document or an error: a panic or a hang fails the build. Run other mutations
+  with `HOSTILE_SEED=<n> cargo test --test hostile`. These tests found, before any release
+  carried them, an infinite loop on an infinite cell height, a crash in the Excel exporter on
+  negative sizes, a crash on a color with non-ASCII characters and an overflow on a font of
+  size 0.
+- **Attack templates.** Deep nesting, image bombs, links out of the resource directory and
+  subreports that multiply are each covered by a test.
+- **Dependencies.** `cargo deny` runs on every push and once a week: known vulnerabilities,
+  licenses (permissive only) and sources (crates.io only).
 
 ## The HTTP server
 
@@ -45,16 +71,27 @@ Other inputs grow the work in proportion to their size: pages follow the rows of
 machines, set a token (`--token` or `FERROREPORT_TOKEN`): requests must then send
 `Authorization: Bearer <token>`, compared in constant time. Template names in URLs must be
 relative paths inside `--templates`. A failure while rendering one request answers `500` and
-does not stop the server.
+does not stop the server. The server warns at start-up when it listens beyond localhost without
+a token. `GET /health` answers without the token (it only says the server is up); every other
+path, `GET /metrics` included, needs it.
+
+Every render runs under `--timeout` (60 seconds unless you change it) and `--max-pages` (no
+limit unless you set one); a render that goes over answers `413`. The number of renders at
+once is `--workers`. The server does not limit how often one client may ask: put it behind
+your gateway or reverse proxy for that, as you would any internal service.
 
 ## Spreadsheet exports
 
 XLSX and CSV exports contain the report's text exactly as JasperReports writes it. A value that
 starts with `=`, `+`, `-` or `@` is written as text in XLSX, but spreadsheet programs may treat
-it as a formula when they open a CSV file. If your data comes from untrusted users and the CSV
-is opened in Excel, prefer the XLSX export.
+it as a formula when they open a CSV file. If your data comes from other people and the CSV
+will be opened in a spreadsheet, turn on the formula guard (`--csv-safe`, `csv_safe=True`,
+`csvSafe: true`, `CsvOptions::guard_formulas`): such values get an apostrophe in front, which
+spreadsheets show as text. Plain numbers such as `-12.50` are left alone. It is off by default
+so that the CSV stays byte for byte what JasperReports writes.
 
 ## Dependencies
 
-`cargo audit` reports no known vulnerabilities in the dependencies. It lists `chrono` (dates)
-and `ttf-parser` (fonts) as no longer maintained, with no known flaws.
+`cargo deny` (see `deny.toml`) reports no known vulnerabilities in the dependencies. Two are
+listed as no longer maintained, with no known flaws: `chrono` (dates) and `ttf-parser` (fonts,
+which only reads the fonts built in and the ones you register).

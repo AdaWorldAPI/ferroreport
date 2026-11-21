@@ -141,6 +141,8 @@ h2 { font: 780 clamp(34px, 4.4vw, 52px)/1.02 var(--display); font-stretch: 82%; 
 .num span { color: var(--muted); font-size: 15px; }
 
 .bench { display: grid; gap: 26px; }
+.bench-title { font: 750 24px/1.2 var(--display); margin: 44px 0 6px; }
+.bench-title + .fine { margin: 0 0 18px; }
 .bench-row h3 { margin: 0 0 10px; font: 650 19px/1.2 var(--display); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .bench-row h3 span { color: var(--molten); }
 .track { display: grid; grid-template-columns: 150px 1fr 80px; align-items: center; gap: 12px; font-size: 15px; margin: 6px 0; }

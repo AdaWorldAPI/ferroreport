@@ -20,8 +20,18 @@ pub struct PdfOptions {
     pub compress: bool,
 }
 
-/// Level 3 is about twice as fast as the default level 6 and only ~8% larger (still a
-/// quarter of the size of JasperReports' output).
+/// Compresses a stream. Level 3 is about twice as fast as the default level 6 and only
+/// ~8% larger (still a quarter of the size of JasperReports' output).
+#[cfg(not(target_arch = "wasm32"))]
+fn deflate(data: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::with_capacity(data.len() / 3 + 64), flate2::Compression::new(3));
+    // Writing to a Vec cannot fail.
+    let _ = encoder.write_all(data);
+    encoder.finish().unwrap_or_default()
+}
+
+#[cfg(target_arch = "wasm32")]
 fn deflate(data: &[u8]) -> Vec<u8> {
     miniz_oxide::deflate::compress_to_vec_zlib(data, 3)
 }

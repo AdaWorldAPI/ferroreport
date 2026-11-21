@@ -1,6 +1,6 @@
 [package]
 name = "ferroreport"
-description = "The fastest JasperReports engine: render JRXML templates to PDF, Excel (XLSX) and CSV without a JVM, pixel-identical"
+description = "Report engine: PDF, Excel and CSV in milliseconds, in constant memory. Reads JasperReports JRXML templates, pixel-identical, no JVM"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,5 +25,10 @@ thiserror = "2"
 png = "0.17"
 tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 base64 = "0.22"
+
+# A faster deflate for PDF streams where it builds everywhere we ship native code. WebAssembly
+# keeps miniz_oxide, which is already there for reading PNGs.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 
 [dev-dependencies]

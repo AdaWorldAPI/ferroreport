@@ -1,10 +1,16 @@
 # ferroreport
 
-**La forma más rápida de generar reportes de JasperReports.** ferroreport lee las plantillas
-`.jrxml` que ya tienes y las convierte a PDF, Excel (XLSX) o CSV en milisegundos, sin JVM: unas
-**300 veces más rápido** que JasperReports en reportes del día a día, con **la décima parte de la
-memoria**, PDF **idénticos píxel por píxel**, hojas de cálculo con **las mismas celdas** que saca
-Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
+**Reportes en milisegundos, desde cualquier lenguaje.** ferroreport es un motor de reportes:
+le das una plantilla y tus datos y escribe el PDF, el Excel o el CSV. Una factura tarda
+**2 ms**; **un millón de filas** tardan 12 segundos y usan **11 MB de memoria**, porque las
+filas se leen a medida que hacen falta y cada página se escribe apenas se termina. Es un solo
+binario pequeño, sin nada que instalar, y las plantillas **no pueden ejecutar código** en tu
+servidor.
+
+Lee las plantillas de JasperReports (`.jrxml`) que ya tienes y saca el mismo resultado,
+**píxel por píxel**: puedes diseñar en Jaspersoft Studio y cambiar de motor sin tocar un
+reporte. Frente al propio JasperReports es unas **250 veces más rápido arrancando en frío** y
+**de 3 a 6 veces más rápido que una JVM ya caliente** ([los números](#rendimiento)).
 
 <p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Carrera: JasperReports genera 1 factura en 3.01 s; ferroreport genera 301 en el mismo tiempo" width="760"></a></p>
 
@@ -12,20 +18,22 @@ Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 29 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 31 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
 > subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 31 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
+> estilo de JFreeChart. Las 33 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
 > algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
 ## Por qué
 
-- **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
-  Importa en CLIs, funciones serverless y contenedores.
+- **Rápido y con memoria plana.** Un binario de ~8 MB (con las fuentes incluidas) que arranca
+  en milisegundos; importa en CLIs, funciones serverless y contenedores. Las filas entran y
+  las páginas salen sin acumularse: un reporte de un millón de filas usa la memoria de uno de
+  diez.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 29 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 31 coinciden.
+  píxel: hoy los 31 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 33 coinciden.
 - **PDF, Excel y CSV.** La misma plantilla da un PDF, un `.xlsx` armado como el de JasperReports
   (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos) o un CSV.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
@@ -33,7 +41,10 @@ Jasper y plantillas que **no pueden ejecutar código** en tu servidor.
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
   expresiones con una lista cerrada de operaciones: sin reflexión, sin carga de clases, sin
   acceso a la red. Las imágenes y subreportes solo se leen de las carpetas de recursos de la
-  plantilla.
+  plantilla, y hay límites de anidamiento, tamaño de imagen, subreportes, páginas y tiempo
+  para que una plantilla hostil no agote la memoria ni el procesador. En cada cambio, las
+  plantillas de prueba se dañan de miles de formas y el motor debe responder con un documento
+  o un error, nunca caerse ([SECURITY.md](SECURITY.md)).
 - **Úsalo desde cualquier lenguaje.** Paquetes para JavaScript (Node.js, Deno, Bun y
   navegadores) y Python, librería de Rust, CLI, y una API HTTP en imagen Docker para todo lo
   demás (Java, C#, PHP, Go, Ruby...).
@@ -69,8 +80,10 @@ ferroreport render factura.jrxml --data filas.json -o factura.xlsx   # Excel (o 
 ferroreport doctor factura.jrxml     # qué soporta (y qué no) esta plantilla
 ```
 
-`filas.json` es un arreglo JSON de objetos cuyas claves coinciden con los `<field>` de la
-plantilla. Los valores se convierten a la clase que declara cada campo (`BigDecimal`, fechas
+`filas.json` es un arreglo JSON de objetos, o un objeto JSON por línea, cuyas claves coinciden
+con los `<field>` de la plantilla. El archivo se lee a medida que el reporte lo necesita y cada
+página se escribe apenas se termina, así que puede ser mucho más grande que la memoria;
+`--max-pages` y `--timeout` detienen un reporte que crece más de lo esperado. Los valores se convierten a la clase que declara cada campo (`BigDecimal`, fechas
 ISO-8601 a `java.util.Date`, arreglos anidados a `java.util.List`, base64 a `byte[]`, etc.).
 
 Las imágenes y subreportes se buscan junto a la plantilla (agrega más carpetas con
@@ -118,28 +131,59 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 
 ## Rendimiento
 
-Render completo por línea de comandos (desde que arranca el proceso hasta el PDF en disco),
-mediana de 5 corridas en una VM Linux de 2 vCPU:
+Cuánto más rápido es depende de con qué se compare, así que aquí están las tres comparaciones
+que importan, todas contra JasperReports 6.20.6 en Java 21 y en la misma máquina Linux de
+2 CPU. Un solo comando lo reproduce todo: `tools/bench_all.py` (resultados en
+[docs/benchmarks.json](docs/benchmarks.json)).
 
-| Fixture | JasperReports 6.20 | ferroreport | Más rápido | Memoria pico |
+**En frío: un proceso que arranca, genera un reporte y termina.** Lo que paga un script, una
+función serverless o un contenedor por reporte. Tiempo desde que arranca el proceso hasta el
+PDF en disco, y memoria pico (mediana de 5 a 7 corridas):
+
+| Reporte | JasperReports | ferroreport | Más rápido |
+|---|---|---|---|
+| Factura, 2 páginas | 2.98 s, 190 MiB | 11 ms, 10 MiB | 274× |
+| Ventas agrupadas, 4 páginas | 3.13 s, 184 MiB | 13 ms, 11 MiB | 245× |
+| 20,000 filas, 477 páginas | 6.44 s, 461 MiB | 0.26 s, 10 MiB | 25× |
+
+**En caliente: un servicio que se queda encendido.** JasperReports en su mejor caso: una sola
+JVM, la plantilla compilada una vez, el JIT calentado con cientos de corridas, las filas ya
+convertidas a objetos Java y el PDF exportado a memoria. ferroreport hace el trabajo completo
+cada vez (también interpreta la plantilla). Mediana por reporte:
+
+| Reporte | JasperReports | ferroreport | Más rápido |
+|---|---|---|---|
+| Factura, 2 páginas | 8.2 ms | 2.2 ms | 3.8× |
+| Lista de empleados, 2 páginas | 6.2 ms | 1.3 ms | 4.7× |
+| Ventas agrupadas, 4 páginas | 11.8 ms | 3.6 ms | 3.3× |
+| 20,000 filas, 477 páginas | 1258.7 ms | 206.1 ms | 6.1× |
+
+**Grandes: filas por cientos de miles.** El mismo reporte con más filas, en frío, y
+JasperReports con su memoria por defecto. ferroreport lee las filas a medida que las necesita
+y escribe cada página al terminarla, así que su memoria no crece con el reporte:
+
+| Reporte | JasperReports | ferroreport | Más rápido | Menos memoria |
 |---|---|---|---|---|
-| 02-invoice (2 páginas) | 3.01 s | 0.010 s | 309× | 194 MiB → 16 MiB |
-| 03-grouped-sales (4 páginas) | 3.22 s | 0.013 s | 253× | 205 MiB → 16 MiB |
-| 09-large (20,000 filas, 477 páginas) | 7.22 s | 0.39 s | 19× | 489 MiB → 52 MiB |
+| 100,000 filas, 2,382 páginas | 12.38 s, 679 MiB | 1.27 s, 10 MiB | 9.7× | 70× |
+| 1,000,000 filas, 23,810 páginas | 70.06 s, 1,731 MiB | 11.79 s, 11 MiB | 5.9× | 151× |
 
-En reportes pequeños, la mayor parte del tiempo de Jasper es el arranque de la JVM y la
-compilación del JRXML, que un servidor de larga vida amortiza. Contando solo sus fases de
-llenado y exportación, ferroreport es unas 85× más rápido en los reportes pequeños y 13× en el
-grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
+En resumen: en un reporte pequeño, casi todo el tiempo de JasperReports se va en arrancar la
+JVM y compilar la plantilla, por eso la diferencia es de dos órdenes de magnitud cuando arranca
+un proceso por reporte y de 3 a 6 veces cuando no. Los PDF además suelen pesar menos (1.2 MB
+en vez de 4.5 MB con 20,000 filas; más o menos lo mismo con un millón). Los libros de Excel se arman completos, así que se construyen en
+memoria (100,000 filas: unos 3 s y 490 MiB).
 
 ## Roadmap
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
   condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado, gráficos
-  tablas, listas y crosstabs. Siguiente: memoria constante en reportes enormes.
+  tablas, listas y crosstabs, memoria constante en reportes enormes (las filas entran y las
+  páginas salen sin acumularse), límites de páginas y tiempo, pruebas de mutación.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** más tipos de gráficos; listo: exportación a Excel (XLSX) y CSV.
+- **Siguiente:** filas directo desde bases de datos SQL, salida HTML para vistas previas,
+  librería de Java en Maven Central, Excel escrito por partes y un diseñador visual de plantillas.
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ferroreport: JasperReports, 300× faster</title>
-<meta name="description" content="Render JasperReports JRXML templates to PDF in milliseconds, without a JVM. Pixel-identical output, about 300× faster from process start, a tenth of the memory. Rust, JavaScript, Python, Docker.">
-<meta property="og:title" content="ferroreport: your JasperReports, 300× faster">
-<meta property="og:description" content="Same .jrxml, same PDF, no JVM. Watch it race JasperReports.">
+<title>ferroreport: reports in milliseconds, from any language</title>
+<meta name="description" content="A report engine that turns a template and your data into PDF, Excel or CSV in milliseconds: an invoice in 2 ms, a million rows in 11 MB of memory. Reads JasperReports JRXML templates with pixel-identical output, no JVM. Rust, JavaScript, Python, CLI and HTTP.">
+<meta property="og:title" content="ferroreport: reports in milliseconds, from any language">
+<meta property="og:description" content="An invoice in 2 ms, a million rows in 11 MB. Reads your JasperReports templates, no JVM. Watch it race JasperReports.">
 <link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
 </head>
@@ -25,9 +25,10 @@
     </header>
 
     <div class="headline">
-      <h1>Your JasperReports,<br><span class="hot">300× faster.</span></h1>
-      <p class="lead">Keep the <code>.jrxml</code> templates you already have. ferroreport turns them into the same PDF,
-        pixel for pixel, or the same Excel and CSV files, in milliseconds and without a JVM.</p>
+      <h1>Reports in milliseconds,<br><span class="hot">from any language.</span></h1>
+      <p class="lead">A template and your data in; a PDF, an Excel workbook or a CSV out. An invoice takes 2 ms and a million
+        rows take 11 MB of memory. It reads the JasperReports <code>.jrxml</code> templates you already have and gives the
+        same pages, pixel for pixel, without a JVM.</p>
       <div class="cta">
         <a class="btn solid" href="#playground">Render a report in your browser</a>
         <a class="btn quiet" href="docs.html">Read the docs</a>
@@ -91,45 +92,88 @@
 <main class="wrap">
   <section id="numbers" style="padding-top:56px">
     <div class="numbers">
-      <div class="num"><b>~300×</b><span>faster on small reports, end to end</span></div>
-      <div class="num"><b>19×</b><span>faster on 20,000 rows and 477 pages</span></div>
-      <div class="num"><b>10×</b><span>less memory</span></div>
-      <div class="num"><b>29 of 29</b><span>test reports pixel-identical to Jasper</span></div>
+      <div class="num"><b>2 ms</b><span>for a two-page invoice, in a service that is already running</span></div>
+      <div class="num"><b>11 MB</b><span>of memory for a million rows and 23,810 pages</span></div>
+      <div class="num"><b>~250×</b><span>faster than JasperReports from a cold start; 3 to 6× faster than a warm JVM</span></div>
+      <div class="num"><b>31 of 31</b><span>test reports pixel-identical to JasperReports</span></div>
     </div>
   </section>
 
   <section id="benchmarks">
     <h2>Benchmarks</h2>
-    <p class="sub">Same template, same data, a 2-vCPU Linux VM, median of 5 runs. The script is in the repository
-      (<code>tools/bench.py</code>), so you can run it with your own templates.</p>
+    <p class="sub">How much faster depends on what you compare, so here are the three comparisons that matter. Same template,
+      same data, the same 2-CPU Linux machine, against JasperReports 6.20.6 on Java 21. One script in the repository
+      reproduces all of it (<code>tools/bench_all.py</code>).</p>
+
+    <h3 class="bench-title">Cold: a process starts, renders one report and exits</h3>
+    <p class="fine">What a script, a serverless function or a container per report pays. From process start to the PDF on disk.</p>
     <div class="bench">
       <div class="bench-row">
-        <h3>Invoice, 2 pages <span>309× faster · 194 → 16 MiB</span></h3>
-        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">3.01 s</span></div>
-        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:.33%"></i></div><span class="v">0.010 s</span></div>
+        <h3>Invoice, 2 pages <span>274× faster · 190 → 10 MiB</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">2.98 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:0.36%"></i></div><span class="v">11 ms</span></div>
       </div>
       <div class="bench-row">
-        <h3>Grouped sales, 4 pages <span>253× faster · 205 → 16 MiB</span></h3>
-        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">3.22 s</span></div>
-        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:.4%"></i></div><span class="v">0.013 s</span></div>
+        <h3>Grouped sales, 4 pages <span>245× faster · 184 → 11 MiB</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">3.13 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:0.41%"></i></div><span class="v">13 ms</span></div>
       </div>
       <div class="bench-row">
-        <h3>20,000 rows, 477 pages <span>19× faster · 489 → 52 MiB</span></h3>
-        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">7.22 s</span></div>
-        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:5.4%"></i></div><span class="v">0.39 s</span></div>
+        <h3>20,000 rows, 477 pages <span>25× faster · 461 → 10 MiB</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">6.44 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:4.02%"></i></div><span class="v">0.26 s</span></div>
       </div>
     </div>
-    <p class="fine">Small reports are dominated by JVM start-up and JRXML compilation. Counting only Jasper's fill and export
-      phases, ferroreport is still about 85× faster on small reports and 13× on the large one, and its PDFs are a quarter of the size.</p>
+
+    <h3 class="bench-title">Warm: a service that stays up</h3>
+    <p class="fine">JasperReports at its best: one JVM, the template compiled once, the JIT warmed up by hundreds of runs,
+      the PDF exported to memory. ferroreport parses the template again every time.</p>
+    <div class="bench">
+      <div class="bench-row">
+        <h3>Invoice, 2 pages <span>3.8× faster</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">8.2 ms</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:26.43%"></i></div><span class="v">2.2 ms</span></div>
+      </div>
+      <div class="bench-row">
+        <h3>Employee list, 2 pages <span>4.7× faster</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">6.2 ms</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:21.46%"></i></div><span class="v">1.3 ms</span></div>
+      </div>
+      <div class="bench-row">
+        <h3>20,000 rows, 477 pages <span>6.1× faster</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">1.26 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:16.37%"></i></div><span class="v">0.21 s</span></div>
+      </div>
+    </div>
+
+    <h3 class="bench-title">Large: rows by the hundred thousand</h3>
+    <p class="fine">Rows are read as they are needed and each page is written as it is finished, so memory does not grow
+      with the report. JasperReports runs with its default heap.</p>
+    <div class="bench">
+      <div class="bench-row">
+        <h3>100,000 rows, 2,382 pages <span>9.7× faster · 679 → 10 MiB</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">12.38 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:10.30%"></i></div><span class="v">1.27 s</span></div>
+      </div>
+      <div class="bench-row">
+        <h3>1,000,000 rows, 23,810 pages <span>5.9× faster · 1,731 → 11 MiB</span></h3>
+        <div class="track j"><span>JasperReports</span><div class="bar"><i style="width:100%"></i></div><span class="v">70.06 s</span></div>
+        <div class="track f"><span>ferroreport</span><div class="bar"><i style="width:16.83%"></i></div><span class="v">11.79 s</span></div>
+      </div>
+    </div>
+    <p class="fine">In short: most of JasperReports' time on a small report is starting the JVM and compiling the template.
+      That is why the gap is two orders of magnitude when a process starts per report, and 3 to 6× when it does not.
+      PDFs are usually smaller too: 1.2 MB instead of 4.5 MB for the 20,000 rows, and about the same size at a million.</p>
   </section>
 
   <section>
-    <h2>Better than the original where it matters</h2>
-    <p class="sub">A drop-in engine for the reports you already have, built to be fast, small and safe.</p>
+    <h2>Built to be fast, small and safe</h2>
+    <p class="sub">A report engine for any stack, and a drop-in one for the JasperReports templates you already have.</p>
     <div class="features">
       <div class="feature"><h3>Pixel-identical</h3><p>Every test report is rendered by both engines and compared pixel by pixel: text metrics, line breaks, page splits, groups and variables follow Jasper exactly.</p></div>
-      <div class="feature"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only load from directories you allow.</p></div>
-      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest. It starts in milliseconds, so it suits serverless functions too.</p></div>
+      <div class="feature"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only load from directories you allow, and page and time limits stop a report that runs away. Every change is tested against thousands of damaged templates.</p></div>
+      <div class="feature"><h3>Flat memory at any size</h3><p>Rows are read as the report needs them and each page is written as it is finished. A million rows and 23,810 pages render in 11 MB, values like "page 3 of 240" included.</p></div>
+      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest, with a template cache and Prometheus metrics. It starts in milliseconds, so it suits serverless functions too.</p></div>
       <div class="feature"><h3>The features you use</h3><p>Bands that split across pages, frames, images, subreports, tables, lists, crosstabs, charts, QR codes, EAN, UPC, Code 128, Code 39 and other barcodes, styled and HTML text, rotation, multi-column layouts, conditional styles.</p></div>
       <div class="feature"><h3>PDF, Excel and CSV</h3><p>The same template exports to an <code>.xlsx</code> workbook with the cells, merges, fonts, borders, images and charts Jasper's exporter gives, or to CSV. Checked cell by cell against Jasper, and three times faster.</p></div>
       <div class="feature"><h3>Free and open source</h3><p>MIT or Apache-2.0, built for the community. Contributions and new test templates are welcome.</p></div>

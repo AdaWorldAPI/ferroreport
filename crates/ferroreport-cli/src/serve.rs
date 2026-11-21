@@ -4,7 +4,8 @@
 //! POST /render             {"template": "<jasperReport ...>" | "templateName": "invoice.jrxml",
 //!                           "data": [...], "params": {...}, "locale": "es_DO",
 //!                           "resources": {"logo.png": "<base64>"},
-//!                           "format": "pdf" | "xlsx" | "csv"}           -> the file
+//!                           "format": "pdf" | "xlsx" | "csv",
+//!                           "csvSafe": true, "xlsxNumbers": true}       -> the file
 //! POST /render/<name>      {"data": [...], "params": {...}}  (template from --templates)
 //! POST /inspect            {"template": "..."}                          -> JSON
 //! GET  /health                                                          -> JSON
@@ -242,7 +243,12 @@ fn render(
         _ => return Err(bad("send `template` (JRXML source) or `templateName`".into())),
     };
     let locale = body.get("locale").and_then(|v| v.as_str()).unwrap_or("en_US");
-    let mut r = Renderer::new().locale(locale).limits(cfg.limits);
+    let flag = |name: &str| body.get(name).and_then(|v| v.as_bool()).unwrap_or(false);
+    let mut r = Renderer::new()
+        .locale(locale)
+        .limits(cfg.limits)
+        .csv_options(ferroreport::csv::CsvOptions { guard_formulas: flag("csvSafe"), ..Default::default() })
+        .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: flag("xlsxNumbers") });
     if let Some(d) = dir {
         r = r.resource_dir(d);
     }

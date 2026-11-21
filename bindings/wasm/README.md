@@ -1,6 +1,7 @@
 # ferroreport for JavaScript
 
-The fastest way to render **JasperReports `.jrxml` templates to PDF, Excel or CSV** from Node.js,
+**Reports in milliseconds from JavaScript**: a template and your data in, a PDF, an Excel
+workbook or a CSV out. It reads **JasperReports `.jrxml` templates** and runs in Node.js,
 Deno, Bun or the browser. No JVM: the engine is Rust compiled to WebAssembly, and a typical invoice renders
 in a few milliseconds ([benchmarks](https://github.com/cristianEncarnacion/ferroreport#performance),
 [live playground](https://cristianencarnacion.github.io/ferroreport/)). Output is verified pixel by pixel against
@@ -52,6 +53,10 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
     templates (a subreport named `lines.jasper` is read from `lines.jrxml`).
   - `options.now`: value of `new Date()` in expressions (`Date` or ISO string).
   - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook) or `"csv"` (UTF-8 text).
+  - `options.maxPages`: stop with an error if the report grows past this many pages (set it
+    when templates or data come from other people).
+  - `options.csvSafe`: in CSV, put an apostrophe before values a spreadsheet would run as a
+    formula. `options.xlsxNumbers`: in Excel, write numbers as numbers.
 - `inspect(template) => { name, parameters, fields, warnings }`: `warnings` lists what the
   engine does not support in that template yet.
 - `version() => string`

@@ -10,14 +10,18 @@ crates/ferroreport/      library: parser, expression interpreter, filler, PDF wr
 crates/ferroreport-cli/  `ferroreport` command
 fixtures/<name>/         report.jrxml, data.json, params.json (optional), expected.json
 tools/compare.py         pixel comparison against JasperReports
-tools/bench.py           speed and memory benchmark
+tools/compare_sheets.py  cell comparison of the Excel and CSV exports
+tools/bench.py           speed and memory of one fixture, cold
+tools/bench_all.py       every number in the README: cold, warm JVM, 100,000 and 1,000,000 rows
 tools/oracle/            the reference renderer (a small Java program around JasperReports)
 ```
 
 ## Everyday commands
 
 ```bash
-cargo test                      # unit tests + every fixture's page count
+cargo test                      # unit tests, every fixture's page count, streaming, mutation tests
+HOSTILE_SEED=7 cargo test --test hostile   # other mutations of the templates than the usual ones
+cargo deny check                # advisories, licenses and sources of the dependencies
 cargo clippy --all-targets
 cargo fmt
 ```

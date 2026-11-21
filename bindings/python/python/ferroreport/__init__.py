@@ -60,6 +60,23 @@ def _load_template(template: Union[PathLike, str]) -> "tuple[str, Optional[str]]
     return source, os.path.dirname(os.path.abspath(text))
 
 
+def _prepare(template, resources, resource_dirs):
+    source, directory = _load_template(template)
+    dirs = [os.fspath(d) for d in (resource_dirs or [])]
+    if directory:
+        dirs.insert(0, directory)
+    mem = {}
+    for name, value in (resources or {}).items():
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            mem[name] = bytes(value)
+        elif isinstance(value, str) and "<jasperReport" in value:
+            mem[name] = value.encode("utf-8")
+        else:
+            with open(os.fspath(value), "rb") as f:
+                mem[name] = f.read()
+    return source, dirs, mem
+
+
 def render(
     template: Union[PathLike, str],
     data: Any = None,
@@ -70,6 +87,10 @@ def render(
     resource_dirs: Optional[Iterable[PathLike]] = None,
     now: Optional[_dt.datetime] = None,
     format: str = "pdf",
+    max_pages: Optional[int] = None,
+    timeout: Optional[float] = None,
+    csv_safe: bool = False,
+    xlsx_numbers: bool = False,
 ) -> bytes:
     """Renders a template and returns the file's bytes: PDF by default, or an Excel workbook
     (format="xlsx") or CSV text encoded as UTF-8 (format="csv"), laid out like JasperReports'
@@ -85,20 +106,13 @@ def render(
         is always searched. Paths in templates can never leave these directories.
     now: value of `new Date()` in expressions (for reproducible output).
     format: "pdf", "xlsx" or "csv".
+    max_pages, timeout: stop with FerroreportError if the report goes over this many pages
+        or takes longer than this many seconds. Set them when templates or data come from
+        other people.
+    csv_safe: in CSV, put an apostrophe before values a spreadsheet would run as a formula.
+    xlsx_numbers: in Excel, write numbers as numbers instead of formatted text.
     """
-    source, directory = _load_template(template)
-    dirs = [os.fspath(d) for d in (resource_dirs or [])]
-    if directory:
-        dirs.insert(0, directory)
-    mem = {}
-    for name, value in (resources or {}).items():
-        if isinstance(value, (bytes, bytearray, memoryview)):
-            mem[name] = bytes(value)
-        elif isinstance(value, str) and "<jasperReport" in value:
-            mem[name] = value.encode("utf-8")
-        else:
-            with open(os.fspath(value), "rb") as f:
-                mem[name] = f.read()
+    source, dirs, mem = _prepare(template, resources, resource_dirs)
     try:
         return _ferroreport.render(
             source,
@@ -109,20 +123,68 @@ def render(
             mem,
             now.isoformat() if now else None,
             format,
-        )
+            max_pages,
+            timeout,
+            csv_safe,
+            xlsx_numbers,
+        )[0]
     except ValueError as e:
         raise FerroreportError(str(e)) from None
 
 
-def render_to_file(template: Union[PathLike, str], output: PathLike, *args: Any, **kwargs: Any) -> None:
-    """Like render(), writing the file to `output`. The format follows the file's extension
-    (.pdf, .xlsx or .csv) unless `format` is given."""
-    ext = os.path.splitext(os.fspath(output))[1].lower().lstrip(".")
-    if "format" not in kwargs and ext in ("xlsx", "csv"):
-        kwargs["format"] = ext
-    pdf = render(template, *args, **kwargs)
-    with open(os.fspath(output), "wb") as f:
-        f.write(pdf)
+def render_to_file(
+    template: Union[PathLike, str],
+    output: PathLike,
+    data: Any = None,
+    params: Optional[Mapping[str, Any]] = None,
+    *,
+    data_file: Optional[PathLike] = None,
+    locale: str = "en_US",
+    resources: Optional[Mapping[str, Union[bytes, PathLike]]] = None,
+    resource_dirs: Optional[Iterable[PathLike]] = None,
+    now: Optional[_dt.datetime] = None,
+    format: Optional[str] = None,
+    max_pages: Optional[int] = None,
+    timeout: Optional[float] = None,
+    csv_safe: bool = False,
+    xlsx_numbers: bool = False,
+) -> dict:
+    """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
+    disk as soon as they are finished, so memory stays flat however long the report is. The
+    format follows the file's extension (.pdf, .xlsx or .csv) unless `format` is given.
+
+    data_file: instead of `data`, the path of a file with the rows: a JSON array of objects,
+        or one JSON object per line. It is read as the report needs it, so it can be larger
+        than memory: a million rows render in about the memory of a thousand.
+
+    Returns {"pages": ..., "rows": ...}.
+    """
+    if format is None:
+        ext = os.path.splitext(os.fspath(output))[1].lower().lstrip(".")
+        format = ext if ext in ("xlsx", "csv") else "pdf"
+    if data is not None and data_file is not None:
+        raise FerroreportError("give `data` or `data_file`, not both")
+    source, dirs, mem = _prepare(template, resources, resource_dirs)
+    try:
+        _, pages, rows = _ferroreport.render(
+            source,
+            _to_json(data if data is not None else []),
+            _to_json(dict(params or {})),
+            locale,
+            dirs,
+            mem,
+            now.isoformat() if now else None,
+            format,
+            max_pages,
+            timeout,
+            csv_safe,
+            xlsx_numbers,
+            os.fspath(data_file) if data_file is not None else None,
+            os.fspath(output),
+        )
+    except ValueError as e:
+        raise FerroreportError(str(e)) from None
+    return {"pages": pages, "rows": rows}
 
 
 def inspect(template: Union[PathLike, str]) -> dict:

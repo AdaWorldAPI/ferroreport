@@ -71,3 +71,36 @@ def test_excel_and_csv(tmp_path):
     assert (tmp_path / "invoice.csv").read_text().startswith(",Ferro")
     with pytest.raises(ferroreport.FerroreportError):
         ferroreport.render(fx / "report.jrxml", rows, params, format="docx")
+
+
+def test_streams_a_data_file_to_a_file(tmp_path):
+    import json
+
+    fx = FIXTURES / "33-page-x-of-y"
+    rows = json.loads((fx / "data.json").read_text())
+    lines = tmp_path / "rows.jsonl"
+    lines.write_text("\n".join(json.dumps(r) for r in rows))
+    out = tmp_path / "out.pdf"
+    stats = ferroreport.render_to_file(fx / "report.jrxml", out, data_file=lines)
+    assert stats == {"pages": 5, "rows": 190}
+    assert out.read_bytes().startswith(b"%PDF") and not (tmp_path / "out.pdf.part").exists()
+    # The same rows in memory give the same number of pages, and CSV by extension.
+    assert ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "out.csv", rows)["pages"] == 5
+    assert (tmp_path / "out.csv").read_text().count("\n") > 190
+
+
+def test_limits_and_csv_guard(tmp_path):
+    import json
+
+    fx = FIXTURES / "33-page-x-of-y"
+    rows = json.loads((fx / "data.json").read_text())
+    with pytest.raises(ferroreport.FerroreportError, match="more than 2 pages"):
+        ferroreport.render(fx / "report.jrxml", rows, max_pages=2)
+    with pytest.raises(ferroreport.FerroreportError, match="longer than"):
+        ferroreport.render(fx / "report.jrxml", rows, timeout=1e-9)
+    with pytest.raises(ferroreport.FerroreportError):
+        ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "x.pdf", rows, max_pages=2)
+    assert not list(tmp_path.iterdir())
+    rows[0]["name"] = "=HYPERLINK(\"http://evil\")"
+    assert b"'=HYPERLINK" in ferroreport.render(fx / "report.jrxml", rows, format="csv", csv_safe=True)
+    assert b"'=HYPERLINK" not in ferroreport.render(fx / "report.jrxml", rows, format="csv")

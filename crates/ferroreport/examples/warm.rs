@@ -30,10 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         size = pdf.len();
 
         let t = Instant::now();
-        let mut r = ferroreport::Renderer::new().resource_dir(&dir);
-        let records = ferroreport::data::records_from_json(&report, &rows)?;
-        let doc = r.fill(&report, &records, ferroreport::params_from_json(&report, &params)?)?;
-        r.to_pdf(&doc)?;
+        ferroreport::Renderer::new().resource_dir(&dir).render_report_json(&report, &rows, &params, ferroreport::Format::Pdf)?;
         parsed.push(t.elapsed().as_secs_f64() * 1e3);
     }
     println!("{{\"runs\": {runs}, \"whole_ms\": {:.3}, \"parsed_ms\": {:.3}, \"bytes\": {size}}}", median(whole), median(parsed));

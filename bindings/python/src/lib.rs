@@ -10,9 +10,13 @@ fn err(e: impl std::fmt::Display) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 
-/// Renders a JRXML template (source text) with rows and parameters given as JSON text.
+/// Renders a JRXML template (source text) with parameters given as JSON text. Rows come as
+/// JSON text, or from `data_path` (a JSON array or one object per line), read as they are
+/// needed. The document is returned, or written to `output_path` as it is made. Returns
+/// (bytes, pages, rows).
 #[pyfunction]
-#[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None, format=None))]
+#[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None, format=None,
+                    max_pages=None, timeout=None, csv_safe=false, xlsx_numbers=false, data_path=None, output_path=None))]
 #[allow(clippy::too_many_arguments)]
 fn render(
     py: Python<'_>,
@@ -24,16 +28,27 @@ fn render(
     resources: HashMap<String, Vec<u8>>,
     now: Option<String>,
     format: Option<String>,
-) -> PyResult<Py<PyBytes>> {
+    max_pages: Option<usize>,
+    timeout: Option<f64>,
+    csv_safe: bool,
+    xlsx_numbers: bool,
+    data_path: Option<String>,
+    output_path: Option<String>,
+) -> PyResult<(Py<PyBytes>, usize, usize)> {
     let format = match format {
         Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx or csv)")))?,
         None => ferroreport::Format::Pdf,
     };
-    let pdf = py
-        .detach(move || -> Result<Vec<u8>, String> {
-            let rows: serde_json::Value = serde_json::from_str(&data_json).map_err(|e| format!("data: {e}"))?;
+    let (bytes, stats) = py
+        .detach(move || -> Result<(Vec<u8>, ferroreport::FillStats), String> {
             let params: serde_json::Value = serde_json::from_str(&params_json).map_err(|e| format!("params: {e}"))?;
-            let mut r = ferroreport::Renderer::new().locale(&locale);
+            let limits =
+                ferroreport::Limits { max_pages, timeout: timeout.filter(|t| *t > 0.0).map(std::time::Duration::from_secs_f64) };
+            let mut r = ferroreport::Renderer::new()
+                .locale(&locale)
+                .limits(limits)
+                .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
+                .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
             if let Some(now) = now {
                 let t = ferroreport::data::parse_datetime(&now).ok_or_else(|| format!("now: cannot parse `{now}`"))?;
                 r = r.now(t);
@@ -44,10 +59,42 @@ fn render(
             for (name, data) in resources {
                 r.add_resource(&name, data);
             }
-            r.render_json_as(&template, &rows, &params, format).map_err(|e| e.to_string())
+            let report = ferroreport::parse(&template).map_err(|e| e.to_string())?;
+            let params = ferroreport::params_from_json(&report, &params).map_err(|e| e.to_string())?;
+            let rows: ferroreport::RowIter = match &data_path {
+                Some(path) => {
+                    let file = std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?;
+                    Box::new(ferroreport::JsonRows::new(&report, file))
+                }
+                None => Box::new(ferroreport::JsonRows::new(&report, data_json.as_bytes())),
+            };
+            match output_path {
+                Some(path) => {
+                    // Written beside the output and moved into place, so a failed render
+                    // leaves no half-written file.
+                    let part = format!("{path}.part");
+                    let file = std::fs::File::create(&part).map_err(|e| format!("{path}: {e}"))?;
+                    let out = std::io::BufWriter::with_capacity(1 << 16, file);
+                    match r.render_to(&report, rows, params, format, out) {
+                        Ok(stats) => {
+                            std::fs::rename(&part, &path).map_err(|e| format!("{path}: {e}"))?;
+                            Ok((Vec::new(), stats))
+                        }
+                        Err(e) => {
+                            let _ = std::fs::remove_file(&part);
+                            Err(e.to_string())
+                        }
+                    }
+                }
+                None => {
+                    let mut out = Vec::new();
+                    let stats = r.render_to(&report, rows, params, format, &mut out).map_err(|e| e.to_string())?;
+                    Ok((out, stats))
+                }
+            }
         })
         .map_err(err)?;
-    Ok(PyBytes::new(py, &pdf).unbind())
+    Ok((PyBytes::new(py, &bytes).unbind(), stats.pages, stats.rows))
 }
 
 /// Parses a template and reports what this engine does not support in it.
