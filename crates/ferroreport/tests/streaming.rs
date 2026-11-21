@@ -74,6 +74,13 @@ fn every_fixture_streams_to_the_same_document() {
         assert!(pdf.ends_with(b"%%EOF"), "{name}");
         assert_eq!(f.streamed(Format::Csv).0, f.in_memory(Format::Csv), "{name}: CSV");
         assert_eq!(f.streamed(Format::Xlsx).0, f.in_memory(Format::Xlsx), "{name}: XLSX");
+        let html = String::from_utf8(f.streamed(Format::Html).0).unwrap();
+        assert_eq!(html.matches("<svg class=\"page\"").count(), stats.pages, "{name}: HTML pages");
+        assert_eq!(
+            html.matches("</svg>\n").count() >= stats.pages,
+            html.ends_with("</body>\n</html>\n"),
+            "{name}: HTML is closed"
+        );
         checked += 1;
     }
     assert!(checked >= 30, "only {checked} fixtures checked");
@@ -160,4 +167,30 @@ fn bad_rows_stop_a_render_with_their_position() {
     let rows: RowIter = Box::new(JsonRows::new(&f.report, data.as_bytes()));
     let err = f.renderer().render_to(&f.report, rows, Default::default(), Format::Pdf, Vec::new()).unwrap_err();
     assert!(err.to_string().contains("row 1"), "{err}");
+}
+
+#[test]
+fn html_pages_carry_the_report_as_text_and_escape_it() {
+    let f = load("02-invoice");
+    let html = String::from_utf8(f.streamed(Format::Html).0).unwrap();
+    assert!(html.starts_with("<!DOCTYPE html>") && html.contains("<title>invoice</title>"));
+    // Text is text (selectable, searchable), with its font and measured width.
+    assert!(html.contains(">Ferro Industrial SRL</text>"), "{}", &html[..600]);
+    assert!(html.contains("font-family=\"'DejaVu Sans',sans-serif\"") && html.contains("textLength="));
+    // Data cannot inject markup.
+    let data = r#"[{"sku": "<script>alert(1)</script>", "description": "a & b", "qty": 1, "price": "1.00", "discount": "0"}]"#;
+    let rows: RowIter = Box::new(JsonRows::new(&f.report, data.as_bytes()));
+    let params = ferroreport::params_from_json(&f.report, &f.params).unwrap();
+    let mut out = Vec::new();
+    f.renderer().render_to(&f.report, rows, params, Format::Html, &mut out).unwrap();
+    let html = String::from_utf8(out).unwrap();
+    // (the narrow SKU column breaks the text over lines, so only its start is on one of them)
+    assert!(!html.contains("<script") && html.contains("&lt;scr") && html.contains("a &amp; b"), "{html}");
+    // A fragment is just the pages.
+    let rows: RowIter = Box::new(JsonRows::new(&f.report, f.data.as_bytes()));
+    let params = ferroreport::params_from_json(&f.report, &f.params).unwrap();
+    let mut out = Vec::new();
+    let options = ferroreport::html::HtmlOptions { fragment: true, ..Default::default() };
+    f.renderer().html_options(options).render_to(&f.report, rows, params, Format::Html, &mut out).unwrap();
+    assert!(out.starts_with(b"<svg class=\"page\""));
 }

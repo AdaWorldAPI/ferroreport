@@ -33,7 +33,10 @@ with open("invoice.pdf", "wb") as f:
   them in memory with `resources={"logo.png": b"...", "lines.jrxml": "..."}`. A subreport
   named `lines.jasper` is read from `lines.jrxml`; compiled `.jasper` files are never loaded.
 - `format="xlsx"` returns an Excel workbook and `format="csv"` CSV text (UTF-8 bytes), laid out
-  like JasperReports' exporters.
+  like JasperReports' exporters; `format="html"` returns a web page that looks like the PDF,
+  for previews in a browser.
+- `data` can also be any iterator of rows (a generator, a database cursor): it is read one row
+  at a time, so the rows are never all in memory.
 - `ferroreport.render_to_file(template, "out.pdf", data, params)` writes the file as it is made
   (PDF and CSV pages go to disk as they are finished); the format follows the extension
   (`.pdf`, `.xlsx`, `.csv`). It returns `{"pages": ..., "rows": ...}`.

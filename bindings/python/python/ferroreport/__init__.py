@@ -60,6 +60,38 @@ def _load_template(template: Union[PathLike, str]) -> "tuple[str, Optional[str]]
     return source, os.path.dirname(os.path.abspath(text))
 
 
+def _is_stream(data: Any) -> bool:
+    """Whether `data` is rows that arrive one at a time (a generator, a database cursor)
+    rather than a list or JSON text."""
+    return data is not None and not isinstance(data, (list, tuple, dict, str, bytes, bytearray)) and hasattr(data, "__iter__")
+
+
+class _Spooled:
+    """Rows from an iterator, written one per line to a temporary file the engine reads as
+    it needs them, so they are never all in memory."""
+
+    def __init__(self, rows: Iterable[Any]):
+        import tempfile
+
+        self._file = tempfile.NamedTemporaryFile("w", suffix=".jsonl", encoding="utf-8", delete=False)
+        self.path = self._file.name
+        try:
+            for row in rows:
+                self._file.write(json.dumps(row, default=_json_default))
+                self._file.write("\n")
+        except BaseException:
+            self.close()
+            raise
+        self._file.close()
+
+    def close(self) -> None:
+        self._file.close()
+        try:
+            os.unlink(self.path)
+        except OSError:
+            pass
+
+
 def _prepare(template, resources, resource_dirs):
     source, directory = _load_template(template)
     dirs = [os.fspath(d) for d in (resource_dirs or [])]
@@ -97,7 +129,9 @@ def render(
     exporters.
 
     template: path to a .jrxml file, or the JRXML source itself.
-    data: rows for the main data source: a list of dicts (or objects), or JSON text.
+    data: rows for the main data source: a list of dicts (or objects), JSON text, or any
+        iterator of rows (a generator, a database cursor): an iterator is read one row at a
+        time, so the rows are never all in memory.
     params: report parameters by name.
     locale: number and date formatting locale (en_US, es_DO, es_MX, es_ES, ...).
     resources: images and subreport templates in memory, by the relative path the template
@@ -105,7 +139,7 @@ def render(
     resource_dirs: extra directories for images and subreports. The template's own directory
         is always searched. Paths in templates can never leave these directories.
     now: value of `new Date()` in expressions (for reproducible output).
-    format: "pdf", "xlsx" or "csv".
+    format: "pdf", "xlsx", "csv" or "html" (a web page that looks like the PDF, for previews).
     max_pages, timeout: stop with FerroreportError if the report goes over this many pages
         or takes longer than this many seconds. Set them when templates or data come from
         other people.
@@ -113,10 +147,11 @@ def render(
     xlsx_numbers: in Excel, write numbers as numbers instead of formatted text.
     """
     source, dirs, mem = _prepare(template, resources, resource_dirs)
+    spooled = _Spooled(data) if _is_stream(data) else None
     try:
         return _ferroreport.render(
             source,
-            _to_json(data if data is not None else []),
+            _to_json(data if data is not None and spooled is None else []),
             _to_json(dict(params or {})),
             locale,
             dirs,
@@ -127,9 +162,13 @@ def render(
             timeout,
             csv_safe,
             xlsx_numbers,
+            spooled.path if spooled else None,
         )[0]
     except ValueError as e:
         raise FerroreportError(str(e)) from None
+    finally:
+        if spooled:
+            spooled.close()
 
 
 def render_to_file(
@@ -151,7 +190,7 @@ def render_to_file(
 ) -> dict:
     """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
     disk as soon as they are finished, so memory stays flat however long the report is. The
-    format follows the file's extension (.pdf, .xlsx or .csv) unless `format` is given.
+    format follows the file's extension (.pdf, .xlsx, .csv or .html) unless `format` is given.
 
     data_file: instead of `data`, the path of a file with the rows: a JSON array of objects,
         or one JSON object per line. It is read as the report needs it, so it can be larger
@@ -161,14 +200,17 @@ def render_to_file(
     """
     if format is None:
         ext = os.path.splitext(os.fspath(output))[1].lower().lstrip(".")
-        format = ext if ext in ("xlsx", "csv") else "pdf"
+        format = ext if ext in ("xlsx", "csv", "html") else "pdf"
     if data is not None and data_file is not None:
         raise FerroreportError("give `data` or `data_file`, not both")
     source, dirs, mem = _prepare(template, resources, resource_dirs)
+    spooled = _Spooled(data) if _is_stream(data) else None
+    if spooled:
+        data_file = spooled.path
     try:
         _, pages, rows = _ferroreport.render(
             source,
-            _to_json(data if data is not None else []),
+            _to_json(data if data is not None and spooled is None else []),
             _to_json(dict(params or {})),
             locale,
             dirs,
@@ -184,6 +226,9 @@ def render_to_file(
         )
     except ValueError as e:
         raise FerroreportError(str(e)) from None
+    finally:
+        if spooled:
+            spooled.close()
     return {"pages": pages, "rows": rows}
 
 

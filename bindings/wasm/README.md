@@ -52,7 +52,8 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   - `options.resources`: `{ [path]: Uint8Array | string }` images (PNG, JPEG) and subreport
     templates (a subreport named `lines.jasper` is read from `lines.jrxml`).
   - `options.now`: value of `new Date()` in expressions (`Date` or ISO string).
-  - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook) or `"csv"` (UTF-8 text).
+  - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook), `"csv"` (UTF-8 text) or
+    `"html"` (a web page that looks like the PDF, for previews: UTF-8 text).
   - `options.maxPages`: stop with an error if the report grows past this many pages (set it
     when templates or data come from other people).
   - `options.csvSafe`: in CSV, put an apostrophe before values a spreadsheet would run as a

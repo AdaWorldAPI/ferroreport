@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.cristianencarnacion</groupId>
+  <artifactId>ferroreport</artifactId>
+  <version>0.8.0</version>
+  <packaging>jar</packaging>
+
+  <name>ferroreport</name>
+  <description>Report engine for Java: PDF, Excel, CSV and HTML in milliseconds from JasperReports JRXML templates, without JasperReports on the classpath. Rows stream from a ResultSet or any Iterable, so a report can be larger than the heap.</description>
+  <url>https://github.com/cristianEncarnacion/ferroreport</url>
+  <licenses>
+    <license><name>MIT</name><url>https://opensource.org/licenses/MIT</url></license>
+    <license><name>Apache-2.0</name><url>https://www.apache.org/licenses/LICENSE-2.0</url></license>
+  </licenses>
+  <developers>
+    <developer><name>Cristian Encarnacion</name><url>https://github.com/cristianEncarnacion</url></developer>
+  </developers>
+  <scm>
+    <url>https://github.com/cristianEncarnacion/ferroreport</url>
+    <connection>scm:git:https://github.com/cristianEncarnacion/ferroreport.git</connection>
+  </scm>
+
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

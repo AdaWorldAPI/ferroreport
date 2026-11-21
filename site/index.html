@@ -173,9 +173,9 @@
       <div class="feature"><h3>Pixel-identical</h3><p>Every test report is rendered by both engines and compared pixel by pixel: text metrics, line breaks, page splits, groups and variables follow Jasper exactly.</p></div>
       <div class="feature"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only load from directories you allow, and page and time limits stop a report that runs away. Every change is tested against thousands of damaged templates.</p></div>
       <div class="feature"><h3>Flat memory at any size</h3><p>Rows are read as the report needs them and each page is written as it is finished. A million rows and 23,810 pages render in 11 MB, values like "page 3 of 240" included.</p></div>
-      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest, with a template cache and Prometheus metrics. It starts in milliseconds, so it suits serverless functions too.</p></div>
+      <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, Java (it reads a <code>ResultSet</code> row by row), and an HTTP API in an ~8 MB Docker image for C#, PHP, Go and the rest, with a template cache and Prometheus metrics. It starts in milliseconds, so it suits serverless functions too.</p></div>
       <div class="feature"><h3>The features you use</h3><p>Bands that split across pages, frames, images, subreports, tables, lists, crosstabs, charts, QR codes, EAN, UPC, Code 128, Code 39 and other barcodes, styled and HTML text, rotation, multi-column layouts, conditional styles.</p></div>
-      <div class="feature"><h3>PDF, Excel and CSV</h3><p>The same template exports to an <code>.xlsx</code> workbook with the cells, merges, fonts, borders, images and charts Jasper's exporter gives, or to CSV. Checked cell by cell against Jasper, and three times faster.</p></div>
+      <div class="feature"><h3>PDF, Excel, CSV and HTML</h3><p>The same template exports to an <code>.xlsx</code> workbook with the cells, merges, fonts, borders, images and charts Jasper's exporter gives, to CSV, or to a web page that looks like the PDF for previews in a browser. Excel and CSV are checked cell by cell against Jasper.</p></div>
       <div class="feature"><h3>Free and open source</h3><p>MIT or Apache-2.0, built for the community. Contributions and new test templates are welcome.</p></div>
     </div>
   </section>
@@ -278,7 +278,7 @@ const pdf = render(jrxml, rows, { CUSTOMER: "Distribuidora Caribe" });</pre>
     <p class="sub">Pick the way you want to call it. Every option uses the same engine and produces the same PDF.</p>
     <p class="note">The npm package, the Rust crates, the binaries and the Docker image are available now. The PyPI package is being published. Every function and option is described in the <a href="docs.html">documentation</a>.</p>
     <div class="tabs" id="langs">
-      <button type="button" aria-pressed="true" data-l="cli">CLI</button><button type="button" aria-pressed="false" data-l="docker">Docker and HTTP</button><button type="button" aria-pressed="false" data-l="js">JavaScript</button><button type="button" aria-pressed="false" data-l="py">Python</button><button type="button" aria-pressed="false" data-l="rust">Rust</button>
+      <button type="button" aria-pressed="true" data-l="cli">CLI</button><button type="button" aria-pressed="false" data-l="docker">Docker and HTTP</button><button type="button" aria-pressed="false" data-l="js">JavaScript</button><button type="button" aria-pressed="false" data-l="py">Python</button><button type="button" aria-pressed="false" data-l="java">Java</button><button type="button" aria-pressed="false" data-l="rust">Rust</button>
     </div>
     <pre id="code"></pre>
   </section>
@@ -412,10 +412,17 @@ const snippets = {
 ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
 ferroreport doctor invoice.jrxml   # what this template uses, and whether it is supported`,
   docker: `docker run -p 8080:8080 -v "$PWD/templates:/templates" -e FERROREPORT_TEMPLATES=/templates \\
-  ghcr.io/cristianencarnacion/ferroreport
+  -e FERROREPORT_TOKEN=change-me ghcr.io/cristianencarnacion/ferroreport
 
-curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \\
+curl -X POST localhost:8080/render/invoice -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \\
   -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf`,
+  java: `// pom.xml: repository https://jitpack.io, then
+// com.github.cristianEncarnacion:ferroreport:v0.8.0
+
+Ferroreport reports = Ferroreport.local();
+byte[] pdf = reports.template(Path.of("invoice.jrxml")).rows(lines).param("CUSTOMER", "Distribuidora Caribe").render();
+// A query straight to a file, in constant memory:
+reports.template(Path.of("sales.jrxml")).rows(resultSet).renderTo(Path.of("sales.pdf"));`,
   js: `npm install ferroreport
 
 import { render } from "ferroreport";

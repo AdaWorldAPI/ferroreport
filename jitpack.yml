@@ -1,0 +1,6 @@
+# Builds the Java library (bindings/java) for https://jitpack.io, so a Java project can depend
+# on it straight from a GitHub release:  com.github.cristianEncarnacion:ferroreport:<tag>
+jdk:
+  - openjdk17
+install:
+  - cd bindings/java && mvn -B -q -DskipTests install

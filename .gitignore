@@ -4,3 +4,4 @@
 *.jasper
 !site/examples/*/jasper.pdf
 __pycache__/
+bindings/java/target/

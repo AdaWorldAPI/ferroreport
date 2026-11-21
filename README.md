@@ -1,7 +1,7 @@
 # ferroreport
 
 **Reports in milliseconds, from any language.** ferroreport is a report engine: give it a
-template and your data and it writes the PDF, the Excel workbook or the CSV. An invoice takes
+template and your data and it writes the PDF, the Excel workbook, the CSV or a web preview. An invoice takes
 **2 ms**; a **million rows** take 12 seconds and **11 MB of memory**, because rows are read as
 they are needed and pages are written as they are finished. It is one small binary with no
 runtime to install, and templates **cannot run code** on your server.
@@ -31,8 +31,9 @@ a report. Against JasperReports itself it is about **250× faster from a cold st
   out: a report of a million rows uses the memory of a report of ten.
 - **Identical output.** Every fixture is rendered by both engines and compared pixel by pixel,
   and its Excel and CSV exports cell by cell (see [how output is verified](#how-output-is-verified)).
-- **PDF, Excel and CSV.** The same template gives a PDF, an `.xlsx` workbook laid out like
-  JasperReports' (merged cells, fonts, fills, borders, row heights, images, charts) or a CSV.
+- **PDF, Excel, CSV and HTML.** The same template gives a PDF, an `.xlsx` workbook laid out like
+  JasperReports' (merged cells, fonts, fills, borders, row heights, images, charts), a CSV, or
+  a web page that looks like the PDF, for previews in a browser.
 - **Safe with untrusted templates.** JasperReports compiles template expressions to Java and
   loads serialized `.jasper` files, which is how recent remote-code-execution bugs happened
   (CVE-2025-10492, CVE-2026-6009). ferroreport never deserializes objects and interprets
@@ -41,9 +42,9 @@ a report. Against JasperReports itself it is about **250× faster from a cold st
   image size, subreports, pages and time keep a hostile template from exhausting memory or time.
   Every push mutates each test template thousands of ways and requires an error or a document,
   never a crash ([SECURITY.md](SECURITY.md)).
-- **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers) and
-  Python, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (Java,
-  C#, PHP, Go, Ruby...).
+- **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers), Python
+  and Java, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (C#,
+  PHP, Go, Ruby...).
 
 ## Use it from your language
 
@@ -71,21 +72,31 @@ ferroreport.render_to_file("invoice.jrxml", "invoice.xlsx", rows)  # format from
 ferroreport.render_to_file("sales.jrxml", "sales.pdf", data_file="sales.jsonl")
 ```
 
-**Any language, over HTTP** (Java, C#, PHP, Go, Ruby...):
+**Java** (Quarkus, Spring, plain Java 11+; [details](bindings/java/README.md)):
+
+```java
+Ferroreport reports = Ferroreport.local();
+byte[] pdf = reports.template(Path.of("invoice.jrxml")).rows(lines).param("CUSTOMER", "Caribe").render();
+// A query straight to a file, in constant memory:
+reports.template(Path.of("sales.jrxml")).rows(resultSet).renderTo(Path.of("sales.pdf"));
+```
+
+**Any language, over HTTP** (C#, PHP, Go, Ruby...):
 
 ```bash
 docker run -p 8080:8080 -v "$PWD/templates:/templates" -e FERROREPORT_TEMPLATES=/templates \
-  ghcr.io/cristianencarnacion/ferroreport
+  -e FERROREPORT_TOKEN=change-me ghcr.io/cristianencarnacion/ferroreport
 
-curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
+curl -X POST localhost:8080/render/invoice -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \
   -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf
 ```
 
 `POST /render` also accepts the template itself (`{"template": "<jasperReport...", "data": ...,
-"resources": {"logo.png": "<base64>"}}`); add `"format": "xlsx"` or `"csv"` (or `?format=xlsx`)
-for Excel or CSV. `POST /inspect` reports unsupported features, `GET /health` is there for
-load balancers and `GET /metrics` for Prometheus. Set `FERROREPORT_TOKEN` to require a bearer
-token. Templates are parsed once and cached, and every render runs under a time limit (60 s
+"resources": {"logo.png": "<base64>"}}`); add `"format": "xlsx"`, `"csv"` or `"html"` (or
+`?format=xlsx`) for Excel, CSV or a web preview. `POST /inspect` reports unsupported features, `GET /health` is there for
+load balancers and `GET /metrics` for Prometheus. The server will not listen beyond localhost
+without a token (`FERROREPORT_TOKEN`), unless you say the port is private
+(`FERROREPORT_ALLOW_ANONYMOUS=1`); `--rate-limit` caps the requests per minute of one client. Templates are parsed once and cached, and every render runs under a time limit (60 s
 unless you change `--timeout`) and, if you set `--max-pages`, a page limit.
 
 **Rust**: `cargo add ferroreport` (example below). **Command line**: download a binary from
@@ -101,7 +112,7 @@ Language packages are published by the [release workflow](RELEASING.md).
 cargo install --path crates/ferroreport-cli
 
 ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
-ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .csv)
+ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .csv, .html)
 ferroreport doctor invoice.jrxml     # what in this template is (not yet) supported
 ```
 
@@ -146,6 +157,36 @@ println!("{} pages from {} rows", stats.pages, stats.rows);
 
 `rows` is any iterator of records, so they can come from a database cursor or a queue just as
 well; and `fill_to` hands each finished page to a `PageSink` of your own.
+
+### Rows from a database
+
+The engine does not open database connections: your application already has one, with its
+credentials and its pool. Hand it the rows as they come and nothing is held in memory.
+
+```bash
+# PostgreSQL: one JSON object per row, straight into the report
+psql -At -c "select row_to_json(s) from (select * from sales order by region) s" mydb \
+  | ferroreport render sales.jrxml -d - -o sales.pdf
+
+# SQLite and MySQL
+sqlite3 -json app.db "select * from sales order by region" | ferroreport render sales.jrxml -d - -o sales.pdf
+mysql -N -B -e "select json_object('region', region, 'amount', amount) from sales" mydb \
+  | ferroreport render sales.jrxml -d - -o sales.pdf
+```
+
+```java
+// Java: the ResultSet is read as the report needs it
+reports.template(Path.of("sales.jrxml")).rows(statement.executeQuery("select * from sales")).renderTo(Path.of("sales.pdf"));
+```
+
+```python
+# Python: any cursor or generator
+cursor.execute("select region, amount from sales order by region")
+rows = (dict(zip(("region", "amount"), r)) for r in cursor)
+ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)
+```
+
+Templates with an embedded SQL query do not run it: send the rows.
 
 ### Excel and CSV
 
@@ -304,8 +345,12 @@ workbooks are laid out as a whole, so they are built in memory (100,000 rows: ab
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.
 - **Phase 4:** more chart types; done: Excel (XLSX) and CSV export.
-- **Next:** rows straight from SQL databases, HTML output for previews, a Java library on
-  Maven Central, Excel workbooks written as a stream, a visual template designer.
+- **Done in 0.8:** HTML output for previews, a Java library that streams a `ResultSet`, rows
+  from any database through a pipe or an iterator, a server that refuses to run open to the
+  network and can limit each client.
+- **Next:** the Java library on Maven Central (today it is built by JitPack), Excel workbooks
+  written as a stream, Word output, a visual template designer (Jaspersoft Studio works with
+  ferroreport's templates meanwhile).
 
 ## Contributing
 

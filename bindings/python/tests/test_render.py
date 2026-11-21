@@ -104,3 +104,20 @@ def test_limits_and_csv_guard(tmp_path):
     rows[0]["name"] = "=HYPERLINK(\"http://evil\")"
     assert b"'=HYPERLINK" in ferroreport.render(fx / "report.jrxml", rows, format="csv", csv_safe=True)
     assert b"'=HYPERLINK" not in ferroreport.render(fx / "report.jrxml", rows, format="csv")
+
+
+def test_rows_from_a_generator_and_html(tmp_path):
+    fx = FIXTURES / "09-large"
+
+    def rows():
+        for i in range(1, 5001):
+            yield {"id": i, "name": f"Employee {i}", "department": "Sales", "salary": 1000.5 + i}
+
+    stats = ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "list.csv", rows())
+    assert stats["rows"] == 5000
+    assert "Employee 5000" in (tmp_path / "list.csv").read_text()
+    pdf = ferroreport.render(fx / "report.jrxml", rows(), max_pages=500)
+    assert pdf.startswith(b"%PDF")
+    html = ferroreport.render(fx / "report.jrxml", list(rows())[:50], format="html").decode()
+    assert html.startswith("<!DOCTYPE html>") and "Employee 50</text>" in html
+    assert ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "list.html", list(rows())[:50])["pages"] == 2

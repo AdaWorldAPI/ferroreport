@@ -37,6 +37,37 @@ pub struct Config {
     pub cache: usize,
     /// Print a line per request to standard error.
     pub access_log: bool,
+    /// Listen beyond localhost without a token.
+    pub allow_anonymous: bool,
+    /// Most requests one client address may make per minute.
+    pub rate_limit: Option<u32>,
+}
+
+/// Counts each client's requests in the current minute.
+#[derive(Default)]
+pub struct RateLimiter {
+    clients: Mutex<HashMap<std::net::IpAddr, (Instant, u32)>>,
+}
+
+impl RateLimiter {
+    /// Whether `client` may make another request now; if not, the seconds until it may.
+    fn allow(&self, client: std::net::IpAddr, per_minute: u32, now: Instant) -> Result<(), u64> {
+        let window = std::time::Duration::from_secs(60);
+        let mut clients = self.clients.lock().unwrap_or_else(|e| e.into_inner());
+        // Forget clients whose minute has passed once the table grows.
+        if clients.len() > 10_000 {
+            clients.retain(|_, (start, _)| now.duration_since(*start) < window);
+        }
+        let entry = clients.entry(client).or_insert((now, 0));
+        if now.duration_since(entry.0) >= window {
+            *entry = (now, 0);
+        }
+        if entry.1 >= per_minute {
+            return Err((window - now.duration_since(entry.0)).as_secs().max(1));
+        }
+        entry.1 += 1;
+        Ok(())
+    }
 }
 
 /// Parsed templates by their source text, the least recently used dropped first.
@@ -98,6 +129,7 @@ pub struct Metrics {
     renders_failed: AtomicU64,
     limited: AtomicU64,
     unauthorized: AtomicU64,
+    rate_limited: AtomicU64,
     panics: AtomicU64,
     render_micros: AtomicU64,
     pages: AtomicU64,
@@ -133,6 +165,12 @@ impl Metrics {
             "counter",
             "Requests refused for a missing or wrong token.",
             g(&self.unauthorized).to_string(),
+        );
+        line(
+            "ferroreport_rate_limited_total",
+            "counter",
+            "Requests refused because the client asked too often.",
+            g(&self.rate_limited).to_string(),
         );
         line(
             "ferroreport_panics_total",
@@ -171,6 +209,7 @@ pub struct State {
     pub cfg: Config,
     pub cache: TemplateCache,
     pub metrics: Metrics,
+    pub limiter: RateLimiter,
 }
 
 /// A rendered document and what it took.
@@ -293,6 +332,13 @@ fn handle(state: &State, req: &mut Request) -> Reply {
     if (req.method(), url.as_str()) == (&Method::Get, "/health") {
         return json(200, serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") }));
     }
+    if let (Some(per_minute), Some(client)) = (cfg.rate_limit, req.remote_addr().map(|a| a.ip())) {
+        if let Err(wait) = state.limiter.allow(client, per_minute, Instant::now()) {
+            state.metrics.rate_limited.fetch_add(1, Ordering::Relaxed);
+            return error(429, format!("too many requests: try again in {wait} s"))
+                .with_header(Header::from_bytes("Retry-After", wait.to_string()).expect("ascii header"));
+        }
+    }
     if let Some(token) = &cfg.token {
         let ok = req.headers().iter().any(|h| {
             h.field.equiv("Authorization")
@@ -311,7 +357,14 @@ fn handle(state: &State, req: &mut Request) -> Reply {
                 return error(413, "request body too large");
             }
             let mut buf = Vec::new();
-            if req.as_reader().take(cfg.max_body as u64 + 1).read_to_end(&mut buf).is_err() {
+            // Read what the request says it carries, not "until the connection ends": a client
+            // that offers to switch protocols (Java's HttpClient offers HTTP/2 on every first
+            // request) keeps the connection open, and waiting for its end would never return.
+            let limit = match req.body_length() {
+                Some(n) => n as u64,
+                None => cfg.max_body as u64 + 1,
+            };
+            if req.as_reader().take(limit).read_to_end(&mut buf).is_err() {
                 return error(400, "cannot read request body");
             }
             if buf.len() > cfg.max_body {
@@ -350,7 +403,7 @@ fn handle(state: &State, req: &mut Request) -> Reply {
                 None => ferroreport::Format::Pdf,
                 Some(f) => match ferroreport::Format::parse(&f) {
                     Some(f) => f,
-                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx or csv)")),
+                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, csv or html)")),
                 },
             };
             let m = &state.metrics;
@@ -382,18 +435,34 @@ fn handle(state: &State, req: &mut Request) -> Reply {
     }
 }
 
+/// Whether an address to listen on can only be reached from this machine.
+fn is_local(addr: &str) -> bool {
+    ["127.", "localhost", "[::1]"].iter().any(|p| addr.starts_with(p))
+}
+
+/// Refuses a configuration that would let anyone on the network render reports.
+pub fn check(cfg: &Config) -> Result<(), String> {
+    if cfg.token.is_none() && !cfg.allow_anonymous && !is_local(&cfg.addr) {
+        return Err(format!(
+            "refusing to listen on {} without a token: anyone who can reach this port could render reports.\n\
+             Set --token <secret> (or FERROREPORT_TOKEN), or pass --allow-anonymous (or FERROREPORT_ALLOW_ANONYMOUS=1) \
+             if the port is only reachable by your own services.",
+            cfg.addr
+        ));
+    }
+    Ok(())
+}
+
 pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
+    check(&cfg)?;
     let server = Arc::new(Server::http(&cfg.addr).map_err(|e| format!("{}: {e}", cfg.addr))?);
     eprintln!("ferroreport {} listening on http://{}", env!("CARGO_PKG_VERSION"), cfg.addr);
-    let local = ["127.", "localhost", "[::1]"].iter().any(|p| cfg.addr.starts_with(p));
-    if cfg.token.is_none() && !local {
-        eprintln!(
-            "warning: listening on {} without a token: anyone who can reach this port can render reports. \
-             Set --token (or FERROREPORT_TOKEN), or keep the port private.",
-            cfg.addr
-        );
-    }
-    let state = Arc::new(State { cache: TemplateCache::new(cfg.cache), metrics: Metrics::default(), cfg });
+    let state = Arc::new(State {
+        cache: TemplateCache::new(cfg.cache),
+        metrics: Metrics::default(),
+        limiter: RateLimiter::default(),
+        cfg,
+    });
     let workers: Vec<_> = (0..state.cfg.workers.max(1))
         .map(|_| {
             let (server, state) = (server.clone(), state.clone());
@@ -462,6 +531,47 @@ mod tests {
         assert_eq!(cache.get(&t("b")).unwrap().0.name, "b");
         assert!(cache.get("<nonsense").is_err());
         assert!(!TemplateCache::new(0).get(&t("a")).unwrap().1 && !TemplateCache::new(0).get(&t("a")).unwrap().1);
+    }
+
+    fn config(addr: &str, token: Option<&str>, allow_anonymous: bool) -> Config {
+        Config {
+            addr: addr.into(),
+            templates: None,
+            resources: Vec::new(),
+            token: token.map(str::to_string),
+            max_body: 1 << 20,
+            workers: 1,
+            limits: Default::default(),
+            cache: 0,
+            access_log: false,
+            allow_anonymous,
+            rate_limit: None,
+        }
+    }
+
+    #[test]
+    fn a_public_address_needs_a_token() {
+        assert!(check(&config("127.0.0.1:8080", None, false)).is_ok());
+        assert!(check(&config("[::1]:8080", None, false)).is_ok());
+        assert!(check(&config("0.0.0.0:8080", None, false)).is_err());
+        assert!(check(&config("10.0.0.5:8080", None, false)).is_err());
+        assert!(check(&config("0.0.0.0:8080", Some("s3cret"), false)).is_ok());
+        assert!(check(&config("0.0.0.0:8080", None, true)).is_ok());
+    }
+
+    #[test]
+    fn clients_are_limited_per_minute() {
+        let limiter = RateLimiter::default();
+        let (a, b): (std::net::IpAddr, std::net::IpAddr) = ("10.0.0.1".parse().unwrap(), "10.0.0.2".parse().unwrap());
+        let t0 = Instant::now();
+        for _ in 0..3 {
+            assert!(limiter.allow(a, 3, t0).is_ok());
+        }
+        let wait = limiter.allow(a, 3, t0 + std::time::Duration::from_secs(20)).unwrap_err();
+        assert!((39..=40).contains(&wait), "{wait}");
+        // Another client is not affected, and the minute starts over.
+        assert!(limiter.allow(b, 3, t0).is_ok());
+        assert!(limiter.allow(a, 3, t0 + std::time::Duration::from_secs(61)).is_ok());
     }
 
     #[test]

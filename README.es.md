@@ -1,7 +1,7 @@
 # ferroreport
 
 **Reportes en milisegundos, desde cualquier lenguaje.** ferroreport es un motor de reportes:
-le das una plantilla y tus datos y escribe el PDF, el Excel o el CSV. Una factura tarda
+le das una plantilla y tus datos y escribe el PDF, el Excel, el CSV o una vista previa web. Una factura tarda
 **2 ms**; **un millón de filas** tardan 12 segundos y usan **11 MB de memoria**, porque las
 filas se leen a medida que hacen falta y cada página se escribe apenas se termina. Es un solo
 binario pequeño, sin nada que instalar, y las plantillas **no pueden ejecutar código** en tu
@@ -34,8 +34,9 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
   píxel: hoy los 31 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
   celda por celda, y las 33 coinciden.
-- **PDF, Excel y CSV.** La misma plantilla da un PDF, un `.xlsx` armado como el de JasperReports
-  (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos) o un CSV.
+- **PDF, Excel, CSV y HTML.** La misma plantilla da un PDF, un `.xlsx` armado como el de
+  JasperReports (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y
+  gráficos), un CSV o una página web que se ve como el PDF, para vistas previas.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -46,8 +47,10 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   plantillas de prueba se dañan de miles de formas y el motor debe responder con un documento
   o un error, nunca caerse ([SECURITY.md](SECURITY.md)).
 - **Úsalo desde cualquier lenguaje.** Paquetes para JavaScript (Node.js, Deno, Bun y
-  navegadores) y Python, librería de Rust, CLI, y una API HTTP en imagen Docker para todo lo
-  demás (Java, C#, PHP, Go, Ruby...).
+  navegadores), Python y Java (Quarkus, Spring; lee un `ResultSet` fila por fila, ver
+  [bindings/java](bindings/java/README.md)), librería de Rust, CLI, y una API HTTP en imagen
+  Docker para todo lo demás (C#, PHP, Go, Ruby...). El servidor no escucha fuera de localhost
+  sin token.
 
 ## Desde tu lenguaje
 
@@ -63,9 +66,13 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   `ferroreport.render("factura.jrxml", filas, parametros, locale="es_DO")` (agrega
   `format="xlsx"` o `"csv"`, o usa `render_to_file(..., "factura.xlsx", ...)`).
 - **Cualquier lenguaje por HTTP:**
-  `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates ghcr.io/cristianencarnacion/ferroreport`
-  y luego `POST /render/factura` con `{"data": [...], "params": {...}}` te devuelve el PDF
-  (agrega `"format": "xlsx"` o `"csv"` para Excel o CSV).
+  `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates -e FERROREPORT_TOKEN=cambiame ghcr.io/cristianencarnacion/ferroreport`
+  y luego `POST /render/factura` con `Authorization: Bearer cambiame` y
+  `{"data": [...], "params": {...}}` te devuelve el PDF (agrega `"format": "xlsx"`, `"csv"` o
+  `"html"` para Excel, CSV o una vista previa web).
+- **Java:** `Ferroreport.local().template(Path.of("factura.jrxml")).rows(lineas).param("CLIENTE", "Caribe").render()`;
+  con `.rows(resultSet).renderTo(Path.of("ventas.pdf"))` un query va directo al archivo sin
+  cargarse en memoria.
 - **Rust:** `cargo add ferroreport`. **Línea de comandos:** binarios en
   [Releases](https://github.com/cristianEncarnacion/ferroreport/releases); `-d -` y `-o -` leen
   las filas de stdin y escriben el PDF en stdout.
@@ -182,8 +189,12 @@ memoria (100,000 filas: unos 3 s y 490 MiB).
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** más tipos de gráficos; listo: exportación a Excel (XLSX) y CSV.
-- **Siguiente:** filas directo desde bases de datos SQL, salida HTML para vistas previas,
-  librería de Java en Maven Central, Excel escrito por partes y un diseñador visual de plantillas.
+- **Listo en 0.8:** salida HTML para vistas previas, librería de Java que lee un `ResultSet`
+  fila por fila, filas desde cualquier base de datos por tubería o iterador, y un servidor que
+  se niega a quedar abierto a la red y puede limitar a cada cliente.
+- **Siguiente:** la librería de Java en Maven Central (hoy la construye JitPack), Excel escrito
+  por partes, salida a Word y un diseñador visual (mientras tanto, Jaspersoft Studio sirve para
+  diseñar las plantillas).
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

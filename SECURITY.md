@@ -67,18 +67,21 @@ their size.
 
 ## The HTTP server
 
-`ferroreport serve` listens on `127.0.0.1` unless told otherwise. When it is reachable from other
-machines, set a token (`--token` or `FERROREPORT_TOKEN`): requests must then send
-`Authorization: Bearer <token>`, compared in constant time. Template names in URLs must be
+`ferroreport serve` listens on `127.0.0.1` unless told otherwise, and refuses to start on any
+other address without a token (`--token` or `FERROREPORT_TOKEN`): requests must then send
+`Authorization: Bearer <token>`, compared in constant time. If the port can only be reached by
+your own services (a private network, a sidecar), say so with `--allow-anonymous` or
+`FERROREPORT_ALLOW_ANONYMOUS=1`. The Docker image listens on `0.0.0.0`, so it needs one or the
+other. Template names in URLs must be
 relative paths inside `--templates`. A failure while rendering one request answers `500` and
-does not stop the server. The server warns at start-up when it listens beyond localhost without
-a token. `GET /health` answers without the token (it only says the server is up); every other
+does not stop the server. `GET /health` answers without the token (it only says the server is up); every other
 path, `GET /metrics` included, needs it.
 
 Every render runs under `--timeout` (60 seconds unless you change it) and `--max-pages` (no
 limit unless you set one); a render that goes over answers `413`. The number of renders at
-once is `--workers`. The server does not limit how often one client may ask: put it behind
-your gateway or reverse proxy for that, as you would any internal service.
+once is `--workers`, and `--rate-limit <n>` caps the requests per minute from one client address
+(over it, the answer is `429` with `Retry-After`). Behind a reverse proxy every request comes
+from the proxy's address, so set the limit there instead.
 
 ## Spreadsheet exports
 
@@ -89,6 +92,20 @@ will be opened in a spreadsheet, turn on the formula guard (`--csv-safe`, `csv_s
 `csvSafe: true`, `CsvOptions::guard_formulas`): such values get an apostrophe in front, which
 spreadsheets show as text. Plain numbers such as `-12.50` are left alone. It is off by default
 so that the CSV stays byte for byte what JasperReports writes.
+
+## HTML output
+
+The HTML export writes the report's text as text. Everything that comes from the template or the
+data is escaped, so a value such as `<script>` shows as those characters and cannot run. The
+page holds no scripts and loads nothing from the network: images are embedded.
+
+## The Java library
+
+The Java library runs the engine as a child process (or talks to a server). If no engine is
+installed it downloads the release with its own version from this project's GitHub releases over
+HTTPS and checks it against the release's SHA-256 list before installing it in the user's cache
+directory. Where programs may not be fetched at run time, install the engine in the image and
+set `-Dferroreport.download=false`.
 
 ## Dependencies
 

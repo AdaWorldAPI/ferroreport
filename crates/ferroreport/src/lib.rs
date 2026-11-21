@@ -25,6 +25,7 @@ pub mod fill;
 pub mod fonts;
 pub mod format;
 mod grid;
+pub mod html;
 pub mod image;
 pub mod jrxml;
 pub mod model;
@@ -65,15 +66,18 @@ pub enum Format {
     Xlsx,
     /// Comma-separated values, laid out like JasperReports' CSV exporter.
     Csv,
+    /// A web page with every page of the report drawn as it is in the PDF, for previews.
+    Html,
 }
 
 impl Format {
-    /// `pdf`, `xlsx` or `csv` (any case).
+    /// `pdf`, `xlsx`, `csv` or `html` (any case).
     pub fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
             "xlsx" | "excel" => Some(Format::Xlsx),
             "csv" => Some(Format::Csv),
+            "html" | "htm" => Some(Format::Html),
             _ => None,
         }
     }
@@ -83,6 +87,7 @@ impl Format {
             Format::Pdf => "pdf",
             Format::Xlsx => "xlsx",
             Format::Csv => "csv",
+            Format::Html => "html",
         }
     }
 
@@ -91,6 +96,7 @@ impl Format {
             Format::Pdf => "application/pdf",
             Format::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             Format::Csv => "text/csv; charset=utf-8",
+            Format::Html => "text/html; charset=utf-8",
         }
     }
 }
@@ -104,6 +110,7 @@ pub struct Renderer {
     limits: Limits,
     xlsx: xlsx::XlsxOptions,
     csv: csv::CsvOptions,
+    html: html::HtmlOptions,
 }
 
 impl Default for Renderer {
@@ -122,6 +129,7 @@ impl Renderer {
             limits: Limits::default(),
             xlsx: Default::default(),
             csv: Default::default(),
+            html: Default::default(),
         }
     }
 
@@ -152,6 +160,12 @@ impl Renderer {
     /// Options for CSV output from [`Renderer::export`] and the `render` methods.
     pub fn csv_options(mut self, options: csv::CsvOptions) -> Renderer {
         self.csv = options;
+        self
+    }
+
+    /// Options for HTML output from [`Renderer::export`] and the `render` methods.
+    pub fn html_options(mut self, options: html::HtmlOptions) -> Renderer {
+        self.html = options;
         self
     }
 
@@ -244,6 +258,13 @@ impl Renderer {
                 sink.finish()?;
                 Ok(stats)
             }
+            Format::Html => {
+                let mut sink =
+                    html::HtmlStream::new(out, &report.name, report.page_width, report.page_height, self.html.clone())?;
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish()?;
+                Ok(stats)
+            }
             Format::Xlsx => {
                 let mut count = 0;
                 let rows = rows.inspect(|_| count += 1);
@@ -277,6 +298,7 @@ impl Renderer {
             Format::Pdf => self.to_pdf(doc)?,
             Format::Xlsx => self.to_xlsx(doc, &self.xlsx),
             Format::Csv => self.to_csv(doc, &self.csv).into_bytes(),
+            Format::Html => html::write_html(doc, &self.fonts, &self.html)?.into_bytes(),
         })
     }
 

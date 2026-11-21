@@ -46,6 +46,20 @@ jobs:
       - run: maturin build --release -m bindings/python/Cargo.toml -o dist
       - run: pip install dist/*.whl && pytest -q bindings/python/tests
 
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: cargo build --release -p ferroreport-cli
+      - run: mvn -B -q -f bindings/java/pom.xml verify
+        env:
+          FERROREPORT_BIN: ${{ github.workspace }}/target/release/ferroreport
+
   wasm:
     runs-on: ubuntu-latest
     steps:
@@ -73,7 +87,9 @@ jobs:
       - run: docker build -t ferroreport:ci .
       - name: Smoke-test the HTTP API
         run: |
-          docker run -d --name fr -p 8080:8080 ferroreport:ci
+          # Without a token the server refuses to listen beyond localhost.
+          if docker run --rm ferroreport:ci; then echo 'started without a token'; exit 1; fi
+          docker run -d --name fr -p 8080:8080 -e FERROREPORT_TOKEN=ci-secret ferroreport:ci
           for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
           python3 - <<'EOF'
           import json, urllib.request
@@ -81,7 +97,7 @@ jobs:
           data = json.load(open("fixtures/01-employee-list/data.json"))
           req = urllib.request.Request("http://localhost:8080/render", method="POST",
               data=json.dumps({"template": tpl, "data": data}).encode(),
-              headers={"Content-Type": "application/json"})
+              headers={"Content-Type": "application/json", "Authorization": "Bearer ci-secret"})
           pdf = urllib.request.urlopen(req).read()
           assert pdf.startswith(b"%PDF"), pdf[:200]
           print("ok", len(pdf))

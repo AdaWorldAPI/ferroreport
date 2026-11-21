@@ -36,7 +36,7 @@ fn render(
     output_path: Option<String>,
 ) -> PyResult<(Py<PyBytes>, usize, usize)> {
     let format = match format {
-        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx or csv)")))?,
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx, csv or html)")))?,
         None => ferroreport::Format::Pdf,
     };
     let (bytes, stats) = py

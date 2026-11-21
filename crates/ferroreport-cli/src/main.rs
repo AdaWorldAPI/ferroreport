@@ -9,7 +9,7 @@ use std::time::Instant;
 mod serve;
 
 const USAGE: &str = "\
-ferroreport — render JasperReports JRXML templates to PDF, Excel or CSV, no JVM required
+ferroreport — report engine: PDF, Excel, CSV and HTML from JasperReports JRXML templates, no JVM required
 
 USAGE:
     ferroreport render <template.jrxml> [OPTIONS]
@@ -22,8 +22,10 @@ RENDER OPTIONS:
                                 as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
-                                extension picks the format: .pdf, .xlsx or .csv
-    -f, --format <pdf|xlsx|csv> Output format, when the file name does not say it
+                                extension picks the format: .pdf, .xlsx, .csv or .html
+    -f, --format <pdf|xlsx|csv|html>
+                                Output format, when the file name does not say it. html is a
+                                web page that looks like the PDF, for previews
         --xlsx-numbers          In XLSX, write numbers as numbers (default: as formatted text,
                                 like JasperReports)
         --csv-safe              In CSV, put an apostrophe before values a spreadsheet would
@@ -43,12 +45,17 @@ DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
-add format xlsx or csv to the request for Excel or CSV):
+add format xlsx, csv or html to the request for Excel, CSV or a web preview):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
     -r, --resources <dir>       Extra directory for images and subreports (repeatable)
-        --token <secret>        Require `Authorization: Bearer <secret>` (or FERROREPORT_TOKEN)
+        --token <secret>        Require `Authorization: Bearer <secret>` (or FERROREPORT_TOKEN).
+                                Needed to listen beyond localhost, unless:
+        --allow-anonymous       Listen beyond localhost without a token (or
+                                FERROREPORT_ALLOW_ANONYMOUS=1): only for ports your own
+                                services alone can reach
+        --rate-limit <n>        Most requests per minute from one client address (answers 429)
         --max-body <MB>         Largest request accepted (default: 50)
         --workers <n>           Requests rendered in parallel (default: CPU count)
         --timeout <seconds>     Longest a render may take (default: 60; 0 for no limit)
@@ -146,7 +153,7 @@ fn render(args: &[String]) -> CliResult {
     }
     let template = template.ok_or("missing template path")?;
     let format = match format {
-        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx or csv)"))?,
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx, csv or html)"))?,
         None => output
             .as_deref()
             .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))
@@ -251,6 +258,8 @@ fn serve(args: &[String]) -> CliResult {
     let mut limits = ferroreport::Limits { max_pages: None, timeout: Some(std::time::Duration::from_secs(60)) };
     let mut cache = 128usize;
     let mut access_log = false;
+    let mut allow_anonymous = std::env::var("FERROREPORT_ALLOW_ANONYMOUS").is_ok_and(|v| !v.is_empty() && v != "0");
+    let mut rate_limit = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
@@ -269,6 +278,8 @@ fn serve(args: &[String]) -> CliResult {
             }
             "--cache" => cache = value(a)?.parse().map_err(|_| "--cache expects a number of templates")?,
             "--access-log" => access_log = true,
+            "--allow-anonymous" => allow_anonymous = true,
+            "--rate-limit" => rate_limit = Some(value(a)?.parse().map_err(|_| "--rate-limit expects requests per minute")?),
             s => return Err(format!("unknown option {s}").into()),
         }
     }
@@ -282,6 +293,8 @@ fn serve(args: &[String]) -> CliResult {
         limits,
         cache,
         access_log,
+        allow_anonymous,
+        rate_limit,
     })
 }
 

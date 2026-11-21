@@ -157,12 +157,12 @@ fn on_small_stack(f: impl FnOnce() + Send + 'static) {
 fn mutated_templates_never_panic() {
     on_small_stack(|| {
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ seed());
-        let formats = [Format::Pdf, Format::Xlsx, Format::Csv];
+        let formats = [Format::Pdf, Format::Xlsx, Format::Csv, Format::Html];
         for (dir, template, data, params) in fixtures() {
             for round in 0..120 {
                 let bytes = mutate(template.as_bytes(), &mut rng);
                 let text = String::from_utf8_lossy(&bytes);
-                render(&dir, &text, data.as_bytes(), &params, formats[round % 3]);
+                render(&dir, &text, data.as_bytes(), &params, formats[round % 4]);
             }
         }
     });

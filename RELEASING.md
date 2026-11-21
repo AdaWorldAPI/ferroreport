@@ -1,8 +1,9 @@
 # Releasing
 
 1. Update `version` in `Cargo.toml` (workspace), `crates/ferroreport-cli/Cargo.toml` (the
-   `ferroreport` dependency) and `bindings/wasm/package.json`.
-2. Commit, then tag and push: `git tag v0.7.0 && git push origin v0.7.0`.
+   `ferroreport` dependency), `bindings/wasm/package.json`, and for Java `bindings/java/pom.xml`
+   and `Ferroreport.VERSION` (the engine release the Java library downloads).
+2. Commit, then tag and push: `git tag v0.8.0 && git push origin v0.8.0`.
 
 The [release workflow](.github/workflows/release.yml) then publishes:
 
@@ -13,6 +14,7 @@ The [release workflow](.github/workflows/release.yml) then publishes:
 | npm | `ferroreport` (WebAssembly: Node.js, Deno, Bun, browsers) | variable `PUBLISH_NPM=true` |
 | PyPI | `ferroreport` (wheels for Linux, macOS, Windows; Python 3.9+) | variable `PUBLISH_PYPI=true` |
 | crates.io | `ferroreport` (library) and `ferroreport-cli` | variable `PUBLISH_CRATES=true` |
+| JitPack | the Java library, as `com.github.cristianEncarnacion:ferroreport:<tag>` | none: JitPack builds `bindings/java` from the tag the first time someone asks for it (`jitpack.yml`) |
 
 Repository variables live in *Settings → Secrets and variables → Actions → Variables*.
 

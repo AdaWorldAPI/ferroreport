@@ -30,13 +30,16 @@
       <a href="#http">HTTP API (any language)</a>
       <a href="#js">JavaScript</a>
       <a href="#python">Python</a>
+      <a href="#java">Java</a>
       <a href="#rust">Rust</a>
       <b>Reports</b>
       <a href="#resources">Images and subreports</a>
       <a href="#tables">Tables</a>
       <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
+      <a href="#html">HTML previews</a>
       <a href="#large">Large reports and limits</a>
+      <a href="#database">Rows from a database</a>
       <a href="#fonts">Fonts</a>
       <a href="#locale">Locale and dates</a>
       <a href="#check">Check a template</a>
@@ -151,7 +154,9 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>-P, --port &lt;n&gt;</code></td><td><code>FERROREPORT_PORT</code></td><td>Port. Default <code>8080</code></td></tr>
         <tr><td><code>-t, --templates &lt;dir&gt;</code></td><td><code>FERROREPORT_TEMPLATES</code></td><td>Directory of templates for <code>POST /render/&lt;name&gt;</code></td></tr>
         <tr><td><code>-r, --resources &lt;dir&gt;</code></td><td></td><td>Extra directory for images and subreports. Repeatable</td></tr>
-        <tr><td><code>--token &lt;secret&gt;</code></td><td><code>FERROREPORT_TOKEN</code></td><td>Requires <code>Authorization: Bearer &lt;secret&gt;</code> on every request</td></tr>
+        <tr><td><code>--token &lt;secret&gt;</code></td><td><code>FERROREPORT_TOKEN</code></td><td>Requires <code>Authorization: Bearer &lt;secret&gt;</code> on every request. The server refuses to listen beyond localhost without it</td></tr>
+        <tr><td><code>--allow-anonymous</code></td><td><code>FERROREPORT_ALLOW_ANONYMOUS=1</code></td><td>Listens beyond localhost without a token. Only for ports that your own services alone can reach</td></tr>
+        <tr><td><code>--rate-limit &lt;n&gt;</code></td><td></td><td>Most requests per minute from one client address; over it the answer is <code>429</code>. Default: no limit</td></tr>
         <tr><td><code>--max-body &lt;MB&gt;</code></td><td></td><td>Largest request accepted. Default 50</td></tr>
         <tr><td><code>--workers &lt;n&gt;</code></td><td></td><td>Requests rendered in parallel. Default: the number of CPUs</td></tr>
         <tr><td><code>--timeout &lt;seconds&gt;</code></td><td></td><td>Longest a render may take. Default 60; <code>0</code> for no limit</td></tr>
@@ -171,7 +176,7 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>POST /render/&lt;name&gt;</code></td><td>Renders <code>&lt;name&gt;.jrxml</code> from the templates directory (subfolders allowed: <code>/render/sales/invoice</code>)</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /render</code></td><td>Renders the template sent in the request</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /inspect</code></td><td>Reports a template's parameters, fields and unsupported features</td><td>JSON</td></tr>
-        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.7.0"}</code></td></tr>
+        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.8.0"}</code></td></tr>
         <tr><td><code>GET /metrics</code></td><td>Counters for Prometheus: renders, errors, renders stopped by a limit, time spent, pages, rows, bytes sent, template cache hits and misses, renders in flight</td><td>Prometheus text</td></tr>
       </table>
       <p>The request body is JSON:</p>
@@ -181,7 +186,7 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>params</code></td><td>Object of parameter values</td></tr>
         <tr><td><code>locale</code></td><td><code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>now</code></td><td>Fixed value of <code>new Date()</code>, ISO-8601</td></tr>
-        <tr><td><code>format</code></td><td><code>pdf</code> (default), <code>xlsx</code> (returns <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>) or <code>csv</code> (<code>text/csv</code>). Also accepted in the URL: <code>/render/invoice?format=xlsx</code></td></tr>
+        <tr><td><code>format</code></td><td><code>html</code> returns a <a href="#html">web preview</a>; <code>pdf</code> (default), <code>xlsx</code> (returns <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>) or <code>csv</code> (<code>text/csv</code>). Also accepted in the URL: <code>/render/invoice?format=xlsx</code></td></tr>
         <tr><td><code>csvSafe</code>, <code>xlsxNumbers</code></td><td><code>true</code> to guard CSV against spreadsheet formulas in the data, or to write numbers as numbers in Excel. See <a href="#excel">Excel and CSV</a></td></tr>
         <tr><td><code>resources</code></td><td>Images and subreport templates as base64, by the path the template uses: <code>{"logo.png": "iVBOR..."}</code></td></tr>
         <tr><td><code>template</code></td><td><code>POST /render</code> and <code>/inspect</code> only: the JRXML source text</td></tr>
@@ -189,7 +194,7 @@ ferroreport render invoice.jrxml -d rows.json \
       </table>
       <p>Errors come back as <code>{"error": "what went wrong"}</code> with one of these statuses: <code>400</code> the request is malformed,
         <code>401</code> the token is missing or wrong, <code>404</code> the template does not exist, <code>413</code> the body is too large
-        or the render went over the page or time limit, <code>422</code> the template or its data cannot be rendered.</p>
+        or the render went over the page or time limit, <code>429</code> the client asked too often (<code>--rate-limit</code>), <code>422</code> the template or its data cannot be rendered.</p>
       <p>Every rendered document comes with two headers: <code>Server-Timing</code> (milliseconds spent parsing the template, 0 when it
         came from the cache, and rendering) and <code>X-Report-Pages</code>. The server warns at start-up if it listens beyond
         localhost without a token.</p>
@@ -203,14 +208,9 @@ curl -X POST localhost:8080/render/invoice \
 curl -X POST 'localhost:8080/render/invoice?format=xlsx' \
   -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \
   -d '{"data": [...], "params": {...}}' -o invoice.xlsx</pre>
-<pre>// Java 11+
-HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:8080/render/invoice"))
-    .header("Content-Type", "application/json")
-    .header("Authorization", "Bearer change-me")
-    .POST(HttpRequest.BodyPublishers.ofString(json))   // {"data": [...], "params": {...}}
-    .build();
-byte[] pdf = HttpClient.newHttpClient()
-    .send(request, HttpResponse.BodyHandlers.ofByteArray()).body();</pre>
+<pre>// Java: use the <a href="#java">Java library</a>, which talks to this server too
+Ferroreport reports = Ferroreport.server(URI.create("http://localhost:8080"), "change-me");
+byte[] pdf = reports.named("invoice").rows(lines).param("CUSTOMER", "Caribe").render();</pre>
 <pre>// C#
 using var http = new HttpClient();
 http.DefaultRequestHeaders.Authorization = new("Bearer", "change-me");
@@ -312,6 +312,50 @@ def invoice_pdf(request, pk):
 def invoice_pdf(pk: int):
     rows, params = load_invoice(pk)
     return Response(ferroreport.render("reports/invoice.jrxml", rows, params), media_type="application/pdf")</pre>
+
+      <h2 id="java">Java</h2>
+      <p>A library with no dependencies, for Java 11 and newer (Quarkus, Spring, plain Java). It runs the native engine and feeds it
+        the rows as they are read, so a report can be far larger than the heap.</p>
+<pre>&lt;!-- pom.xml --&gt;
+&lt;repositories&gt;
+  &lt;repository&gt;&lt;id&gt;jitpack.io&lt;/id&gt;&lt;url&gt;https://jitpack.io&lt;/url&gt;&lt;/repository&gt;
+&lt;/repositories&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.github.cristianEncarnacion&lt;/groupId&gt;
+  &lt;artifactId&gt;ferroreport&lt;/artifactId&gt;
+  &lt;version&gt;v0.8.0&lt;/version&gt;
+&lt;/dependency&gt;</pre>
+<pre>Ferroreport reports = Ferroreport.local();
+
+byte[] pdf = reports.template(Path.of("reports/invoice.jrxml"))
+    .rows(lines)                                  // List&lt;Map&lt;String, Object&gt;&gt;, or any Iterable
+    .param("CUSTOMER", "Distribuidora Caribe")
+    .locale("es_DO")
+    .render();
+
+// A query straight to a file, in constant memory
+try (ResultSet sales = statement.executeQuery("select * from sales order by region")) {
+    reports.template(Path.of("reports/sales.jrxml"))
+        .rows(sales)
+        .maxPages(50_000).timeout(Duration.ofMinutes(2))
+        .renderTo(Path.of("sales.pdf"));          // .xlsx, .csv and .html work the same way
+}
+
+// Quarkus / JAX-RS: stream the PDF into the response
+StreamingOutput body = out -&gt; reports.template(Path.of("reports/invoice.jrxml")).rows(lines).renderTo(out);</pre>
+      <table>
+        <tr><th>Call</th><th>Does</th></tr>
+        <tr><td><code>Ferroreport.local()</code>, <code>local(Path)</code></td><td>The engine on this machine. It is found through <code>-Dferroreport.bin</code> or <code>FERROREPORT_BIN</code>, then the <code>PATH</code>, and otherwise downloaded once from the project's releases and checked against their SHA-256 list (<code>-Dferroreport.download=false</code> forbids that)</td></tr>
+        <tr><td><code>Ferroreport.server(URI, token)</code></td><td>A <code>ferroreport serve</code> instance, for a sidecar or a shared service</td></tr>
+        <tr><td><code>.template(Path)</code>, <code>.source(String)</code>, <code>.named(String)</code></td><td>A report from a file, from JRXML text, or by the name a server knows it by</td></tr>
+        <tr><td><code>.rows(Iterable)</code>, <code>.rows(ResultSet)</code></td><td>The rows, read one at a time: Maps of field name to value (nested Maps and Lists feed subreports and tables), or the columns of a query</td></tr>
+        <tr><td><code>.param</code>, <code>.params</code>, <code>.locale</code>, <code>.now</code>, <code>.format</code>, <code>.resources</code></td><td>Parameters, formatting locale, the value of <code>new Date()</code>, output format, extra folders for images and subreports</td></tr>
+        <tr><td><code>.maxPages(n)</code>, <code>.timeout(Duration)</code>, <code>.csvSafe(true)</code>, <code>.xlsxNumbers(true)</code></td><td>Limits and export options, as on the command line</td></tr>
+        <tr><td><code>.render()</code>, <code>.renderTo(Path)</code>, <code>.renderTo(OutputStream)</code></td><td>The document as bytes, as a file written page by page (nothing is left if it fails), or into a stream as it is made</td></tr>
+        <tr><td><code>FerroreportException</code></td><td>Thrown with the engine's message when a report cannot be rendered</td></tr>
+      </table>
+      <p>In a container, copy the engine into the image so nothing is downloaded at run time:
+        <code>COPY --from=ghcr.io/cristianencarnacion/ferroreport /ferroreport /usr/local/bin/ferroreport</code>.</p>
 
       <h2 id="rust">Rust</h2>
 <pre>use ferroreport::Renderer;
@@ -440,6 +484,15 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p>Not available yet: other exporters (Word, HTML, ODS, the old XLS format) and the <code>net.sf.jasperreports.export.*</code> properties
         other than number detection.</p>
 
+      <h2 id="html">HTML previews</h2>
+      <p>Ask for <code>html</code> (<code>-o report.html</code>, <code>format="html"</code>, <code>Format::Html</code>,
+        <code>Format.HTML</code>) and you get one web page with every page of the report drawn as it is in the PDF: same positions,
+        fonts, colors, images, charts and barcodes. The text is real text, so it can be selected, searched and read aloud, and
+        everything from the template or the data is escaped. The page has no scripts and loads nothing from the network.</p>
+      <p>Each line of text carries its measured width, so the layout holds even where the browser does not have the report's font
+        and falls back to another. Use it to show a report in a browser without a PDF viewer; the PDF remains the document to print
+        or keep. In Rust, <code>HtmlOptions { fragment: true, .. }</code> gives only the pages, to place inside a page of your own.</p>
+
       <h2 id="large">Large reports and limits</h2>
       <p>A report does not have to fit in memory. Rows are read as the report asks for them and each page is written as soon as it
         is finished, so a million rows and 23,810 pages render in about 11 MB, at about 85,000 rows a second on one core.</p>
@@ -467,6 +520,24 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td>Time</td><td><code>--timeout</code> (60 s by default in <code>serve</code>)</td><td><code>timeout=</code></td><td><code>Limits::timeout</code></td><td>not available: there is no clock to check in WebAssembly</td></tr>
       </table>
       <p>A render that goes over stops with an error (<code>413</code> from the server) and leaves no file behind.</p>
+
+      <h2 id="database">Rows from a database</h2>
+      <p>The engine does not open database connections: your application already has one, with its credentials and its pool. Hand
+        it the rows as they come and nothing is held in memory. Templates with an embedded SQL query do not run it.</p>
+<pre># PostgreSQL: one JSON object per row, straight into the report
+psql -At -c "select row_to_json(s) from (select * from sales order by region) s" mydb \
+  | ferroreport render sales.jrxml -d - -o sales.pdf
+
+# SQLite, MySQL
+sqlite3 -json app.db "select * from sales order by region" | ferroreport render sales.jrxml -d - -o sales.pdf
+mysql -N -B -e "select json_object('region', region, 'amount', amount) from sales" mydb \
+  | ferroreport render sales.jrxml -d - -o sales.pdf</pre>
+<pre>// Java: the ResultSet is read as the report needs it
+reports.template(Path.of("sales.jrxml")).rows(statement.executeQuery("select * from sales")).renderTo(Path.of("sales.pdf"));</pre>
+<pre># Python: any cursor or generator is read one row at a time
+cursor.execute("select region, amount from sales order by region")
+rows = (dict(zip(("region", "amount"), r)) for r in cursor)
+ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)</pre>
 
       <h2 id="fonts">Fonts</h2>
       <p>DejaVu Sans, DejaVu Serif and DejaVu Sans Mono are built in. They are the families of the <code>jasperreports-fonts</code>
