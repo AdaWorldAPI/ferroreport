@@ -1,7 +1,9 @@
 # ferroreport for JavaScript
 
-Render **JasperReports `.jrxml` templates to PDF** from Node.js, Deno, Bun or the browser. No JVM:
-the engine is Rust compiled to WebAssembly. Output is verified pixel by pixel against
+The fastest way to render **JasperReports `.jrxml` templates to PDF** from Node.js, Deno, Bun or
+the browser. No JVM: the engine is Rust compiled to WebAssembly, and a typical invoice renders
+in a few milliseconds ([benchmarks](https://github.com/cristianEncarnacion/ferroreport#performance),
+[live playground](https://cristianencarnacion.github.io/ferroreport/)). Output is verified pixel by pixel against
 JasperReports 6.20, and templates cannot run code or read files, so they are safe to accept
 from users.
 

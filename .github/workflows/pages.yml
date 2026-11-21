@@ -1,0 +1,58 @@
+# Publishes the website and the in-browser playground to GitHub Pages.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "bindings/wasm/**", "crates/ferroreport/**", "fixtures/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-bindgen-cli matching Cargo.lock
+        run: |
+          V=$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          echo "WASM_BINDGEN=wasm-bindgen-cli@$V" >> "$GITHUB_ENV"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: ${{ env.WASM_BINDGEN }},binaryen
+      - run: bindings/wasm/build.sh
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/pkg _site/examples
+          cp site/index.html _site/
+          cp bindings/wasm/pkg/web/* _site/pkg/
+          for f in 02-invoice 24-charts 18-barcodes 21-markup; do
+            mkdir -p _site/examples/$f
+            cp fixtures/$f/report.jrxml fixtures/$f/data.json _site/examples/$f/
+            [ -f fixtures/$f/params.json ] && cp fixtures/$f/params.json _site/examples/$f/ || true
+          done
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

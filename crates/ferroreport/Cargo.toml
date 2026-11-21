@@ -1,6 +1,6 @@
 [package]
 name = "ferroreport"
-description = "Render JasperReports JRXML templates to PDF without a JVM"
+description = "The fastest JasperReports engine: render JRXML templates to PDF without a JVM, pixel-identical"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

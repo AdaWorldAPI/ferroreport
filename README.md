@@ -1,15 +1,21 @@
 # ferroreport
 
-**Your JasperReports templates, without the JVM.** ferroreport reads `.jrxml` files and renders
-them to PDF from a single native binary: faster, with a fraction of the memory, and safe to use
-with templates you did not write.
+**The fastest way to render JasperReports.** ferroreport reads the `.jrxml` templates you
+already have and renders them to PDF in milliseconds, without a JVM: about **300× faster** than
+JasperReports on everyday reports, with **a tenth of the memory**, output that matches
+**pixel for pixel**, and templates that **cannot run code** on your server.
 
-> Status: **preview (phase 2).** Every comparable template in the test suite renders pixel for
-> pixel like JasperReports, including band splitting, images, subreports and QR codes. Some
-> features are still missing; see [compatibility](#compatibility). Not affiliated with
-> Jaspersoft or Cloud Software Group.
+<p align="center"><img src="docs/benchmark.svg" alt="Invoice render: JasperReports 3.01 s, ferroreport 0.010 s" width="760"></p>
 
+**[Try it in your browser](https://cristianencarnacion.github.io/ferroreport/)** ·
+[Download](https://github.com/cristianEncarnacion/ferroreport/releases) ·
+[Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
+
+> Status: **preview.** All 22 comparable test templates render pixel for pixel like
+> JasperReports 6.20, including band splitting, images, subreports, QR codes, styled text and
+> multi-column layouts; charts follow JFreeChart's look closely. Some features are still missing;
+> see [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
 
 ## Why
 

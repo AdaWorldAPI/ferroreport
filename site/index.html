@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ferroreport — the fastest JasperReports engine</title>
+<meta name="description" content="Render JasperReports JRXML templates to PDF in milliseconds, without a JVM. Pixel-identical output, 300x faster start, a tenth of the memory. Rust, JavaScript, Python, Docker.">
+<style>
+  :root {
+    --ink: #10151f; --muted: #5b6474; --line: #e4e7ee; --bg: #fbfaf7; --panel: #ffffff;
+    --accent: #e8590c; --accent-2: #1f4e8c; --good: #2b8a3e; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  a { color: var(--accent-2); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 20px 0; display: flex; justify-content: space-between; align-items: center; }
+  .brand { font-weight: 800; letter-spacing: -0.02em; font-size: 20px; }
+  .brand span { color: var(--accent); }
+  nav a { margin-left: 20px; text-decoration: none; color: var(--muted); font-weight: 500; }
+  nav a:hover { color: var(--ink); }
+  .hero { padding: 56px 0 40px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; align-items: center; }
+  .eyebrow { font-family: var(--mono); font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+  h1 { font-size: 54px; line-height: 1.04; letter-spacing: -0.035em; margin: 12px 0 18px; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .lead { font-size: 19px; color: var(--muted); max-width: 34em; }
+  .cta { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--ink); }
+  .btn.primary { background: var(--ink); color: #fff; }
+  .btn.ghost { color: var(--ink); background: transparent; }
+  .race { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(16,21,31,0.06); }
+  .race h3 { margin: 0 0 4px; font-size: 15px; }
+  .race p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+  .bar { margin: 14px 0; }
+  .bar .label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
+  .bar .label span:last-child { font-family: var(--mono); }
+  .track { height: 14px; background: #f1f2f5; border-radius: 7px; overflow: hidden; margin-top: 6px; }
+  .fill { height: 100%; border-radius: 7px; }
+  .fill.jasper { background: #9aa3b2; width: 100%; }
+  .fill.ferro { background: var(--accent); width: 0.4%; min-width: 6px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0 56px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .stat b { display: block; font-size: 30px; letter-spacing: -0.03em; }
+  .stat span { color: var(--muted); font-size: 14px; }
+  section { padding: 40px 0; }
+  h2 { font-size: 34px; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; font-size: 15px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  th { background: #f6f7f9; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  td.num { font-family: var(--mono); }
+  td.win { color: var(--good); font-weight: 700; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  pre { background: #10151f; color: #e9edf5; border-radius: 12px; padding: 16px; overflow: auto; font: 13.5px/1.5 var(--mono); margin: 8px 0 0; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button { border: 1px solid var(--line); background: var(--panel); padding: 8px 14px; border-radius: 8px; cursor: pointer; font: 600 14px system-ui; }
+  .tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .play { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .play textarea { width: 100%; height: 300px; font: 12.5px/1.45 var(--mono); border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--panel); resize: vertical; }
+  .play .small textarea { height: 150px; }
+  .play iframe { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 10px; background: #e9ebef; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+  .toolbar select, .toolbar button { font: 600 14px system-ui; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+  .toolbar button.run { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+  #status { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  #status.ok { color: var(--good); }
+  #status.err { color: #c92a2a; }
+  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); margin-top: 40px; }
+  @media (max-width: 860px) {
+    .hero, .play { grid-template-columns: 1fr; }
+    h1 { font-size: 40px; }
+    .stats, .grid3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">ferro<span>report</span></div>
+    <nav>
+      <a href="#benchmarks">Benchmarks</a>
+      <a href="#playground">Playground</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/cristianEncarnacion/ferroreport">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow">JasperReports-compatible · no JVM</div>
+      <h1>The <em>fastest</em> way to render your JasperReports.</h1>
+      <p class="lead">ferroreport reads the <code>.jrxml</code> templates you already have and turns them into PDF in milliseconds.
+        The output matches JasperReports pixel for pixel, it needs a tenth of the memory, and templates can't run code on your server.</p>
+      <div class="cta">
+        <a class="btn primary" href="#playground">Try it in your browser</a>
+        <a class="btn ghost" href="https://github.com/cristianEncarnacion/ferroreport">Star on GitHub</a>
+      </div>
+    </div>
+    <div class="race" aria-label="Invoice render time">
+      <h3>Render a 2-page invoice, from process start to PDF</h3>
+      <p>Same template, same data, 2-vCPU Linux VM, median of 5 runs</p>
+      <div class="bar"><div class="label"><span>JasperReports 6.20 (Java 21)</span><span>3.01 s</span></div><div class="track"><div class="fill jasper"></div></div></div>
+      <div class="bar"><div class="label"><span>ferroreport</span><span>0.010 s</span></div><div class="track"><div class="fill ferro"></div></div></div>
+      <p style="margin:16px 0 0">That's <b style="color:var(--accent)">~300× faster</b>, with 16 MiB of memory instead of 194 MiB.</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>~300×</b><span>faster on small reports (end to end)</span></div>
+    <div class="stat"><b>19×</b><span>faster on 20,000 rows / 477 pages</span></div>
+    <div class="stat"><b>10×</b><span>less memory</span></div>
+    <div class="stat"><b>22/22</b><span>test reports pixel-identical to Jasper</span></div>
+  </div>
+
+  <section id="benchmarks">
+    <h2>Benchmarks</h2>
+    <p class="sub">Measured with <code>tools/bench.py</code> in the repository; run it yourself with your own templates.</p>
+    <table>
+      <tr><th>Report</th><th>JasperReports 6.20</th><th>ferroreport</th><th>Speed-up</th><th>Peak memory</th></tr>
+      <tr><td>Invoice, 2 pages</td><td class="num">3.01 s</td><td class="num">0.010 s</td><td class="num win">309×</td><td class="num">194 → 16 MiB</td></tr>
+      <tr><td>Grouped sales, 4 pages</td><td class="num">3.22 s</td><td class="num">0.013 s</td><td class="num win">253×</td><td class="num">205 → 16 MiB</td></tr>
+      <tr><td>20,000 rows, 477 pages</td><td class="num">7.22 s</td><td class="num">0.39 s</td><td class="num win">19×</td><td class="num">489 → 52 MiB</td></tr>
+    </table>
+    <p class="sub" style="margin-top:12px;font-size:14px">Small reports are dominated by JVM start-up and JRXML compilation. Counting only Jasper's fill and export phases, ferroreport is still about 85× faster on small reports and 13× on the large one, and its PDFs are a quarter of the size.</p>
+  </section>
+
+  <section>
+    <h2>Better than the original where it matters</h2>
+    <div class="grid3">
+      <div class="card"><h3>Pixel-identical</h3><p>Every test report is rendered by both engines and compared pixel by pixel: text metrics, line breaking, page splits, groups and variables follow Jasper exactly.</p></div>
+      <div class="card"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only come from directories you allow.</p></div>
+      <div class="card"><h3>One binary, any language</h3><p>CLI, Rust library, JavaScript/WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest.</p></div>
+      <div class="card"><h3>Everything you use</h3><p>Bands split across pages, frames, images, subreports, charts, QR codes and Code 128, styled/HTML text, rotation, multi-column layouts, conditional styles.</p></div>
+      <div class="card"><h3>Serverless-ready</h3><p>Starts in milliseconds instead of seconds: ideal for Lambda, Cloud Run, edge functions and CLIs.</p></div>
+      <div class="card"><h3>Free and open source</h3><p>MIT or Apache-2.0. Built for the community; contributions and new test templates are welcome.</p></div>
+    </div>
+  </section>
+
+  <section id="playground">
+    <h2>Playground</h2>
+    <p class="sub">Runs entirely in your browser (WebAssembly). Edit the template or the data and render again.</p>
+    <div class="toolbar">
+      <select id="example">
+        <option value="02-invoice">Invoice</option>
+        <option value="24-charts">Charts</option>
+        <option value="18-barcodes">QR codes (e-CF) and barcodes</option>
+        <option value="21-markup">Styled text</option>
+      </select>
+      <button class="run" id="run">Render PDF</button>
+      <span id="status">loading engine…</span>
+    </div>
+    <div class="play">
+      <div>
+        <label><b>Template (JRXML)</b></label>
+        <textarea id="tpl" spellcheck="false"></textarea>
+        <div class="small"><label><b>Data (JSON rows)</b></label><textarea id="data" spellcheck="false"></textarea></div>
+        <div class="small"><label><b>Parameters (JSON)</b></label><textarea id="params" spellcheck="false">{}</textarea></div>
+      </div>
+      <div><iframe id="pdf" title="Rendered PDF"></iframe></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <div class="tabs" id="langs">
+      <button class="on" data-l="cli">CLI</button><button data-l="docker">Docker / HTTP</button><button data-l="js">JavaScript</button><button data-l="py">Python</button><button data-l="rust">Rust</button>
+    </div>
+    <pre id="code"></pre>
+  </section>
+
+  <footer>
+    ferroreport is independent and not affiliated with Jaspersoft or Cloud Software Group. JasperReports is a trademark of Cloud Software Group, Inc.
+    · <a href="https://github.com/cristianEncarnacion/ferroreport">Source</a> · MIT or Apache-2.0
+  </footer>
+</div>
+
+<script type="module">
+const snippets = {
+  cli: `# Download a binary from GitHub Releases, then:
+ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
+ferroreport doctor invoice.jrxml   # what this template uses, and whether it is supported`,
+  docker: `docker run -p 8080:8080 -v "$PWD/templates:/templates" -e FERROREPORT_TEMPLATES=/templates \\
+  ghcr.io/cristianencarnacion/ferroreport
+
+curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \\
+  -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf`,
+  js: `npm install ferroreport
+
+import { render } from "ferroreport";
+const pdf = render(jrxml, rows, { CUSTOMER: "Distribuidora Caribe" }, { locale: "es_DO" });`,
+  py: `pip install ferroreport
+
+import ferroreport
+pdf = ferroreport.render("invoice.jrxml", rows, {"CUSTOMER": "Distribuidora Caribe"}, locale="es_DO")`,
+  rust: `cargo add ferroreport
+
+let pdf = ferroreport::Renderer::new().locale("es_DO").render_json(&template, &rows, &params)?;`,
+};
+const code = document.getElementById("code");
+code.textContent = snippets.cli;
+document.querySelectorAll("#langs button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#langs button").forEach((x) => x.classList.toggle("on", x === b));
+  code.textContent = snippets[b.dataset.l];
+}));
+
+const status = document.getElementById("status");
+const set = (text, cls = "") => { status.textContent = text; status.className = cls; };
+let engine;
+try {
+  engine = await import("./pkg/ferroreport.js");
+  await engine.default();
+  set(`engine ${engine.version()} ready`, "ok");
+} catch (e) {
+  set("could not load the WebAssembly engine: " + e, "err");
+}
+
+async function load(name) {
+  const get = (f) => fetch(`examples/${name}/${f}`).then((r) => (r.ok ? r.text() : ""));
+  document.getElementById("tpl").value = await get("report.jrxml");
+  document.getElementById("data").value = (await get("data.json")) || "[]";
+  document.getElementById("params").value = (await get("params.json")) || "{}";
+  if (engine) run();
+}
+
+let lastUrl;
+function run() {
+  if (!engine) return;
+  try {
+    const t0 = performance.now();
+    const pdf = engine.render(document.getElementById("tpl").value, document.getElementById("data").value,
+      document.getElementById("params").value, { locale: "en_US" });
+    const ms = performance.now() - t0;
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+    document.getElementById("pdf").src = lastUrl;
+    set(`rendered in ${ms.toFixed(1)} ms (${(pdf.length / 1024).toFixed(1)} KB) — in your browser`, "ok");
+  } catch (e) {
+    set(String(e.message || e), "err");
+  }
+}
+document.getElementById("run").addEventListener("click", run);
+document.getElementById("example").addEventListener("change", (e) => load(e.target.value));
+load("02-invoice");
+</script>
+</body>
+</html>

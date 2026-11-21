@@ -1,7 +1,8 @@
 # ferroreport for Python
 
-Render **JasperReports `.jrxml` templates to PDF** from Python. No JVM, no Java bridge: the
-engine is native Rust. Output is verified pixel by pixel against JasperReports 6.20, it is
+The fastest way to render **JasperReports `.jrxml` templates to PDF** from Python. No JVM, no
+Java bridge: the engine is native Rust, about 300× faster than JasperReports end to end on
+everyday reports ([benchmarks](https://github.com/cristianEncarnacion/ferroreport#performance)). Output is verified pixel by pixel against JasperReports 6.20, it is
 hundreds of times faster to start, and templates cannot run code, so they are safe to accept
 from users.
 

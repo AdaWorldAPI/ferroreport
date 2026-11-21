@@ -1,12 +1,20 @@
 # ferroreport
 
-**Tus plantillas de JasperReports, sin JVM.** ferroreport lee archivos `.jrxml` y los convierte a
-PDF desde un único binario nativo: más rápido, con una fracción de la memoria y seguro para
-plantillas que no escribiste tú.
+**La forma más rápida de generar reportes de JasperReports.** ferroreport lee las plantillas
+`.jrxml` que ya tienes y las convierte a PDF en milisegundos, sin JVM: unas **300 veces más
+rápido** que JasperReports en reportes del día a día, con **la décima parte de la memoria**,
+salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar código** en tu servidor.
 
-> Estado: **vista previa (fase 2).** Todas las plantillas comparables de la batería de pruebas
-> salen píxel por píxel igual que en JasperReports, incluyendo bandas divididas entre páginas,
-> imágenes, subreportes y códigos QR. Todavía faltan algunas funciones; ver
+<p align="center"><img src="docs/benchmark.svg" alt="Factura: JasperReports 3.01 s, ferroreport 0.010 s" width="760"></p>
+
+**[Pruébalo en tu navegador](https://cristianencarnacion.github.io/ferroreport/)** ·
+[Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
+[Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
+
+> Estado: **vista previa.** Las 22 plantillas comparables de la batería de pruebas salen píxel por
+> píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
+> subreportes, códigos QR, texto con formato y varias columnas; los gráficos siguen de cerca el
+> estilo de JFreeChart. Todavía faltan algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
 ## Por qué
