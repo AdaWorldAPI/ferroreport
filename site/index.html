@@ -88,7 +88,7 @@
       <div class="num"><b>~300×</b><span>faster on small reports, end to end</span></div>
       <div class="num"><b>19×</b><span>faster on 20,000 rows and 477 pages</span></div>
       <div class="num"><b>10×</b><span>less memory</span></div>
-      <div class="num"><b>22 of 22</b><span>test reports pixel-identical to Jasper</span></div>
+      <div class="num"><b>23 of 23</b><span>test reports pixel-identical to Jasper</span></div>
     </div>
   </section>
 
@@ -124,7 +124,7 @@
       <div class="feature"><h3>Pixel-identical</h3><p>Every test report is rendered by both engines and compared pixel by pixel: text metrics, line breaks, page splits, groups and variables follow Jasper exactly.</p></div>
       <div class="feature"><h3>Safe with any template</h3><p>No <code>.jasper</code> deserialization, no Java code in expressions, no network. Images and subreports only load from directories you allow.</p></div>
       <div class="feature"><h3>One engine, any language</h3><p>CLI, Rust library, JavaScript and WebAssembly, Python, and an HTTP API in an ~8 MB Docker image for Java, C#, PHP, Go and the rest.</p></div>
-      <div class="feature"><h3>The features you use</h3><p>Bands that split across pages, frames, images, subreports, charts, QR codes and Code 128, styled and HTML text, rotation, multi-column layouts, conditional styles.</p></div>
+      <div class="feature"><h3>The features you use</h3><p>Bands that split across pages, frames, images, subreports, charts, QR codes, EAN, UPC, Code 128, Code 39 and other barcodes, styled and HTML text, rotation, multi-column layouts, conditional styles.</p></div>
       <div class="feature"><h3>Ready for serverless</h3><p>It starts in milliseconds instead of seconds, which suits Lambda, Cloud Run, edge functions and command-line tools.</p></div>
       <div class="feature"><h3>Free and open source</h3><p>MIT or Apache-2.0, built for the community. Contributions and new test templates are welcome.</p></div>
     </div>
@@ -140,7 +140,8 @@
         <div class="chips" id="examples" role="group" aria-label="Example report">
           <button type="button" data-ex="02-invoice" aria-pressed="true">Invoice</button>
           <button type="button" data-ex="dashboard" aria-pressed="false">Charts</button>
-          <button type="button" data-ex="18-barcodes" aria-pressed="false">QR codes and barcodes</button>
+          <button type="button" data-ex="18-barcodes" aria-pressed="false">e-CF QR codes</button>
+          <button type="button" data-ex="26-barcodes-1d" aria-pressed="false">Product labels</button>
           <button type="button" data-ex="21-markup" aria-pressed="false">Styled text</button>
         </div>
       </div>
@@ -367,7 +368,7 @@ langs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () =
 const $ = (id) => document.getElementById(id);
 const status = $("status");
 const set = (text, cls = "") => { status.textContent = text; status.className = cls; };
-const JASPER_SECONDS = { "02-invoice": 3.01, "dashboard": 2.80, "18-barcodes": 3.49, "21-markup": 2.68 };
+const JASPER_SECONDS = { "02-invoice": 3.01, "dashboard": 2.80, "18-barcodes": 3.49, "21-markup": 2.68, "26-barcodes-1d": 2.89 };
 const VIEW = "#toolbar=0&navpanes=0&view=FitH";
 const kb = (n) => (n / 1024).toFixed(1) + " KB";
 let engine, example = "02-invoice", showing = "ferro", ferroUrl, edited = false;

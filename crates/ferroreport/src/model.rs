@@ -411,7 +411,7 @@ impl Report {
     }
 }
 
-/// A barcode component (`jr:QRCode`, `jr:Code128`).
+/// A barcode component (`jr:QRCode`, `jr:Code128`, `jr:EAN13`, ...).
 #[derive(Debug, Clone)]
 pub struct BarcodeElement {
     pub symbology: Symbology,
@@ -435,6 +435,19 @@ pub enum Symbology {
         quiet_zone: Option<f64>,
         vertical_quiet_zone: Option<f64>,
     },
+    /// Code 39, Interleaved 2 of 5, Codabar, EAN-13, EAN-8, UPC-A.
+    Linear(crate::barcode::linear::Spec),
+}
+
+impl Symbology {
+    /// The component name used in JRXML.
+    pub fn component(&self) -> &'static str {
+        match self {
+            Symbology::Qr { .. } => "QRCode",
+            Symbology::Code128 { .. } => "Code128",
+            Symbology::Linear(spec) => spec.kind.component(),
+        }
+    }
 }
 
 /// A `<subreport>`: another template filled with its own data for each print of the element.

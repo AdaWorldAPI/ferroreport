@@ -1150,6 +1150,7 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
             *quiet_zone,
             *vertical_quiet_zone,
         ),
+        Symbology::Linear(spec) => crate::barcode::linear::symbol(spec, &code, el.height as f64, bc.font_size.map(|s| s as f64)),
     };
     symbol.map(Some).map_err(|e| Error::eval(format!("barcode `{code}`: {e}")))
 }
@@ -1174,12 +1175,12 @@ fn place_symbol(
     // QR codes take the element's color; barcode4j draws black.
     let color = match bc.symbology {
         Symbology::Qr { .. } => el.forecolor,
-        Symbology::Code128 { .. } => Color::BLACK,
+        Symbology::Code128 { .. } | Symbology::Linear(_) => Color::BLACK,
     };
     // Human-readable text: JasperReports draws the SVG text as glyph outlines, centered on
     // its anchor with fractional advances.
     let mut path = Vec::new();
-    if let Some(t) = &sym.text {
+    for t in &sym.texts {
         let spec = FontSpec {
             name: bc.font_name.clone().unwrap_or_else(|| "Helvetica".into()),
             size: t.size as f32,
@@ -1191,17 +1192,64 @@ fn place_symbol(
         let id = fonts.resolve(&spec);
         let face = fonts.face(id);
         let upem = face.units_per_em as f64;
-        let width: f64 = t.text.chars().map(|c| face.advance(face.glyph(c)) as f64 * t.size / upem).sum();
-        let mut pen = t.x - width / 2.0;
-        for c in t.text.chars() {
-            face.glyph_outline(c, t.size, pen, t.y, &mut path);
-            pen += face.advance(face.glyph(c)) as f64 * t.size / upem;
+        let advances: Vec<f64> = t.text.chars().map(|c| face.advance(face.glyph(c)) as f64 * t.size / upem).collect();
+        // SVG textLength with lengthAdjust="spacing", as Batik does it: glyph positions are
+        // scaled about the first one so that the ink of the last glyph ends at the given length.
+        let n = advances.len();
+        let (start, scale) = match t.length {
+            Some(len) if n > 1 => {
+                let natural: f64 = advances.iter().sum();
+                let last = t.text.chars().last().unwrap_or(' ');
+                let last_w = face.glyph_x_max(last) * t.size / upem;
+                (t.x - len / 2.0, (len - last_w) / (natural - advances[n - 1]))
+            }
+            Some(len) => (t.x - len / 2.0, 1.0),
+            None => (t.x - advances.iter().sum::<f64>() / 2.0, 1.0),
+        };
+        let mut prefix = 0.0;
+        for (c, adv) in t.text.chars().zip(&advances) {
+            face.glyph_outline(c, t.size, start + prefix * scale, t.y, &mut path);
+            prefix += adv;
         }
     }
+    let (rects, path) = match bc.symbology {
+        Symbology::Qr { .. } => (sym.rects, path),
+        _ => snap_like_jasper(sym.rects, path, sym.height),
+    };
     out.push(Laid {
-        item: PrintItem::Shapes { x: ox, y: oy, scale, color, rects: Arc::new(sym.rects), path: Arc::new(path) },
+        item: PrintItem::Shapes { x: ox, y: oy, scale, color, rects: Arc::new(rects), path: Arc::new(path) },
         deferred: None,
     });
+}
+
+/// JasperReports draws barcode4j's SVG into a PDF form whose units are 96-dpi pixels, and iText
+/// writes each coordinate there with 2 decimals. Snapping our millimetre geometry to the same grid
+/// puts every bar edge exactly where Jasper's lands, so they anti-alias the same way.
+fn snap_like_jasper(rects: Vec<[f64; 4]>, path: Vec<PathOp>, height_mm: f64) -> (Vec<[f64; 4]>, Vec<PathOp>) {
+    const PX_PER_MM: f64 = 96.0 / 25.4;
+    let h = height_mm * PX_PER_MM;
+    let round2 = |v: f64| (v * 100.0).round() / 100.0;
+    let sx = |x: f64| round2(x * PX_PER_MM) / PX_PER_MM;
+    // The form's y axis points up from its bottom edge.
+    let sy = |y: f64| (h - round2(h - y * PX_PER_MM)) / PX_PER_MM;
+    let rects = rects
+        .into_iter()
+        .map(|[x, y, w, hh]| {
+            let (x0, x1, y0, y1) = (sx(x), sx(x + w), sy(y), sy(y + hh));
+            [x0, y0, x1 - x0, y1 - y0]
+        })
+        .collect();
+    let path = path
+        .into_iter()
+        .map(|op| match op {
+            PathOp::Move(x, y) => PathOp::Move(sx(x), sy(y)),
+            PathOp::Line(x, y) => PathOp::Line(sx(x), sy(y)),
+            PathOp::Quad(a, b, x, y) => PathOp::Quad(sx(a), sy(b), sx(x), sy(y)),
+            PathOp::Cubic(a, b, c, d, x, y) => PathOp::Cubic(sx(a), sy(b), sx(c), sy(d), sx(x), sy(y)),
+            PathOp::Close => PathOp::Close,
+        })
+        .collect();
+    (rects, path)
 }
 
 /// Subreports nested deeper than this are reported as an error (a template including itself).

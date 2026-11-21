@@ -5,6 +5,7 @@
 //! exactly like Jasper scales its SVG image.
 
 pub mod code128;
+pub mod linear;
 pub mod qr;
 mod qr_tables;
 
@@ -15,20 +16,22 @@ pub struct Symbol {
     pub width: f64,
     pub height: f64,
     pub rects: Vec<[f64; 4]>,
-    pub text: Option<SymbolText>,
+    pub texts: Vec<SymbolText>,
 }
 
-/// Text centered on `x` with its baseline at `y`.
-#[derive(Debug, Clone)]
+/// Text centered on `x` with its baseline at `y`. With `length`, the text is spread to exactly
+/// that width (SVG `textLength`, used for the digit groups of UPC and EAN codes).
+#[derive(Debug, Clone, PartialEq)]
 pub struct SymbolText {
     pub text: String,
     pub x: f64,
     pub y: f64,
     pub size: f64,
+    pub length: Option<f64>,
 }
 
 /// Rounds like barcode4j's SVG output (`DecimalFormat("0.####")`).
-fn r4(v: f64) -> f64 {
+pub(crate) fn r4(v: f64) -> f64 {
     format!("{v:.4}").parse().unwrap_or(v)
 }
 
@@ -68,7 +71,7 @@ pub fn qr_symbol(
             }
         }
     }
-    Ok(Symbol { width: svg_w as f64, height: svg_h as f64, rects, text: None })
+    Ok(Symbol { width: svg_w as f64, height: svg_h as f64, rects, texts: Vec::new() })
 }
 
 /// barcode4j's points-to-millimetres conversion.
@@ -76,7 +79,7 @@ pub fn pt2mm(pt: f64) -> f64 {
     pt / 2.835
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextPosition {
     None,
     Bottom,
@@ -113,14 +116,20 @@ pub fn code128_symbol(
     }
     let width = x + quiet;
     let height = bar_height + text_height + 2.0 * vquiet;
-    let text = match position {
-        TextPosition::None => None,
+    let texts = match position {
+        TextPosition::None => Vec::new(),
         _ => {
             let base = if position == TextPosition::Top { text_height } else { bar_height + text_height };
             // barcode4j shifts the baseline by 0.2 × pt2mm(size in mm).
             let y = base - text_height / 13.0 * 3.0 - pt2mm(font) * 0.2;
-            Some(SymbolText { text: code128::human_readable(msg), x: r4(quiet + (x - quiet) / 2.0), y: r4(y), size: r4(font) })
+            vec![SymbolText {
+                text: code128::human_readable(msg),
+                x: r4(quiet + (x - quiet) / 2.0),
+                y: r4(y),
+                size: r4(font),
+                length: None,
+            }]
         }
     };
-    Ok(Symbol { width: r4(width), height: r4(height), rects, text })
+    Ok(Symbol { width: r4(width), height: r4(height), rects, texts })
 }

@@ -12,8 +12,8 @@ JasperReports on everyday reports, with **a tenth of the memory**, output that m
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
 
-> Status: **preview.** All 22 comparable test templates render pixel for pixel like
-> JasperReports 6.20, including band splitting, images, subreports, QR codes, styled text and
+> Status: **preview.** All 23 comparable test templates render pixel for pixel like
+> JasperReports 6.20, including band splitting, images, subreports, QR codes and barcodes, styled text and
 > multi-column layouts; charts follow JFreeChart's look closely. Some features are still missing;
 > see [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
 
@@ -111,7 +111,7 @@ std::fs::write("invoice.pdf", pdf)?;
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 element syntax | `.jasper` files (by design), scriptlets, subdatasets, style templates |
 | Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical print order, `isStartNewColumn`, column breaks) | horizontal print order |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, charts, QR code and Code 128 barcodes (barcode4j components), page break (applied after its band) | crosstab, table, list, other barcode types, Barbecue barcodes |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, charts, barcodes (barcode4j components: QR code, Code 128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), page break (applied after its band) | crosstab, table, list, UPC-E, EAN-128, PDF417, DataMatrix, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled and HTML markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks, lists), also across page breaks; rotation (Left, Right, UpsideDown) | RTF markup |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style, parent styles, element overrides, conditional styles (up to 4 per style) | |
@@ -134,7 +134,8 @@ Run `ferroreport doctor template.jrxml` to get this verdict for a specific templ
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-22 comparable fixtures match.
+23 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
+(`crates/ferroreport/tests/barcode4j.rs`).
 
 | Fixture | What it exercises | Result |
 |---|---|---|
@@ -163,6 +164,7 @@ than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exa
 | 23-rotation | rotated text (left, right, upside down) with padding and alignment | identical |
 | 24-charts | pie, 3D pie, bar, stacked horizontal bar, line and area charts | same layout (charts are not compared pixel by pixel) |
 | 25-charts-xy | XY line and scatter charts per group (`evaluationTime="Group"`) | same layout (charts are not compared pixel by pixel) |
+| 26-barcodes-1d | EAN-13, UPC-A (text on top), EAN-8, Code 39 with check character, Interleaved 2 of 5, Codabar | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -195,8 +197,8 @@ also smaller (1.1 MB instead of 4.5 MB for 09-large).
 ## Roadmap
 
 - **Phase 2 (in progress):** done: band splitting, images, subreports, conditional styles,
-  justified text, QR codes, Code 128, multi-column layout, styled/HTML text, rotated text and charts. Next: more
-  barcode types, constant memory for huge reports (streaming pages to the PDF).
+  justified text, QR codes and barcodes, multi-column layout, styled/HTML text, rotated text and charts. Next:
+  constant memory for huge reports (streaming pages to the PDF).
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.
 - **Phase 4:** tables, crosstabs, more chart types, Excel export.

@@ -144,6 +144,12 @@ impl FaceData {
         face.outline_glyph(ttf_parser::GlyphId(self.glyph(c)), &mut b);
     }
 
+    /// Right edge of the outline of `c`'s glyph, in font units (0 for empty glyphs).
+    pub fn glyph_x_max(&self, c: char) -> f64 {
+        let Ok(face) = ttf_parser::Face::parse(&self.data, 0) else { return 0.0 };
+        face.glyph_bounding_box(ttf_parser::GlyphId(self.glyph(c))).map(|b| b.x_max as f64).unwrap_or(0.0)
+    }
+
     /// Glyph for `c`, or the `.notdef` glyph.
     pub fn glyph(&self, c: char) -> u16 {
         match self.bmp.get(c as usize) {

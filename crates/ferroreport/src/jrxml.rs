@@ -493,7 +493,7 @@ impl Parser {
 /// The barcode4j/ZXing component inside a `componentElement` (JRXML 6) or a
 /// `<element kind="component">` (JRXML 7), when this engine can draw it.
 fn barcode_node(n: &Node) -> Option<&Node> {
-    const SUPPORTED: &[&str] = &["QRCode", "Code128"];
+    const SUPPORTED: &[&str] = &["QRCode", "Code128", "Code39", "Interleaved2Of5", "Codabar", "EAN13", "EAN8", "UPCA"];
     n.children.iter().find(|c| {
         SUPPORTED.contains(&c.name.as_str())
             || (c.name == "component" && c.attr("kind").is_some_and(|k| SUPPORTED.contains(&k.rsplit(':').next().unwrap_or(k))))
@@ -1022,15 +1022,44 @@ impl Parser {
                     if c.attr("orientation").is_some_and(|o| !matches!(o, "0" | "up")) {
                         self.warnings.push("rotated barcodes are drawn unrotated".into());
                     }
-                    Symbology::Code128 {
-                        module_width: num("moduleWidth"),
-                        text_position: match c.attr("textPosition") {
-                            Some("none") => crate::barcode::TextPosition::None,
-                            Some("top") => crate::barcode::TextPosition::Top,
-                            _ => crate::barcode::TextPosition::Bottom,
+                    let text_position = match c.attr("textPosition") {
+                        Some("none") => crate::barcode::TextPosition::None,
+                        Some("top") => crate::barcode::TextPosition::Top,
+                        _ => crate::barcode::TextPosition::Bottom,
+                    };
+                    match crate::barcode::linear::Kind::from_component(name) {
+                        Some(kind) => {
+                            use crate::barcode::linear::{Checksum, Spec};
+                            let flag = |a: &str| c.attr(a).map(parse_bool).unwrap_or(false);
+                            let checksum = match c.attr("checksumMode") {
+                                Some(m) => Checksum::from_name(m).unwrap_or_else(|| {
+                                    self.warnings.push(format!("unknown barcode checksumMode `{m}`, using auto"));
+                                    Checksum::Auto
+                                }),
+                                None => Checksum::Auto,
+                            };
+                            let display_start_stop = flag("displayStartStop");
+                            Symbology::Linear(Spec {
+                                module_width: num("moduleWidth"),
+                                text_position,
+                                quiet_zone: num("quietZone"),
+                                vertical_quiet_zone: num("verticalQuietZone"),
+                                checksum,
+                                wide_factor: num("wideFactor"),
+                                // barcode4j shows the check character whenever it shows start/stop.
+                                display_checksum: flag("displayChecksum") || display_start_stop,
+                                display_start_stop,
+                                extended: flag("extendedCharSetEnabled"),
+                                intercharacter_gap: num("intercharGapWidth"),
+                                ..Spec::new(kind)
+                            })
+                        }
+                        None => Symbology::Code128 {
+                            module_width: num("moduleWidth"),
+                            text_position,
+                            quiet_zone: num("quietZone"),
+                            vertical_quiet_zone: num("verticalQuietZone"),
                         },
-                        quiet_zone: num("quietZone"),
-                        vertical_quiet_zone: num("verticalQuietZone"),
                     }
                 };
                 ElementKind::Barcode(Box::new(BarcodeElement {

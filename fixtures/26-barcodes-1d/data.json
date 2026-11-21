@@ -1,0 +1,5 @@
+[
+ {"product": "Cemento Portland 42.5 kg", "ean": "746123400017", "upc": "03600029145", "sku": "CEM-425", "box": "1234567"},
+ {"product": "Varilla corrugada 3/8\"", "ean": "746123400026", "upc": "07252727307", "sku": "VAR-038", "box": "00012345"},
+ {"product": "Pintura acrílica galón", "ean": "590123412345", "upc": "01234567890", "sku": "PIN-GAL", "box": "987654"}
+]

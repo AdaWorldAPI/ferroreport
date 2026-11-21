@@ -1,0 +1,41 @@
+code39 ABC-123 50
+code39 AB1 50 - top
+code39 AB1 50 - none
+code39 HELLO 40 1.2 bottom 7
+code39 AB 50 - - - checksum=add dispcheck=true
+code39 AB1 50 - - - startstop=true
+code39 ab 50 - - - ext=true
+code39 abc 50 - - - ext=true checksum=add dispcheck=true
+code39 a~b 50 - - - ext=true
+code39 x-y 50 - - - wide=3 gap=0.5
+code39 Q 30 - - 9 quiet=4 vquiet=3
+i25 123456 40
+i25 12345 40
+i25 1234 40 - - - checksum=add dispcheck=true
+i25 1234 40 - - - checksum=add
+i25 98765432 40 0.8 top 6 wide=2.5
+i25 42 40 - none - vquiet=2
+codabar 1234 40
+codabar a1234b 40
+codabar c-$:/.+0d 40 - top
+codabar t987e 40 0.9 - 8 wide=2.5
+ean13 590123412345 60
+ean13 5901234123457 60
+ean13 4006381333931 60 - top
+ean13 4006381333931 60 - none
+ean13 978014300723 50 0.7 bottom 7
+ean13 400638133393 60 - - - vquiet=4
+ean13 400638133393 60 - - - quiet=20
+ean8 9638507 50
+ean8 96385074 50 - top
+ean8 1234567 40 0.9 none
+upca 01234567890 60
+upca 036000291452 60 - top
+upca 03600029145 50 0.8 none
+upca 72527273070 60 - bottom 12
+code128 ABC-12345 50
+code128 12345 40 - top
+code128 X1 40 0.9 none - vquiet=3
+i25 1234567 40 - - - checksum=add dispcheck=true
+i25 987654 40 - - - checksum=add dispcheck=true
+i25 13579 40 - top 8 checksum=add

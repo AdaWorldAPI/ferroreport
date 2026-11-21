@@ -11,9 +11,9 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 22 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 23 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
-> subreportes, códigos QR, texto con formato y varias columnas; los gráficos siguen de cerca el
+> subreportes, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
 > estilo de JFreeChart. Todavía faltan algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
@@ -22,7 +22,7 @@ salida **idéntica píxel por píxel** y plantillas que **no pueden ejecutar có
 - **Sin JVM.** Un binario de ~8 MB (con las fuentes incluidas) que arranca en milisegundos.
   Importa en CLIs, funciones serverless y contenedores.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 22 comparables salen idénticos.
+  píxel: hoy los 23 comparables salen idénticos.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -74,7 +74,8 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 
 - Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`).
 - Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG/JPEG,
-  subreportes, códigos QR y Code 128 (componentes barcode4j).
+  subreportes, y códigos de los componentes barcode4j: QR, Code 128, Code 39 (con ASCII completo),
+  EAN-13, EAN-8, UPC-A, Interleaved 2 of 5 y Codabar. Cada barra se verifica contra barcode4j.
 - Estilos con herencia y estilos condicionales, texto justificado, `isRemoveLineWhenBlank`,
   `isPrintRepeatedValues`, grupos, variables y tiempos de evaluación.
 - Los QR se codifican igual que ZXing (misma versión, máscara y módulos) y se dibujan como los
@@ -109,7 +110,7 @@ grande. Además sus PDF pesan menos (1.1 MB en vez de 4.5 MB en 09-large).
 ## Roadmap
 
 - **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
-  condicionales, texto justificado, códigos QR, Code 128, multicolumna, texto con formato, texto rotado y gráficos. Siguiente: más tipos de códigos de barras y memoria constante en reportes enormes.
+  condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado y gráficos. Siguiente: memoria constante en reportes enormes.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** tablas, crosstabs, más tipos de gráficos y exportación a Excel.
