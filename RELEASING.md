@@ -22,6 +22,16 @@ All registries use **trusted publishing**: GitHub Actions proves its identity to
 so no long-lived token is stored anywhere. Each registry needs the repository
 `cristianEncarnacion/ferroreport`, the workflow `release.yml` and the environment shown below.
 
+Current state:
+
+| Registry | Trusted publisher | Notes |
+|---|---|---|
+| crates.io | configured for `ferroreport` and `ferroreport-cli` (environment `crates-io`) | the `CARGO_REGISTRY_TOKEN` secret is only a fallback and can be deleted |
+| npm | to configure: package settings → Trusted publisher, workflow `release.yml`, environment `npm` | until then releases use `NPM_TOKEN`, which expires on 2026-11-28 |
+| PyPI | to configure: pending publisher for project `ferroreport`, environment `pypi` | needs two-factor authentication on the PyPI account first; then set the repository variable `PUBLISH_PYPI` to `true` |
+
+How each one was set up, for reference:
+
 - **PyPI** (works before the first release): on pypi.org, *Your account → Publishing → Add a new
   pending publisher*: project `ferroreport`, owner `cristianEncarnacion`, repository
   `ferroreport`, workflow `release.yml`, environment `pypi`.
@@ -31,5 +41,5 @@ so no long-lived token is stored anywhere. Each registry needs the repository
   publisher (workflow `release.yml`, environment `npm`) and delete the secret.
 - **crates.io**: same as npm. Create an API token (scope `publish-new`, `publish-update`) on
   crates.io, save it as the secret `CARGO_REGISTRY_TOKEN`, release, then add the trusted
-  publisher for both crates (workflow `release.yml`, environment `crates-io`) and delete the
-  secret.
+  publisher for both crates (workflow `release.yml`, environment `crates-io`). The workflow
+  prefers trusted publishing and only falls back to the secret.

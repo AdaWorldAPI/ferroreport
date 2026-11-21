@@ -137,7 +137,8 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm install -g npm@latest
       - run: bindings/wasm/build.sh && node bindings/wasm/tests/smoke.mjs
-      - name: Publish (trusted publishing, or NPM_TOKEN for the very first release)
+      # npm tries trusted publishing (OIDC) first and falls back to NPM_TOKEN.
+      - name: Publish
         working-directory: bindings/wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -210,18 +211,18 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      HAS_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      # Trusted publishing (configured on crates.io for release.yml in the crates-io environment).
+      # The CARGO_REGISTRY_TOKEN secret is only a fallback.
       - name: Authenticate (trusted publishing)
         id: auth
-        if: ${{ env.HAS_TOKEN != 'true' }}
+        continue-on-error: true
         uses: rust-lang/crates-io-auth-action@v1
       - name: Publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           V=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name=="ferroreport") | .version')
           published() { curl -fsS -A "ferroreport-release-workflow" "https://crates.io/api/v1/crates/$1/$V" >/dev/null 2>&1; }
