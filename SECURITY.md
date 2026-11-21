@@ -38,7 +38,9 @@ A template or its data cannot make a render use unbounded stack, memory or time:
 | Sizes in a template (widths, heights, font sizes) | finite numbers up to 10 million; `inf`, `NaN` and the like are refused |
 | Pages in a report | yours to set: `--max-pages`, `Limits::max_pages`, `max_pages=`, `maxPages` |
 | Time for a render | yours to set: `--timeout`, `Limits::timeout`, `timeout=`; 60 s by default in `ferroreport serve` |
-| HTTP request body (`ferroreport serve`) | 50 MB by default (`--max-body`) |
+| HTTP request body (`ferroreport serve`) | 50 MB by default (`--max-body`). Rows sent one per line (`application/x-ndjson`) are read as they are needed and have no size limit of their own: the time and page limits stop them |
+| Memory for one document waiting to be sent | 32 MB by default (`--spool-memory`); the rest goes to a file |
+| Disk for documents waiting to be sent, all requests together | 4 GB by default (`--spool-disk`); over it the answer is `507` |
 
 Other inputs grow the work in proportion to their size: pages follow the rows of the data. That
 is what the page and time limits are for: set them whenever templates or data come from other
@@ -82,6 +84,16 @@ limit unless you set one); a render that goes over answers `413`. The number of 
 once is `--workers`, and `--rate-limit <n>` caps the requests per minute from one client address
 (over it, the answer is `429` with `Retry-After`). Behind a reverse proxy every request comes
 from the proxy's address, so set the limit there instead.
+
+A document is kept until it is complete (in memory up to `--spool-memory`, then in a file in
+`--spool-dir`, unlinked as soon as it is created so that it cannot outlive the server) and
+sent with its length, so an error is never half a document. The files of all requests together
+stay under `--spool-disk`; a document that does not fit is answered with `507`. A client can
+ask for the document as it renders instead (`Prefer: respond-streaming`): nothing is kept
+then, a client that disconnects stops its render within milliseconds, and a render that fails
+after its first bytes ends the response in a way HTTP clients report as an error rather than
+as a complete document. Without that header, a client that disconnects is only noticed when
+the document is sent, so its render costs at most `--timeout`.
 
 ## Spreadsheet exports
 

@@ -39,14 +39,14 @@ Until the library is on Maven Central, it is built from this repository's releas
 <dependency>
   <groupId>com.github.cristianEncarnacion</groupId>
   <artifactId>ferroreport</artifactId>
-  <version>v0.8.0</version>
+  <version>v0.9.0</version>
 </dependency>
 ```
 
 ```kotlin
 // Gradle
 repositories { maven("https://jitpack.io") }
-dependencies { implementation("com.github.cristianEncarnacion:ferroreport:v0.8.0") }
+dependencies { implementation("com.github.cristianEncarnacion:ferroreport:v0.9.0") }
 ```
 
 Java 11 or newer.
@@ -81,7 +81,7 @@ byte[] pdf = reports.named("invoice").rows(lines).param("CUSTOMER", "Caribe").re
 | Call | Does |
 |---|---|
 | `Ferroreport.local()`, `local(Path binary)` | The engine on this machine, as a child process per report |
-| `Ferroreport.server(URI, token)` | A `ferroreport serve` instance |
+| `Ferroreport.server(URI, token)` | A `ferroreport serve` instance (0.9.0 or later). Rows are sent to it one per line as they are read, so a large `ResultSet` is never in memory here or there, and the answer is the whole document or an exception |
 | `.template(Path)`, `.source(String jrxml)`, `.named(String)` | A report from a file, from JRXML text, or by the name a server knows it by |
 | `.rows(Iterable)`, `.rows(ResultSet)` | The rows, read one at a time. Maps of field name to value; nested Maps and Lists feed subreports and tables |
 | `.param(name, value)`, `.params(Map)` | Report parameters |

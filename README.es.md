@@ -69,7 +69,13 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates -e FERROREPORT_TOKEN=cambiame ghcr.io/cristianencarnacion/ferroreport`
   y luego `POST /render/factura` con `Authorization: Bearer cambiame` y
   `{"data": [...], "params": {...}}` te devuelve el PDF (agrega `"format": "xlsx"`, `"csv"` o
-  `"html"` para Excel, CSV o una vista previa web).
+  `"html"` para Excel, CSV o una vista previa web). Para reportes con más filas de las que
+  quieres en memoria, envíalas una por línea (`Content-Type: application/x-ndjson`: la
+  petición en la primera línea y una fila en cada línea siguiente) y el servidor las lee a
+  medida que el reporte las necesita: un millón de filas con el servidor en unos 45 MB. La
+  respuesta es el documento completo o un error, nunca medio PDF; con
+  `Prefer: respond-streaming` llega mientras se genera (primeros bytes al instante, y si el
+  cliente se va, el reporte se detiene).
 - **Java:** `Ferroreport.local().template(Path.of("factura.jrxml")).rows(lineas).param("CLIENTE", "Caribe").render()`;
   con `.rows(resultSet).renderTo(Path.of("ventas.pdf"))` un query va directo al archivo sin
   cargarse en memoria.

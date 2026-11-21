@@ -12,17 +12,24 @@
 //! GET  /metrics                                 -> counters in Prometheus text format
 //! ```
 //!
+//! Large reports: send `Content-Type: application/x-ndjson` with the request above on the
+//! first line (without `data`) and one row per line after it, and the rows are read as the
+//! report needs them. The document is kept (in memory, then on disk) until it is complete,
+//! so the answer is the whole document or an error; send `Prefer: respond-streaming` to get
+//! it as it renders instead.
+//!
 //! Parsed templates are kept in a small cache, so a template sent again (or read again from
 //! `--templates`) is not parsed twice. Every render runs under the limits given at start-up.
 
+use crate::spool::{Spool, SpoolLimits};
 use ferroreport::Renderer;
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{BufRead, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tiny_http::{Header, Method, Request, Response, Server};
+use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 pub struct Config {
     pub addr: String,
@@ -41,6 +48,12 @@ pub struct Config {
     pub allow_anonymous: bool,
     /// Most requests one client address may make per minute.
     pub rate_limit: Option<u32>,
+    /// Bytes of one document kept in memory before it goes to a file.
+    pub spool_memory: usize,
+    /// Directory for those files (the system's temporary directory when not given).
+    pub spool_dir: Option<PathBuf>,
+    /// Bytes all requests together may keep on disk.
+    pub spool_disk: u64,
 }
 
 /// Counts each client's requests in the current minute.
@@ -130,6 +143,8 @@ pub struct Metrics {
     limited: AtomicU64,
     unauthorized: AtomicU64,
     rate_limited: AtomicU64,
+    streamed: AtomicU64,
+    cancelled: AtomicU64,
     panics: AtomicU64,
     render_micros: AtomicU64,
     pages: AtomicU64,
@@ -141,7 +156,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    fn text(&self) -> String {
+    fn text(&self, spool: &SpoolLimits) -> String {
         let g = |a: &AtomicU64| a.load(Ordering::Relaxed);
         let mut out = String::new();
         let mut line = |name: &str, kind: &str, help: &str, value: String| {
@@ -200,6 +215,24 @@ impl Metrics {
             g(&self.cache_misses).to_string(),
         );
         line("ferroreport_renders_in_flight", "gauge", "Renders running now.", g(&self.in_flight).to_string());
+        line(
+            "ferroreport_streamed_responses_total",
+            "counter",
+            "Documents sent while they rendered (Prefer: respond-streaming).",
+            g(&self.streamed).to_string(),
+        );
+        line(
+            "ferroreport_cancelled_total",
+            "counter",
+            "Renders stopped because the client went away.",
+            g(&self.cancelled).to_string(),
+        );
+        line(
+            "ferroreport_spool_disk_bytes",
+            "gauge",
+            "Bytes of documents and requests kept on disk now.",
+            spool.used().to_string(),
+        );
         out
     }
 }
@@ -210,23 +243,16 @@ pub struct State {
     pub cache: TemplateCache,
     pub metrics: Metrics,
     pub limiter: RateLimiter,
+    pub spool: Arc<SpoolLimits>,
 }
 
-/// A rendered document and what it took.
-struct Rendered {
-    bytes: Vec<u8>,
-    pages: usize,
-    rows: usize,
-    parse_ms: f64,
-    render_ms: f64,
-}
-
-type Reply = Response<std::io::Cursor<Vec<u8>>>;
+type Reply = tiny_http::ResponseBox;
 
 fn json(status: u16, value: serde_json::Value) -> Reply {
     Response::from_data(value.to_string().into_bytes())
         .with_status_code(status)
         .with_header(Header::from_bytes("Content-Type", "application/json").expect("static header"))
+        .boxed()
 }
 
 fn error(status: u16, message: impl std::fmt::Display) -> Reply {
@@ -251,12 +277,49 @@ fn safe_name(name: &str) -> Option<PathBuf> {
     Some(p.to_path_buf())
 }
 
-fn render(
+/// What one request asks for, ready to render on any thread.
+struct Job {
+    report: Arc<ferroreport::Report>,
+    parse_ms: f64,
+    locale: String,
+    dirs: Vec<PathBuf>,
+    resources: Vec<(String, Vec<u8>)>,
+    now: Option<String>,
+    csv_safe: bool,
+    xlsx_numbers: bool,
+    limits: ferroreport::Limits,
+    params: serde_json::Value,
+    format: ferroreport::Format,
+}
+
+/// What a write fails with once the client has closed the connection.
+const GONE: &str = "the client went away";
+
+/// The status a rendering error is answered with.
+fn status_of(e: &ferroreport::Error) -> u16 {
+    match e {
+        ferroreport::Error::Limit(_) => 413,
+        // No room to keep the document until it is complete.
+        ferroreport::Error::Io(m) if m.contains("--spool") => 507,
+        // Nobody to write to any more.
+        ferroreport::Error::Io(m) if m.contains(GONE) => 499,
+        // The rows stopped arriving.
+        ferroreport::Error::Io(_) => 400,
+        _ => 422,
+    }
+}
+
+fn failed(e: ferroreport::Error) -> (u16, String) {
+    (status_of(&e), e.to_string())
+}
+
+/// Reads the request (everything but its rows): which template, with what options.
+fn prepare(
     state: &State,
     body: &serde_json::Value,
     name: Option<&str>,
     format: ferroreport::Format,
-) -> Result<Rendered, (u16, String)> {
+) -> Result<Job, (u16, String)> {
     let cfg = &state.cfg;
     let bad = |m: String| (400, m);
     let (source, dir) = match (name, body.get("templateName").and_then(|v| v.as_str()), body.get("template")) {
@@ -281,51 +344,296 @@ fn render(
         (None, None, Some(serde_json::Value::String(t))) => (t.clone(), None),
         _ => return Err(bad("send `template` (JRXML source) or `templateName`".into())),
     };
-    let locale = body.get("locale").and_then(|v| v.as_str()).unwrap_or("en_US");
-    let flag = |name: &str| body.get(name).and_then(|v| v.as_bool()).unwrap_or(false);
-    let mut r = Renderer::new()
-        .locale(locale)
-        .limits(cfg.limits)
-        .csv_options(ferroreport::csv::CsvOptions { guard_formulas: flag("csvSafe"), ..Default::default() })
-        .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: flag("xlsxNumbers") });
-    if let Some(d) = dir {
-        r = r.resource_dir(d);
+    let mut dirs: Vec<PathBuf> = dir.into_iter().collect();
+    dirs.extend(cfg.resources.iter().cloned());
+    let now = body.get("now").and_then(|v| v.as_str()).map(str::to_string);
+    if let Some(now) = &now {
+        ferroreport::data::parse_datetime(now).ok_or_else(|| bad(format!("cannot parse now `{now}`")))?;
     }
-    for d in &cfg.resources {
-        r = r.resource_dir(d);
-    }
-    if let Some(now) = body.get("now").and_then(|v| v.as_str()) {
-        r = r.now(ferroreport::data::parse_datetime(now).ok_or_else(|| bad(format!("cannot parse now `{now}`")))?);
-    }
+    let mut resources = Vec::new();
     if let Some(res) = body.get("resources").and_then(|v| v.as_object()) {
         for (k, v) in res {
             let text = v.as_str().ok_or_else(|| bad(format!("resource `{k}` must be a base64 string")))?;
             let bytes = ferroreport::image::decode_base64(text).map_err(|e| bad(format!("resource `{k}`: {e}")))?;
-            r.add_resource(k, bytes);
+            resources.push((k.clone(), bytes));
         }
     }
-    let empty_rows = serde_json::Value::Array(Vec::new());
-    let empty_params = serde_json::Value::Object(Default::default());
-    let rows = body.get("data").unwrap_or(&empty_rows);
-    let params = body.get("params").unwrap_or(&empty_params);
-    let failed = |e: ferroreport::Error| match e {
-        ferroreport::Error::Limit(_) => (413, e.to_string()),
-        _ => (422, e.to_string()),
-    };
+    let flag = |name: &str| body.get(name).and_then(|v| v.as_bool()).unwrap_or(false);
     let started = Instant::now();
     let (report, cached) = state.cache.get(&source).map_err(failed)?;
     let counter = if cached { &state.metrics.cache_hits } else { &state.metrics.cache_misses };
     counter.fetch_add(1, Ordering::Relaxed);
-    let parse_ms = started.elapsed().as_secs_f64() * 1e3;
-    let records = ferroreport::data::records_from_json(&report, rows).map_err(failed)?;
-    let params = ferroreport::params_from_json(&report, params).map_err(failed)?;
-    let mut bytes = Vec::new();
-    let stats = r.render_to(&report, Box::new(records.into_iter().map(Ok)), params, format, &mut bytes).map_err(failed)?;
-    let render_ms = started.elapsed().as_secs_f64() * 1e3 - parse_ms;
-    Ok(Rendered { bytes, pages: stats.pages, rows: stats.rows, parse_ms, render_ms })
+    Ok(Job {
+        report,
+        parse_ms: started.elapsed().as_secs_f64() * 1e3,
+        locale: body.get("locale").and_then(|v| v.as_str()).unwrap_or("en_US").to_string(),
+        dirs,
+        resources,
+        now,
+        csv_safe: flag("csvSafe"),
+        xlsx_numbers: flag("xlsxNumbers"),
+        limits: cfg.limits,
+        params: body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default())),
+        format,
+    })
 }
 
-fn handle(state: &State, req: &mut Request) -> Reply {
+impl Job {
+    /// Renders the report with `rows` into `out`.
+    fn run<W: Write>(&self, rows: ferroreport::RowIter, out: W) -> Result<ferroreport::FillStats, (u16, String)> {
+        let mut r = Renderer::new()
+            .locale(&self.locale)
+            .limits(self.limits)
+            .csv_options(ferroreport::csv::CsvOptions { guard_formulas: self.csv_safe, ..Default::default() })
+            .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: self.xlsx_numbers });
+        for d in &self.dirs {
+            r = r.resource_dir(d);
+        }
+        if let Some(now) = self.now.as_deref().and_then(ferroreport::data::parse_datetime) {
+            r = r.now(now);
+        }
+        for (name, bytes) in &self.resources {
+            r.add_resource(name, bytes.clone());
+        }
+        let params = ferroreport::params_from_json(&self.report, &self.params).map_err(failed)?;
+        r.render_to(&self.report, rows, params, self.format, out).map_err(failed)
+    }
+}
+
+/// The rows of a request, owned so they can cross to another thread.
+enum OwnedRows {
+    Records(Vec<ferroreport::Record>),
+    /// One JSON object per line, kept in a spool.
+    Lines(Spool),
+}
+
+/// A piece of a document on its way to the client, or why there will be no more.
+enum Piece {
+    Data(Vec<u8>),
+    Failed(u16, String),
+}
+
+/// Sends what is written to it to the thread that answers the client, 64 KB at a time. A
+/// full channel makes the renderer wait (a slow client slows the render down instead of
+/// filling memory); a closed one means the client is gone, and stops it.
+///
+/// What has not filled a piece yet stays in `tail`, for the renderer's thread to send once
+/// the render has succeeded: a report that fails before its first piece is then answered
+/// with an ordinary error, not with the start of a document.
+struct ToClient {
+    tx: std::sync::mpsc::SyncSender<Piece>,
+    state: Arc<State>,
+    tail: Arc<std::sync::Mutex<Vec<u8>>>,
+}
+
+const PIECE: usize = 1 << 16;
+
+impl ToClient {
+    fn send(tx: &std::sync::mpsc::SyncSender<Piece>, state: &State, bytes: Vec<u8>) -> std::io::Result<()> {
+        let n = bytes.len() as u64;
+        tx.send(Piece::Data(bytes)).map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, GONE))?;
+        state.metrics.bytes_out.fetch_add(n, Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+impl Write for ToClient {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut tail = self.tail.lock().unwrap_or_else(|e| e.into_inner());
+        tail.extend_from_slice(buf);
+        if tail.len() >= PIECE {
+            let full = std::mem::replace(&mut *tail, Vec::with_capacity(PIECE));
+            Self::send(&self.tx, &self.state, full)?;
+        }
+        Ok(buf.len())
+    }
+
+    /// Nothing: pieces go out when they are full, and the last one when the render is done.
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A document on its way out while it renders: its first bytes, and where the rest arrives.
+struct Streamed {
+    format: ferroreport::Format,
+    first: Vec<u8>,
+    rx: std::sync::mpsc::Receiver<Piece>,
+}
+
+/// What a request is answered with.
+enum Outcome {
+    Reply(Reply),
+    Stream(Streamed),
+}
+
+impl Outcome {
+    fn status(&self) -> u16 {
+        match self {
+            Outcome::Reply(r) => r.status_code().0,
+            Outcome::Stream(_) => 200,
+        }
+    }
+}
+
+impl Streamed {
+    /// Writes the response by hand, in chunks, as the renderer produces them.
+    ///
+    /// By hand because of how it must end when the render fails half way: a chunked body is
+    /// only known to be complete by its last, empty chunk, and the HTTP library writes that
+    /// chunk whatever happened. Here a failure writes a line no client accepts as a chunk
+    /// instead, so that every client reports an error rather than a document that looks whole.
+    /// Returns whether the document went out complete.
+    fn send(self, mut out: Box<dyn Write + Send>) -> bool {
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nServer: ferroreport/{}\r\nDate: {}\r\nContent-Type: {}\r\nPreference-Applied: respond-streaming\r\n\
+             Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+            env!("CARGO_PKG_VERSION"),
+            httpdate::fmt_http_date(std::time::SystemTime::now()),
+            self.format.mime()
+        );
+        fn chunk(out: &mut dyn Write, bytes: &[u8]) -> std::io::Result<()> {
+            if bytes.is_empty() {
+                return Ok(());
+            }
+            write!(out, "{:x}\r\n", bytes.len())?;
+            out.write_all(bytes)?;
+            out.write_all(b"\r\n")?;
+            out.flush()
+        }
+        // An error here is the client closing the connection: dropping `rx` on the way out
+        // is what tells the renderer to stop.
+        if out.write_all(head.as_bytes()).is_err() || chunk(&mut out, &self.first).is_err() {
+            return false;
+        }
+        loop {
+            match self.rx.recv() {
+                Ok(Piece::Data(bytes)) => {
+                    if chunk(&mut out, &bytes).is_err() {
+                        return false;
+                    }
+                }
+                Ok(Piece::Failed(_, message)) => {
+                    let said: String = message.chars().filter(|c| !c.is_control()).take(300).collect();
+                    let _ = write!(out, "incomplete: {said}\r\n");
+                    let _ = out.flush();
+                    return false;
+                }
+                Err(_) => return out.write_all(b"0\r\n\r\n").and_then(|_| out.flush()).is_ok(),
+            }
+        }
+    }
+}
+
+fn typed(format: ferroreport::Format) -> Header {
+    Header::from_bytes("Content-Type", format.mime()).expect("static header")
+}
+
+/// Renders into a spool and answers with the whole document, or with an error and nothing
+/// else. `lines` are the rows still to be read from the request, when they come one per line.
+fn respond_whole(
+    state: &Arc<State>,
+    job: &Job,
+    body: &serde_json::Value,
+    lines: Option<&mut dyn Read>,
+) -> Result<Reply, (u16, String)> {
+    let rows: ferroreport::RowIter = match lines {
+        Some(reader) => Box::new(ferroreport::JsonRows::new(&job.report, reader).allow_empty()),
+        None => {
+            let empty = serde_json::Value::Array(Vec::new());
+            let records =
+                ferroreport::data::records_from_json(&job.report, body.get("data").unwrap_or(&empty)).map_err(failed)?;
+            Box::new(records.into_iter().map(Ok))
+        }
+    };
+    let started = Instant::now();
+    let mut spool = Spool::new(state.spool.clone(), "the document");
+    let stats = job.run(rows, &mut spool)?;
+    spool.rewind().map_err(|e| (500, e.to_string()))?;
+    let len = spool.len();
+    let m = &state.metrics;
+    m.renders_ok.fetch_add(1, Ordering::Relaxed);
+    m.pages.fetch_add(stats.pages as u64, Ordering::Relaxed);
+    m.rows.fetch_add(stats.rows as u64, Ordering::Relaxed);
+    m.bytes_out.fetch_add(len, Ordering::Relaxed);
+    let timing = format!("parse;dur={:.2}, render;dur={:.2}", job.parse_ms, started.elapsed().as_secs_f64() * 1e3);
+    let headers = vec![
+        typed(job.format),
+        Header::from_bytes("Server-Timing", timing).expect("ascii header"),
+        Header::from_bytes("X-Report-Pages", stats.pages.to_string()).expect("ascii header"),
+    ];
+    // With its length, whatever its size: a client can then tell a whole document from one cut short.
+    Ok(Response::new(StatusCode(200), headers, Box::new(spool) as Box<dyn Read + Send>, Some(len as usize), None)
+        .with_chunked_threshold(usize::MAX))
+}
+
+/// Renders on a thread of its own and answers with the document as it is produced. An error
+/// before the first bytes is answered as an error; one after them cuts the response short.
+fn respond_streaming(state: &Arc<State>, job: Job, rows: OwnedRows) -> Result<Streamed, Reply> {
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Piece>(8);
+    let format = job.format;
+    let shared = state.clone();
+    state.metrics.in_flight.fetch_add(1, Ordering::Relaxed);
+    let spawned = std::thread::Builder::new().name("render".into()).stack_size(32 * 1024 * 1024).spawn(move || {
+        let started = Instant::now();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let iter: ferroreport::RowIter = match rows {
+                OwnedRows::Records(records) => Box::new(records.into_iter().map(Ok)),
+                OwnedRows::Lines(spool) => Box::new(ferroreport::JsonRows::new(&job.report, spool).allow_empty()),
+            };
+            let tail = Arc::new(std::sync::Mutex::new(Vec::with_capacity(PIECE)));
+            let stats = job.run(iter, ToClient { tx: tx.clone(), state: shared.clone(), tail: tail.clone() })?;
+            let last = std::mem::take(&mut *tail.lock().unwrap_or_else(|e| e.into_inner()));
+            ToClient::send(&tx, &shared, last).map_err(|e| failed(ferroreport::Error::Io(e.to_string())))?;
+            Ok(stats)
+        }));
+        let m = &shared.metrics;
+        m.in_flight.fetch_sub(1, Ordering::Relaxed);
+        m.render_micros.fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
+        match result {
+            Ok(Ok(stats)) => {
+                m.renders_ok.fetch_add(1, Ordering::Relaxed);
+                m.pages.fetch_add(stats.pages as u64, Ordering::Relaxed);
+                m.rows.fetch_add(stats.rows as u64, Ordering::Relaxed);
+            }
+            Ok(Err((499, _))) => {
+                m.cancelled.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(Err((status, message))) => {
+                let counter = if status == 413 { &m.limited } else { &m.renders_failed };
+                counter.fetch_add(1, Ordering::Relaxed);
+                let _ = tx.send(Piece::Failed(status, message));
+            }
+            Err(_) => {
+                m.panics.fetch_add(1, Ordering::Relaxed);
+                let _ = tx.send(Piece::Failed(500, "internal error while rendering".into()));
+            }
+        }
+    });
+    if spawned.is_err() {
+        state.metrics.in_flight.fetch_sub(1, Ordering::Relaxed);
+        return Err(error(503, "cannot start another render now"));
+    }
+    let first = match rx.recv() {
+        Ok(Piece::Failed(status, message)) => return Err(error(status, message)),
+        Ok(Piece::Data(bytes)) => bytes,
+        Err(_) => Vec::new(),
+    };
+    state.metrics.streamed.fetch_add(1, Ordering::Relaxed);
+    Ok(Streamed { format, first, rx })
+}
+
+fn handle(state: &Arc<State>, req: &mut Request) -> Outcome {
+    let mut stream = None;
+    let reply = answer(state, req, &mut stream);
+    match stream {
+        Some(streamed) => Outcome::Stream(streamed),
+        None => Outcome::Reply(reply),
+    }
+}
+
+/// Answers a request; a document to be sent while it renders is left in `stream` instead.
+fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) -> Reply {
     let cfg = &state.cfg;
     let url = req.url().split('?').next().unwrap_or("").to_string();
     // Load balancers ask for /health without credentials; it says nothing but "ok".
@@ -350,30 +658,56 @@ fn handle(state: &State, req: &mut Request) -> Reply {
         }
     }
     match (req.method(), url.as_str()) {
-        (Method::Get, "/metrics") => Response::from_data(state.metrics.text().into_bytes())
-            .with_header(Header::from_bytes("Content-Type", "text/plain; version=0.0.4").expect("static header")),
+        (Method::Get, "/metrics") => Response::from_data(state.metrics.text(&state.spool).into_bytes())
+            .with_header(Header::from_bytes("Content-Type", "text/plain; version=0.0.4").expect("static header"))
+            .boxed(),
         (Method::Post, path) if path == "/render" || path.starts_with("/render/") || path == "/inspect" => {
-            if req.body_length().is_some_and(|n| n > cfg.max_body) {
+            let header = |name: &'static str| {
+                req.headers()
+                    .iter()
+                    .find(|h| h.field.equiv(name))
+                    .map(|h| h.value.as_str().to_ascii_lowercase())
+                    .unwrap_or_default()
+            };
+            // Rows one per line after a first line with everything else: read as they are needed.
+            let content_type = header("Content-Type");
+            let lines = ["application/x-ndjson", "application/jsonl", "application/x-jsonlines", "application/json-lines"]
+                .iter()
+                .any(|t| content_type.starts_with(t));
+            // A document can only be sent as it renders to a client that reads chunks (HTTP/1.1).
+            let streaming = header("Prefer").contains("respond-streaming") && *req.http_version() >= tiny_http::HTTPVersion(1, 1);
+            let length = req.body_length();
+            let query = req.url().split_once('?').map(|(_, q)| q.to_string()).unwrap_or_default();
+            if !lines && length.is_some_and(|n| n > cfg.max_body) {
                 return error(413, "request body too large");
             }
-            let mut buf = Vec::new();
             // Read what the request says it carries, not "until the connection ends": a client
             // that offers to switch protocols (Java's HttpClient offers HTTP/2 on every first
             // request) keeps the connection open, and waiting for its end would never return.
-            let limit = match req.body_length() {
+            let limit = match length {
                 Some(n) => n as u64,
+                None if header("Connection").contains("upgrade") => return error(411, "send a Content-Length with this request"),
+                None if lines => u64::MAX,
                 None => cfg.max_body as u64 + 1,
             };
-            if req.as_reader().take(limit).read_to_end(&mut buf).is_err() {
+            let mut reader = std::io::BufReader::with_capacity(1 << 16, req.as_reader().take(limit));
+            let mut head = Vec::new();
+            let read = if lines {
+                (&mut reader).take(cfg.max_body as u64 + 1).read_until(b'\n', &mut head)
+            } else {
+                reader.read_to_end(&mut head)
+            };
+            if read.is_err() {
                 return error(400, "cannot read request body");
             }
-            if buf.len() > cfg.max_body {
-                return error(413, "request body too large");
+            if head.len() > cfg.max_body {
+                return error(413, if lines { "the first line of the request is too large" } else { "request body too large" });
             }
-            let body: serde_json::Value = match serde_json::from_slice(&buf) {
+            let body: serde_json::Value = match serde_json::from_slice(&head) {
                 Ok(v) => v,
                 Err(e) => return error(400, format!("invalid JSON: {e}")),
             };
+            drop(head);
             if path == "/inspect" {
                 let Some(t) = body.get("template").and_then(|v| v.as_str()) else {
                     return error(400, "send `template`");
@@ -393,7 +727,6 @@ fn handle(state: &State, req: &mut Request) -> Reply {
             }
             let name = path.strip_prefix("/render/").map(|n| n.trim_matches('/'));
             // `format` in the body, or `?format=` in the URL; PDF by default.
-            let query = req.url().split_once('?').map(|(_, q)| q.to_string()).unwrap_or_default();
             let requested = body
                 .get("format")
                 .and_then(|v| v.as_str())
@@ -407,28 +740,48 @@ fn handle(state: &State, req: &mut Request) -> Reply {
                 },
             };
             let m = &state.metrics;
+            let refuse = |(status, message): (u16, String)| {
+                let counter = if status == 413 { &m.limited } else { &m.renders_failed };
+                counter.fetch_add(1, Ordering::Relaxed);
+                error(status, message)
+            };
+            let job = match prepare(state, &body, name, format) {
+                Ok(job) => job,
+                Err(e) => return refuse(e),
+            };
+            if streaming {
+                // The response starts while the report renders, and a request cannot be read
+                // and answered at once: its rows are set aside first (on disk when large).
+                let rows = if lines {
+                    let mut spool = Spool::new(state.spool.clone(), "the request");
+                    if let Err(e) = std::io::copy(&mut reader, &mut spool).and_then(|_| spool.rewind()) {
+                        let status = if e.to_string().contains("--spool") { 507 } else { 400 };
+                        return refuse((status, e.to_string()));
+                    }
+                    OwnedRows::Lines(spool)
+                } else {
+                    let empty = serde_json::Value::Array(Vec::new());
+                    match ferroreport::data::records_from_json(&job.report, body.get("data").unwrap_or(&empty)) {
+                        Ok(records) => OwnedRows::Records(records),
+                        Err(e) => return refuse(failed(e)),
+                    }
+                };
+                return match respond_streaming(state, job, rows) {
+                    Ok(streamed) => {
+                        *stream = Some(streamed);
+                        json(200, serde_json::Value::Null)
+                    }
+                    Err(reply) => reply,
+                };
+            }
             m.in_flight.fetch_add(1, Ordering::Relaxed);
             let started = Instant::now();
-            let result = render(state, &body, name, format);
+            let result = respond_whole(state, &job, &body, if lines { Some(&mut reader) } else { None });
             m.in_flight.fetch_sub(1, Ordering::Relaxed);
             m.render_micros.fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
             match result {
-                Ok(done) => {
-                    m.renders_ok.fetch_add(1, Ordering::Relaxed);
-                    m.pages.fetch_add(done.pages as u64, Ordering::Relaxed);
-                    m.rows.fetch_add(done.rows as u64, Ordering::Relaxed);
-                    m.bytes_out.fetch_add(done.bytes.len() as u64, Ordering::Relaxed);
-                    let timing = format!("parse;dur={:.2}, render;dur={:.2}", done.parse_ms, done.render_ms);
-                    Response::from_data(done.bytes)
-                        .with_header(Header::from_bytes("Content-Type", format.mime()).expect("static header"))
-                        .with_header(Header::from_bytes("Server-Timing", timing).expect("ascii header"))
-                        .with_header(Header::from_bytes("X-Report-Pages", done.pages.to_string()).expect("ascii header"))
-                }
-                Err((status, message)) => {
-                    let counter = if status == 413 { &m.limited } else { &m.renders_failed };
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    error(status, message)
-                }
+                Ok(reply) => reply,
+                Err(e) => refuse(e),
             }
         }
         _ => error(404, "not found: use POST /render, POST /render/<name>, POST /inspect, GET /health or GET /metrics"),
@@ -455,12 +808,31 @@ pub fn check(cfg: &Config) -> Result<(), String> {
 
 pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
     check(&cfg)?;
-    let server = Arc::new(Server::http(&cfg.addr).map_err(|e| format!("{}: {e}", cfg.addr))?);
+    let listener = std::net::TcpListener::bind(&cfg.addr).map_err(|e| format!("{}: {e}", cfg.addr))?;
+    // Answers leave as soon as they are written. Without this the system holds the end of a
+    // response back until the client acknowledges its start, which a client puts off for
+    // 40 ms: every report asked for over a connection that is kept open took that much longer.
+    // Connections take the setting from the socket they are accepted on.
+    let _ = socket2::SockRef::from(&listener).set_tcp_nodelay(true);
+    let server = Arc::new(Server::from_listener(listener, None).map_err(|e| format!("{}: {e}", cfg.addr))?);
     eprintln!("ferroreport {} listening on http://{}", env!("CARGO_PKG_VERSION"), cfg.addr);
+    // Where documents wait until they are complete once they outgrow memory.
+    let spool_dir = match &cfg.spool_dir {
+        Some(dir) if crate::spool::writable(dir) => Some(dir.clone()),
+        Some(dir) => return Err(format!("--spool-dir {}: cannot write there", dir.display()).into()),
+        None => Some(std::env::temp_dir()).filter(|d| crate::spool::writable(d)),
+    };
+    if spool_dir.is_none() {
+        eprintln!(
+            "note: no writable temporary directory: documents over {} MB will be refused. Set --spool-dir to allow them.",
+            cfg.spool_memory / (1024 * 1024)
+        );
+    }
     let state = Arc::new(State {
         cache: TemplateCache::new(cfg.cache),
         metrics: Metrics::default(),
         limiter: RateLimiter::default(),
+        spool: Arc::new(SpoolLimits::new(cfg.spool_memory, spool_dir, cfg.spool_disk)),
         cfg,
     });
     let workers: Vec<_> = (0..state.cfg.workers.max(1))
@@ -474,21 +846,28 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
                     while let Ok(mut req) = server.recv() {
                         // A bug must not take the worker down with it: answer 500 and go on.
                         let started = Instant::now();
-                        let reply = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&state, &mut req)))
+                        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&state, &mut req)))
                             .unwrap_or_else(|_| {
                                 state.metrics.panics.fetch_add(1, Ordering::Relaxed);
-                                error(500, "internal error while rendering")
+                                Outcome::Reply(error(500, "internal error while rendering"))
                             });
                         if state.cfg.access_log {
                             eprintln!(
                                 "{} {} {} {:.1}ms",
                                 req.method(),
                                 req.url().split('?').next().unwrap_or(""),
-                                reply.status_code().0,
+                                outcome.status(),
                                 started.elapsed().as_secs_f64() * 1e3
                             );
                         }
-                        let _ = req.respond(reply);
+                        match outcome {
+                            Outcome::Reply(reply) => {
+                                let _ = req.respond(reply);
+                            }
+                            Outcome::Stream(streamed) => {
+                                streamed.send(req.into_writer());
+                            }
+                        }
                     }
                 })
                 .expect("spawn worker")
@@ -503,6 +882,56 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What `Streamed::send` wrote, for a render that produced `pieces`.
+    fn sent(pieces: Vec<Piece>) -> (bool, String) {
+        #[derive(Clone, Default)]
+        struct Wire(Arc<Mutex<Vec<u8>>>);
+        impl Write for Wire {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let (tx, rx) = std::sync::mpsc::sync_channel(pieces.len() + 1);
+        for p in pieces {
+            tx.send(p).unwrap();
+        }
+        drop(tx);
+        let wire = Wire::default();
+        let whole = Streamed { format: ferroreport::Format::Csv, first: b"a,b\n".to_vec(), rx }.send(Box::new(wire.clone()));
+        let text = String::from_utf8(wire.0.lock().unwrap().clone()).unwrap();
+        (whole, text)
+    }
+
+    #[test]
+    fn a_streamed_document_ends_with_the_last_chunk_only_when_it_is_whole() {
+        let (whole, text) = sent(vec![Piece::Data(b"1,2\n".to_vec())]);
+        assert!(whole);
+        assert!(text.starts_with("HTTP/1.1 200 OK\r\n"), "{text}");
+        assert!(text.contains("Transfer-Encoding: chunked\r\n") && text.contains("Preference-Applied: respond-streaming\r\n"));
+        assert!(text.ends_with("\r\n\r\n4\r\na,b\n\r\n4\r\n1,2\n\r\n0\r\n\r\n"), "{text:?}");
+
+        // A render that fails half way: no last chunk, and a line that is not a chunk size,
+        // so that a client reports an error instead of a short document.
+        let (whole, text) = sent(vec![Piece::Data(b"1,2\n".to_vec()), Piece::Failed(422, "row 7\r\nis wrong".into())]);
+        assert!(!whole);
+        assert!(text.ends_with("4\r\n1,2\n\r\nincomplete: row 7is wrong\r\n"), "{text:?}");
+        assert!(!text.contains("0\r\n\r\n"));
+    }
+
+    #[test]
+    fn errors_are_answered_with_the_status_that_says_whose_they_are() {
+        use ferroreport::Error;
+        assert_eq!(status_of(&Error::Limit("too many pages".into())), 413);
+        assert_eq!(status_of(&Error::Io(format!("the document {}", crate::spool::NO_DIR))), 507);
+        assert_eq!(status_of(&Error::Io(format!("the document {}", crate::spool::DISK_FULL))), 507);
+        assert_eq!(status_of(&Error::Io(GONE.into())), 499);
+        assert_eq!(status_of(&Error::Data("row 3 is not an object".into())), 422);
+    }
 
     #[test]
     fn secrets_compare_exactly() {
@@ -546,6 +975,9 @@ mod tests {
             access_log: false,
             allow_anonymous,
             rate_limit: None,
+            spool_memory: 1 << 20,
+            spool_dir: None,
+            spool_disk: 1 << 30,
         }
     }
 
@@ -579,7 +1011,7 @@ mod tests {
         let m = Metrics::default();
         m.renders_ok.fetch_add(3, Ordering::Relaxed);
         m.render_micros.fetch_add(1_500_000, Ordering::Relaxed);
-        let text = m.text();
+        let text = m.text(&SpoolLimits::new(0, None, 0));
         assert!(text.contains("# TYPE ferroreport_renders_total counter\nferroreport_renders_total 3\n"), "{text}");
         assert!(text.contains("ferroreport_render_seconds_total 1.500000\n"), "{text}");
     }

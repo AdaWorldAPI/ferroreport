@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "base64",
  "chrono",
@@ -214,16 +214,18 @@ dependencies = [
 
 [[package]]
 name = "ferroreport-cli"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "ferroreport",
+ "httpdate",
  "serde_json",
+ "socket2",
  "tiny_http",
 ]
 
 [[package]]
 name = "ferroreport-python"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "chrono",
  "ferroreport",
@@ -233,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "ferroreport-wasm"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "ferroreport",
  "js-sys",
@@ -797,6 +799,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
 
 [[package]]
+name = "socket2"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
+dependencies = [
+ "libc",
+ "windows-sys",
+]
+
+[[package]]
 name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1056,6 +1068,15 @@ name = "windows-strings"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
+dependencies = [
+ "windows-link",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.61.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
 ]

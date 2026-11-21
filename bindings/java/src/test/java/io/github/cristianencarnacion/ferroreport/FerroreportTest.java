@@ -53,6 +53,31 @@ public class FerroreportTest {
         return rows;
     }
 
+    /** `count` rows made as they are asked for; the one at `failAt` throws. */
+    private static Iterable<Map<String, Object>> people(int count, int failAt) {
+        return () -> new java.util.Iterator<Map<String, Object>>() {
+            private int i;
+
+            @Override
+            public boolean hasNext() {
+                return i < count;
+            }
+
+            @Override
+            public Map<String, Object> next() {
+                if (i == failAt) {
+                    throw new IllegalStateException("row " + i + " failed");
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", ++i);
+                row.put("name", "Person " + i);
+                row.put("department", "Engineering");
+                row.put("salary", 1000.5 + i);
+                return row;
+            }
+        };
+    }
+
     private static Report invoice(Ferroreport engine) {
         return filled(engine.template(FIXTURES.resolve("02-invoice/report.jrxml")));
     }
@@ -293,6 +318,23 @@ public class FerroreportTest {
                     .build(),
                 java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(plain.body(), 200, plain.statusCode());
+            // Rows that are never in memory together: made one by one here, read one by one there.
+            Path large = FIXTURES.resolve("09-large/report.jrxml");
+            int[] lines = {0};
+            java.io.OutputStream counting = new java.io.OutputStream() {
+                @Override
+                public void write(int b) {
+                    lines[0] += b == '\n' ? 1 : 0;
+                }
+            };
+            remote.template(large).rows(people(200_000, -1)).format(Format.CSV).renderTo(counting);
+            assertTrue("lines: " + lines[0], lines[0] > 200_000);
+            // Rows that stop half way: the error is the rows', and no document comes back.
+            FerroreportException broken = assertThrows(FerroreportException.class, () -> remote.template(large).rows(people(200_000, 50_000)).render());
+            assertTrue(broken.getMessage(), broken.getMessage().contains("cannot read the rows: row 50000 failed"));
+            // An answer that comes before the rows have all been sent is still the server's answer.
+            FerroreportException early = assertThrows(FerroreportException.class, () -> remote.source("<jasperReport").rows(people(200_000, -1)).render());
+            assertTrue(early.getMessage(), early.getMessage().contains("XML"));
             FerroreportException denied = assertThrows(FerroreportException.class, () -> invoice(Ferroreport.server(URI.create("http://127.0.0.1:" + port), "wrong")).render());
             assertTrue(denied.getMessage(), denied.getMessage().contains("token"));
         } finally {

@@ -163,6 +163,9 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>--max-pages &lt;n&gt;</code></td><td></td><td>Most pages a report may have. Default: no limit</td></tr>
         <tr><td><code>--cache &lt;n&gt;</code></td><td></td><td>Parsed templates kept in memory, so a template sent again is not parsed again. Default 128; <code>0</code> for none</td></tr>
         <tr><td><code>--access-log</code></td><td></td><td>Prints a line per request: method, path, status and time</td></tr>
+        <tr><td><code>--spool-memory &lt;MB&gt;</code></td><td><code>FERROREPORT_SPOOL_MEMORY</code></td><td>How much of one document is kept in memory until it is complete; the rest goes to a file. Default 32</td></tr>
+        <tr><td><code>--spool-dir &lt;dir&gt;</code></td><td><code>FERROREPORT_SPOOL_DIR</code></td><td>Where those files go. Default: the system's temporary directory (<code>/tmp</code> in the Docker image)</td></tr>
+        <tr><td><code>--spool-disk &lt;MB&gt;</code></td><td><code>FERROREPORT_SPOOL_DISK</code></td><td>Disk all requests together may use for them. Default 4096</td></tr>
       </table>
 
       <h2 id="http">HTTP API (any language)</h2>
@@ -176,13 +179,13 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>POST /render/&lt;name&gt;</code></td><td>Renders <code>&lt;name&gt;.jrxml</code> from the templates directory (subfolders allowed: <code>/render/sales/invoice</code>)</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /render</code></td><td>Renders the template sent in the request</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /inspect</code></td><td>Reports a template's parameters, fields and unsupported features</td><td>JSON</td></tr>
-        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.8.0"}</code></td></tr>
-        <tr><td><code>GET /metrics</code></td><td>Counters for Prometheus: renders, errors, renders stopped by a limit, time spent, pages, rows, bytes sent, template cache hits and misses, renders in flight</td><td>Prometheus text</td></tr>
+        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.9.0"}</code></td></tr>
+        <tr><td><code>GET /metrics</code></td><td>Counters for Prometheus: renders, errors, renders stopped by a limit, renders stopped because the client left, documents sent as they rendered, time spent, pages, rows, bytes sent, template cache hits and misses, renders in flight, disk in use for documents</td><td>Prometheus text</td></tr>
       </table>
       <p>The request body is JSON:</p>
       <table>
         <tr><th>Key</th><th>Meaning</th></tr>
-        <tr><td><code>data</code></td><td>Array of rows</td></tr>
+        <tr><td><code>data</code></td><td>Array of rows. For more rows than you want in memory, send them <a href="#http-large">one per line</a> instead</td></tr>
         <tr><td><code>params</code></td><td>Object of parameter values</td></tr>
         <tr><td><code>locale</code></td><td><code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>now</code></td><td>Fixed value of <code>new Date()</code>, ISO-8601</td></tr>
@@ -193,11 +196,13 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>templateName</code></td><td><code>POST /render</code> only: a template from the templates directory, instead of <code>template</code></td></tr>
       </table>
       <p>Errors come back as <code>{"error": "what went wrong"}</code> with one of these statuses: <code>400</code> the request is malformed,
-        <code>401</code> the token is missing or wrong, <code>404</code> the template does not exist, <code>413</code> the body is too large
-        or the render went over the page or time limit, <code>429</code> the client asked too often (<code>--rate-limit</code>), <code>422</code> the template or its data cannot be rendered.</p>
-      <p>Every rendered document comes with two headers: <code>Server-Timing</code> (milliseconds spent parsing the template, 0 when it
-        came from the cache, and rendering) and <code>X-Report-Pages</code>. The server warns at start-up if it listens beyond
-        localhost without a token.</p>
+        <code>401</code> the token is missing or wrong, <code>404</code> the template does not exist, <code>411</code> the request has no
+        <code>Content-Length</code> and asks to switch protocols, <code>413</code> the body is too large
+        or the render went over the page or time limit, <code>429</code> the client asked too often (<code>--rate-limit</code>), <code>422</code> the template or its data cannot be rendered,
+        <code>507</code> the document is too large for the memory and disk the server may use (<code>--spool-memory</code>, <code>--spool-dir</code>, <code>--spool-disk</code>).</p>
+      <p>A document is sent only once it is complete, with its <code>Content-Length</code>: the answer is the whole document or an error,
+        never part of one. It comes with two more headers: <code>Server-Timing</code> (milliseconds spent parsing the template, 0 when it
+        came from the cache, and rendering) and <code>X-Report-Pages</code>.</p>
 <pre># curl
 curl -X POST localhost:8080/render/invoice \
   -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \
@@ -225,6 +230,46 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
 ]);
 $pdf = curl_exec($ch);</pre>
+
+      <h3 id="http-large">Large reports over HTTP</h3>
+      <p>Two things can be changed, each on its own, for reports with more rows than you want in memory.</p>
+      <p><b>Rows one per line.</b> Send <code>Content-Type: application/x-ndjson</code> with the request (everything in the table above
+        except <code>data</code>) on the first line, and one row per line after it. The server reads the rows as the report asks for them,
+        so neither side holds them all: a million rows render with the server at about 45 MB. Send them straight from a query:</p>
+<pre># rows.ndjson
+{"params": {"YEAR": 2026}}
+{"sku": "FX-1000", "qty": 21, "price": "185.00"}
+{"sku": "FX-2000", "qty": 4, "price": "92.50"}
+
+curl -X POST localhost:8080/render/sales -H 'Authorization: Bearer change-me' \
+  -H 'Content-Type: application/x-ndjson' -T rows.ndjson -o sales.pdf
+
+# or without a file, as the database produces them
+psql -At -c "select row_to_json(s) from sales s" | { echo '{"params": {"YEAR": 2026}}'; cat; } | \
+  curl -X POST localhost:8080/render/sales -H 'Authorization: Bearer change-me' \
+    -H 'Content-Type: application/x-ndjson' -T - -o sales.pdf</pre>
+      <p>The first line may be as large as <code>--max-body</code>; the rows have no limit of their own (<code>--timeout</code> and
+        <code>--max-pages</code> are what stop a report that is too large).</p>
+      <p><b>The document as it renders.</b> By default the server keeps the document until it is complete (in memory up to
+        <code>--spool-memory</code>, then in a file), so that an error is always an error and never half a PDF. Add
+        <code>Prefer: respond-streaming</code> and the document is sent while it renders instead: the first bytes arrive in a fraction of
+        a second, however long the report is, and nothing is kept on the server. The answer says so with
+        <code>Preference-Applied: respond-streaming</code>.</p>
+      <table>
+        <tr><th></th><th>Default</th><th><code>Prefer: respond-streaming</code></th></tr>
+        <tr><td>First byte</td><td>When the report is finished</td><td>At once</td></tr>
+        <tr><td>An error while rendering</td><td>An error status and <code>{"error": ...}</code>; no document</td><td>Before the first 64 KB: the same. After that the status is already <code>200</code>, so the response is cut short in a way every HTTP client reports as an error (curl exits with 56, Java throws <code>IOException</code>, Python raises <code>IncompleteRead</code>). Never keep a file whose download failed</td></tr>
+        <tr><td>The client goes away</td><td>The render runs to its end or to <code>--timeout</code></td><td>The render stops within milliseconds</td></tr>
+        <tr><td>Headers</td><td><code>Content-Length</code>, <code>X-Report-Pages</code>, <code>Server-Timing</code></td><td><code>Transfer-Encoding: chunked</code></td></tr>
+        <tr><td>Server memory and disk</td><td>The document, up to <code>--spool-memory</code>; the rest on disk</td><td>None for the document. Rows sent one per line are put aside first (a request cannot be read while it is being answered)</td></tr>
+      </table>
+      <p>Both give the same bytes. Use the default unless you need the first bytes early (a browser download of a long report, a
+        gateway with a short time-out) or want abandoned downloads to stop costing work. In Docker the files go to <code>/tmp</code>,
+        which the image provides; with a read-only root filesystem, mount a volume there or set <code>FERROREPORT_SPOOL_DIR</code>.
+        Without a place to write, documents over <code>--spool-memory</code> are answered with <code>507</code>.</p>
+      <p>These promises are checked on every change by <a href="https://github.com/cristianEncarnacion/ferroreport/blob/main/tools/http_check.py"><code>tools/http_check.py</code></a>:
+        a million rows, 50 clients at once, a client that leaves half way, a wrong row in each mode, and the same bytes as the command
+        line for every test report.</p>
 
       <h2 id="js">JavaScript</h2>
       <p>For Node.js 18+, Deno, Bun and browsers. The engine is WebAssembly: no native build step, no JVM.</p>
@@ -323,7 +368,7 @@ def invoice_pdf(pk: int):
 &lt;dependency&gt;
   &lt;groupId&gt;com.github.cristianEncarnacion&lt;/groupId&gt;
   &lt;artifactId&gt;ferroreport&lt;/artifactId&gt;
-  &lt;version&gt;v0.8.0&lt;/version&gt;
+  &lt;version&gt;v0.9.0&lt;/version&gt;
 &lt;/dependency&gt;</pre>
 <pre>Ferroreport reports = Ferroreport.local();
 
@@ -346,7 +391,7 @@ StreamingOutput body = out -&gt; reports.template(Path.of("reports/invoice.jrxml
       <table>
         <tr><th>Call</th><th>Does</th></tr>
         <tr><td><code>Ferroreport.local()</code>, <code>local(Path)</code></td><td>The engine on this machine. It is found through <code>-Dferroreport.bin</code> or <code>FERROREPORT_BIN</code>, then the <code>PATH</code>, and otherwise downloaded once from the project's releases and checked against their SHA-256 list (<code>-Dferroreport.download=false</code> forbids that)</td></tr>
-        <tr><td><code>Ferroreport.server(URI, token)</code></td><td>A <code>ferroreport serve</code> instance, for a sidecar or a shared service</td></tr>
+        <tr><td><code>Ferroreport.server(URI, token)</code></td><td>A <code>ferroreport serve</code> instance (0.9.0 or later), for a sidecar or a shared service. Rows are sent to it one per line as they are read, so a large <code>ResultSet</code> is never in memory on either side, and the answer is the whole document or an exception</td></tr>
         <tr><td><code>.template(Path)</code>, <code>.source(String)</code>, <code>.named(String)</code></td><td>A report from a file, from JRXML text, or by the name a server knows it by</td></tr>
         <tr><td><code>.rows(Iterable)</code>, <code>.rows(ResultSet)</code></td><td>The rows, read one at a time: Maps of field name to value (nested Maps and Lists feed subreports and tables), or the columns of a query</td></tr>
         <tr><td><code>.param</code>, <code>.params</code>, <code>.locale</code>, <code>.now</code>, <code>.format</code>, <code>.resources</code></td><td>Parameters, formatting locale, the value of <code>new Date()</code>, output format, extra folders for images and subreports</td></tr>
@@ -501,7 +546,9 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td>Command line</td><td>Nothing to do: <code>ferroreport render sales.jrxml -d sales.json -o sales.pdf</code> already reads and writes as it goes. The rows can be a JSON array or one object per line, from a file or from standard input</td></tr>
         <tr><td>Python</td><td><code>render_to_file("sales.jrxml", "sales.pdf", data_file="sales.jsonl")</code></td></tr>
         <tr><td>Rust</td><td><code>renderer.render_to(&amp;report, Box::new(rows), params, Format::Pdf, writer)</code>, where <code>rows</code> is any iterator of records (a database cursor, a queue, <code>JsonRows</code> over a file)</td></tr>
-        <tr><td>HTTP, JavaScript</td><td>Rows arrive in the request or the call, so they are in memory; the document is still built page by page</td></tr>
+        <tr><td>HTTP</td><td>Send the rows <a href="#http-large">one per line</a> (<code>application/x-ndjson</code>): they are read as the report needs them</td></tr>
+        <tr><td>Java</td><td><code>.rows(resultSet)</code> or any <code>Iterable</code>: rows go to the engine (a local process or a server) as they are read</td></tr>
+        <tr><td>JavaScript</td><td>Rows arrive in the call, so they are in memory; the document is still built page by page</td></tr>
       </table>
       <p>What this covers, and what it does not:</p>
       <ul>

@@ -140,6 +140,8 @@ pub struct JsonRows<R: std::io::Read> {
     fields: Vec<crate::model::Field>,
     keep_row: bool,
     done: bool,
+    /// No text at all means no rows, instead of an error.
+    empty_ok: bool,
 }
 
 #[derive(PartialEq)]
@@ -162,7 +164,15 @@ impl<R: std::io::Read> JsonRows<R> {
             fields: report.fields.clone(),
             keep_row: report.uses_data_source,
             done: false,
+            empty_ok: false,
         }
+    }
+
+    /// Takes text with nothing in it as no rows. For rows that follow something else (the
+    /// lines after the first one of a request): a report without data has none.
+    pub fn allow_empty(mut self) -> JsonRows<R> {
+        self.empty_ok = true;
+        self
     }
 
     /// Drops what was consumed and reads more text.
@@ -196,6 +206,7 @@ impl<R: std::io::Read> JsonRows<R> {
                 return match self.shape {
                     Shape::Array => Err(Error::Data("the JSON array of rows is not closed".into())),
                     Shape::Lines => Ok(None),
+                    Shape::Unknown if self.empty_ok => Ok(None),
                     Shape::Unknown => Err(Error::Data("expected a JSON array of objects".into())),
                 };
             }

@@ -80,25 +80,52 @@ jobs:
       - run: bindings/wasm/build.sh
       - run: node bindings/wasm/tests/smoke.mjs
 
+  # What the server promises about large reports (tools/http_check.py says what).
+  http:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p ferroreport-cli
+      - run: python3 tools/http_check.py --rows 100000 --clients 20
+
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - run: docker build -t ferroreport:ci .
+      - name: Build the image releases publish, from the same binary
+        run: |
+          mkdir -p dist
+          docker create --name bin ferroreport:ci
+          docker cp bin:/ferroreport dist/ferroreport-linux-amd64
+          docker rm bin
+          docker build -t ferroreport:release -f Dockerfile.release .
       - name: Smoke-test the HTTP API
         run: |
           # Without a token the server refuses to listen beyond localhost.
           if docker run --rm ferroreport:ci; then echo 'started without a token'; exit 1; fi
-          docker run -d --name fr -p 8080:8080 -e FERROREPORT_TOKEN=ci-secret ferroreport:ci
-          for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
-          python3 - <<'EOF'
+          for image in ferroreport:ci ferroreport:release; do
+            # No memory for documents: every one goes through a file, which proves that the
+            # image has somewhere to write (it is built from nothing, as a user that is not root).
+            docker run -d --name fr -p 8080:8080 -e FERROREPORT_TOKEN=ci-secret -e FERROREPORT_SPOOL_MEMORY=0 $image
+            for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
+            python3 - <<'EOF'
           import json, urllib.request
           tpl = open("fixtures/01-employee-list/report.jrxml").read()
           data = json.load(open("fixtures/01-employee-list/data.json"))
-          req = urllib.request.Request("http://localhost:8080/render", method="POST",
-              data=json.dumps({"template": tpl, "data": data}).encode(),
-              headers={"Content-Type": "application/json", "Authorization": "Bearer ci-secret"})
-          pdf = urllib.request.urlopen(req).read()
-          assert pdf.startswith(b"%PDF"), pdf[:200]
-          print("ok", len(pdf))
+          def render(body, kind, **more):
+              req = urllib.request.Request("http://localhost:8080/render", method="POST", data=body,
+                  headers={"Content-Type": kind, "Authorization": "Bearer ci-secret", **more})
+              return urllib.request.urlopen(req).read()
+          whole = render(json.dumps({"template": tpl, "now": "2026-01-15T10:30:00", "data": data}).encode(), "application/json")
+          assert whole.startswith(b"%PDF"), whole[:200]
+          lines = (json.dumps({"template": tpl, "now": "2026-01-15T10:30:00"}) + "\n" + "".join(json.dumps(r) + "\n" for r in data)).encode()
+          assert render(lines, "application/x-ndjson") == whole
+          assert render(lines, "application/x-ndjson", Prefer="respond-streaming") == whole
+          print("ok", len(whole))
           EOF
+            docker logs fr 2>&1 | tail -5
+            if docker logs fr 2>&1 | grep -q 'no writable temporary directory'; then echo 'the image has nowhere to write'; exit 1; fi
+            docker rm -f fr
+          done

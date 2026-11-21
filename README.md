@@ -99,6 +99,13 @@ without a token (`FERROREPORT_TOKEN`), unless you say the port is private
 (`FERROREPORT_ALLOW_ANONYMOUS=1`); `--rate-limit` caps the requests per minute of one client. Templates are parsed once and cached, and every render runs under a time limit (60 s
 unless you change `--timeout`) and, if you set `--max-pages`, a page limit.
 
+For reports with more rows than you want in memory, send them one per line
+(`Content-Type: application/x-ndjson`: the request on the first line, a row on each line after
+it) and the server reads them as the report needs them: a million rows with the server at
+about 45 MB. The answer is the whole document or an error, never half a PDF; add
+`Prefer: respond-streaming` to get it as it renders instead (first bytes at once, and a client
+that leaves stops the render). [How both work](https://cristianencarnacion.github.io/ferroreport/docs.html#http-large).
+
 **Rust**: `cargo add ferroreport` (example below). **Command line**: download a binary from
 [Releases](https://github.com/cristianEncarnacion/ferroreport/releases) or `cargo install
 ferroreport-cli`; `-d -` and `-o -` read rows from stdin and write the PDF to stdout, which

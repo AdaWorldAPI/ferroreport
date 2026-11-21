@@ -17,6 +17,8 @@ name = "ferroreport"
 path = "src/main.rs"
 
 [dependencies]
-ferroreport = { path = "../ferroreport", version = "0.8.0" }
+ferroreport = { path = "../ferroreport", version = "0.9.0" }
 serde_json = "1"
 tiny_http = "0.12"
+httpdate = "1"
+socket2 = "0.6"

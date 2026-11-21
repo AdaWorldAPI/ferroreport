@@ -1,0 +1,114 @@
+{
+  "rows_whole": {
+    "rows": 1000000,
+    "seconds": 12.4,
+    "first_byte_seconds": 12.34,
+    "peak_mib": 44.0,
+    "bytes": 60967423,
+    "sha256": "950045dfcb34ddf129280049be4bb7349fbb2e59dc7b417ff47cf46a5af46504"
+  },
+  "rows_as_it_renders": {
+    "rows": 1000000,
+    "seconds": 12.24,
+    "first_byte_seconds": 0.38,
+    "peak_mib": 45.3,
+    "bytes": 60967423,
+    "sha256": "950045dfcb34ddf129280049be4bb7349fbb2e59dc7b417ff47cf46a5af46504"
+  },
+  "clients": {
+    "clients": 50,
+    "rows_each": 20000,
+    "seconds": 8.87,
+    "peak_mib": 36.9,
+    "peak_disk_mib": 0.0
+  },
+  "clients_on_disk": {
+    "clients": 50,
+    "rows_each": 20000,
+    "seconds": 7.94,
+    "peak_mib": 32.6,
+    "peak_disk_mib": 1.7
+  },
+  "post_render_ms": {
+    "02-invoice": 3.237,
+    "01-employee-list": 2.402,
+    "03-grouped-sales": 5.048
+  },
+  "post_render_ms_against": {
+    "02-invoice": 44.308,
+    "01-employee-list": 44.015,
+    "03-grouped-sales": 48.02
+  },
+  "checks": [
+    {
+      "check": "same documents",
+      "ok": true,
+      "detail": "272 requests, all equal to the command line's output"
+    },
+    {
+      "check": "a wrong row, answer whole",
+      "ok": true,
+      "detail": "HTTP 422 {\"error\":\"invalid data: row 19990: key must be a string at line 1 column 2\"}"
+    },
+    {
+      "check": "a wrong row, answer as it renders",
+      "ok": true,
+      "detail": "the client reports an incomplete response (IncompleteRead)"
+    },
+    {
+      "check": "a wrong first row, answer as it renders",
+      "ok": true,
+      "detail": "HTTP 422 {\"error\":\"invalid data: row 0: key must be a string at line 1 column 2\"}"
+    },
+    {
+      "check": "nothing left behind after errors",
+      "ok": true,
+      "detail": "no disk in use"
+    },
+    {
+      "check": "a client leaves half way",
+      "ok": true,
+      "detail": "the render stopped 54 ms later, with nothing left on disk"
+    },
+    {
+      "check": "no directory to write to",
+      "ok": true,
+      "detail": "large: HTTP 507 {\"error\":\"cannot write the output: the document is larger th...; small reports: HTTP 200"
+    },
+    {
+      "check": "over the disk budget",
+      "ok": true,
+      "detail": "HTTP 507 {\"error\":\"cannot write the output: the document does not fit...; the space was given back"
+    },
+    {
+      "check": "1,000,000 rows, answer whole",
+      "ok": true,
+      "detail": "12.4 s, first byte at 12.3 s, 61 MB of PDF, server peak 44 MiB"
+    },
+    {
+      "check": "1,000,000 rows, answer as it renders",
+      "ok": true,
+      "detail": "12.2 s, first byte at 0.4 s, 61 MB of PDF, server peak 45 MiB"
+    },
+    {
+      "check": "both answers are the same document",
+      "ok": true,
+      "detail": "same bytes"
+    },
+    {
+      "check": "50 clients at once, default settings (20,000 rows each, half answered as it renders)",
+      "ok": true,
+      "detail": "8.9 s, server peak 37 MiB, at most 0 MiB on disk, none left after"
+    },
+    {
+      "check": "50 clients at once, documents kept on disk (20,000 rows each, half answered as it renders)",
+      "ok": true,
+      "detail": "7.9 s, server peak 33 MiB, at most 2 MiB on disk, none left after"
+    },
+    {
+      "check": "POST /render is as fast as before",
+      "ok": true,
+      "detail": "02-invoice 3.237 ms, 01-employee-list 2.402 ms, 03-grouped-sales 5.048 ms; the other build: 02-invoice 44.308 ms, 01-employee-list 44.015 ms, 03-grouped-sales 48.02 ms"
+    }
+  ]
+}

@@ -5,5 +5,10 @@ COPY dist/ferroreport-linux-${TARGETARCH} /ferroreport
 ENV FERROREPORT_HOST=0.0.0.0 FERROREPORT_PORT=8080
 EXPOSE 8080
 USER 65532:65532
+# Somewhere to keep a large document until it is complete: created here, after USER, so that
+# it belongs to the user the server runs as. (With a read-only root filesystem, mount a
+# volume at /tmp or point FERROREPORT_SPOOL_DIR at one.)
+WORKDIR /tmp
+WORKDIR /
 ENTRYPOINT ["/ferroreport"]
 CMD ["serve"]

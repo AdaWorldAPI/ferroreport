@@ -322,37 +322,40 @@ public final class Report {
     // The engine as a server.
 
     private void remote(OutputStream out, Format f) {
-        StringBuilder body = new StringBuilder(1 << 12);
+        StringBuilder head = new StringBuilder(1 << 12);
+        AtomicReference<Throwable> rowsFailure = new AtomicReference<>();
         try {
-            body.append('{');
+            // The request on the first line, then one row per line: the rows leave as they
+            // are read (from a ResultSet, say) and the server reads them as the report needs
+            // them, so neither side ever holds them all.
+            head.append('{');
             if (name == null) {
-                body.append("\"template\":");
-                Json.string(source != null ? source : new String(Files.readAllBytes(template), StandardCharsets.UTF_8), body);
-                body.append(',');
+                head.append("\"template\":");
+                Json.string(source != null ? source : new String(Files.readAllBytes(template), StandardCharsets.UTF_8), head);
+                head.append(',');
             }
-            body.append("\"format\":\"").append(f.id()).append("\",\"locale\":");
-            Json.string(locale, body);
+            head.append("\"format\":\"").append(f.id()).append("\",\"locale\":");
+            Json.string(locale, head);
             if (now != null) {
-                body.append(",\"now\":");
-                Json.string(now.toString(), body);
+                head.append(",\"now\":");
+                Json.string(now.toString(), head);
             }
             if (csvSafe) {
-                body.append(",\"csvSafe\":true");
+                head.append(",\"csvSafe\":true");
             }
             if (xlsxNumbers) {
-                body.append(",\"xlsxNumbers\":true");
+                head.append(",\"xlsxNumbers\":true");
             }
-            body.append(",\"params\":");
-            Json.write(params, body);
-            body.append(",\"data\":");
-            Json.write(rows != null ? rows : List.of(), body);
-            body.append('}');
+            head.append(",\"params\":");
+            Json.write(params, head);
+            head.append("}\n");
 
             String base = engine.server.toString().replaceAll("/+$", "");
             URI uri = URI.create(base + (name == null ? "/render" : "/render/" + name.replaceAll("^/+", "")));
+            byte[] first = head.toString().getBytes(StandardCharsets.UTF_8);
             HttpRequest.Builder request = HttpRequest.newBuilder(uri)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
+                .header("Content-Type", "application/x-ndjson")
+                .POST(HttpRequest.BodyPublishers.ofInputStream(() -> new Lines(first, rows, rowsFailure)));
             if (engine.token != null) {
                 request.header("Authorization", "Bearer " + engine.token);
             }
@@ -360,15 +363,84 @@ public final class Report {
             try (InputStream document = response.body()) {
                 if (response.statusCode() != 200) {
                     String text = new String(document.readAllBytes(), StandardCharsets.UTF_8);
-                    throw new FerroreportException(errorOf(text, response.statusCode()));
+                    String message = errorOf(text, response.statusCode());
+                    if (response.statusCode() == 400 && message.startsWith("invalid JSON") && rowsFailure.get() == null) {
+                        message += " (is the server older than ferroreport 0.9.0? This library sends rows one per line, which older servers do not read)";
+                    }
+                    throw new FerroreportException(message);
                 }
                 document.transferTo(out);
             }
         } catch (IOException e) {
+            Throwable failed = rowsFailure.get();
+            if (failed != null) {
+                throw new FerroreportException("cannot read the rows: " + failed.getMessage(), failed);
+            }
             throw new FerroreportException("cannot reach the ferroreport server at " + engine.server + ": " + e.getMessage(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new FerroreportException("interrupted while rendering", e);
+        }
+        Throwable failed = rowsFailure.get();
+        if (failed != null) {
+            throw new FerroreportException("cannot read the rows: " + failed.getMessage(), failed);
+        }
+    }
+
+    /** The body of a request, produced as it is sent: the first line, then each row on its own. */
+    private static final class Lines extends InputStream {
+        private final Iterator<?> rows;
+        private final AtomicReference<Throwable> failure;
+        private final StringBuilder text = new StringBuilder(1 << 16);
+        private byte[] piece;
+        private int at;
+
+        Lines(byte[] first, Iterable<?> rows, AtomicReference<Throwable> failure) {
+            this.piece = first;
+            this.rows = rows == null ? null : rows.iterator();
+            this.failure = failure;
+        }
+
+        /** Makes the next piece (about 64 KB of rows); false when there are no more. */
+        private boolean more() throws IOException {
+            if (rows == null) {
+                return false;
+            }
+            text.setLength(0);
+            try {
+                while (text.length() < (1 << 16) && rows.hasNext()) {
+                    Json.write(rows.next(), text);
+                    text.append('\n');
+                }
+            } catch (RuntimeException e) {
+                Throwable cause = e.getCause() instanceof SQLException ? e.getCause() : e;
+                failure.compareAndSet(null, cause);
+                // Stops the request: a report from half of the rows would be a wrong report.
+                throw new IOException("cannot read the rows", cause);
+            }
+            piece = text.toString().getBytes(StandardCharsets.UTF_8);
+            at = 0;
+            return piece.length > 0;
+        }
+
+        @Override
+        public int read(byte[] out, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            if (at == piece.length && !more()) {
+                return -1;
+            }
+            int n = Math.min(len, piece.length - at);
+            System.arraycopy(piece, at, out, off, n);
+            at += n;
+            return n;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            return read(one, 0, 1) < 0 ? -1 : one[0] & 0xff;
         }
     }
 

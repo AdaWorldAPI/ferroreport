@@ -1,6 +1,6 @@
 {
   "name": "ferroreport",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Report engine for Node.js, Deno, Bun and browsers: PDF, Excel (XLSX) and CSV in milliseconds. Reads JasperReports JRXML templates with pixel-identical output, no JVM, safe with untrusted templates.",
   "license": "MIT OR Apache-2.0",
   "author": "Cristian Encarnacion",

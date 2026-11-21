@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 mod serve;
+mod spool;
 
 const USAGE: &str = "\
 ferroreport — report engine: PDF, Excel, CSV and HTML from JasperReports JRXML templates, no JVM required
@@ -56,6 +57,14 @@ add format xlsx, csv or html to the request for Excel, CSV or a web preview):
                                 FERROREPORT_ALLOW_ANONYMOUS=1): only for ports your own
                                 services alone can reach
         --rate-limit <n>        Most requests per minute from one client address (answers 429)
+        --spool-memory <MB>     How much of one document is kept in memory until it is complete
+                                (default: 32; the rest goes to a file)
+        --spool-dir <dir>       Where those files go (default: the system's temporary directory;
+                                or FERROREPORT_SPOOL_DIR)
+        --spool-disk <MB>       Disk all requests together may use for them (default: 4096)
+    Large reports: POST with Content-Type application/x-ndjson, the request on the first line
+    and one row per line after it. Add `Prefer: respond-streaming` to get the document as it
+    renders instead of once it is complete.
         --max-body <MB>         Largest request accepted (default: 50)
         --workers <n>           Requests rendered in parallel (default: CPU count)
         --timeout <seconds>     Longest a render may take (default: 60; 0 for no limit)
@@ -260,6 +269,10 @@ fn serve(args: &[String]) -> CliResult {
     let mut access_log = false;
     let mut allow_anonymous = std::env::var("FERROREPORT_ALLOW_ANONYMOUS").is_ok_and(|v| !v.is_empty() && v != "0");
     let mut rate_limit = None;
+    let megabytes = |name: &str, default: u64| std::env::var(name).ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(default);
+    let mut spool_memory = megabytes("FERROREPORT_SPOOL_MEMORY", 32);
+    let mut spool_disk = megabytes("FERROREPORT_SPOOL_DISK", 4096);
+    let mut spool_dir = std::env::var("FERROREPORT_SPOOL_DIR").ok().filter(|d| !d.is_empty()).map(PathBuf::from);
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
@@ -279,6 +292,9 @@ fn serve(args: &[String]) -> CliResult {
             "--cache" => cache = value(a)?.parse().map_err(|_| "--cache expects a number of templates")?,
             "--access-log" => access_log = true,
             "--allow-anonymous" => allow_anonymous = true,
+            "--spool-dir" => spool_dir = Some(PathBuf::from(value(a)?)),
+            "--spool-memory" => spool_memory = value(a)?.parse().map_err(|_| "--spool-memory expects megabytes")?,
+            "--spool-disk" => spool_disk = value(a)?.parse().map_err(|_| "--spool-disk expects megabytes")?,
             "--rate-limit" => rate_limit = Some(value(a)?.parse().map_err(|_| "--rate-limit expects requests per minute")?),
             s => return Err(format!("unknown option {s}").into()),
         }
@@ -295,6 +311,9 @@ fn serve(args: &[String]) -> CliResult {
         access_log,
         allow_anonymous,
         rate_limit,
+        spool_memory: (spool_memory as usize).saturating_mul(1024 * 1024),
+        spool_dir,
+        spool_disk: spool_disk.saturating_mul(1024 * 1024),
     })
 }
 
