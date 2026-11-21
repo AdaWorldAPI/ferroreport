@@ -2,7 +2,7 @@
 
 1. Update `version` in `Cargo.toml` (workspace), `crates/ferroreport-cli/Cargo.toml` (the
    `ferroreport` dependency) and `bindings/wasm/package.json`.
-2. Commit, then tag and push: `git tag v0.6.0 && git push origin v0.6.0`.
+2. Commit, then tag and push: `git tag v0.6.1 && git push origin v0.6.1`.
 
 The [release workflow](.github/workflows/release.yml) then publishes:
 
