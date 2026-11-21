@@ -84,6 +84,20 @@ fn rounded_rect(content: &mut Content, x: f32, y: f32, w: f32, h: f32, r: f32) {
     content.close_path();
 }
 
+/// A rectangle as iText's `roundRectangle` writes it with radius 0: lines with zero-length
+/// curves at the corners, not closed.
+fn itext_rect(content: &mut Content, x: f32, y: f32, w: f32, h: f32) {
+    content.move_to(x, y);
+    content.line_to(x + w, y);
+    content.cubic_to(x + w, y, x + w, y, x + w, y);
+    content.line_to(x + w, y + h);
+    content.cubic_to(x + w, y + h, x + w, y + h, x + w, y + h);
+    content.line_to(x, y + h);
+    content.cubic_to(x, y + h, x, y + h, x, y + h);
+    content.line_to(x, y);
+    content.cubic_to(x, y, x, y, x, y);
+}
+
 fn ellipse(content: &mut Content, x: f32, y: f32, w: f32, h: f32) {
     let (rx, ry) = (w / 2.0, h / 2.0);
     let (cx, cy) = (x + rx, y + ry);
@@ -372,25 +386,26 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                         _ => c.stroke(),
                     };
                 }
-                PrintItem::Rect { x, y, w, h, fill, stroke, radius } => {
+                PrintItem::Rect { x, y, w, h, fill, stroke, radius, path } => {
                     let (px, py) = (*x, ph - y - h);
-                    if let Some(color) = fill {
-                        let (r, g, b) = rgb(*color);
-                        c.set_fill_rgb(r, g, b);
+                    let shape = |c: &mut Content| {
                         if *radius > 0.0 {
-                            rounded_rect(&mut c, px, py, *w, *h, *radius);
+                            rounded_rect(c, px, py, *w, *h, *radius);
+                        } else if *path {
+                            itext_rect(c, px, py, *w, *h);
                         } else {
                             c.rect(px, py, *w, *h);
                         }
+                    };
+                    if let Some(color) = fill {
+                        let (r, g, b) = rgb(*color);
+                        c.set_fill_rgb(r, g, b);
+                        shape(&mut c);
                         c.fill_nonzero();
                     }
                     if let Some(pen) = stroke {
                         apply_pen(&mut c, pen, true);
-                        if *radius > 0.0 {
-                            rounded_rect(&mut c, px, py, *w, *h, *radius);
-                        } else {
-                            c.rect(px, py, *w, *h);
-                        }
+                        shape(&mut c);
                         c.stroke();
                     }
                 }

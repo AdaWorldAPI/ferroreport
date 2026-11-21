@@ -707,6 +707,13 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     m.blank = segments.is_empty();
                     m.content = Some(Arc::new(segments));
                 }
+                ElementKind::List(l) => {
+                    let report = crate::table::list_report(l, el.width);
+                    let segments = run_dataset_report(le, &l.run, &report, "list")?;
+                    m.new_h = el.height.max(Segment::flow_height(&segments));
+                    m.blank = segments.is_empty();
+                    m.content = Some(Arc::new(segments));
+                }
                 ElementKind::Table(t) => {
                     let segments = run_table(le, t, el.width)?;
                     m.new_h = el.height.max(Segment::flow_height(&segments));
@@ -908,7 +915,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         part_box.bottom.width = 0.0;
                         frame_split = Some((inner, part_box));
                     }
-                    ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::Content(_) => {
+                    ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content(_) => {
                         // Subreport content breaks between its bands; the page and column
                         // headers of the subreport are printed again where it continues.
                         let all = m.content.take().unwrap_or_default();
@@ -962,7 +969,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Text(te) => {
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
-                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
                         deferred: None,
                     });
                 }
@@ -1027,6 +1034,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                     fill: (el.mode == Mode::Opaque).then_some(el.backcolor),
                     stroke: (pen.width > 0.0).then_some(*pen),
                     radius: *radius,
+                    path: true,
                 },
                 deferred: None,
             }),
@@ -1044,7 +1052,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Frame { boxed, .. } => {
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
-                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
                         deferred: None,
                     });
                 }
@@ -1069,7 +1077,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Image(img) => {
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
-                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
                         deferred: None,
                     });
                 }
@@ -1078,7 +1086,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 }
                 box_items(&img.boxed, x, y, w, h, &mut out.items);
             }
-            ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::Content(_) => {
+            ElementKind::Subreport(_) | ElementKind::Table(_) | ElementKind::List(_) | ElementKind::Content(_) => {
                 let mut top = y;
                 for seg in m.content.take().iter().flat_map(|c| c.iter()).filter(|s| !s.footer) {
                     for item in &seg.items {
@@ -1116,7 +1124,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Barcode(bc) => {
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
-                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0 },
+                        item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
                         deferred: None,
                     });
                 }
@@ -1329,18 +1337,22 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
 /// Fills a table component: the report Jasper builds from the printed columns, run like a
 /// subreport over the rows of the table's data source.
 fn run_table(le: &mut LayoutEnv, t: &TableElement, width: f32) -> Result<Vec<Segment>> {
-    if le.images.depth >= MAX_SUBREPORT_DEPTH {
-        return Err(Error::Unsupported(format!("table: nested more than {MAX_SUBREPORT_DEPTH} levels")));
-    }
     let (scope, env) = (le.scope, le.env);
     let columns = crate::table::fill_columns(&t.columns, &mut |e| Ok(matches!(eval(e, scope, env)?, Value::Bool(true))))?;
     if columns.is_empty() {
         return Ok(Vec::new());
     }
     let report = crate::table::report(t, &columns, width);
+    run_dataset_report(le, &t.run, &report, "table")
+}
 
+/// Fills a report built for a table or list over the rows of its dataset run.
+fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, what: &str) -> Result<Vec<Segment>> {
+    if le.images.depth >= MAX_SUBREPORT_DEPTH {
+        return Err(Error::Unsupported(format!("{what}: nested more than {MAX_SUBREPORT_DEPTH} levels")));
+    }
     let mut params = HashMap::new();
-    if let Some(e) = &t.parameters_map {
+    if let Some(e) = &run.parameters_map {
         if let Value::Json(map) = eval(e, le.scope, le.env)? {
             if let Some(obj) = map.as_object() {
                 for (k, v) in obj {
@@ -1350,22 +1362,22 @@ fn run_table(le: &mut LayoutEnv, t: &TableElement, width: f32) -> Result<Vec<Seg
             }
         }
     }
-    for (name, e) in &t.parameters {
+    for (name, e) in &run.parameters {
         params.insert(name.clone(), eval(e, le.scope, le.env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
-    let rows = match &t.data_source {
+    let rows = match &run.data_source {
         Some(e) => match eval(e, le.scope, le.env)? {
             Value::Json(j) => j,
             Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
-            other => return Err(Error::eval(format!("table data source is a {}, expected a list", other.type_name()))),
+            other => return Err(Error::eval(format!("{what} data source is a {}, expected a list", other.type_name()))),
         },
         None => Arc::new(serde_json::Value::Array(Vec::new())),
     };
-    let records = crate::data::records_from_json(&report, &rows)?;
+    let records = crate::data::records_from_json(report, &rows)?;
     let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
     le.images.depth += 1;
-    let filled = fill_flow(&report, &records, params, le.fonts, le.images, &env);
+    let filled = fill_flow(report, &records, params, le.fonts, le.images, &env);
     le.images.depth -= 1;
     Ok(filled?.0)
 }

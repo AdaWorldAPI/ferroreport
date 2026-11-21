@@ -1,0 +1,151 @@
+[
+ {
+  "customer": "Grupo Ramos",
+  "city": "Santo Domingo",
+  "contacts": [
+   {
+    "name": "Luis Mejía",
+    "role": "Recepción de mercancía",
+    "phone": "809-812-9924",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "Luis Mejía",
+    "role": "Asistente administrativa",
+    "phone": "809-552-6437",
+    "note": null
+   },
+   {
+    "name": "Ana Peña",
+    "role": "Gerente de compras",
+    "phone": "809-306-7286",
+    "note": "Prefiere llamadas en la mañana."
+   }
+  ]
+ },
+ {
+  "customer": "Ferretería Ochoa",
+  "city": "Santiago",
+  "contacts": []
+ },
+ {
+  "customer": "Constructora del Cibao",
+  "city": "La Vega",
+  "contacts": [
+   {
+    "name": "Pedro Almonte",
+    "role": "Gerente de compras",
+    "phone": "809-709-5395",
+    "note": "Cliente desde 2019."
+   },
+   {
+    "name": "Rosa Taveras",
+    "role": "Contabilidad",
+    "phone": "809-657-2792",
+    "note": "Prefiere llamadas en la mañana."
+   },
+   {
+    "name": "Rosa Taveras",
+    "role": "Dueño",
+    "phone": "809-890-9217",
+    "note": "Cliente desde 2019."
+   },
+   {
+    "name": "José Rosario",
+    "role": "Asistente administrativa",
+    "phone": "809-890-6921",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "Marta Díaz",
+    "role": "Asistente administrativa",
+    "phone": "809-968-3602",
+    "note": null
+   },
+   {
+    "name": "Félix Batista",
+    "role": "Asistente administrativa",
+    "phone": "809-347-5031",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "Félix Batista",
+    "role": "Dueño",
+    "phone": "809-832-1625",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "Carla Núñez",
+    "role": "Recepción de mercancía",
+    "phone": "809-353-5581",
+    "note": null
+   },
+   {
+    "name": "Rosa Taveras",
+    "role": "Contabilidad",
+    "phone": "809-625-6979",
+    "note": null
+   },
+   {
+    "name": "Marta Díaz",
+    "role": "Asistente administrativa",
+    "phone": "809-875-2550",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "José Rosario",
+    "role": "Recepción de mercancía",
+    "phone": "809-215-0358",
+    "note": null
+   },
+   {
+    "name": "Rosa Taveras",
+    "role": "Asistente administrativa",
+    "phone": "809-339-7150",
+    "note": "Prefiere llamadas en la mañana."
+   },
+   {
+    "name": "Marta Díaz",
+    "role": "Gerente de compras",
+    "phone": "809-249-0646",
+    "note": "Solicitar factura con crédito fiscal y enviar copia por correo al departamento de contabilidad antes del día 25 de cada mes, sin excepción."
+   },
+   {
+    "name": "Luis Mejía",
+    "role": "Gerente de compras",
+    "phone": "809-842-8491",
+    "note": null
+   },
+   {
+    "name": "Ana Peña",
+    "role": "Asistente administrativa",
+    "phone": "809-983-0136",
+    "note": "Prefiere llamadas en la mañana."
+   },
+   {
+    "name": "Carla Núñez",
+    "role": "Dueño",
+    "phone": "809-578-3778",
+    "note": null
+   }
+  ]
+ },
+ {
+  "customer": "Hotel Playa Dorada",
+  "city": "Puerto Plata",
+  "contacts": [
+   {
+    "name": "Ana Peña",
+    "role": "Contabilidad",
+    "phone": "809-463-8189",
+    "note": null
+   },
+   {
+    "name": "Carla Núñez",
+    "role": "Contabilidad",
+    "phone": "809-315-2710",
+    "note": null
+   }
+  ]
+ }
+]

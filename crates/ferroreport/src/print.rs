@@ -61,6 +61,10 @@ pub enum PrintItem {
         fill: Option<Color>,
         stroke: Option<Pen>,
         radius: f32,
+        /// Written as a path like iText's `roundRectangle` (rectangle elements) rather than
+        /// with `re` (backgrounds), as JasperReports does: PDF viewers anti-alias the two
+        /// differently.
+        path: bool,
     },
     Ellipse {
         x: f32,

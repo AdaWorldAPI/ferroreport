@@ -147,7 +147,7 @@ fn group_cell<'c>(cells: &'c [(String, TableCell)], group: &str) -> Option<&'c T
 /// The report JasperReports fills for a table whose printed columns are `columns`, placed in
 /// an element `width` points wide.
 pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Report {
-    let dataset = table.dataset.clone().unwrap_or(Dataset {
+    let dataset = table.run.dataset.clone().unwrap_or(Dataset {
         name: "table".into(),
         parameters: Vec::new(),
         fields: Vec::new(),
@@ -197,9 +197,9 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
 
     Report {
         name: dataset.name,
-        language: table.language,
+        language: table.run.language,
         page_width: width,
-        page_height: table.page_height,
+        page_height: table.run.page_height,
         column_width: width,
         column_count: 1,
         column_spacing: 0.0,
@@ -223,6 +223,51 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         last_page_footer,
         summary,
         no_data,
+        datasets: Vec::new(),
+        uses_data_source: true,
+        warnings: Vec::new(),
+    }
+}
+
+/// The report JasperReports effectively fills for a vertical list: the contents as the detail
+/// band, nothing else.
+pub fn list_report(list: &ListElement, width: f32) -> Report {
+    let run = &list.run;
+    let dataset = run.dataset.clone().unwrap_or(Dataset {
+        name: "list".into(),
+        parameters: Vec::new(),
+        fields: Vec::new(),
+        variables: Vec::new(),
+        groups: Vec::new(),
+    });
+    Report {
+        name: dataset.name,
+        language: run.language,
+        page_width: width,
+        page_height: run.page_height,
+        column_width: width,
+        column_count: 1,
+        column_spacing: 0.0,
+        margins: Margins { left: 0.0, right: 0.0, top: 0.0, bottom: 0.0 },
+        when_no_data: WhenNoData::NoPages,
+        title_new_page: false,
+        summary_new_page: false,
+        summary_with_page_header_and_footer: false,
+        float_column_footer: false,
+        parameters: dataset.parameters,
+        fields: dataset.fields,
+        variables: dataset.variables,
+        groups: dataset.groups.into_iter().map(|g| Group { header: Vec::new(), footer: Vec::new(), ..g }).collect(),
+        background: None,
+        title: None,
+        page_header: None,
+        column_header: None,
+        detail: vec![list.contents.clone()],
+        column_footer: None,
+        page_footer: None,
+        last_page_footer: None,
+        summary: None,
+        no_data: None,
         datasets: Vec::new(),
         uses_data_source: true,
         warnings: Vec::new(),

@@ -259,7 +259,7 @@ impl Canvas<'_> {
         }));
     }
     fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, fill: Option<Color>, stroke: Option<Pen>) {
-        self.items.push(PrintItem::Rect { x, y, w, h, fill, stroke, radius: 0.0 });
+        self.items.push(PrintItem::Rect { x, y, w, h, fill, stroke, radius: 0.0, path: false });
     }
     fn path(&mut self, ops: Vec<PathOp>, fill: Option<Color>, stroke: Option<(Color, f32)>, dash: Option<[f32; 2]>) {
         self.items.push(PrintItem::Path { ops: Arc::new(ops), fill, stroke, dash });

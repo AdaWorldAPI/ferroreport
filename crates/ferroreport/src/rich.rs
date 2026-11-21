@@ -846,6 +846,7 @@ pub fn layout(
                     fill: Some(back),
                     stroke: None,
                     radius: 0.0,
+                    path: false,
                 });
             }
             items.push(PrintItem::Text(PrintText {

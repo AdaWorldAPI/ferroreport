@@ -495,20 +495,20 @@ impl Parser {
         Ok(Dataset { name: node.attr("name").unwrap_or_default().to_string(), parameters, fields, variables, groups })
     }
 
-    /// A table component (`jr:table`, or `<component kind="table">` in JRXML 7).
-    fn table(&mut self, t: &Node, element_width: f32) -> Result<TableElement> {
-        let run = t.child("datasetRun");
+    /// A `<datasetRun>` (of a table or list).
+    fn dataset_run(&mut self, run: Option<&Node>, what: &str) -> Result<DatasetRun> {
         let dataset = match run.and_then(|r| r.attr("subDataset")) {
             Some(name) => match self.datasets.get(name) {
                 Some(d) => Some(d.clone()),
                 None => {
-                    self.warnings.push(format!("table: unknown subdataset `{name}`"));
+                    self.warnings.push(format!("{what}: unknown subdataset `{name}`"));
                     None
                 }
             },
             None => None,
         };
         let mut parameters = Vec::new();
+        let (mut parameters_map, mut data_source) = (None, None);
         if let Some(r) = run {
             for c in r.children.iter().filter(|c| c.name == "datasetParameter" || c.name == "parameter") {
                 if let Some(e) = self.child_expr(c, &["datasetParameterExpression", "expression"])? {
@@ -516,9 +516,37 @@ impl Parser {
                 }
             }
             if r.child("connectionExpression").is_some() && r.child("dataSourceExpression").is_none() {
-                self.warnings.push("tables with a connectionExpression get no rows (only data sources are supported)".into());
+                self.warnings.push(format!("{what}s with a connectionExpression get no rows (only data sources are supported)"));
             }
+            parameters_map = self.child_expr(r, &["parametersMapExpression"])?;
+            data_source = self.child_expr(r, &["dataSourceExpression"])?;
         }
+        Ok(DatasetRun {
+            dataset,
+            parameters,
+            parameters_map,
+            data_source,
+            page_height: self.page_height,
+            language: if self.groovy { Language::Groovy } else { Language::Java },
+        })
+    }
+
+    /// A list component (`jr:list`, or `<component kind="list">` in JRXML 7).
+    fn list(&mut self, l: &Node) -> Result<ListElement> {
+        let run = self.dataset_run(l.child("datasetRun"), "list")?;
+        if attr(l, &["printOrder"]) == Some("Horizontal") {
+            self.warnings.push("lists with printOrder=\"Horizontal\" are rendered vertically".into());
+        }
+        let contents = match l.child("listContents").or_else(|| l.child("contents")) {
+            Some(c) => self.band(c)?,
+            None => Band { height: 0.0, split_type: SplitType::Stretch, print_when: None, elements: Vec::new() },
+        };
+        Ok(ListElement { run, contents })
+    }
+
+    /// A table component (`jr:table`, or `<component kind="table">` in JRXML 7).
+    fn table(&mut self, t: &Node, element_width: f32) -> Result<TableElement> {
+        let run = self.dataset_run(t.child("datasetRun"), "table")?;
         let mut columns = Vec::new();
         for c in &t.children {
             if let Some(col) = self.table_column(c)? {
@@ -530,16 +558,7 @@ impl Parser {
             None => None,
         };
         Ok(TableElement {
-            dataset,
-            parameters,
-            parameters_map: match run {
-                Some(r) => self.child_expr(r, &["parametersMapExpression"])?,
-                None => None,
-            },
-            data_source: match run {
-                Some(r) => self.child_expr(r, &["dataSourceExpression"])?,
-                None => None,
-            },
+            run,
             columns,
             when_no_data: match t.attr("whenNoDataType") {
                 Some("AllSectionsNoDetail") => WhenNoData::AllSectionsNoDetail,
@@ -547,8 +566,6 @@ impl Parser {
                 _ => WhenNoData::NoPages,
             },
             no_data,
-            page_height: self.page_height,
-            language: if self.groovy { Language::Groovy } else { Language::Java },
         })
     }
 
@@ -676,7 +693,13 @@ fn barcode_node(n: &Node) -> Option<&Node> {
 /// The table component inside a `componentElement` (JRXML 6) or a `<element kind="component">`
 /// (JRXML 7).
 fn table_node(n: &Node) -> Option<&Node> {
-    n.children.iter().find(|c| c.name == "table" || (c.name == "component" && c.attr("kind") == Some("table")))
+    component_node(n, "table")
+}
+
+/// The component called `name` inside a component element (JRXML 6 `<jr:name>` or JRXML 7
+/// `<component kind="name">`).
+fn component_node<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
+    n.children.iter().find(|c| c.name == name || (c.name == "component" && c.attr("kind") == Some(name)))
 }
 
 fn font_from(node: Option<&Node>, base: &FontSpec) -> FontSpec {
@@ -1184,6 +1207,10 @@ impl Parser {
                     strike: false,
                 };
                 ElementKind::Chart(Box::new(self.chart(n, tag, base_font, props.box_style(forecolor))?))
+            }
+            "componentElement" | "component" if component_node(n, "list").is_some() => {
+                let l = component_node(n, "list").unwrap_or(n);
+                ElementKind::List(Box::new(self.list(l)?))
             }
             "componentElement" | "component" if table_node(n).is_some() => {
                 let t = table_node(n).unwrap_or(n);

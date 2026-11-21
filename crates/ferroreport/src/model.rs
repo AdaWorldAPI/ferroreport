@@ -306,6 +306,8 @@ pub enum ElementKind {
     Subreport(Box<SubreportElement>),
     /// A table component (`jr:table`), filled like a subreport over a subdataset.
     Table(Box<TableElement>),
+    /// A list component (`jr:list`), filled like a subreport over a subdataset.
+    List(Box<ListElement>),
     Barcode(Box<BarcodeElement>),
     Chart(Box<crate::chart::ChartElement>),
     /// Already filled subreport content still to be printed (the continuation of a subreport
@@ -486,22 +488,38 @@ pub struct Dataset {
     pub groups: Vec<Group>,
 }
 
-/// A table component. JasperReports fills a table as a subreport built from its columns
-/// (`TableReport`); [`crate::table`] builds the same report.
+/// A `<datasetRun>`: the subdataset a table or list iterates over and where its rows and
+/// parameters come from.
 #[derive(Debug, Clone)]
-pub struct TableElement {
-    /// The subdataset the table iterates over (`None`: a dataset with no fields).
+pub struct DatasetRun {
+    /// The subdataset (`None`: a dataset with no fields).
     pub dataset: Option<Dataset>,
     pub parameters: Vec<(String, Expr)>,
     pub parameters_map: Option<Expr>,
     pub data_source: Option<Expr>,
-    pub columns: Vec<TableColumn>,
-    pub when_no_data: WhenNoData,
-    pub no_data: Option<TableCell>,
-    /// Page height of the containing report (the table report uses it).
+    /// Page height of the containing report (the report built for the run uses it).
     pub page_height: f32,
     /// Expression language of the containing report.
     pub language: Language,
+}
+
+/// A table component. JasperReports fills a table as a subreport built from its columns
+/// (`TableReport`); [`crate::table`] builds the same report.
+#[derive(Debug, Clone)]
+pub struct TableElement {
+    pub run: DatasetRun,
+    pub columns: Vec<TableColumn>,
+    pub when_no_data: WhenNoData,
+    pub no_data: Option<TableCell>,
+}
+
+/// A list component (`jr:list`): its contents repeated for each row of the subdataset,
+/// one below the other.
+#[derive(Debug, Clone)]
+pub struct ListElement {
+    pub run: DatasetRun,
+    /// The contents, as a band as tall as `<listContents height>`.
+    pub contents: Band,
 }
 
 /// A table column, or a column group with `children`.
