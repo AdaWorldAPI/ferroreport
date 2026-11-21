@@ -97,6 +97,24 @@ pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").ok().and_then(|d| d.and_hms_opt(0, 0, 0))
 }
 
+/// Builds one record from a JSON object, typed according to `fields`.
+fn record_from_json(fields: &[crate::model::Field], keep_row: bool, i: usize, row: &serde_json::Value) -> Result<Record> {
+    let obj = row.as_object().ok_or_else(|| Error::Data(format!("row {i} is not an object")))?;
+    let mut rec = Record::with_capacity(fields.len() + keep_row as usize);
+    if keep_row {
+        rec.insert(ROW_KEY.to_string(), Value::Json(std::sync::Arc::new(row.clone())));
+    }
+    for field in fields {
+        let v = obj.get(&field.name).or_else(|| lookup_path(row, &field.name));
+        let value = match v {
+            Some(v) => json_to_value(v, field.class).map_err(|e| Error::Data(format!("row {i}, field `{}`: {e}", field.name)))?,
+            None => Value::Null,
+        };
+        rec.insert(field.name.clone(), value);
+    }
+    Ok(rec)
+}
+
 /// Builds records from a JSON array of objects, typed according to the report's fields.
 /// Keys may be dotted paths (`customer.name`) into nested objects.
 pub fn records_from_json(report: &Report, json: &serde_json::Value) -> Result<Vec<Record>> {
@@ -104,29 +122,208 @@ pub fn records_from_json(report: &Report, json: &serde_json::Value) -> Result<Ve
         serde_json::Value::Array(rows) => rows,
         _ => return Err(Error::Data("expected a JSON array of objects".into())),
     };
-    rows.iter()
-        .enumerate()
-        .map(|(i, row)| {
-            let obj = row.as_object().ok_or_else(|| Error::Data(format!("row {i} is not an object")))?;
-            let mut rec = Record::new();
-            if report.uses_data_source {
-                rec.insert(ROW_KEY.to_string(), Value::Json(std::sync::Arc::new(row.clone())));
+    rows.iter().enumerate().map(|(i, row)| record_from_json(&report.fields, report.uses_data_source, i, row)).collect()
+}
+
+/// Rows read one at a time from JSON text, so a large data file is never in memory whole.
+/// The text is an array of objects (`[{...}, {...}]`) or one object after another
+/// (JSON Lines).
+pub struct JsonRows<R: std::io::Read> {
+    reader: R,
+    buf: Vec<u8>,
+    pos: usize,
+    eof: bool,
+    shape: Shape,
+    /// In an array: a value was read, so a comma or the closing bracket comes next.
+    after_value: bool,
+    index: usize,
+    fields: Vec<crate::model::Field>,
+    keep_row: bool,
+    done: bool,
+}
+
+#[derive(PartialEq)]
+enum Shape {
+    Unknown,
+    Array,
+    Lines,
+}
+
+impl<R: std::io::Read> JsonRows<R> {
+    pub fn new(report: &Report, reader: R) -> JsonRows<R> {
+        JsonRows {
+            reader,
+            buf: Vec::new(),
+            pos: 0,
+            eof: false,
+            shape: Shape::Unknown,
+            after_value: false,
+            index: 0,
+            fields: report.fields.clone(),
+            keep_row: report.uses_data_source,
+            done: false,
+        }
+    }
+
+    /// Drops what was consumed and reads more text.
+    fn more(&mut self) -> Result<()> {
+        self.buf.drain(..self.pos);
+        self.pos = 0;
+        let old = self.buf.len();
+        self.buf.resize(old + old.max(256 * 1024), 0);
+        let n = loop {
+            match self.reader.read(&mut self.buf[old..]) {
+                Ok(n) => break n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(Error::Data(format!("cannot read the data: {e}"))),
             }
-            for field in &report.fields {
-                let v = obj.get(&field.name).or_else(|| lookup_path(row, &field.name));
-                let value = match v {
-                    Some(v) => {
-                        json_to_value(v, field.class).map_err(|e| Error::Data(format!("row {i}, field `{}`: {e}", field.name)))?
-                    }
-                    None => Value::Null,
+        };
+        self.buf.truncate(old + n);
+        self.eof = n == 0;
+        Ok(())
+    }
+
+    fn next_value(&mut self) -> Result<Option<serde_json::Value>> {
+        loop {
+            while self.pos < self.buf.len() && self.buf[self.pos].is_ascii_whitespace() {
+                self.pos += 1;
+            }
+            if self.pos == self.buf.len() {
+                if !self.eof {
+                    self.more()?;
+                    continue;
+                }
+                return match self.shape {
+                    Shape::Array => Err(Error::Data("the JSON array of rows is not closed".into())),
+                    Shape::Lines => Ok(None),
+                    Shape::Unknown => Err(Error::Data("expected a JSON array of objects".into())),
                 };
-                rec.insert(field.name.clone(), value);
             }
-            Ok(rec)
-        })
-        .collect()
+            let b = self.buf[self.pos];
+            match self.shape {
+                Shape::Unknown => {
+                    match b {
+                        b'[' => {
+                            self.shape = Shape::Array;
+                            self.pos += 1;
+                        }
+                        b'{' => self.shape = Shape::Lines,
+                        // A UTF-8 byte order mark.
+                        0xEF if self.buf[self.pos..].starts_with(&[0xEF, 0xBB, 0xBF]) => self.pos += 3,
+                        0xEF if self.buf.len() - self.pos < 3 && !self.eof => self.more()?,
+                        _ => return Err(Error::Data("expected a JSON array of objects".into())),
+                    }
+                    continue;
+                }
+                Shape::Array if self.after_value => {
+                    self.pos += 1;
+                    match b {
+                        b',' => self.after_value = false,
+                        b']' => return Ok(None),
+                        _ => return Err(Error::Data(format!("after row {}: expected `,` or `]`", self.index.saturating_sub(1)))),
+                    }
+                    continue;
+                }
+                Shape::Array if b == b']' => return Ok(None),
+                _ => {}
+            }
+            let mut values = serde_json::Deserializer::from_slice(&self.buf[self.pos..]).into_iter::<serde_json::Value>();
+            match values.next() {
+                Some(Ok(v)) => {
+                    let used = values.byte_offset();
+                    // Anything but an object or array may continue in text not read yet.
+                    if self.pos + used == self.buf.len() && !self.eof && !(v.is_object() || v.is_array()) {
+                        self.more()?;
+                        continue;
+                    }
+                    self.pos += used;
+                    self.after_value = true;
+                    return Ok(Some(v));
+                }
+                Some(Err(e)) if e.is_eof() && !self.eof => self.more()?,
+                Some(Err(e)) => return Err(Error::Data(format!("row {}: {e}", self.index))),
+                None => self.more()?,
+            }
+        }
+    }
+}
+
+impl<R: std::io::Read> Iterator for JsonRows<R> {
+    type Item = Result<Record>;
+
+    fn next(&mut self) -> Option<Result<Record>> {
+        if self.done {
+            return None;
+        }
+        let row = match self.next_value() {
+            Ok(Some(v)) => record_from_json(&self.fields, self.keep_row, self.index, &v),
+            Ok(None) => {
+                self.done = true;
+                return None;
+            }
+            Err(e) => Err(e),
+        };
+        self.index += 1;
+        self.done = row.is_err();
+        Some(row)
+    }
 }
 
 fn lookup_path<'a>(v: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     path.split('.').try_fold(v, |cur, key| cur.get(key))
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+
+    /// Hands out the text a few bytes at a time, like a slow socket.
+    struct Drip<'a>(&'a [u8], usize);
+    impl std::io::Read for Drip<'_> {
+        fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+            let n = self.1.min(self.0.len()).min(out.len());
+            out[..n].copy_from_slice(&self.0[..n]);
+            self.0 = &self.0[n..];
+            Ok(n)
+        }
+    }
+
+    fn report() -> Report {
+        crate::parse(
+            r#"<jasperReport name="t" pageWidth="200" pageHeight="200" columnWidth="200" leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0">
+            <field name="id" class="java.lang.Integer"/><field name="name" class="java.lang.String"/></jasperReport>"#,
+        )
+        .unwrap()
+    }
+
+    fn show(records: Vec<Record>) -> Vec<String> {
+        records.iter().map(|r| format!("{:?} {:?}", r["id"], r["name"])).collect()
+    }
+
+    fn read(text: &str, step: usize) -> Result<Vec<String>> {
+        JsonRows::new(&report(), Drip(text.as_bytes(), step)).collect::<Result<Vec<Record>>>().map(show)
+    }
+
+    #[test]
+    fn streams_arrays_and_lines_the_same_as_whole_documents() {
+        let array = r#" [ {"id": 1, "name": "Añasco, \"x\""} ,{"id":2,"name":"b"},
+            {"id": 3, "name": null} ] "#;
+        let whole = show(records_from_json(&report(), &serde_json::from_str(array).unwrap()).unwrap());
+        for step in [1, 2, 7, 4096] {
+            assert_eq!(read(array, step).unwrap(), whole, "array, {step} bytes at a time");
+            let lines = "\u{feff}{\"id\": 1, \"name\": \"Añasco, \\\"x\\\"\"}\n{\"id\":2,\"name\":\"b\"}\n\n{\"id\": 3, \"name\": null}\n";
+            assert_eq!(read(lines, step).unwrap(), whole, "lines, {step} bytes at a time");
+        }
+        assert!(read("[]", 1).unwrap().is_empty());
+        assert!(read("", 1).is_err());
+    }
+
+    #[test]
+    fn reports_broken_data() {
+        assert!(read(r#"[{"id": 1}"#, 3).is_err());
+        assert!(read(r#"[{"id": 1} {"id": 2}]"#, 3).is_err());
+        assert!(read(r#"[1, 2]"#, 3).is_err());
+        assert!(read(r#"{"id": 1"#, 3).is_err());
+        assert!(read(r#""rows""#, 3).is_err());
+    }
 }

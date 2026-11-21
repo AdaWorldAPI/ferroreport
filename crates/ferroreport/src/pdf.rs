@@ -9,7 +9,7 @@ use crate::image::{ImageData, Pixels};
 use crate::model::{Color, LineStyle, Pen};
 use crate::print::{PathOp, PrintDocument, PrintItem};
 use pdf_writer::types::{CidFontType, FontFlags, LineCapStyle, SystemInfo};
-use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
+use pdf_writer::{Chunk, Content, Filter, Finish, Name, Rect, Ref, Str, TextStr};
 use std::collections::{BTreeMap, BTreeSet};
 use subsetter::GlyphRemapper;
 
@@ -24,18 +24,6 @@ pub struct PdfOptions {
 /// quarter of the size of JasperReports' output).
 fn deflate(data: &[u8]) -> Vec<u8> {
     miniz_oxide::deflate::compress_to_vec_zlib(data, 3)
-}
-
-struct Ids {
-    next: i32,
-}
-
-impl Ids {
-    fn next(&mut self) -> Ref {
-        let r = Ref::new(self.next);
-        self.next += 1;
-        r
-    }
 }
 
 /// iText (and so JasperReports) writes coordinates with two decimals; rounding the same way
@@ -119,45 +107,6 @@ fn subset_tag(face: FaceId, glyphs: &BTreeSet<u16>) -> String {
     (0..6).map(|i| (b'A' + ((h >> (i * 5)) % 26) as u8) as char).collect()
 }
 
-/// Writes an image XObject (plus its soft mask for transparency).
-fn write_image(pdf: &mut Pdf, ids: &mut Ids, r: Ref, image: &ImageData) {
-    match &image.pixels {
-        Pixels::Jpeg { data, components } => {
-            let mut x = pdf.image_xobject(r, data);
-            x.filter(Filter::DctDecode);
-            x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
-            match components {
-                1 => x.color_space().device_gray(),
-                4 => x.color_space().device_cmyk(),
-                _ => x.color_space().device_rgb(),
-            };
-        }
-        Pixels::Raw { samples, gray, alpha } => {
-            let mask = alpha.as_ref().map(|a| {
-                let mr = ids.next();
-                let compressed = deflate(a);
-                let mut m = pdf.image_xobject(mr, &compressed);
-                m.filter(Filter::FlateDecode);
-                m.width(image.width as i32).height(image.height as i32).bits_per_component(8);
-                m.color_space().device_gray();
-                mr
-            });
-            let compressed = deflate(samples);
-            let mut x = pdf.image_xobject(r, &compressed);
-            x.filter(Filter::FlateDecode);
-            x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
-            if *gray {
-                x.color_space().device_gray();
-            } else {
-                x.color_space().device_rgb();
-            }
-            if let Some(mr) = mask {
-                x.s_mask(mr);
-            }
-        }
-    }
-}
-
 /// One drawing step: an item, or entering/leaving a transformed coordinate system.
 enum Draw<'a> {
     Item(&'a PrintItem),
@@ -181,145 +130,162 @@ fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<Draw<'a>>) {
     }
 }
 
-/// Serialises a filled document to PDF bytes.
-pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> Result<Vec<u8>> {
-    let flat: Vec<Vec<Draw>> = doc
-        .pages
-        .iter()
-        .map(|p| {
-            let mut v = Vec::with_capacity(p.items.len());
-            flatten(&p.items, &mut v);
-            v
+/// What a document has used of one font face so far.
+struct FaceUse {
+    remapper: GlyphRemapper,
+    /// Glyph of the face -> its number in the subset plus one (0: not used yet).
+    codes: Vec<u16>,
+    /// The glyphs used and a character each stands for, in order of first use.
+    chars: Vec<(u16, char)>,
+    resource: String,
+}
+
+impl FaceUse {
+    fn new(number: usize) -> FaceUse {
+        FaceUse { remapper: GlyphRemapper::new(), codes: Vec::new(), chars: Vec::new(), resource: format!("F{number}") }
+    }
+
+    /// The code that draws `glyph` in the subset font.
+    fn code(&mut self, glyph: u16, ch: char) -> u16 {
+        let i = glyph as usize;
+        if i >= self.codes.len() {
+            self.codes.resize(i + 1, 0);
+        }
+        if self.codes[i] == 0 {
+            let new = self.remapper.remap(glyph);
+            self.codes[i] = new.wrapping_add(1);
+            self.chars.push((glyph, ch));
+        }
+        self.codes[i].wrapping_sub(1)
+    }
+}
+
+/// Writes a PDF page by page: each page's content goes to `out` as soon as it arrives, and
+/// fonts (subsetted to the glyphs used), the page tree and the cross-reference table follow
+/// at the end. Memory use does not grow with the number of pages.
+pub struct PdfStream<W: std::io::Write> {
+    out: W,
+    pos: u64,
+    /// Byte offset of each object, by object number minus one.
+    offsets: Vec<u64>,
+    options: PdfOptions,
+    page_width: f32,
+    page_height: f32,
+    faces: BTreeMap<FaceId, FaceUse>,
+    images: BTreeMap<usize, (String, Ref)>,
+    /// The content streams of each page.
+    pages: Vec<Vec<Ref>>,
+}
+
+fn io(e: std::io::Error) -> Error {
+    Error::Io(e.to_string())
+}
+
+impl<W: std::io::Write> PdfStream<W> {
+    pub fn new(mut out: W, page_width: f32, page_height: f32, options: PdfOptions) -> Result<PdfStream<W>> {
+        let header = b"%PDF-1.7\n%\x80\x80\x80\x80\n\n";
+        out.write_all(header).map_err(io)?;
+        // Objects 1 to 3 are the catalog, the page tree and the document information.
+        Ok(PdfStream {
+            out,
+            pos: header.len() as u64,
+            offsets: vec![0; 3],
+            options,
+            page_width,
+            page_height,
+            faces: BTreeMap::new(),
+            images: BTreeMap::new(),
+            pages: Vec::new(),
         })
-        .collect();
-    // 1. Which glyphs of which faces are used (and which characters they stand for).
-    let mut used: BTreeMap<FaceId, BTreeMap<u16, char>> = BTreeMap::new();
-    for page in &flat {
-        for draw in page {
-            if let Draw::Item(PrintItem::Text(t)) = draw {
-                let face = fonts.face(t.face);
-                let entry = used.entry(t.face).or_default();
-                for line in &t.lines {
-                    for c in line.text.chars() {
-                        entry.entry(face.glyph(c)).or_insert(c);
+    }
+
+    fn next_id(&mut self) -> Ref {
+        self.offsets.push(0);
+        Ref::new(self.offsets.len() as i32)
+    }
+
+    /// Writes a chunk holding the single object `id`.
+    fn put(&mut self, id: Ref, chunk: &Chunk) -> Result<()> {
+        self.offsets[id.get() as usize - 1] = self.pos;
+        self.out.write_all(chunk.as_bytes()).map_err(io)?;
+        self.pos += chunk.len() as u64;
+        Ok(())
+    }
+
+    fn content_stream(&mut self, raw: &[u8]) -> Result<Ref> {
+        let id = self.next_id();
+        let mut chunk = Chunk::new();
+        if self.options.compress {
+            chunk.stream(id, &deflate(raw)).filter(Filter::FlateDecode);
+        } else {
+            chunk.stream(id, raw);
+        }
+        self.put(id, &chunk)?;
+        Ok(id)
+    }
+
+    /// The resource name of an image, writing the image the first time it is used.
+    fn image_name(&mut self, image: &ImageData) -> Result<String> {
+        if let Some((name, _)) = self.images.get(&image.id) {
+            return Ok(name.clone());
+        }
+        let r = self.next_id();
+        let mut chunk = Chunk::new();
+        match &image.pixels {
+            Pixels::Jpeg { data, components } => {
+                let mut x = chunk.image_xobject(r, data);
+                x.filter(Filter::DctDecode);
+                x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
+                match components {
+                    1 => x.color_space().device_gray(),
+                    4 => x.color_space().device_cmyk(),
+                    _ => x.color_space().device_rgb(),
+                };
+            }
+            Pixels::Raw { samples, gray, alpha } => {
+                let mask = match alpha {
+                    Some(a) => {
+                        let mr = self.next_id();
+                        let compressed = deflate(a);
+                        let mut mc = Chunk::new();
+                        let mut m = mc.image_xobject(mr, &compressed);
+                        m.filter(Filter::FlateDecode);
+                        m.width(image.width as i32).height(image.height as i32).bits_per_component(8);
+                        m.color_space().device_gray();
+                        m.finish();
+                        self.put(mr, &mc)?;
+                        Some(mr)
                     }
+                    None => None,
+                };
+                let compressed = deflate(samples);
+                let mut x = chunk.image_xobject(r, &compressed);
+                x.filter(Filter::FlateDecode);
+                x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
+                if *gray {
+                    x.color_space().device_gray();
+                } else {
+                    x.color_space().device_rgb();
+                }
+                if let Some(mr) = mask {
+                    x.s_mask(mr);
                 }
             }
         }
+        self.put(r, &chunk)?;
+        let name = format!("Im{}", self.images.len() + 1);
+        self.images.insert(image.id, (name.clone(), r));
+        Ok(name)
     }
 
-    let mut ids = Ids { next: 1 };
-    let catalog_id = ids.next();
-    let tree_id = ids.next();
-    let info_id = ids.next();
-    let mut pdf = Pdf::new();
-
-    // 2. Fonts.
-    let mut remappers: BTreeMap<FaceId, (GlyphRemapper, String)> = BTreeMap::new();
-    let mut font_refs: Vec<(String, Ref)> = Vec::new();
-    for (i, (&face_id, glyph_map)) in used.iter().enumerate() {
-        let face = fonts.face(face_id);
-        let mut remapper = GlyphRemapper::new();
-        for &g in glyph_map.keys() {
-            remapper.remap(g);
-        }
-        let subset = subsetter::subset(&face.data, 0, &remapper).map_err(|e| Error::Font(format!("{}: {e}", face.family)))?;
-        let glyph_set: BTreeSet<u16> = glyph_map.keys().copied().collect();
-        let base_name = format!("{}+{}", subset_tag(face_id, &glyph_set), face.postscript_name);
-        let resource = format!("F{}", i + 1);
-
-        let type0 = ids.next();
-        let cid = ids.next();
-        let descriptor = ids.next();
-        let cmap_ref = ids.next();
-        let file = ids.next();
-        let scale = 1000.0 / face.units_per_em;
-
-        pdf.type0_font(type0)
-            .base_font(Name(base_name.as_bytes()))
-            .encoding_predefined(Name(b"Identity-H"))
-            .descendant_font(cid)
-            .to_unicode(cmap_ref);
-
-        let system_info = SystemInfo { registry: Str(b"Adobe"), ordering: Str(b"Identity"), supplement: 0 };
-        // iText (used by JasperReports) truncates glyph widths to whole units; viewers advance
-        // glyphs by these widths, so we do the same to match its output.
-        let widths: Vec<f32> = remapper.remapped_gids().map(|old| (face.advance(old) * scale).trunc()).collect();
-        let mut cid_font = pdf.cid_font(cid);
-        cid_font
-            .subtype(CidFontType::Type2)
-            .base_font(Name(base_name.as_bytes()))
-            .system_info(system_info)
-            .font_descriptor(descriptor)
-            .default_width(0.0)
-            .cid_to_gid_map_predefined(Name(b"Identity"));
-        cid_font.widths().consecutive(0, widths);
-        cid_font.finish();
-
-        let mut flags = FontFlags::NON_SYMBOLIC;
-        if face.family.contains("Serif") {
-            flags |= FontFlags::SERIF;
-        }
-        if face.family.contains("Mono") {
-            flags |= FontFlags::FIXED_PITCH;
-        }
-        if face.italic {
-            flags |= FontFlags::ITALIC;
-        }
-        let b = face.bbox;
-        pdf.font_descriptor(descriptor)
-            .name(Name(base_name.as_bytes()))
-            .flags(flags)
-            .bbox(Rect::new(b[0] * scale, b[1] * scale, b[2] * scale, b[3] * scale))
-            .italic_angle(face.italic_angle)
-            .ascent(face.ascender * scale)
-            .descent(-face.descender * scale)
-            .cap_height(face.cap_height * scale)
-            .stem_v(if face.bold { 120.0 } else { 80.0 })
-            .font_file2(file);
-
-        let mut cmap = pdf_writer::types::UnicodeCmap::new(Name(b"Custom"), system_info);
-        for (&old, &c) in glyph_map {
-            if let Some(new) = remapper.get(old) {
-                cmap.pair(new, c);
-            }
-        }
-        pdf.cmap(cmap_ref, &cmap.finish());
-        let compressed = deflate(&subset);
-        pdf.stream(file, &compressed).filter(Filter::FlateDecode).pair(Name(b"Length1"), subset.len() as i32);
-
-        font_refs.push((resource.clone(), type0));
-        remappers.insert(face_id, (remapper, resource));
-    }
-
-    // 3. Images, written once each.
-    let mut image_refs: BTreeMap<usize, (String, Ref)> = BTreeMap::new();
-    for page in &flat {
-        for draw in page {
-            if let Draw::Item(PrintItem::Image { image, .. }) = draw {
-                if image_refs.contains_key(&image.id) {
-                    continue;
-                }
-                let r = ids.next();
-                let name = format!("Im{}", image_refs.len() + 1);
-                write_image(&mut pdf, &mut ids, r, image);
-                image_refs.insert(image.id, (name, r));
-            }
-        }
-    }
-
-    // 4. Pages.
-    let mut page_ids = Vec::new();
-    let ph = doc.page_height;
-    let empty: Vec<Draw> = Vec::new();
-    let pages: Vec<&Vec<Draw>> = if flat.is_empty() { vec![&empty] } else { flat.iter().collect() };
-    for page in pages {
-        let page_id = ids.next();
-        let content_id = ids.next();
-        page_ids.push(page_id);
+    /// The content stream that draws `items`.
+    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<Vec<u8>> {
+        let mut flat = Vec::with_capacity(items.len());
+        flatten(items, &mut flat);
+        let ph = self.page_height;
         let mut c = Content::new();
         c.set_line_cap(LineCapStyle::ButtCap);
-        for draw in page.iter() {
+        for draw in flat.iter() {
             let item = match draw {
                 Draw::Item(item) => *item,
                 Draw::Push([a, b, cc, d, e, f]) => {
@@ -451,7 +417,7 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                     }
                 }
                 PrintItem::Image { x, y, w, h, clip, image } => {
-                    let Some((name, _)) = image_refs.get(&image.id) else { continue };
+                    let name = self.image_name(image)?;
                     c.save_state();
                     if let Some([cx, cy, cw, ch]) = clip {
                         c.rect(*cx, ph - cy - ch, *cw, *ch);
@@ -482,7 +448,9 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                     if t.lines.iter().all(|l| l.text.is_empty()) {
                         continue;
                     }
-                    let Some((remapper, resource)) = remappers.get(&t.face) else { continue };
+                    let next = self.faces.len() + 1;
+                    let used = self.faces.entry(t.face).or_insert_with(|| FaceUse::new(next));
+                    let resource = used.resource.clone();
                     let face = fonts.face(t.face);
                     let (r, g, b) = rgb(t.color);
                     c.set_fill_rgb(r, g, b);
@@ -492,8 +460,8 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                         if line.text.is_empty() {
                             continue;
                         }
-                        let encode = |s: &str| -> Vec<u8> {
-                            s.chars().flat_map(|ch| remapper.get(face.glyph(ch)).unwrap_or(0).to_be_bytes()).collect()
+                        let mut encode = |s: &str| -> Vec<u8> {
+                            s.chars().flat_map(|ch| used.code(face.glyph(ch), ch).to_be_bytes()).collect()
                         };
                         c.set_text_matrix([1.0, 0.0, 0.0, 1.0, r2(line.x), r2(ph - line.baseline)]);
                         if line.word_spacing.abs() > 1e-4 {
@@ -535,38 +503,217 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
                 }
             }
         }
-        let raw = c.finish();
-        if options.compress {
-            pdf.stream(content_id, &deflate(&raw)).filter(Filter::FlateDecode);
-        } else {
-            pdf.stream(content_id, &raw);
+        Ok(c.finish().to_vec())
+    }
+
+    /// Adds the next page.
+    pub fn page(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
+        let raw = self.draw(items, fonts)?;
+        let id = self.content_stream(&raw)?;
+        self.pages.push(vec![id]);
+        Ok(())
+    }
+
+    /// Draws `items` on top of a page added earlier (numbered from 0).
+    pub fn late(&mut self, page: usize, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
+        let raw = self.draw(items, fonts)?;
+        let id = self.content_stream(&raw)?;
+        if let Some(p) = self.pages.get_mut(page) {
+            p.push(id);
         }
-        let mut p = pdf.page(page_id);
-        p.parent(tree_id).media_box(Rect::new(0.0, 0.0, doc.page_width, doc.page_height)).contents(content_id);
-        let mut res = p.resources();
+        Ok(())
+    }
+
+    /// Pages added so far.
+    pub fn page_count(&self) -> usize {
+        self.pages.len()
+    }
+
+    /// Writes the fonts, the page tree and the trailer, and returns the output.
+    pub fn finish(mut self, fonts: &FontSet) -> Result<W> {
+        if self.pages.is_empty() {
+            self.page(&[], fonts)?;
+        }
+        // Fonts, each cut down to the glyphs the document used.
+        let mut font_refs: Vec<(String, Ref)> = Vec::new();
+        for (face_id, used) in std::mem::take(&mut self.faces) {
+            let face = fonts.face(face_id);
+            let subset =
+                subsetter::subset(&face.data, 0, &used.remapper).map_err(|e| Error::Font(format!("{}: {e}", face.family)))?;
+            let glyph_set: BTreeSet<u16> = used.chars.iter().map(|&(g, _)| g).collect();
+            let base_name = format!("{}+{}", subset_tag(face_id, &glyph_set), face.postscript_name);
+
+            let type0 = self.next_id();
+            let cid = self.next_id();
+            let descriptor = self.next_id();
+            let cmap_ref = self.next_id();
+            let file = self.next_id();
+            let scale = 1000.0 / face.units_per_em;
+
+            let mut chunk = Chunk::new();
+            chunk
+                .type0_font(type0)
+                .base_font(Name(base_name.as_bytes()))
+                .encoding_predefined(Name(b"Identity-H"))
+                .descendant_font(cid)
+                .to_unicode(cmap_ref);
+            self.put(type0, &chunk)?;
+
+            let system_info = SystemInfo { registry: Str(b"Adobe"), ordering: Str(b"Identity"), supplement: 0 };
+            // iText (used by JasperReports) truncates glyph widths to whole units; viewers advance
+            // glyphs by these widths, so we do the same to match its output.
+            let widths: Vec<f32> = used.remapper.remapped_gids().map(|old| (face.advance(old) * scale).trunc()).collect();
+            let mut chunk = Chunk::new();
+            let mut cid_font = chunk.cid_font(cid);
+            cid_font
+                .subtype(CidFontType::Type2)
+                .base_font(Name(base_name.as_bytes()))
+                .system_info(system_info)
+                .font_descriptor(descriptor)
+                .default_width(0.0)
+                .cid_to_gid_map_predefined(Name(b"Identity"));
+            cid_font.widths().consecutive(0, widths);
+            cid_font.finish();
+            self.put(cid, &chunk)?;
+
+            let mut flags = FontFlags::NON_SYMBOLIC;
+            if face.family.contains("Serif") {
+                flags |= FontFlags::SERIF;
+            }
+            if face.family.contains("Mono") {
+                flags |= FontFlags::FIXED_PITCH;
+            }
+            if face.italic {
+                flags |= FontFlags::ITALIC;
+            }
+            let b = face.bbox;
+            let mut chunk = Chunk::new();
+            chunk
+                .font_descriptor(descriptor)
+                .name(Name(base_name.as_bytes()))
+                .flags(flags)
+                .bbox(Rect::new(b[0] * scale, b[1] * scale, b[2] * scale, b[3] * scale))
+                .italic_angle(face.italic_angle)
+                .ascent(face.ascender * scale)
+                .descent(-face.descender * scale)
+                .cap_height(face.cap_height * scale)
+                .stem_v(if face.bold { 120.0 } else { 80.0 })
+                .font_file2(file);
+            self.put(descriptor, &chunk)?;
+
+            let mut cmap = pdf_writer::types::UnicodeCmap::new(Name(b"Custom"), system_info);
+            let mut pairs: Vec<(u16, char)> =
+                used.chars.iter().filter_map(|&(old, c)| used.remapper.get(old).map(|new| (new, c))).collect();
+            pairs.sort_unstable();
+            for (new, c) in pairs {
+                cmap.pair(new, c);
+            }
+            let mut chunk = Chunk::new();
+            chunk.cmap(cmap_ref, &cmap.finish());
+            self.put(cmap_ref, &chunk)?;
+
+            let compressed = deflate(&subset);
+            let mut chunk = Chunk::new();
+            chunk.stream(file, &compressed).filter(Filter::FlateDecode).pair(Name(b"Length1"), subset.len() as i32);
+            self.put(file, &chunk)?;
+
+            font_refs.push((used.resource, type0));
+        }
+
+        // One resource dictionary shared by every page.
+        let resources = self.next_id();
+        let mut chunk = Chunk::new();
+        let mut res = chunk.indirect(resources).start::<pdf_writer::writers::Resources>();
         let mut fonts_dict = res.fonts();
         for (name, r) in &font_refs {
             fonts_dict.pair(Name(name.as_bytes()), *r);
         }
         fonts_dict.finish();
-        if !image_refs.is_empty() {
+        if !self.images.is_empty() {
             let mut xobjects = res.x_objects();
-            for (name, r) in image_refs.values() {
+            for (name, r) in self.images.values() {
                 xobjects.pair(Name(name.as_bytes()), *r);
             }
             xobjects.finish();
         }
         res.finish();
-        p.finish();
+        self.put(resources, &chunk)?;
+
+        let (catalog_id, tree_id, info_id) = (Ref::new(1), Ref::new(2), Ref::new(3));
+        let mut page_ids = Vec::with_capacity(self.pages.len());
+        for contents in std::mem::take(&mut self.pages) {
+            let page_id = self.next_id();
+            page_ids.push(page_id);
+            let mut chunk = Chunk::new();
+            let mut p = chunk.page(page_id);
+            p.parent(tree_id).media_box(Rect::new(0.0, 0.0, self.page_width, self.page_height));
+            match contents.as_slice() {
+                [one] => {
+                    p.contents(*one);
+                }
+                many => {
+                    p.contents_array(many.iter().copied());
+                }
+            }
+            p.pair(Name(b"Resources"), resources);
+            p.finish();
+            self.put(page_id, &chunk)?;
+        }
+
+        let mut chunk = Chunk::new();
+        chunk.pages(tree_id).kids(page_ids.iter().copied()).count(page_ids.len() as i32);
+        self.put(tree_id, &chunk)?;
+        let mut chunk = Chunk::new();
+        chunk.indirect(catalog_id).start::<pdf_writer::writers::Catalog>().pages(tree_id);
+        self.put(catalog_id, &chunk)?;
+        let mut chunk = Chunk::new();
+        let mut info = chunk.indirect(info_id).start::<pdf_writer::writers::DocumentInfo>();
+        info.producer(TextStr(concat!("ferroreport ", env!("CARGO_PKG_VERSION"))));
+        if let Some(t) = &self.options.title {
+            info.title(TextStr(t));
+        }
+        info.finish();
+        self.put(info_id, &chunk)?;
+
+        // Cross-reference table and trailer.
+        let mut end = Vec::with_capacity(self.offsets.len() * 20 + 128);
+        end.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f\r\n", self.offsets.len() + 1).as_bytes());
+        for offset in &self.offsets {
+            end.extend_from_slice(format!("{offset:010} 00000 n\r\n").as_bytes());
+        }
+        end.extend_from_slice(
+            format!(
+                "trailer\n<<\n  /Size {}\n  /Root 1 0 R\n  /Info 3 0 R\n>>\nstartxref\n{}\n%%EOF",
+                self.offsets.len() + 1,
+                self.pos
+            )
+            .as_bytes(),
+        );
+        self.out.write_all(&end).map_err(io)?;
+        self.out.flush().map_err(io)?;
+        Ok(self.out)
+    }
+}
+
+impl<W: std::io::Write> crate::fill::PageSink for PdfStream<W> {
+    fn accepts_late(&self) -> bool {
+        true
     }
 
-    pdf.pages(tree_id).kids(page_ids.iter().copied()).count(page_ids.len() as i32);
-    pdf.catalog(catalog_id).pages(tree_id);
-    let mut info = pdf.document_info(info_id);
-    info.producer(TextStr(concat!("ferroreport ", env!("CARGO_PKG_VERSION"))));
-    if let Some(t) = &options.title {
-        info.title(TextStr(t));
+    fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> Result<()> {
+        PdfStream::page(self, &page.items, fonts)
     }
-    info.finish();
-    Ok(pdf.finish())
+
+    fn late(&mut self, page: usize, item: PrintItem, fonts: &FontSet) -> Result<()> {
+        PdfStream::late(self, page, std::slice::from_ref(&item), fonts)
+    }
+}
+
+/// Serialises a filled document to PDF bytes.
+pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> Result<Vec<u8>> {
+    let mut pdf = PdfStream::new(Vec::new(), doc.page_width, doc.page_height, options.clone())?;
+    for page in &doc.pages {
+        pdf.page(&page.items, fonts)?;
+    }
+    pdf.finish(fonts)
 }

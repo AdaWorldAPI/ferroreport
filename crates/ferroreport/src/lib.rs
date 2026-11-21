@@ -39,8 +39,9 @@ pub mod xlsx;
 mod xml;
 mod zip;
 
-pub use data::Record;
+pub use data::{JsonRows, Record};
 pub use error::{Error, Result};
+pub use fill::{FillStats, Limits, PageSink, RowIter};
 pub use format::Locale;
 pub use model::Report;
 pub use print::PrintDocument;
@@ -100,6 +101,9 @@ pub struct Renderer {
     images: image::ImageStore,
     locale: &'static Locale,
     now: Option<NaiveDateTime>,
+    limits: Limits,
+    xlsx: xlsx::XlsxOptions,
+    csv: csv::CsvOptions,
 }
 
 impl Default for Renderer {
@@ -110,7 +114,15 @@ impl Default for Renderer {
 
 impl Renderer {
     pub fn new() -> Renderer {
-        Renderer { fonts: FontSet::new(), images: image::ImageStore::new(), locale: &format::locale::EN_US, now: None }
+        Renderer {
+            fonts: FontSet::new(),
+            images: image::ImageStore::new(),
+            locale: &format::locale::EN_US,
+            now: None,
+            limits: Limits::default(),
+            xlsx: Default::default(),
+            csv: Default::default(),
+        }
     }
 
     /// Sets the locale used for number and date formatting (`en_US`, `es_DO`, `es_ES`, ...).
@@ -122,6 +134,24 @@ impl Renderer {
     /// Fixes the value of `new java.util.Date()` (useful for reproducible output).
     pub fn now(mut self, now: NaiveDateTime) -> Renderer {
         self.now = Some(now);
+        self
+    }
+
+    /// Stops a render that goes over `limits` (pages, time) with [`Error::Limit`].
+    pub fn limits(mut self, limits: Limits) -> Renderer {
+        self.limits = limits;
+        self
+    }
+
+    /// Options for Excel output from [`Renderer::export`] and the `render` methods.
+    pub fn xlsx_options(mut self, options: xlsx::XlsxOptions) -> Renderer {
+        self.xlsx = options;
+        self
+    }
+
+    /// Options for CSV output from [`Renderer::export`] and the `render` methods.
+    pub fn csv_options(mut self, options: csv::CsvOptions) -> Renderer {
+        self.csv = options;
         self
     }
 
@@ -152,12 +182,77 @@ impl Renderer {
 
     /// Fills a parsed report into a print document.
     pub fn fill(&mut self, report: &Report, records: &[Record], params: HashMap<String, Value>) -> Result<PrintDocument> {
-        let env = expr::EvalEnv {
+        let env = self.env(report);
+        fill::fill_slice(report, records, params, &mut self.fonts, &mut self.images, &env, self.limits)
+    }
+
+    fn env(&self, report: &Report) -> expr::EvalEnv<'static> {
+        expr::EvalEnv {
             locale: self.locale,
             groovy: report.language == model::Language::Groovy,
             now: self.now.unwrap_or_else(|| chrono::Utc::now().naive_utc()),
-        };
-        fill::fill(report, records, params, &mut self.fonts, &mut self.images, &env)
+        }
+    }
+
+    /// Fills a report whose rows arrive one at a time, handing each page to `sink` as soon as
+    /// it is finished. Use it to write a format of your own, or to send pages somewhere
+    /// as they are made.
+    pub fn fill_to(
+        &mut self,
+        report: &Report,
+        rows: RowIter,
+        params: HashMap<String, Value>,
+        sink: &mut dyn PageSink,
+    ) -> Result<FillStats> {
+        let env = self.env(report);
+        fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, sink)
+    }
+
+    /// Renders a report whose rows arrive one at a time, writing the output as it goes:
+    /// PDF and CSV pages leave memory as soon as they are finished, so a report of a
+    /// million rows needs about as much memory as one of a thousand. (Excel workbooks are
+    /// laid out as a whole, so they are built in memory first.)
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let report = ferroreport::parse(&std::fs::read_to_string("sales.jrxml")?)?;
+    /// let rows = ferroreport::JsonRows::new(&report, std::fs::File::open("sales.json")?);
+    /// let out = std::io::BufWriter::new(std::fs::File::create("sales.pdf")?);
+    /// ferroreport::Renderer::new().render_to(&report, Box::new(rows), Default::default(), ferroreport::Format::Pdf, out)?;
+    /// # Ok(()) }
+    /// ```
+    pub fn render_to<W: std::io::Write>(
+        &mut self,
+        report: &Report,
+        rows: RowIter,
+        params: HashMap<String, Value>,
+        format: Format,
+        mut out: W,
+    ) -> Result<FillStats> {
+        let env = self.env(report);
+        match format {
+            Format::Pdf => {
+                let options = pdf::PdfOptions { title: Some(report.name.clone()), compress: true };
+                let mut sink = pdf::PdfStream::new(out, report.page_width, report.page_height, options)?;
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish(&self.fonts)?;
+                Ok(stats)
+            }
+            Format::Csv => {
+                let mut sink = csv::CsvStream::new(out, report.page_width, report.page_height, self.csv.clone());
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish()?;
+                Ok(stats)
+            }
+            Format::Xlsx => {
+                let mut count = 0;
+                let rows = rows.inspect(|_| count += 1);
+                let doc = fill::fill_rows(report, Box::new(rows), params, &mut self.fonts, &mut self.images, &env, self.limits)?;
+                let bytes = self.to_xlsx(&doc, &self.xlsx);
+                out.write_all(&bytes).and_then(|_| out.flush()).map_err(|e| Error::Io(e.to_string()))?;
+                Ok(FillStats { pages: doc.pages.len(), rows: count })
+            }
+        }
     }
 
     /// Exports a filled document to PDF.
@@ -176,12 +271,12 @@ impl Renderer {
         csv::write_csv(doc, options)
     }
 
-    /// Exports a filled document in the given format (XLSX and CSV with default options).
+    /// Exports a filled document in the given format.
     pub fn export(&self, doc: &PrintDocument, format: Format) -> Result<Vec<u8>> {
         Ok(match format {
             Format::Pdf => self.to_pdf(doc)?,
-            Format::Xlsx => self.to_xlsx(doc, &Default::default()),
-            Format::Csv => self.to_csv(doc, &Default::default()).into_bytes(),
+            Format::Xlsx => self.to_xlsx(doc, &self.xlsx),
+            Format::Csv => self.to_csv(doc, &self.csv).into_bytes(),
         })
     }
 

@@ -17,13 +17,19 @@ USAGE:
     ferroreport serve [OPTIONS]
 
 RENDER OPTIONS:
-    -d, --data <file.json>      JSON array of rows (omit for reports without data; - reads stdin)
+    -d, --data <file.json>      Rows: a JSON array of objects, or one JSON object per line
+                                (omit for reports without data; - reads stdin). Rows are read
+                                as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
                                 extension picks the format: .pdf, .xlsx or .csv
     -f, --format <pdf|xlsx|csv> Output format, when the file name does not say it
         --xlsx-numbers          In XLSX, write numbers as numbers (default: as formatted text,
                                 like JasperReports)
+        --csv-safe              In CSV, put an apostrophe before values a spreadsheet would
+                                run as a formula (use it when the data comes from other people)
+        --max-pages <n>         Stop if the report goes over this many pages
+        --timeout <seconds>     Stop if the render takes longer than this
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
@@ -107,6 +113,8 @@ fn render(args: &[String]) -> CliResult {
     let mut resources = Vec::new();
     let mut format = None;
     let mut xlsx_numbers = false;
+    let mut csv_safe = false;
+    let mut limits = ferroreport::Limits::default();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
@@ -114,6 +122,12 @@ fn render(args: &[String]) -> CliResult {
             "-d" | "--data" => data = Some(value(a)?),
             "-f" | "--format" => format = Some(value(a)?.to_ascii_lowercase()),
             "--xlsx-numbers" => xlsx_numbers = true,
+            "--csv-safe" => csv_safe = true,
+            "--max-pages" => limits.max_pages = Some(value(a)?.parse().map_err(|_| "--max-pages expects a number")?),
+            "--timeout" => {
+                let secs: f64 = value(a)?.parse().map_err(|_| "--timeout expects seconds")?;
+                limits.timeout = Some(std::time::Duration::from_secs_f64(secs.max(0.0)));
+            }
             "-p" | "--params" => params = Some(value(a)?),
             "-o" | "--output" => output = Some(value(a)?),
             "-l" | "--locale" => locale = value(a)?,
@@ -138,17 +152,18 @@ fn render(args: &[String]) -> CliResult {
     let started = Instant::now();
     let source = std::fs::read_to_string(&template).map_err(|e| format!("{template}: {e}"))?;
     let report = ferroreport::parse(&source)?;
-    let rows = match &data {
-        Some(p) => read_json(p)?,
-        None => serde_json::Value::Array(Vec::new()),
-    };
     let params_json = match &params {
         Some(p) => read_json(p)?,
         None => serde_json::Value::Object(Default::default()),
     };
     let template_dir = PathBuf::from(&template).parent().map(PathBuf::from).unwrap_or_default();
     let template_dir = if template_dir.as_os_str().is_empty() { PathBuf::from(".") } else { template_dir };
-    let mut renderer = Renderer::new().locale(&locale).resource_dir(template_dir);
+    let mut renderer = Renderer::new()
+        .locale(&locale)
+        .resource_dir(template_dir)
+        .limits(limits)
+        .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
+        .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
     for dir in &resources {
         renderer = renderer.resource_dir(dir);
     }
@@ -164,22 +179,39 @@ fn render(args: &[String]) -> CliResult {
         let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
         renderer.register_font(family, flags.contains(&"bold"), flags.contains(&"italic"), bytes)?;
     }
-    let records = ferroreport::data::records_from_json(&report, &rows)?;
     let params = ferroreport::params_from_json(&report, &params_json)?;
     let parsed = started.elapsed();
-    let doc = renderer.fill(&report, &records, params)?;
-    let filled = started.elapsed();
-    let bytes = match format {
-        ferroreport::Format::Xlsx => renderer.to_xlsx(&doc, &ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers }),
-        other => renderer.export(&doc, other)?,
+    // Rows are read as they are needed and pages are written as they are finished, so the
+    // size of the data does not decide how much memory the render takes.
+    let rows: ferroreport::RowIter = match data.as_deref() {
+        Some("-") => Box::new(ferroreport::JsonRows::new(&report, std::io::stdin().lock())),
+        Some(path) => {
+            Box::new(ferroreport::JsonRows::new(&report, std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?))
+        }
+        None => Box::new(std::iter::empty()),
     };
     let to_stdout = output.as_os_str() == "-";
-    if to_stdout {
-        std::io::Write::write_all(&mut std::io::stdout(), &bytes).map_err(|e| format!("stdout: {e}"))?;
+    let stats = if to_stdout {
         quiet = true;
+        renderer.render_to(&report, rows, params, format, std::io::BufWriter::new(std::io::stdout().lock()))?
     } else {
-        std::fs::write(&output, &bytes).map_err(|e| format!("{}: {e}", output.display()))?;
-    }
+        // Written beside the output and moved into place, so a failed render leaves no
+        // half-written file behind.
+        let mut name = output.file_name().unwrap_or_default().to_os_string();
+        name.push(".part");
+        let part = output.with_file_name(name);
+        let file = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", output.display()))?;
+        match renderer.render_to(&report, rows, params, format, std::io::BufWriter::with_capacity(1 << 16, file)) {
+            Ok(stats) => {
+                std::fs::rename(&part, &output).map_err(|e| format!("{}: {e}", output.display()))?;
+                stats
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&part);
+                return Err(e.into());
+            }
+        }
+    };
     let total = started.elapsed();
 
     for w in &report.warnings {
@@ -190,14 +222,13 @@ fn render(args: &[String]) -> CliResult {
     }
     if !quiet {
         eprintln!(
-            "{} -> {} ({} pages, {} rows) parse {:.1} ms, fill {:.1} ms, export {:.1} ms",
+            "{} -> {} ({} pages, {} rows) parse {:.1} ms, render {:.1} ms",
             template,
             output.display(),
-            doc.pages.len(),
-            records.len(),
+            stats.pages,
+            stats.rows,
             parsed.as_secs_f64() * 1e3,
-            (filled - parsed).as_secs_f64() * 1e3,
-            (total - filled).as_secs_f64() * 1e3,
+            (total - parsed).as_secs_f64() * 1e3,
         );
     }
     Ok(())

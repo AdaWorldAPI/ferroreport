@@ -29,6 +29,12 @@ pub enum Error {
     /// Font loading or subsetting failed.
     #[error("font error: {0}")]
     Font(String),
+    /// The render went over a limit set for it (pages, time).
+    #[error("limit exceeded: {0}")]
+    Limit(String),
+    /// The output could not be written.
+    #[error("cannot write the output: {0}")]
+    Io(String),
 }
 
 impl Error {

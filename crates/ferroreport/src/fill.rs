@@ -202,6 +202,195 @@ impl Scope for Ctx<'_> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Rows, limits and where pages go
+
+/// A row of the data source: borrowed, or owned when it arrives from a stream.
+pub type Row<'a> = std::borrow::Cow<'a, Record>;
+
+/// Rows arriving one at a time.
+pub type RowIter<'a> = Box<dyn Iterator<Item = Result<Record>> + 'a>;
+
+enum RowSource<'a> {
+    Slice(std::slice::Iter<'a, Record>),
+    Stream(RowIter<'a>),
+}
+
+/// The rows of the report being filled. Only the current row and the one before it are
+/// kept, unless the report needs them all (a crosstab over the report's own rows).
+struct Rows<'a> {
+    source: RowSource<'a>,
+    seen: Vec<Row<'a>>,
+    keep_all: bool,
+    count: usize,
+}
+
+impl<'a> Rows<'a> {
+    fn new(source: RowIter<'a>, report: &Report) -> Rows<'a> {
+        Rows { source: RowSource::Stream(source), seen: Vec::new(), keep_all: needs_all_rows(report), count: 0 }
+    }
+
+    fn from_slice(records: &'a [Record], report: &Report) -> Rows<'a> {
+        Rows { source: RowSource::Slice(records.iter()), seen: Vec::new(), keep_all: needs_all_rows(report), count: 0 }
+    }
+
+    /// Moves to the next row; false at the end (the last row stays current).
+    fn advance(&mut self) -> Result<bool> {
+        let next = match &mut self.source {
+            RowSource::Slice(it) => it.next().map(|r| Ok(Row::Borrowed(r))),
+            RowSource::Stream(it) => it.next().map(|r| r.map(Row::Owned)),
+        };
+        match next {
+            Some(row) => {
+                let row = row?;
+                if !self.keep_all && self.seen.len() >= 2 {
+                    self.seen.remove(0);
+                }
+                self.seen.push(row);
+                self.count += 1;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    fn current(&self) -> Option<&Record> {
+        self.seen.last().map(|r| r.as_ref())
+    }
+
+    fn record(&self, mode: Values) -> Option<&Record> {
+        match mode {
+            Values::Old if self.seen.len() >= 2 => Some(self.seen[self.seen.len() - 2].as_ref()),
+            _ => self.current(),
+        }
+    }
+
+    fn seen(&self) -> &[Row<'a>] {
+        &self.seen
+    }
+}
+
+/// Whether filling `report` reads rows again after printing them.
+fn needs_all_rows(report: &Report) -> bool {
+    fn any(elements: &[Element]) -> bool {
+        elements.iter().any(|e| match &e.kind {
+            ElementKind::Crosstab(ct) => ct.run.is_none(),
+            ElementKind::Frame { children, .. } => any(children),
+            _ => false,
+        })
+    }
+    let r = report;
+    [
+        &r.background,
+        &r.title,
+        &r.page_header,
+        &r.column_header,
+        &r.column_footer,
+        &r.page_footer,
+        &r.last_page_footer,
+        &r.summary,
+        &r.no_data,
+    ]
+    .into_iter()
+    .flatten()
+    .chain(r.detail.iter())
+    .chain(r.groups.iter().flat_map(|g| g.header.iter().chain(g.footer.iter())))
+    .any(|b| any(&b.elements))
+}
+
+/// What one render may use. Rendering stops with [`Error::Limit`] when it goes over.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Limits {
+    /// Most pages a report may have.
+    pub max_pages: Option<usize>,
+    /// Longest a render may take (checked while filling).
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Limits {
+    fn check_pages(&self, pages: usize) -> Result<()> {
+        match self.max_pages {
+            Some(max) if pages > max => Err(Error::Limit(format!("the report has more than {max} pages"))),
+            _ => Ok(()),
+        }
+    }
+
+    fn check_time(&self, deadline: Option<std::time::Instant>) -> Result<()> {
+        match (deadline, self.timeout) {
+            (Some(d), Some(t)) if std::time::Instant::now() > d => {
+                Err(Error::Limit(format!("rendering took longer than {} s", t.as_secs_f32())))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn deadline(&self) -> Option<std::time::Instant> {
+        self.timeout.map(|t| std::time::Instant::now() + t)
+    }
+}
+
+/// Receives the pages of a report as they are finished, so a long report never has to be
+/// held in memory whole.
+pub trait PageSink {
+    /// Whether [`PageSink::late`] can add to a page after it was delivered.
+    fn accepts_late(&self) -> bool {
+        false
+    }
+
+    /// The next page of the document.
+    fn page(&mut self, page: PrintPage, fonts: &FontSet) -> Result<()>;
+
+    /// A value computed after its page was delivered ("page 3 of 240"), drawn on top of
+    /// page number `page` (from 0). Only called when [`PageSink::accepts_late`] is true.
+    fn late(&mut self, _page: usize, _item: PrintItem, _fonts: &FontSet) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// How much was filled.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FillStats {
+    pub pages: usize,
+    pub rows: usize,
+}
+
+/// Whether `item` may draw inside the box `b` (`x0, y0, x1, y1`). True when unsure.
+fn may_touch(item: &PrintItem, b: [f32; 4]) -> bool {
+    let hit = |x: f32, y: f32, w: f32, h: f32| x < b[2] && x + w > b[0] && y < b[3] && y + h > b[1];
+    match item {
+        PrintItem::Element(_) => false,
+        PrintItem::Cell(info, _) => hit(info.x, info.y, info.w, info.h),
+        PrintItem::Group(items) => items.iter().any(|i| may_touch(i, b)),
+        PrintItem::Rect { x, y, w, h, fill, stroke, .. } => match (fill, stroke) {
+            (Some(_), _) => hit(*x, *y, *w, *h),
+            (None, Some(pen)) => {
+                // Only the outline is drawn.
+                let t = pen.width / 2.0 + 0.5;
+                hit(x - t, y - t, w + 2.0 * t, 2.0 * t)
+                    || hit(x - t, y + h - t, w + 2.0 * t, 2.0 * t)
+                    || hit(x - t, y - t, 2.0 * t, h + 2.0 * t)
+                    || hit(x + w - t, y - t, 2.0 * t, h + 2.0 * t)
+            }
+            (None, None) => false,
+        },
+        PrintItem::Ellipse { x, y, w, h, .. } | PrintItem::Image { x, y, w, h, .. } => hit(*x, *y, *w, *h),
+        PrintItem::Line { x1, y1, x2, y2, pen } => {
+            let t = pen.width / 2.0 + 0.5;
+            hit(x1.min(*x2) - t, y1.min(*y2) - t, (x1 - x2).abs() + 2.0 * t, (y1 - y2).abs() + 2.0 * t)
+        }
+        PrintItem::Text(t) => t.lines.iter().any(|l| hit(l.x, l.baseline - t.size, l.width, t.size * 1.5)),
+        PrintItem::Path { .. } | PrintItem::Transform(..) | PrintItem::Shapes { .. } => true,
+    }
+}
+
+/// Whether nothing drawn after a waiting element touches its box, so that drawing it last
+/// gives the same page.
+fn stands_alone(items: &[PrintItem], p: &Pending) -> bool {
+    let d = &p.text;
+    let b = [d.x, d.y, d.x + d.w, d.y + d.h];
+    !items[p.item + 1..].iter().any(|i| may_touch(i, b))
+}
+
+// ---------------------------------------------------------------------------
 // Band layout
 
 /// What a deferred element draws.
@@ -355,7 +544,7 @@ struct LayoutEnv<'a> {
     charts: &'a HashMap<usize, crate::chart::DataState>,
     /// The report being filled and its rows read so far (crosstabs over the report's data).
     report: &'a Report,
-    records: &'a [Record],
+    records: &'a [Row<'a>],
 }
 
 /// Evaluates a chart's title, axis labels and range limits.
@@ -1732,7 +1921,7 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
         params.insert(name.clone(), eval(e, le.scope, le.env)?);
     }
     // The rows: a subdataset run's, or the report's own.
-    let mut own_records = Vec::new();
+    let mut own_records: Vec<Row> = Vec::new();
     let mut run_params = HashMap::new();
     let mut dataset_fields = Vec::new();
     let sub = ct.run.is_some();
@@ -1753,10 +1942,10 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
             },
             None => Arc::new(serde_json::Value::Array(Vec::new())),
         };
-        own_records = crate::data::records_from_json(&report, &rows)?;
+        own_records = crate::data::records_from_json(&report, &rows)?.into_iter().map(Row::Owned).collect();
         dataset_fields = report.fields.clone();
     }
-    let (records, fields): (&[Record], &[Field]) =
+    let (records, fields): (&[Row], &[Field]) =
         if sub { (&own_records, &dataset_fields) } else { (le.records, &le.report.fields) };
 
     let defs: Vec<VarDef> = ct
@@ -2177,7 +2366,7 @@ struct Pending {
 
 struct Filler<'a> {
     report: &'a Report,
-    records: &'a [Record],
+    rows: Rows<'a>,
     params: HashMap<String, Value>,
     fonts: &'a mut FontSet,
     images: &'a mut ImageStore,
@@ -2186,13 +2375,23 @@ struct Filler<'a> {
     var_index: HashMap<String, usize>,
     committed: Vec<VarState>,
     estimated: Option<Vec<VarState>>,
-    current: Option<usize>,
     pages: Vec<PrintPage>,
+    /// Pages already handed to the sink (the index of `pages[0]` in the document).
+    page_base: usize,
+    sink: Option<&'a mut dyn PageSink>,
+    /// A page is waiting for a value that cannot be added to it later: nothing more is
+    /// handed to the sink until that value is known.
+    held: bool,
+    limits: Limits,
+    deadline: Option<std::time::Instant>,
     page_number: i32,
     offset_y: f32,
     /// Something other than page/column headers was printed on the current page.
     page_has_content: bool,
     pending: Vec<Pending>,
+    /// Elements evaluated at the end of the report ("page X of Y"), kept apart so the
+    /// checks made on every page and group do not walk them.
+    pending_final: Vec<Pending>,
     group_values: Vec<Option<Value>>,
     /// Whether the column/page footer of the current page has been printed already.
     footers_done: bool,
@@ -2235,14 +2434,6 @@ impl<'a> Filler<'a> {
         }
     }
 
-    fn record_for(&self, mode: Values) -> Option<&'a Record> {
-        let idx = match mode {
-            Values::Old => self.current.and_then(|c| c.checked_sub(1)),
-            _ => self.current,
-        };
-        idx.and_then(|i| self.records.get(i)).or_else(|| if self.records.is_empty() { None } else { self.records.last() })
-    }
-
     fn eval_with(&self, e: &Expr, vars: &[VarState], record: Option<&Record>) -> Result<Value> {
         let ctx = Ctx {
             record,
@@ -2259,7 +2450,7 @@ impl<'a> Filler<'a> {
     fn reset_var(&self, vars: &mut [VarState], i: usize) -> Result<()> {
         let initial = match &self.defs[i].initial {
             Some(e) => {
-                let rec = self.current.and_then(|c| self.records.get(c));
+                let rec = self.rows.current();
                 self.defs[i].class.coerce(self.eval_with(e, vars, rec)?)
             }
             None => Value::Null,
@@ -2274,7 +2465,7 @@ impl<'a> Filler<'a> {
         if self.charts.is_empty() {
             return Ok(());
         }
-        let record = self.record_for(mode);
+        let record = self.rows.record(mode);
         let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
         let ctx = Ctx {
             record,
@@ -2350,7 +2541,7 @@ impl<'a> Filler<'a> {
     /// Variables after adding the current record to `base`.
     fn calculate(&self, base: &[VarState]) -> Result<Vec<VarState>> {
         let mut vars = base.to_vec();
-        let rec = self.current.and_then(|c| self.records.get(c));
+        let rec = self.rows.current();
         for (i, def) in self.defs.iter().enumerate() {
             let ev = match &def.expression {
                 Some(e) => self.eval_with(e, &vars, rec)?,
@@ -2362,7 +2553,7 @@ impl<'a> Filler<'a> {
     }
 
     fn layout(&mut self, band: &Band, mode: Values) -> Result<Option<BandLayout>> {
-        let record = self.record_for(mode);
+        let record = self.rows.record(mode);
         let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
         let ctx = Ctx {
             record,
@@ -2388,14 +2579,14 @@ impl<'a> Filler<'a> {
             scope: &ctx,
             charts: &self.chart_data,
             report: self.report,
-            records: &self.records[..self.current.map_or(self.records.len(), |c| (c + 1).min(self.records.len()))],
+            records: self.rows.seen(),
         };
         layout_elements(&mut le, &band.elements, band.height, None).map(Some)
     }
 
     /// Lays out a list of elements (a band or the continuation of a split band).
     fn layout_elems(&mut self, elements: &[Element], design_h: f32, mode: Values, avail: Option<f32>) -> Result<BandLayout> {
-        let record = self.record_for(mode);
+        let record = self.rows.record(mode);
         let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
         let ctx = Ctx {
             record,
@@ -2416,7 +2607,7 @@ impl<'a> Filler<'a> {
             scope: &ctx,
             charts: &self.chart_data,
             report: self.report,
-            records: &self.records[..self.current.map_or(self.records.len(), |c| (c + 1).min(self.records.len()))],
+            records: self.rows.seen(),
         };
         layout_elements(&mut le, elements, design_h, avail)
     }
@@ -2434,8 +2625,9 @@ impl<'a> Filler<'a> {
         }
         let r = self.report;
         let dx = r.margins.left + if self.in_column { self.column as f32 * (r.column_width + r.column_spacing) } else { 0.0 };
-        let page = self.pages.len() - 1;
-        let first_item = self.pages[page].items.len();
+        let local = self.pages.len() - 1;
+        let page = self.page_base + local;
+        let first_item = self.pages[local].items.len();
         if let Some(marks) = &mut self.flow {
             marks.push(FlowMark {
                 y,
@@ -2446,13 +2638,14 @@ impl<'a> Filler<'a> {
         }
         for mut laid in layout.items {
             translate(&mut laid.item, dx, y);
-            let idx = self.pages[page].items.len();
+            let idx = self.pages[local].items.len();
             if let Some(mut d) = laid.deferred {
                 d.x += dx;
                 d.y += y;
-                self.pending.push(Pending { page, item: idx, text: d });
+                let list = if d.time == EvaluationTime::Report { &mut self.pending_final } else { &mut self.pending };
+                list.push(Pending { page, item: idx, text: d });
             }
-            self.pages[page].items.push(laid.item);
+            self.pages[local].items.push(laid.item);
         }
     }
 
@@ -2470,6 +2663,45 @@ impl<'a> Filler<'a> {
             None => &mut self.committed,
         };
         update_var(&mut vars[i], &def, value);
+    }
+
+    /// Hands the pages filled so far to the sink (called when a page is finished and at the
+    /// end, `all`). A page still waiting for a value goes only if the sink can add to it
+    /// later and nothing drawn after that value would end up underneath it.
+    fn flush_pages(&mut self, all: bool) -> Result<()> {
+        let Some(sink) = self.sink.as_deref_mut() else { return Ok(()) };
+        if self.held && !all {
+            return Ok(());
+        }
+        let mut n = 0;
+        while n < self.pages.len() {
+            let abs = self.page_base + n;
+            let items = &self.pages[n].items;
+            let mut waiting = [&self.pending, &self.pending_final]
+                .into_iter()
+                .flat_map(|list| list.iter().rev().take_while(move |p| p.page >= abs).filter(move |p| p.page == abs))
+                .peekable();
+            if waiting.peek().is_some() && !(sink.accepts_late() && waiting.all(|p| stands_alone(items, p))) {
+                self.held = true;
+                break;
+            }
+            n += 1;
+        }
+        for page in self.pages.drain(..n) {
+            sink.page(page, self.fonts)?;
+        }
+        self.page_base += n;
+        Ok(())
+    }
+
+    fn document(self) -> PrintDocument {
+        PrintDocument {
+            name: self.report.name.clone(),
+            page_width: self.report.page_width,
+            page_height: self.report.page_height,
+            landscape: self.report.landscape,
+            pages: self.pages,
+        }
     }
 
     fn page_footer_band(&self, last: bool) -> Option<&'a Band> {
@@ -2501,6 +2733,9 @@ impl<'a> Filler<'a> {
             }
             return Ok(());
         }
+        self.flush_pages(false)?;
+        self.limits.check_pages(self.page_base + self.pages.len() + 1)?;
+        self.limits.check_time(self.deadline)?;
         self.pages.push(PrintPage::default());
         self.page_number += 1;
         self.column = 0;
@@ -2721,10 +2956,21 @@ impl<'a> Filler<'a> {
     }
 
     fn resolve_pending(&mut self, pred: impl Fn(&DeferredText) -> bool, mode: Values) -> Result<()> {
-        let (ready, rest): (Vec<Pending>, Vec<Pending>) =
-            std::mem::take(&mut self.pending).into_iter().partition(|p| pred(&p.text));
-        self.pending = rest;
-        let record = self.record_for(mode);
+        let mut ready = Vec::new();
+        if self.pending.iter().any(|p| pred(&p.text)) {
+            let (hit, rest): (Vec<Pending>, Vec<Pending>) =
+                std::mem::take(&mut self.pending).into_iter().partition(|p| pred(&p.text));
+            self.pending = rest;
+            ready = hit;
+        }
+        if self.pending_final.first().is_some_and(|p| pred(&p.text)) {
+            ready.append(&mut self.pending_final);
+        }
+        if ready.is_empty() {
+            return Ok(());
+        }
+        self.held = false;
+        let record = self.rows.record(mode);
         let vars = self.ctx_vars(mode).to_vec();
         for p in ready {
             let ctx = Ctx {
@@ -2750,7 +2996,11 @@ impl<'a> Filler<'a> {
                     PrintItem::Group(crate::chart::render(ch, data, &texts, self.fonts, self.env.locale, d.x, d.y, d.w, d.h))
                 }
             };
-            self.pages[p.page].items[p.item] = item;
+            if p.page >= self.page_base {
+                self.pages[p.page - self.page_base].items[p.item] = item;
+            } else if let Some(sink) = self.sink.as_deref_mut() {
+                sink.late(p.page, item, self.fonts)?;
+            }
         }
         Ok(())
     }
@@ -2793,7 +3043,7 @@ impl<'a> Filler<'a> {
 
     /// Index of the outermost group whose value changes with the current record.
     fn group_rupture(&mut self) -> Result<Option<usize>> {
-        let rec = self.current.and_then(|c| self.records.get(c));
+        let rec = self.rows.current();
         let mut first = None;
         let groups = &self.report.groups;
         for (gi, group) in groups.iter().enumerate() {
@@ -2815,7 +3065,7 @@ impl<'a> Filler<'a> {
 
     fn run(&mut self) -> Result<()> {
         let r = self.report;
-        let no_data = self.records.is_empty();
+        let no_data = !self.rows.advance()?;
         if no_data {
             match r.when_no_data {
                 WhenNoData::NoPages => return Ok(()),
@@ -2832,8 +3082,6 @@ impl<'a> Filler<'a> {
                 }
                 WhenNoData::AllSectionsNoDetail => {}
             }
-        } else {
-            self.current = Some(0);
         }
 
         self.reset_where(|_| true)?;
@@ -2847,8 +3095,9 @@ impl<'a> Filler<'a> {
         }
         self.page_headers()?;
 
-        for idx in 0..self.records.len() {
-            self.current = Some(idx);
+        let mut idx = 0usize;
+        let mut more = !no_data;
+        while more {
             if let Some(gi) = self.group_rupture()? {
                 if idx > 0 {
                     self.group_footers(gi, Values::Old)?;
@@ -2868,11 +3117,15 @@ impl<'a> Filler<'a> {
             if let Some(est) = self.estimated.take() {
                 self.committed = est;
             }
+            idx += 1;
+            if idx % 256 == 0 {
+                self.limits.check_time(self.deadline)?;
+            }
+            more = self.rows.advance()?;
         }
 
         // End of data: closing group footers see the last record.
         if !no_data {
-            self.current = Some(self.records.len() - 1);
             self.group_footers(0, Values::Committed)?;
         }
         self.finish()
@@ -2929,15 +3182,68 @@ pub fn fill(
     env: &EvalEnv,
 ) -> Result<PrintDocument> {
     images.runs = 0;
-    let mut filler = new_filler(report, records, params, fonts, images, env)?;
+    let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.run()?;
-    Ok(PrintDocument {
-        name: report.name.clone(),
-        page_width: report.page_width,
-        page_height: report.page_height,
-        landscape: report.landscape,
-        pages: filler.pages,
-    })
+    Ok(filler.document())
+}
+
+/// Like [`fill`], with limits on what the render may use.
+pub fn fill_slice(
+    report: &Report,
+    records: &[Record],
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+    limits: Limits,
+) -> Result<PrintDocument> {
+    images.runs = 0;
+    let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
+    filler.limits = limits;
+    filler.deadline = limits.deadline();
+    filler.run()?;
+    Ok(filler.document())
+}
+
+/// Like [`fill`], with rows that arrive one at a time and limits on what the render may use.
+pub fn fill_rows(
+    report: &Report,
+    rows: RowIter,
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+    limits: Limits,
+) -> Result<PrintDocument> {
+    images.runs = 0;
+    let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
+    filler.limits = limits;
+    filler.deadline = limits.deadline();
+    filler.run()?;
+    Ok(filler.document())
+}
+
+/// Fills `report` and hands each page to `sink` as soon as it is finished, so memory stays
+/// flat however long the report is.
+#[allow(clippy::too_many_arguments)]
+pub fn fill_to(
+    report: &Report,
+    rows: RowIter,
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+    limits: Limits,
+    sink: &mut dyn PageSink,
+) -> Result<FillStats> {
+    images.runs = 0;
+    let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
+    filler.limits = limits;
+    filler.deadline = limits.deadline();
+    filler.sink = Some(sink);
+    filler.run()?;
+    filler.flush_pages(true)?;
+    Ok(FillStats { pages: filler.page_base, rows: filler.rows.count })
 }
 
 /// Fills a subreport without pagination: its bands as segments, and its final variables.
@@ -2949,7 +3255,7 @@ fn fill_flow(
     images: &mut ImageStore,
     env: &EvalEnv,
 ) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
-    let mut filler = new_filler(report, records, params, fonts, images, env)?;
+    let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.flow = Some(Vec::new());
     filler.run()?;
     let vars = filler.var_index.iter().map(|(name, &i)| (name.clone(), filler.committed[i].value.clone())).collect();
@@ -2997,7 +3303,7 @@ fn fill_flow(
 
 fn new_filler<'a>(
     report: &'a Report,
-    records: &'a [Record],
+    rows: Rows<'a>,
     mut params: HashMap<String, Value>,
     fonts: &'a mut FontSet,
     images: &'a mut ImageStore,
@@ -3062,7 +3368,7 @@ fn new_filler<'a>(
     let committed = vec![VarState::default(); defs.len()];
     Ok(Filler {
         report,
-        records,
+        rows,
         params,
         fonts,
         images,
@@ -3072,12 +3378,17 @@ fn new_filler<'a>(
         var_index,
         committed,
         estimated: None,
-        current: None,
         pages: Vec::new(),
+        page_base: 0,
+        sink: None,
+        held: false,
+        limits: Limits::default(),
+        deadline: None,
         page_number: 0,
         offset_y: 0.0,
         page_has_content: false,
         pending: Vec::new(),
+        pending_final: Vec::new(),
         footers_done: false,
         starting_group: None,
         repeated: HashMap::new(),
