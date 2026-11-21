@@ -1,0 +1,2 @@
+# Jasper's reference exports are compared byte for byte: keep their line endings.
+fixtures/**/jasper-xlsx/* -text

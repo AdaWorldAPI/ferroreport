@@ -30,7 +30,7 @@ const csv = Buffer.from(ferroreport.render(template, data, {}, {
   resources: { "lines.jrxml": readFileSync(new URL("lines.jrxml", fx)) },
   format: "csv",
 })).toString();
-assert.ok(csv.includes("Ferreteria"), csv.slice(0, 200));
+assert.ok(csv.startsWith("Orders with line items,"), csv.slice(0, 200));
 
 assert.throws(() => ferroreport.render("<jasperReport", [], {}, {}));
 assert.throws(() => ferroreport.render(template, data, {}, { format: "docx" }));
