@@ -27,6 +27,9 @@ plantillas que no escribiste tú.
 
 ## Desde tu lenguaje
 
+> Los paquetes de npm, PyPI y crates.io se están registrando; mientras tanto usa los
+> [binarios de Releases](https://github.com/cristianEncarnacion/ferroreport/releases) o la imagen Docker.
+
 - **JavaScript/TypeScript:** `npm install ferroreport` y
   `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF.
 - **Python:** `pip install ferroreport` y

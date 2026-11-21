@@ -28,6 +28,10 @@ with templates you did not write.
 
 ## Use it from your language
 
+> The npm, PyPI and crates.io packages are being registered; until they are published, use the
+> [release binaries](https://github.com/cristianEncarnacion/ferroreport/releases), the Docker image, or
+> build the packages from `bindings/` (see [RELEASING.md](RELEASING.md)).
+
 **JavaScript / TypeScript** (Node.js, Deno, Bun, browsers): `npm install ferroreport`
 
 ```js
