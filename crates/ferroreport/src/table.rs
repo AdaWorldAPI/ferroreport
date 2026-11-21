@@ -197,6 +197,8 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
 
     Report {
         name: dataset.name,
+        resource_bundle: None,
+        when_resource_missing: WhenResourceMissing::Null,
         language: table.run.language,
         page_width: width,
         page_height: table.run.page_height,
@@ -243,6 +245,8 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
     });
     Report {
         name: dataset.name,
+        resource_bundle: None,
+        when_resource_missing: WhenResourceMissing::Null,
         language: run.language,
         page_width: width,
         page_height: run.page_height,

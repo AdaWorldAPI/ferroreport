@@ -65,6 +65,32 @@ impl ImageStore {
         self.files.insert(normalize_name(name), data.into());
     }
 
+    /// The texts of a report's resource bundle: `<base>.properties` and the more specific
+    /// `<base>_<language>.properties` and `<base>_<language>_<COUNTRY>.properties` for the
+    /// locale, the more specific winning. None when no such file is found.
+    pub fn load_bundle(&self, base: &str, locale_tag: &str) -> Option<std::collections::HashMap<String, String>> {
+        // A bundle is named like a Java class (`com.acme.texts`) or like a file (`texts`).
+        let (language, country) = locale_tag.split_once('_').unwrap_or((locale_tag, ""));
+        let mut names = vec![String::new(), format!("_{language}")];
+        if !country.is_empty() {
+            names.push(format!("_{language}_{country}"));
+        }
+        let mut texts = None;
+        for base in [base.to_string(), base.replace('.', "/")] {
+            for suffix in &names {
+                if let Ok(bytes) = self.read(&format!("{base}{suffix}.properties")) {
+                    texts
+                        .get_or_insert_with(std::collections::HashMap::new)
+                        .extend(crate::format::message::parse_properties(&bytes));
+                }
+            }
+            if texts.is_some() {
+                break;
+            }
+        }
+        texts
+    }
+
     /// Reads a resource by relative location: in-memory files first, then the directories.
     fn read(&self, location: &str) -> Result<Vec<u8>> {
         check_relative(location)?;

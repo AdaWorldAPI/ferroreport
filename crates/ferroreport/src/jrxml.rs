@@ -329,13 +329,34 @@ impl Parser {
         let mut default_name = None;
         let mut warnings = Vec::new();
         let mut raw_conditionals: Vec<(String, String, StyleProps)> = Vec::new();
+        // A style without a parent takes what it does not set from the default style, as an
+        // element without a style does. The default style and its own ancestors are the
+        // exception: they are what the others fall back on.
+        let parent_of = |s: &Node| attr(s, &["style", "parentStyle"]).map(str::to_string);
+        let named: HashMap<&str, &Node> = root.children_named("style").filter_map(|s| s.attr("name").map(|n| (n, s))).collect();
+        let default_node = root.children_named("style").find(|s| attr(s, &["isDefault", "default"]).is_some_and(parse_bool));
+        let mut base_chain: Vec<&Node> = Vec::new();
+        let mut at = default_node;
+        while let Some(node) = at {
+            if base_chain.iter().any(|seen| std::ptr::eq(*seen, node)) {
+                break;
+            }
+            base_chain.push(node);
+            at = parent_of(node).and_then(|p| named.get(p.as_str()).copied());
+        }
+        let fallback =
+            base_chain.iter().rev().fold(StyleProps::default(), |under, node| StyleProps::from_style_node(node).over(&under));
         for s in root.children_named("style") {
             let Some(name) = s.attr("name") else { continue };
             let mut props = StyleProps::from_style_node(s);
-            if let Some(parent) = attr(s, &["style", "parentStyle"]) {
-                if let Some(p) = styles.get(parent) {
-                    props = props.over(p);
+            match parent_of(s) {
+                Some(parent) => {
+                    if let Some(p) = styles.get(&parent) {
+                        props = props.over(p);
+                    }
                 }
+                None if !base_chain.iter().any(|b| std::ptr::eq(*b, s)) => props = props.over(&fallback),
+                None => {}
             }
             for cs in s.children_named("conditionalStyle") {
                 let cond = cs.child("conditionExpression").map(|c| c.text.clone()).unwrap_or_default();
@@ -429,6 +450,13 @@ impl Parser {
             |p: &mut Parser, name: &str| -> Result<Option<Band>> { Ok(p.section_bands(root.child(name))?.into_iter().next()) };
         let report = Report {
             name: root.attr("name").unwrap_or("report").to_string(),
+            resource_bundle: root.attr("resourceBundle").filter(|b| !b.is_empty()).map(str::to_string),
+            when_resource_missing: match root.attr("whenResourceMissingType") {
+                Some("Empty") => WhenResourceMissing::Empty,
+                Some("Key") => WhenResourceMissing::Key,
+                Some("Error") => WhenResourceMissing::Error,
+                _ => WhenResourceMissing::Null,
+            },
             language: if self.groovy { Language::Groovy } else { Language::Java },
             page_width,
             page_height: num(&["pageHeight"], 842.0)?,
@@ -1307,9 +1335,6 @@ impl Parser {
                         "Auto" => EvaluationTime::Auto,
                         _ => EvaluationTime::Now,
                     };
-                    if matches!(evaluation_time, EvaluationTime::Auto) {
-                        self.warnings.push("evaluationTime=\"Auto\" is treated as \"Report\"".into());
-                    }
                     TextContent::Expression {
                         expr: self.child_expr(n, &["textFieldExpression", "expression"])?,
                         pattern: props.pattern.clone(),

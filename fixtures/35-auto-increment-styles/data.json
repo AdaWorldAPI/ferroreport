@@ -1,0 +1,87 @@
+[
+{
+"country": "Argentina",
+"city": "Buenos Aires",
+"amount": 120.5
+},
+{
+"country": "Argentina",
+"city": "Córdoba",
+"amount": 80
+},
+{
+"country": "Austria",
+"city": "Graz",
+"amount": 300.25
+},
+{
+"country": "Austria",
+"city": "Salzburg",
+"amount": 45.1
+},
+{
+"country": "Austria",
+"city": "Wien",
+"amount": 10
+},
+{
+"country": "Belgium",
+"city": "Charleroi",
+"amount": 77.7
+},
+{
+"country": "Brazil",
+"city": "Rio de Janeiro",
+"amount": 410
+},
+{
+"country": "Brazil",
+"city": "São Paulo",
+"amount": 99.99
+},
+{
+"country": "Brazil",
+"city": "Resende",
+"amount": 5.5
+},
+{
+"country": "Canada",
+"city": "Montréal",
+"amount": 230
+},
+{
+"country": "Canada",
+"city": "Vancouver",
+"amount": 64.4
+},
+{
+"country": "Denmark",
+"city": "Århus",
+"amount": 150
+},
+{
+"country": "Denmark",
+"city": "København",
+"amount": 20.2
+},
+{
+"country": "Finland",
+"city": "Oulu",
+"amount": 88
+},
+{
+"country": "France",
+"city": "Lyon",
+"amount": 310.3
+},
+{
+"country": "France",
+"city": "Nantes",
+"amount": 12
+},
+{
+"country": "France",
+"city": "Paris",
+"amount": 500
+}
+]

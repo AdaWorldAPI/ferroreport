@@ -390,10 +390,23 @@ pub struct Margins {
     pub bottom: f32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum WhenResourceMissing {
+    #[default]
+    Null,
+    Empty,
+    Key,
+    Error,
+}
+
 /// A parsed, style-resolved report template.
 #[derive(Debug, Clone)]
 pub struct Report {
     pub name: String,
+    /// Base name of the `.properties` files with the texts of `$R{key}` (`resourceBundle`).
+    pub resource_bundle: Option<String>,
+    /// What `$R{key}` gives when there is no such key (`whenResourceMissingType`).
+    pub when_resource_missing: WhenResourceMissing,
     pub language: Language,
     pub page_width: f32,
     pub page_height: f32,

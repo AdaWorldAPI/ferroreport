@@ -29,6 +29,9 @@ struct VarDef {
     class: JavaType,
     calculation: Calculation,
     reset: ResetType,
+    /// When the variable takes a new value in: with every row (`None`), or once for each
+    /// group, page or column (`incrementType`).
+    increment: ResetType,
     expression: Option<Expr>,
     initial: Option<Expr>,
 }
@@ -422,6 +425,20 @@ struct DeferredText {
     h: f32,
     time: EvaluationTime,
     group: Option<String>,
+    /// For `evaluationTime="Auto"`: what the element still waits for.
+    auto: Option<Box<Auto>>,
+}
+
+/// A text field with `evaluationTime="Auto"`: each variable of its expression is read at the
+/// moment its own reset type names (a group's total when the group ends, the report's when
+/// the report ends), and everything else as it was when the element was laid out. That is
+/// what makes "this group's share of the grand total" one expression.
+#[derive(Debug, Clone)]
+struct Auto {
+    record: Option<Record>,
+    vars: Vec<VarState>,
+    /// The moments still to come, each with the variables it brings.
+    waits: Vec<(EvaluationTime, Option<String>, Vec<usize>)>,
 }
 
 #[derive(Debug)]
@@ -1407,6 +1424,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                                 h,
                                 time,
                                 group,
+                                auto: None,
                             }),
                         });
                     }
@@ -1552,6 +1570,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                             h,
                             time: ch.evaluation_time,
                             group: ch.evaluation_group.clone(),
+                            auto: None,
                         }),
                     });
                 }
@@ -1970,6 +1989,7 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
             class: m.class,
             calculation: m.calculation,
             reset: ResetType::Report,
+            increment: ResetType::None,
             expression: m.expr.clone(),
             initial: None,
         })
@@ -2337,6 +2357,9 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
         params.insert(name.clone(), eval(e, le.scope, le.env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
+    if let Ok(bundle) = le.scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
+        params.entry(crate::expr::eval::RESOURCE_BUNDLE.into()).or_insert(bundle);
+    }
     let rows = match &run.data_source {
         Some(e) => match eval(e, le.scope, le.env)? {
             Value::Json(j) => j,
@@ -2406,6 +2429,11 @@ struct Filler<'a> {
     /// checks made on every page and group do not walk them.
     pending_final: Vec<Pending>,
     group_values: Vec<Option<Value>>,
+    /// For variables with an `incrementType`: their state when their group (page, column)
+    /// last ended. Each row is added to this, not to the running value, so the variable moves
+    /// once per group: a count with `incrementType="Group"` counts groups.
+    stepped: Vec<Option<VarState>>,
+    groups_read_variables: bool,
     /// Whether the column/page footer of the current page has been printed already.
     footers_done: bool,
     /// Groups from this index on are starting: their headers must not be reprinted by a
@@ -2542,9 +2570,26 @@ impl<'a> Filler<'a> {
             }
         }
         let mut vars = std::mem::take(&mut self.committed);
-        for (i, def) in self.defs.iter().enumerate() {
-            if pred(&def.reset) {
+        for i in 0..self.defs.len() {
+            let stepped = self.stepped[i].is_some();
+            // What ended takes its last value in, before anything starts again.
+            if stepped && pred(&self.defs[i].increment) {
+                self.stepped[i] = Some(vars[i].clone());
+            }
+            if matches!(self.defs[i].reset, ResetType::None) {
+                // Never reset: instead, whenever other variables start again (a group, a page,
+                // the report), it takes the value of its expression for the row at hand.
+                // That is why it can be printed in a group header, which comes before the
+                // row is added to anything.
+                if let Some(e) = &self.defs[i].expression {
+                    let value = self.eval_with(e, &vars, self.rows.current())?;
+                    vars[i].value = self.defs[i].class.coerce(value);
+                }
+            } else if pred(&self.defs[i].reset) {
                 self.reset_var(&mut vars, i)?;
+                if stepped {
+                    self.stepped[i] = Some(vars[i].clone());
+                }
             }
         }
         self.committed = vars;
@@ -2560,6 +2605,9 @@ impl<'a> Filler<'a> {
                 Some(e) => self.eval_with(e, &vars, rec)?,
                 None => Value::Null,
             };
+            if let Some(base) = &self.stepped[i] {
+                vars[i] = base.clone();
+            }
             update_var(&mut vars[i], def, ev);
         }
         Ok(vars)
@@ -2594,7 +2642,9 @@ impl<'a> Filler<'a> {
             report: self.report,
             records: self.rows.seen(),
         };
-        layout_elements(&mut le, &band.elements, band.height, None).map(Some)
+        let mut layout = layout_elements(&mut le, &band.elements, band.height, None)?;
+        self.plan_auto(&mut layout, record, &vars);
+        Ok(Some(layout))
     }
 
     /// Lays out a list of elements (a band or the continuation of a split band).
@@ -2622,7 +2672,48 @@ impl<'a> Filler<'a> {
             report: self.report,
             records: self.rows.seen(),
         };
-        layout_elements(&mut le, elements, design_h, avail)
+        let mut layout = layout_elements(&mut le, elements, design_h, avail)?;
+        self.plan_auto(&mut layout, record, &vars);
+        Ok(layout)
+    }
+
+    fn plan_auto(&self, layout: &mut BandLayout, record: Option<&Record>, vars: &[VarState]) {
+        for laid in &mut layout.items {
+            if let Some(d) = laid.deferred.as_mut().filter(|d| d.time == EvaluationTime::Auto) {
+                d.auto = Some(Box::new(self.auto_plan(d, record, vars)));
+            }
+        }
+    }
+
+    /// When each variable of an `evaluationTime="Auto"` element is to be read.
+    fn auto_plan(&self, d: &DeferredText, record: Option<&Record>, vars: &[VarState]) -> Auto {
+        let mut names = Vec::new();
+        if let Deferred::Text(te) = &d.what {
+            if let TextContent::Expression { expr, pattern_expr, .. } = &te.content {
+                expr.iter().chain(pattern_expr.iter()).for_each(|e| e.variables(&mut names));
+            }
+        }
+        let mut waits: Vec<(EvaluationTime, Option<String>, Vec<usize>)> = Vec::new();
+        for name in names {
+            let index = self.var_index.get(&*name).copied();
+            let (time, group) = match index.map(|i| &self.defs[i].reset) {
+                Some(ResetType::None) => continue,
+                Some(ResetType::Page) => (EvaluationTime::Page, None),
+                Some(ResetType::Column) => (EvaluationTime::Column, None),
+                Some(ResetType::Group(g)) => (EvaluationTime::Group, Some(g.clone())),
+                // The report's variables, and the page number, which is only final at the end.
+                _ => (EvaluationTime::Report, None),
+            };
+            let at = match waits.iter().position(|w| w.0 == time && w.1 == group) {
+                Some(at) => at,
+                None => {
+                    waits.push((time, group, Vec::new()));
+                    waits.len() - 1
+                }
+            };
+            waits[at].2.extend(index);
+        }
+        Auto { record: record.cloned(), vars: vars.to_vec(), waits }
     }
 
     fn emit(&mut self, layout: BandLayout, y: f32) {
@@ -2757,9 +2848,8 @@ impl<'a> Filler<'a> {
         self.footers_done = false;
         if self.page_number > 1 {
             self.reset_where(|r| matches!(r, ResetType::Page | ResetType::Column))?;
-            if let Some(est) = &self.estimated {
+            if self.estimated.is_some() {
                 // Re-estimate the record being moved to this page with page variables reset.
-                let _ = est;
                 self.estimated = Some(self.calculate(&self.committed.clone())?);
                 for (i, calculation, value) in self.returned.clone() {
                     self.apply_return(i, calculation, value);
@@ -2969,6 +3059,34 @@ impl<'a> Filler<'a> {
     }
 
     fn resolve_pending(&mut self, pred: impl Fn(&DeferredText) -> bool, mode: Values) -> Result<()> {
+        // Elements with evaluationTime="Auto" take from this moment the variables that belong
+        // to it, and are ready when they have them all.
+        if self.pending.iter().any(|p| p.text.auto.is_some()) {
+            let now = self.ctx_vars(mode).to_vec();
+            for p in &mut self.pending {
+                let Some(mut auto) = p.text.auto.take() else { continue };
+                let mut still = Vec::new();
+                for (time, group, indexes) in std::mem::take(&mut auto.waits) {
+                    p.text.time = time;
+                    p.text.group = group;
+                    if pred(&p.text) {
+                        for i in indexes {
+                            auto.vars[i] = now[i].clone();
+                        }
+                    } else {
+                        still.push((time, p.text.group.take(), indexes));
+                    }
+                }
+                auto.waits = still;
+                p.text.time = EvaluationTime::Auto;
+                p.text.group = None;
+                p.text.auto = Some(auto);
+            }
+        }
+        let pred = |d: &DeferredText| match &d.auto {
+            Some(auto) => auto.waits.is_empty(),
+            None => pred(d),
+        };
         let mut ready = Vec::new();
         if self.pending.iter().any(|p| pred(&p.text)) {
             let (hit, rest): (Vec<Pending>, Vec<Pending>) =
@@ -2986,11 +3104,15 @@ impl<'a> Filler<'a> {
         let record = self.rows.record(mode);
         let vars = self.ctx_vars(mode).to_vec();
         for p in ready {
+            let (record, vars) = match &p.text.auto {
+                Some(auto) => (auto.record.as_ref(), &auto.vars),
+                None => (record, &vars),
+            };
             let ctx = Ctx {
                 record,
                 report: self.report,
                 params: &self.params,
-                vars: &vars,
+                vars,
                 var_index: &self.var_index,
                 page_number: self.page_number,
                 column_number: self.column as i32 + 1,
@@ -3060,6 +3182,9 @@ impl<'a> Filler<'a> {
 
     /// Index of the outermost group whose value changes with the current record.
     fn group_rupture(&mut self) -> Result<Option<usize>> {
+        if self.groups_read_variables {
+            return self.group_rupture_with_variables();
+        }
         let rec = self.rows.current();
         let mut first = None;
         let groups = &self.report.groups;
@@ -3076,6 +3201,53 @@ impl<'a> Filler<'a> {
                 first = Some(gi);
             }
             self.group_values[gi] = Some(v);
+        }
+        Ok(first)
+    }
+
+    /// The same question when a group expression reads variables, asked the way JasperReports
+    /// asks it (`JRCalculator.estimateGroupRuptures`), because the answer depends on it:
+    ///
+    /// 1. each group on its own: does its expression say something else for this row, with
+    ///    the variables as the row would leave them, than for the row before, with the
+    ///    variables as that row left them?
+    /// 2. variables that move once per group (`incrementType="Group"`) take their step if
+    ///    their group changes, and the variables are worked out again;
+    /// 3. the groups in order, with those values: the first that changes takes the ones
+    ///    inside it along.
+    fn group_rupture_with_variables(&mut self) -> Result<Option<usize>> {
+        let r = self.report;
+        let first_row = self.group_values.iter().any(|v| v.is_none());
+        let changes = |f: &Filler, with_row: &[VarState], group: &Group| -> Result<(bool, Value)> {
+            let Some(e) = &group.expression else { return Ok((false, Value::Null)) };
+            let new = f.eval_with(e, with_row, f.rows.current())?;
+            // The first row starts every group: there is no row before to ask about.
+            if first_row {
+                return Ok((true, new));
+            }
+            let old = f.eval_with(e, &f.committed, f.rows.record(Values::Old))?;
+            Ok((!old.java_equals(&new), new))
+        };
+        let with_row = self.calculate(&self.committed)?;
+        let mut moved = false;
+        for group in &r.groups {
+            if changes(self, &with_row, group)?.0 {
+                for i in 0..self.defs.len() {
+                    if self.stepped[i].is_some() && matches!(&self.defs[i].increment, ResetType::Group(g) if *g == group.name) {
+                        self.stepped[i] = Some(self.committed[i].clone());
+                        moved = true;
+                    }
+                }
+            }
+        }
+        let with_row = if moved { self.calculate(&self.committed)? } else { with_row };
+        let mut first = None;
+        for (gi, group) in r.groups.iter().enumerate() {
+            let (changed, value) = changes(self, &with_row, group)?;
+            if changed && first.is_none() {
+                first = Some(gi);
+            }
+            self.group_values[gi] = Some(value);
         }
         Ok(first)
     }
@@ -3337,6 +3509,7 @@ fn new_filler<'a>(
         class: JavaType::Integer,
         calculation: Calculation::Count,
         reset,
+        increment: ResetType::None,
         expression: Some(Expr::Lit(Value::Int(1))),
         initial: Some(Expr::Lit(Value::Int(0))),
     };
@@ -3354,10 +3527,15 @@ fn new_filler<'a>(
             class: v.class,
             calculation: v.calculation,
             reset: v.reset.clone(),
+            increment: v.increment.clone(),
             expression: v.expression.clone(),
             initial: v.initial.clone(),
         });
     }
+    let stepped = defs.iter().map(|d| (!matches!(d.increment, ResetType::None)).then(VarState::default)).collect();
+    // A group expression that reads variables reads them as they will be with the row at hand.
+    let groups_read_variables =
+        report.groups.iter().any(|g| g.expression.as_ref().is_some_and(|e| format!("{e:?}").contains("Var(")));
     let var_index = defs.iter().enumerate().map(|(i, d)| (d.name.clone(), i)).collect();
 
     // Parameters: supplied values, then defaults (which may reference earlier parameters).
@@ -3367,6 +3545,19 @@ fn new_filler<'a>(
         params.entry(name.to_string()).or_insert(Value::Null);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| Value::str(env.locale.tag));
+    // The texts of `$R{key}`: the report's own bundle, or the one it was handed (a table or
+    // list inside a report uses the report's).
+    if !params.contains_key(crate::expr::eval::RESOURCE_BUNDLE) {
+        let mut texts: serde_json::Map<String, serde_json::Value> = report
+            .resource_bundle
+            .as_deref()
+            .and_then(|base| images.load_bundle(base, env.locale.tag))
+            .map(|t| t.into_iter().map(|(k, v)| (k, serde_json::Value::String(v))).collect())
+            .unwrap_or_default();
+        let missing = format!("{:?}", report.when_resource_missing);
+        texts.insert(crate::expr::eval::RESOURCE_MISSING.into(), serde_json::Value::String(missing));
+        params.insert(crate::expr::eval::RESOURCE_BUNDLE.into(), Value::Json(Arc::new(serde_json::Value::Object(texts))));
+    }
     params.entry("REPORT_TIME_ZONE".into()).or_insert_with(|| Value::str("UTC"));
     params.entry("IS_IGNORE_PAGINATION".into()).or_insert(Value::Bool(false));
     for p in &report.parameters {
@@ -3396,6 +3587,8 @@ fn new_filler<'a>(
         images,
         env,
         group_values: vec![None; report.groups.len()],
+        stepped,
+        groups_read_variables,
         defs,
         var_index,
         committed,

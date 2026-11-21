@@ -2,6 +2,7 @@
 
 pub mod date;
 pub mod locale;
+pub mod message;
 pub mod number;
 
 pub use locale::Locale;

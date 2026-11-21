@@ -116,7 +116,14 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
         }
         Expr::Static { class, name, args } => {
             let argv = args.iter().map(|a| eval(a, scope, env)).collect::<Result<Vec<_>>>()?;
-            static_call(class, name, argv, env)
+            match (&**class, &**name) {
+                ("", "msg") => {
+                    let pattern = argv.first().map(|v| v.to_java_string()).unwrap_or_default();
+                    Ok(Value::str(crate::format::message::message_format(&pattern, argv.get(1..).unwrap_or(&[]), env.locale)))
+                }
+                ("", "str") => resource(&argv.first().map(|v| v.to_java_string()).unwrap_or_default(), scope),
+                _ => static_call(class, name, argv, env),
+            }
         }
         Expr::StaticField { class, name } => static_field(class, name),
         Expr::New { class, args } => {
@@ -335,6 +342,14 @@ fn method(recv: Value, name: &str, args: Vec<Value>, env: &EvalEnv) -> Result<Va
         Value::Bool(b) if name == "booleanValue" => Ok(Value::Bool(*b)),
         Value::Date(d) => match name {
             "getTime" => Ok(Value::Long(d.and_utc().timestamp_millis())),
+            // The getters of java.util.Date, with its conventions: years from 1900, months from 0.
+            "getYear" => Ok(Value::Int(chrono::Datelike::year(d) - 1900)),
+            "getMonth" => Ok(Value::Int(chrono::Datelike::month0(d) as i32)),
+            "getDate" => Ok(Value::Int(chrono::Datelike::day(d) as i32)),
+            "getDay" => Ok(Value::Int(chrono::Datelike::weekday(d).num_days_from_sunday() as i32)),
+            "getHours" => Ok(Value::Int(chrono::Timelike::hour(d) as i32)),
+            "getMinutes" => Ok(Value::Int(chrono::Timelike::minute(d) as i32)),
+            "getSeconds" => Ok(Value::Int(chrono::Timelike::second(d) as i32)),
             "before" | "after" => {
                 let o = arg(&args, 0, name)?;
                 let Value::Date(o) = o else { return Err(Error::eval("Date comparison with non-date")) };
@@ -500,6 +515,29 @@ fn to_type(v: Value, ty: JavaType) -> Result<Value> {
         Value::Str(s) => parse_number(&s, ty),
         Value::Null => Ok(Value::Null),
         other => Ok(ty.coerce(other)),
+    }
+}
+
+/// Parameter that holds the texts of the report's resource bundle, as a JSON object.
+pub const RESOURCE_BUNDLE: &str = "REPORT_RESOURCE_BUNDLE";
+/// Key of that object that says what a missing text gives (`Null`, `Empty`, `Key`, `Error`).
+pub const RESOURCE_MISSING: &str = "\u{0}missing";
+
+/// The text of `key` in the report's resource bundle (`$R{key}`, `str("key")`).
+fn resource(key: &str, scope: &dyn Scope) -> Result<Value> {
+    let bundle = scope.param(RESOURCE_BUNDLE).unwrap_or_default();
+    let texts = match &bundle {
+        Value::Json(j) => j.as_object(),
+        _ => None,
+    };
+    if let Some(text) = texts.and_then(|t| t.get(key)).and_then(|v| v.as_str()) {
+        return Ok(Value::str(text));
+    }
+    match texts.and_then(|t| t.get(RESOURCE_MISSING)).and_then(|v| v.as_str()) {
+        Some("Empty") => Ok(Value::str("")),
+        Some("Key") => Ok(Value::str(key)),
+        Some("Error") => Err(Error::eval(format!("no text for `{key}` in the report's resource bundle"))),
+        _ => Ok(Value::Null),
     }
 }
 

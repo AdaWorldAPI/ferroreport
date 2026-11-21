@@ -45,6 +45,31 @@ pub enum Expr {
     Cast(JavaType, Box<Expr>),
 }
 
+impl Expr {
+    /// The names of the variables the expression reads.
+    pub fn variables(&self, out: &mut Vec<Box<str>>) {
+        match self {
+            Expr::Var(name) => out.push(name.clone()),
+            Expr::Lit(_) | Expr::Field(_) | Expr::Param(_) | Expr::StaticField { .. } => {}
+            Expr::Unary(_, e) | Expr::Cast(_, e) => e.variables(out),
+            Expr::Binary(_, a, b) | Expr::And(a, b) | Expr::Or(a, b) | Expr::Elvis(a, b) => {
+                a.variables(out);
+                b.variables(out);
+            }
+            Expr::Cond(a, b, c) => {
+                a.variables(out);
+                b.variables(out);
+                c.variables(out);
+            }
+            Expr::Method { target, args, .. } => {
+                target.variables(out);
+                args.iter().for_each(|a| a.variables(out));
+            }
+            Expr::Static { args, .. } | Expr::New { args, .. } => args.iter().for_each(|a| a.variables(out)),
+        }
+    }
+}
+
 struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -321,6 +346,10 @@ impl Parser {
             Token::Field(n) => Ok(Expr::Field(n.into())),
             Token::Param(n) => Ok(Expr::Param(n.into())),
             Token::Var(n) => Ok(Expr::Var(n.into())),
+            // `$R{key}` is `str("key")`.
+            Token::Resource(key) => {
+                Ok(Expr::Static { class: "".into(), name: "str".into(), args: vec![Expr::Lit(Value::str(key))] })
+            }
             Token::LParen => {
                 let e = self.expr(0)?;
                 self.expect(Token::RParen)?;
@@ -348,6 +377,11 @@ impl Parser {
                         if self.peek() == &Token::LParen {
                             break;
                         }
+                    }
+                    // The functions every expression has: msg(pattern, args...) and str(key).
+                    if parts.len() == 1 && matches!(parts[0].as_str(), "msg" | "str") && self.peek() == &Token::LParen {
+                        let args = self.args()?;
+                        return Ok(Expr::Static { class: "".into(), name: parts.remove(0).into(), args });
                     }
                     if parts.len() < 2 {
                         return Err(format!("unknown identifier `{}`", parts[0]));

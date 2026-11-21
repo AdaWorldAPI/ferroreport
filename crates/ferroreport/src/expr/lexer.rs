@@ -10,6 +10,8 @@ pub enum Token {
     Field(String),
     Param(String),
     Var(String),
+    /// `$R{key}`: a text of the report's resource bundle.
+    Resource(String),
     Op(&'static str),
     LParen,
     RParen,
@@ -82,7 +84,7 @@ pub fn tokenize(src: &str, groovy: bool) -> Result<Vec<Token>, String> {
                     'F' => Token::Field(name),
                     'P' => Token::Param(name),
                     'V' => Token::Var(name),
-                    _ => return Err(format!("resource references $R{{{name}}} are not supported")),
+                    _ => Token::Resource(name),
                 });
                 i = end + 1;
                 continue;
