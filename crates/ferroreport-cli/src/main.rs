@@ -51,6 +51,11 @@ add format xlsx or csv to the request for Excel or CSV):
         --token <secret>        Require `Authorization: Bearer <secret>` (or FERROREPORT_TOKEN)
         --max-body <MB>         Largest request accepted (default: 50)
         --workers <n>           Requests rendered in parallel (default: CPU count)
+        --timeout <seconds>     Longest a render may take (default: 60; 0 for no limit)
+        --max-pages <n>         Most pages a report may have (default: no limit)
+        --cache <n>             Parsed templates kept in memory (default: 128; 0 for none)
+        --access-log            Print a line per request
+    GET /health answers without a token; GET /metrics gives counters for Prometheus.
 ";
 
 fn main() -> ExitCode {
@@ -242,6 +247,10 @@ fn serve(args: &[String]) -> CliResult {
     let mut token = std::env::var("FERROREPORT_TOKEN").ok().filter(|t| !t.is_empty());
     let mut max_body_mb: usize = 50;
     let mut workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2);
+    // A request that runs for a minute is almost always a mistake or an attack.
+    let mut limits = ferroreport::Limits { max_pages: None, timeout: Some(std::time::Duration::from_secs(60)) };
+    let mut cache = 128usize;
+    let mut access_log = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
@@ -253,6 +262,13 @@ fn serve(args: &[String]) -> CliResult {
             "--token" => token = Some(value(a)?),
             "--max-body" => max_body_mb = value(a)?.parse().map_err(|_| "--max-body expects megabytes")?,
             "--workers" => workers = value(a)?.parse().map_err(|_| "--workers expects a number")?,
+            "--max-pages" => limits.max_pages = Some(value(a)?.parse().map_err(|_| "--max-pages expects a number")?),
+            "--timeout" => {
+                let secs: f64 = value(a)?.parse().map_err(|_| "--timeout expects seconds (0 for none)")?;
+                limits.timeout = (secs > 0.0).then(|| std::time::Duration::from_secs_f64(secs));
+            }
+            "--cache" => cache = value(a)?.parse().map_err(|_| "--cache expects a number of templates")?,
+            "--access-log" => access_log = true,
             s => return Err(format!("unknown option {s}").into()),
         }
     }
@@ -263,6 +279,9 @@ fn serve(args: &[String]) -> CliResult {
         token,
         max_body: max_body_mb * 1024 * 1024,
         workers,
+        limits,
+        cache,
+        access_log,
     })
 }
 

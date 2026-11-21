@@ -435,13 +435,10 @@ fn parse_markup(src: &str, base: &RunStyle, markup: Markup) -> Option<StyledText
                         ("style", "fontName") | ("font", "face" | "fontFace") => {
                             style.font.name = v.split(',').next().unwrap_or(v).trim().to_string()
                         }
-                        ("style", "size") => style.font.size = v.trim().parse().unwrap_or(style.font.size),
+                        ("style", "size") => style.font.size = font_size(v).unwrap_or(style.font.size),
                         ("font", "size") => {
-                            style.font.size = if html {
-                                html_font_size(v, style.font.size)
-                            } else {
-                                v.trim().parse().unwrap_or(style.font.size)
-                            }
+                            style.font.size =
+                                if html { html_font_size(v, style.font.size) } else { font_size(v).unwrap_or(style.font.size) }
                         }
                         ("style", "isBold") => style.font.bold = truthy(v),
                         ("style", "isItalic") => style.font.italic = truthy(v),
@@ -867,6 +864,12 @@ pub fn layout(
         }
     }
     (PrintItem::Group(items), needed)
+}
+
+/// A font size from markup: a finite, sensible number of points (anything else is ignored,
+/// like an unreadable value).
+fn font_size(v: &str) -> Option<f32> {
+    v.trim().parse::<f32>().ok().filter(|s| s.is_finite() && *s >= 0.0 && *s <= 10_000.0)
 }
 
 #[cfg(test)]

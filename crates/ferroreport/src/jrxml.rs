@@ -27,7 +27,19 @@ pub fn parse_report(source: &str) -> Result<Report> {
 // Attribute helpers
 
 fn parse_f32(v: &str, what: &str) -> Result<f32> {
-    v.trim().parse::<f32>().map_err(|_| Error::template(format!("invalid number `{v}` for {what}")))
+    number(v).ok_or_else(|| Error::template(format!("invalid number `{v}` for {what}")))
+}
+
+/// A number from an attribute. Values that are not finite (`inf`, `NaN`, `1e999`) or are
+/// far beyond any page are refused: a size like that would send layout into a loop.
+fn number<T: std::str::FromStr>(v: &str) -> Option<T> {
+    let v = v.trim();
+    let f: f64 = v.parse().ok()?;
+    if f.is_finite() && f.abs() <= 1e7 {
+        v.parse().ok()
+    } else {
+        None
+    }
 }
 
 fn parse_bool(v: &str) -> bool {
@@ -42,6 +54,10 @@ fn attr<'a>(node: &'a Node, names: &[&str]) -> Option<&'a str> {
 fn parse_color(v: &str) -> Option<Color> {
     let v = v.trim();
     if let Some(hex) = v.strip_prefix('#') {
+        // Only hexadecimal digits make a color (and anything else could not be sliced by bytes).
+        if !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
         let hex = if hex.len() == 3 { hex.chars().flat_map(|c| [c, c]).collect::<String>() } else { hex.to_string() };
         let n = u32::from_str_radix(&hex[hex.len().saturating_sub(6)..], 16).ok()?;
         return Some(Color { r: (n >> 16) as u8, g: (n >> 8) as u8, b: n as u8 });
@@ -78,7 +94,7 @@ struct PenProps {
 impl PenProps {
     fn read(node: &Node) -> PenProps {
         PenProps {
-            width: node.attr("lineWidth").and_then(|v| v.trim().parse().ok()),
+            width: node.attr("lineWidth").and_then(number),
             color: node.attr("lineColor").and_then(parse_color),
             style: node.attr("lineStyle").map(|s| match s {
                 "Dashed" => LineStyle::Dashed,
@@ -165,7 +181,7 @@ impl StyleProps {
         if let Some(v) = attr(n, &["fontName"]) {
             self.font_name = Some(v.to_string());
         }
-        if let Some(v) = attr(n, &["size", "fontSize"]).and_then(|v| v.trim().parse().ok()) {
+        if let Some(v) = attr(n, &["size", "fontSize"]).and_then(number) {
             self.font_size = Some(v);
         }
         let b = |names: &[&str]| attr(n, names).map(parse_bool);
@@ -206,7 +222,7 @@ impl StyleProps {
     }
 
     fn read_box(&mut self, b: &Node) {
-        let p = |names: &[&str]| attr(b, names).and_then(|v| v.trim().parse::<f32>().ok());
+        let p = |names: &[&str]| attr(b, names).and_then(number::<f32>);
         self.padding[0] = p(&["padding"]).or(self.padding[0]);
         self.padding[1] = p(&["topPadding"]).or(self.padding[1]);
         self.padding[2] = p(&["leftPadding"]).or(self.padding[2]);
@@ -223,7 +239,7 @@ impl StyleProps {
         if let Some(v) = p.attr("lineSpacing") {
             self.line_spacing = Some(v.to_string());
         }
-        if let Some(v) = p.attr("lineSpacingSize").and_then(|v| v.trim().parse().ok()) {
+        if let Some(v) = p.attr("lineSpacingSize").and_then(number) {
             self.line_spacing_size = Some(v);
         }
     }
@@ -240,7 +256,7 @@ impl StyleProps {
         if let Some(v) = attr(n, &["isBlankWhenNull", "blankWhenNull"]) {
             s.blank_when_null = Some(parse_bool(v));
         }
-        if let Some(v) = n.attr("radius").and_then(|v| v.trim().parse().ok()) {
+        if let Some(v) = n.attr("radius").and_then(number) {
             s.radius = Some(v);
         }
         if let Some(pen) = n.child("pen") {
@@ -341,7 +357,7 @@ impl Parser {
             conditionals: HashMap::new(),
             warnings: Vec::new(),
             datasets: HashMap::new(),
-            page_height: attr(root, &["pageHeight"]).and_then(|v| v.trim().parse().ok()).unwrap_or(842.0),
+            page_height: attr(root, &["pageHeight"]).and_then(number).unwrap_or(842.0),
         };
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
@@ -495,7 +511,7 @@ impl Parser {
                 start_new_column: attr(g, &["isStartNewColumn", "startNewColumn"]).is_some_and(parse_bool),
                 reprint_header_on_each_page: attr(g, &["isReprintHeaderOnEachPage", "reprintHeaderOnEachPage"])
                     .is_some_and(parse_bool),
-                min_height_to_start_new_page: attr(g, &["minHeightToStartNewPage"]).and_then(|v| v.parse().ok()).unwrap_or(0.0),
+                min_height_to_start_new_page: attr(g, &["minHeightToStartNewPage"]).and_then(number).unwrap_or(0.0),
                 header: self.section_bands(g.child("groupHeader"))?,
                 footer: self.section_bands(g.child("groupFooter"))?,
             });
@@ -688,7 +704,7 @@ impl Parser {
             cells,
             header_cell,
             no_data_cell,
-            column_break_offset: attr(n, &["columnBreakOffset"]).and_then(|v| v.trim().parse().ok()).unwrap_or(10.0),
+            column_break_offset: attr(n, &["columnBreakOffset"]).and_then(number).unwrap_or(10.0),
             repeat_column_headers: flag(&["isRepeatColumnHeaders", "repeatColumnHeaders"]),
             repeat_row_headers: flag(&["isRepeatRowHeaders", "repeatRowHeaders"]),
         })
@@ -895,7 +911,7 @@ fn font_from(node: Option<&Node>, base: &FontSpec) -> FontSpec {
         if let Some(v) = n.attr("fontName") {
             f.name = v.to_string();
         }
-        if let Some(v) = attr(n, &["size", "fontSize"]).and_then(|v| v.trim().parse().ok()) {
+        if let Some(v) = attr(n, &["size", "fontSize"]).and_then(number) {
             f.size = v;
         }
         f.bold = attr(n, &["isBold", "bold"]).map(parse_bool).unwrap_or(f.bold);
@@ -1169,7 +1185,7 @@ impl Parser {
         if let Some(v) = attr(n, &["isBlankWhenNull", "blankWhenNull"]) {
             own.blank_when_null = Some(parse_bool(v));
         }
-        if let Some(v) = n.attr("radius").and_then(|v| v.trim().parse().ok()) {
+        if let Some(v) = n.attr("radius").and_then(number) {
             own.radius = Some(v);
         }
         if let Some(pen) = n.child("graphicElement").and_then(|g| g.child("pen")).or_else(|| n.child("pen")) {
@@ -1402,20 +1418,20 @@ impl Parser {
             "componentElement" | "component" if table_node(n).is_some() => {
                 let t = table_node(n).unwrap_or(n);
                 let re = n.child("reportElement").unwrap_or(n);
-                let width = re.attr("width").and_then(|w| w.trim().parse().ok()).unwrap_or(0.0);
+                let width = re.attr("width").and_then(number).unwrap_or(0.0);
                 ElementKind::Table(Box::new(self.table(t, width)?))
             }
             "componentElement" | "component" if barcode_node(n).is_some() => {
                 let c = barcode_node(n).unwrap_or(n);
                 let name = c.attr("kind").map(|k| k.rsplit(':').next().unwrap_or(k)).filter(|_| c.name == "component");
                 let name = name.unwrap_or(c.name.as_str());
-                let num = |a: &str| c.attr(a).and_then(|v| v.trim().parse::<f64>().ok());
+                let num = |a: &str| c.attr(a).and_then(number::<f64>);
                 let symbology = if name == "QRCode" {
                     let level = c.attr("errorCorrectionLevel").and_then(crate::barcode::qr::Ecl::from_name);
                     Symbology::Qr {
                         level: level.unwrap_or(crate::barcode::qr::Ecl::L),
-                        margin: c.attr("margin").and_then(|v| v.trim().parse().ok()),
-                        version: c.attr("qrVersion").and_then(|v| v.trim().parse().ok()),
+                        margin: c.attr("margin").and_then(number),
+                        version: c.attr("qrVersion").and_then(number),
                     }
                 } else {
                     if c.attr("orientation").is_some_and(|o| !matches!(o, "0" | "up")) {

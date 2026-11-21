@@ -1,0 +1,28 @@
+# Policy for the crates ferroreport depends on, checked in CI with `cargo deny check`.
+
+[advisories]
+# Known vulnerabilities fail the build. Crates that are merely unmaintained are reported
+# when they are our own direct dependencies, so we hear about them without a red build for
+# something deep in the tree we cannot change.
+unmaintained = "workspace"
+ignore = [
+    # chrono and ttf-parser were declared unmaintained; neither has a known vulnerability.
+    # ttf-parser only reads fonts the operator installs, and replacing it is on the roadmap.
+    { id = "RUSTSEC-2026-0543", reason = "chrono: unmaintained, no vulnerability; dates only" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser: unmaintained, no vulnerability; operator-supplied fonts only" },
+]
+
+[licenses]
+# Only permissive licenses: anyone can ship ferroreport inside a closed product.
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "Unicode-3.0", "BSL-1.0"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# Everything comes from crates.io: no git dependencies, no other registries.
+unknown-registry = "deny"
+unknown-git = "deny"

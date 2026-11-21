@@ -314,17 +314,20 @@ impl Limits {
         }
     }
 
-    fn check_time(&self, deadline: Option<std::time::Instant>) -> Result<()> {
-        match (deadline, self.timeout) {
-            (Some(d), Some(t)) if std::time::Instant::now() > d => {
-                Err(Error::Limit(format!("rendering took longer than {} s", t.as_secs_f32())))
-            }
-            _ => Ok(()),
-        }
+    /// When a render started now must be done, with the time it was given.
+    fn deadline(&self) -> Option<(std::time::Instant, std::time::Duration)> {
+        self.timeout.map(|t| (std::time::Instant::now() + t, t))
     }
+}
 
-    fn deadline(&self) -> Option<std::time::Instant> {
-        self.timeout.map(|t| std::time::Instant::now() + t)
+/// Stops a render that has run past its deadline. The deadline travels with the image
+/// store, which every nested fill (subreports, tables, lists) shares.
+fn check_time(images: &ImageStore) -> Result<()> {
+    match images.deadline {
+        Some((deadline, given)) if std::time::Instant::now() > deadline => {
+            Err(Error::Limit(format!("rendering took longer than {} s", given.as_secs_f32())))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -1732,6 +1735,7 @@ const MAX_SUBREPORT_DEPTH: usize = 8;
 const MAX_SUBREPORT_RUNS: usize = 500_000;
 
 fn count_run(le: &mut LayoutEnv, what: &str) -> Result<()> {
+    check_time(le.images)?;
     le.images.runs += 1;
     if le.images.runs > MAX_SUBREPORT_RUNS {
         return Err(Error::Unsupported(format!(
@@ -2393,7 +2397,6 @@ struct Filler<'a> {
     /// handed to the sink until that value is known.
     held: bool,
     limits: Limits,
-    deadline: Option<std::time::Instant>,
     page_number: i32,
     offset_y: f32,
     /// Something other than page/column headers was printed on the current page.
@@ -2745,7 +2748,7 @@ impl<'a> Filler<'a> {
         }
         self.flush_pages(false)?;
         self.limits.check_pages(self.page_base + self.pages.len() + 1)?;
-        self.limits.check_time(self.deadline)?;
+        check_time(self.images)?;
         self.pages.push(PrintPage::default());
         self.page_number += 1;
         self.column = 0;
@@ -3133,7 +3136,7 @@ impl<'a> Filler<'a> {
             }
             idx += 1;
             if idx % 256 == 0 {
-                self.limits.check_time(self.deadline)?;
+                check_time(self.images)?;
             }
             more = self.rows.advance()?;
         }
@@ -3197,6 +3200,7 @@ pub fn fill(
 ) -> Result<PrintDocument> {
     images.runs = 0;
     images.skip_cells = false;
+    images.deadline = None;
     let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.run()?;
     Ok(filler.document())
@@ -3214,9 +3218,9 @@ pub fn fill_slice(
 ) -> Result<PrintDocument> {
     images.runs = 0;
     images.skip_cells = false;
+    images.deadline = limits.deadline();
     let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.limits = limits;
-    filler.deadline = limits.deadline();
     filler.run()?;
     Ok(filler.document())
 }
@@ -3233,9 +3237,9 @@ pub fn fill_rows(
 ) -> Result<PrintDocument> {
     images.runs = 0;
     images.skip_cells = false;
+    images.deadline = limits.deadline();
     let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
     filler.limits = limits;
-    filler.deadline = limits.deadline();
     filler.run()?;
     Ok(filler.document())
 }
@@ -3255,9 +3259,9 @@ pub fn fill_to(
 ) -> Result<FillStats> {
     images.runs = 0;
     images.skip_cells = !sink.wants_cells();
+    images.deadline = limits.deadline();
     let mut filler = new_filler(report, Rows::new(rows, report), params, fonts, images, env)?;
     filler.limits = limits;
-    filler.deadline = limits.deadline();
     filler.sink = Some(sink);
     filler.run()?;
     filler.flush_pages(true)?;
@@ -3401,7 +3405,6 @@ fn new_filler<'a>(
         sink: None,
         held: false,
         limits: Limits::default(),
-        deadline: None,
         page_number: 0,
         offset_y: 0.0,
         page_has_content: false,

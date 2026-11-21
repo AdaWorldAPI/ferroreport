@@ -46,6 +46,8 @@ pub struct ImageStore {
     pub(crate) runs: usize,
     /// Texts are filled without the data only spreadsheet and text exporters use.
     pub(crate) skip_cells: bool,
+    /// When the current render must be done, and the time it was given.
+    pub(crate) deadline: Option<(std::time::Instant, std::time::Duration)>,
 }
 
 impl ImageStore {

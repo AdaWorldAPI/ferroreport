@@ -214,7 +214,8 @@ impl VerticalMetrics {
         if self.first_line_height > available + 1e-3 {
             return 0;
         }
-        1 + ((available - self.first_line_height + 1e-3) / self.other_line_height).floor().max(0.0) as usize
+        // Lines of no height (a font of size 0) all fit: the count saturates.
+        1usize.saturating_add(((available - self.first_line_height + 1e-3) / self.other_line_height).floor().max(0.0) as usize)
     }
 }
 

@@ -240,7 +240,8 @@ impl<'a> Layout<'a, '_> {
         if let Some(u) = self.xcuts.used.get_mut(c1) {
             *u = true;
         }
-        if c2 == c1 || r2 == r1 {
+        // Nothing to place for an element without area (a negative size counts as none).
+        if c2 <= c1 || r2 <= r1 {
             return;
         }
         let style = match &n.what {
