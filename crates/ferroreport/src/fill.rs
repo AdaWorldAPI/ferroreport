@@ -169,6 +169,7 @@ struct Ctx<'a> {
     vars: &'a [VarState],
     var_index: &'a HashMap<String, usize>,
     page_number: i32,
+    column_number: i32,
 }
 
 impl Scope for Ctx<'_> {
@@ -190,7 +191,7 @@ impl Scope for Ctx<'_> {
     fn variable(&self, name: &str) -> Result<Value> {
         match name {
             "PAGE_NUMBER" => Ok(Value::Int(self.page_number)),
-            "COLUMN_NUMBER" => Ok(Value::Int(1)),
+            "COLUMN_NUMBER" => Ok(Value::Int(self.column_number)),
             _ => self
                 .var_index
                 .get(name)
@@ -227,6 +228,7 @@ struct BandLayout {
     height: f32,
     items: Vec<Laid>,
     has_break: bool,
+    has_column_break: bool,
     /// When the layout was cut at the available height: what still has to be printed, in the
     /// container's coordinates (not yet moved up), with expressions already evaluated.
     rest: Option<Vec<Element>>,
@@ -877,6 +879,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 };
                 if let Some(inner) = inner {
                     out.has_break |= inner.has_break;
+                    out.has_column_break |= inner.has_column_break;
                     for mut laid in inner.items {
                         translate(&mut laid.item, x, y);
                         if let Some(d) = &mut laid.deferred {
@@ -924,6 +927,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 box_items(&bc.boxed, x, y, w, h, &mut out.items);
             }
             ElementKind::Break => out.has_break = true,
+            ElementKind::ColumnBreak => out.has_column_break = true,
             ElementKind::Unsupported(_) => {}
         }
     }
@@ -1127,6 +1131,11 @@ struct Filler<'a> {
     repeated: HashMap<usize, String>,
     /// Groups that changed with the current record (until its first detail band prints).
     changed_groups: Vec<String>,
+    /// Current column (multi-column reports) and where columns start on this page.
+    column: u32,
+    column_top: f32,
+    /// The band being printed belongs to a column (detail, groups, column header/footer).
+    in_column: bool,
     /// Subreport return values applied while printing the current record.
     returned: Vec<(usize, Calculation, Value)>,
     /// Subreport mode: one unbounded page, with the extent of every band recorded.
@@ -1167,6 +1176,7 @@ impl<'a> Filler<'a> {
             vars,
             var_index: &self.var_index,
             page_number: self.page_number,
+            column_number: self.column as i32 + 1,
         };
         eval(e, &ctx, self.env)
     }
@@ -1218,6 +1228,7 @@ impl<'a> Filler<'a> {
             vars: &vars,
             var_index: &self.var_index,
             page_number: self.page_number,
+            column_number: self.column as i32 + 1,
         };
         if let Some(pw) = &band.print_when {
             if !truthy(&eval(pw, &ctx, self.env)?, self.env)? {
@@ -1247,6 +1258,7 @@ impl<'a> Filler<'a> {
             vars: &vars,
             var_index: &self.var_index,
             page_number: self.page_number,
+            column_number: self.column as i32 + 1,
         };
         let mut le = LayoutEnv {
             fonts: self.fonts,
@@ -1271,7 +1283,8 @@ impl<'a> Filler<'a> {
                 self.returned.push((i, calculation, value));
             }
         }
-        let dx = self.report.margins.left;
+        let r = self.report;
+        let dx = r.margins.left + if self.in_column { self.column as f32 * (r.column_width + r.column_spacing) } else { 0.0 };
         let page = self.pages.len() - 1;
         let first_item = self.pages[page].items.len();
         if let Some(marks) = &mut self.flow {
@@ -1341,6 +1354,7 @@ impl<'a> Filler<'a> {
         }
         self.pages.push(PrintPage::default());
         self.page_number += 1;
+        self.column = 0;
         self.offset_y = self.report.margins.top;
         self.page_has_content = false;
         self.footers_done = false;
@@ -1381,9 +1395,8 @@ impl<'a> Filler<'a> {
         if let Some(b) = &self.report.page_header {
             self.print_band_at_offset(b, Values::Committed)?;
         }
-        if let Some(b) = &self.report.column_header {
-            self.print_band_at_offset(b, Values::Committed)?;
-        }
+        self.column_top = self.offset_y;
+        self.column_header()?;
         self.flow_header = false;
         if self.page_number > 1 {
             let limit = self.starting_group.unwrap_or(self.report.groups.len());
@@ -1413,12 +1426,7 @@ impl<'a> Filler<'a> {
             return self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), mode);
         }
         let pf_h = footer.map(|b| b.height).unwrap_or(0.0);
-        if let Some(cf) = &r.column_footer {
-            let y = if r.float_column_footer { self.offset_y } else { r.page_height - r.margins.bottom - pf_h - cf.height };
-            if let Some(l) = self.layout(cf, mode)? {
-                self.emit(l, y);
-            }
-        }
+        self.column_footer(mode, pf_h)?;
         if let Some(pf) = footer {
             if let Some(l) = self.layout(pf, mode)? {
                 let y = r.page_height - r.margins.bottom - pf_h;
@@ -1427,6 +1435,55 @@ impl<'a> Filler<'a> {
         }
         self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), mode)?;
         Ok(())
+    }
+
+    fn column_header(&mut self) -> Result<()> {
+        if let Some(b) = &self.report.column_header {
+            self.in_column = true;
+            let r = self.print_band_at_offset(b, Values::Committed);
+            self.in_column = false;
+            r?;
+        }
+        Ok(())
+    }
+
+    /// The column footer of the current column: at the bottom of the column, or right after
+    /// its content with isFloatColumnFooter.
+    fn column_footer(&mut self, mode: Values, page_footer_h: f32) -> Result<()> {
+        let r = self.report;
+        if let Some(cf) = &r.column_footer {
+            let y =
+                if r.float_column_footer { self.offset_y } else { r.page_height - r.margins.bottom - page_footer_h - cf.height };
+            if let Some(l) = self.layout(cf, mode)? {
+                self.in_column = true;
+                self.emit(l, y);
+                self.in_column = false;
+            }
+        }
+        Ok(())
+    }
+
+    /// Moves on to the next column, or to the next page after the last column.
+    fn column_break(&mut self, mode: Values) -> Result<()> {
+        if self.flow.is_some() {
+            return Ok(());
+        }
+        if self.column + 1 >= self.report.column_count.max(1) {
+            return self.page_break(mode);
+        }
+        let pf_h = self.page_footer_band(false).map(|b| b.height).unwrap_or(0.0);
+        self.column_footer(mode, pf_h)?;
+        self.column += 1;
+        self.offset_y = self.column_top;
+        self.page_has_content = false;
+        self.reset_where(|r| matches!(r, ResetType::Column))?;
+        if self.estimated.is_some() {
+            self.estimated = Some(self.calculate(&self.committed.clone())?);
+            for (i, calculation, value) in self.returned.clone() {
+                self.apply_return(i, calculation, value);
+            }
+        }
+        self.column_header()
     }
 
     fn page_break(&mut self, mode: Values) -> Result<()> {
@@ -1442,6 +1499,13 @@ impl<'a> Filler<'a> {
     /// JasperReports' default `splitType="Stretch"`, prints what fits and continues the rest
     /// on the following pages.
     fn print_body_band(&mut self, band: &Band, mode: Values) -> Result<()> {
+        self.in_column = true;
+        let result = self.print_body_band_in_column(band, mode);
+        self.in_column = false;
+        result
+    }
+
+    fn print_body_band_in_column(&mut self, band: &Band, mode: Values) -> Result<()> {
         let Some(first) = self.layout(band, mode)? else { return Ok(()) };
         let footer_mode = if mode == Values::Estimated { Values::Committed } else { mode };
         let mut elements: Vec<Element> = band.elements.clone();
@@ -1454,13 +1518,18 @@ impl<'a> Filler<'a> {
             };
             let space = self.body_limit() - self.offset_y;
             if full.height <= space + 1e-3 {
-                let (y, h, brk) = (self.offset_y, full.height, full.has_break);
+                let (y, h, brk, col_brk) = (self.offset_y, full.height, full.has_break, full.has_column_break);
                 self.emit(full, y);
                 self.offset_y += h;
                 self.page_has_content = true;
                 if brk {
+                    self.in_column = false;
                     self.page_break(mode)?;
+                } else if col_brk {
+                    self.in_column = false;
+                    self.column_break(mode)?;
                 }
+                self.in_column = true;
                 return Ok(());
             }
             let may_split = !self.page_has_content
@@ -1470,7 +1539,9 @@ impl<'a> Filler<'a> {
                     SplitType::Immediate => true,
                 };
             if !may_split {
-                self.page_break(footer_mode)?;
+                self.in_column = false;
+                self.column_break(footer_mode)?;
+                self.in_column = true;
                 continue;
             }
             let part = self.layout_elems(&elements, design_h, mode, Some(space))?;
@@ -1487,7 +1558,9 @@ impl<'a> Filler<'a> {
             self.emit(part, y);
             self.offset_y = self.body_limit();
             self.page_has_content = true;
-            self.page_break(footer_mode)?;
+            self.in_column = false;
+            self.column_break(footer_mode)?;
+            self.in_column = true;
             if rest.is_empty() {
                 return Ok(());
             }
@@ -1511,6 +1584,7 @@ impl<'a> Filler<'a> {
                 vars: &vars,
                 var_index: &self.var_index,
                 page_number: self.page_number,
+                column_number: self.column as i32 + 1,
             };
             let d = &p.text;
             let text = text_value(&d.element.content, &ctx, self.env)?;
@@ -1538,12 +1612,14 @@ impl<'a> Filler<'a> {
             self.starting_group = Some(gi);
             let header_h: f32 = g.header.iter().map(|b| b.height).sum();
             let remaining = self.body_limit() - self.offset_y;
-            if self.page_has_content
-                && (g.start_new_page
+            if self.page_has_content && g.start_new_page {
+                self.page_break(Values::Committed)?;
+            } else if self.page_has_content
+                && (g.start_new_column
                     || (g.min_height_to_start_new_page > 0.0 && remaining < g.min_height_to_start_new_page)
                     || remaining < header_h.min(1.0))
             {
-                self.page_break(Values::Committed)?;
+                self.column_break(Values::Committed)?;
             }
             for b in &g.header {
                 self.print_body_band(b, Values::Committed)?;
@@ -1646,7 +1722,9 @@ impl<'a> Filler<'a> {
             Some(summary) => {
                 let layout = self.layout(summary, Values::Committed)?;
                 let h = layout.as_ref().map(|l| l.height).unwrap_or(0.0);
-                if r.summary_new_page || self.offset_y + h > self.body_limit() + 1e-3 {
+                // Like JasperReports, a summary that would start beside a column other than the
+                // first goes to a new page.
+                if r.summary_new_page || self.column > 0 || self.offset_y + h > self.body_limit() + 1e-3 {
                     self.page_footers(false, Values::Committed)?;
                     self.new_page()?;
                     if r.summary_with_page_header_and_footer {
@@ -1791,7 +1869,8 @@ fn new_filler<'a>(
         let v = match &p.default {
             Some(e) => {
                 let empty = HashMap::new();
-                let ctx = Ctx { record: None, report, params: &params, vars: &[], var_index: &empty, page_number: 1 };
+                let ctx =
+                    Ctx { record: None, report, params: &params, vars: &[], var_index: &empty, page_number: 1, column_number: 1 };
                 eval(e, &ctx, env)?
             }
             None => Value::Null,
@@ -1823,6 +1902,9 @@ fn new_filler<'a>(
         repeated: HashMap::new(),
         changed_groups: Vec::new(),
         returned: Vec::new(),
+        column: 0,
+        column_top: 0.0,
+        in_column: false,
         flow: None,
         flow_header: false,
     })

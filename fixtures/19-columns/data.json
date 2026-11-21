@@ -1,0 +1,507 @@
+[
+{
+"city": "Santo Domingo",
+"name": "Rafael Ramos",
+"phone": "809-578-9894"
+},
+{
+"city": "Santo Domingo",
+"name": "Juan Gómez",
+"phone": "809-820-0215"
+},
+{
+"city": "Santo Domingo",
+"name": "Juan Fermín",
+"phone": "809-764-3839"
+},
+{
+"city": "Santo Domingo",
+"name": "José Taveras",
+"phone": "809-753-9005"
+},
+{
+"city": "Santo Domingo",
+"name": "Juan Rodríguez",
+"phone": "809-854-2467"
+},
+{
+"city": "Santo Domingo",
+"name": "José Ramos",
+"phone": "809-735-6388"
+},
+{
+"city": "Santo Domingo",
+"name": "Miguel Pérez",
+"phone": "809-887-1049"
+},
+{
+"city": "Santo Domingo",
+"name": "María Pérez",
+"phone": "809-508-0508"
+},
+{
+"city": "Santo Domingo",
+"name": "Carmen Taveras",
+"phone": "809-809-6350"
+},
+{
+"city": "Santo Domingo",
+"name": "Miguel Rodríguez",
+"phone": "809-604-9452"
+},
+{
+"city": "Santo Domingo",
+"name": "Juan Ramos",
+"phone": "809-574-1596"
+},
+{
+"city": "Santo Domingo",
+"name": "Ana Ramos",
+"phone": "809-706-3555"
+},
+{
+"city": "Santo Domingo",
+"name": "Carmen Rodríguez",
+"phone": "809-997-4932"
+},
+{
+"city": "Santo Domingo",
+"name": "Rosa Rodríguez",
+"phone": "809-787-5749"
+},
+{
+"city": "Santo Domingo",
+"name": "Elena Rodríguez",
+"phone": "809-798-3807"
+},
+{
+"city": "Santo Domingo",
+"name": "Pedro Pérez",
+"phone": "809-486-9925"
+},
+{
+"city": "Santo Domingo",
+"name": "Lucía Ramos",
+"phone": "809-915-5347"
+},
+{
+"city": "Santo Domingo",
+"name": "Elena Gómez",
+"phone": "809-930-3459"
+},
+{
+"city": "Santo Domingo",
+"name": "Lucía Fermín",
+"phone": "809-491-2038"
+},
+{
+"city": "Santiago",
+"name": "Juan Taveras",
+"phone": "809-290-5637"
+},
+{
+"city": "Santiago",
+"name": "Luis Rodríguez",
+"phone": "809-354-0329"
+},
+{
+"city": "Santiago",
+"name": "Carmen Rodríguez",
+"phone": "809-987-6802"
+},
+{
+"city": "Santiago",
+"name": "Luis Pérez",
+"phone": "809-819-0736"
+},
+{
+"city": "Santiago",
+"name": "Rosa Díaz",
+"phone": "809-764-4572"
+},
+{
+"city": "Santiago",
+"name": "Elena Ochoa",
+"phone": "809-236-5073"
+},
+{
+"city": "Santiago",
+"name": "Ana Gómez",
+"phone": "809-310-9826"
+},
+{
+"city": "Santiago",
+"name": "Elena Pérez",
+"phone": "809-402-6683"
+},
+{
+"city": "Santiago",
+"name": "Carmen Fermín",
+"phone": "809-359-0695"
+},
+{
+"city": "Santiago",
+"name": "Pedro Díaz",
+"phone": "809-568-2266"
+},
+{
+"city": "Santiago",
+"name": "Rosa Rodríguez",
+"phone": "809-671-8520"
+},
+{
+"city": "Santiago",
+"name": "Rosa Gómez",
+"phone": "809-835-8307"
+},
+{
+"city": "Santiago",
+"name": "Carmen Rodríguez",
+"phone": "809-849-3893"
+},
+{
+"city": "Santiago",
+"name": "Carmen Rodríguez",
+"phone": "809-464-8538"
+},
+{
+"city": "La Romana",
+"name": "Elena Díaz",
+"phone": "809-211-6802"
+},
+{
+"city": "La Romana",
+"name": "Rafael Díaz",
+"phone": "809-220-6168"
+},
+{
+"city": "La Romana",
+"name": "Rafael Ramos",
+"phone": "809-261-5446"
+},
+{
+"city": "La Romana",
+"name": "Juan Díaz",
+"phone": "809-895-5776"
+},
+{
+"city": "La Romana",
+"name": "Rafael Fermín",
+"phone": "809-955-8020"
+},
+{
+"city": "La Romana",
+"name": "Ana Pérez",
+"phone": "809-892-0348"
+},
+{
+"city": "La Romana",
+"name": "Pedro Fermín",
+"phone": "809-843-7476"
+},
+{
+"city": "La Romana",
+"name": "Carmen Díaz",
+"phone": "809-381-5963"
+},
+{
+"city": "La Romana",
+"name": "María Díaz",
+"phone": "809-976-6048"
+},
+{
+"city": "La Romana",
+"name": "Rafael Fermín",
+"phone": "809-507-6179"
+},
+{
+"city": "La Romana",
+"name": "Luis Pérez",
+"phone": "809-782-2153"
+},
+{
+"city": "La Romana",
+"name": "Carmen Ochoa",
+"phone": "809-869-4413"
+},
+{
+"city": "La Romana",
+"name": "José Díaz",
+"phone": "809-391-7130"
+},
+{
+"city": "La Romana",
+"name": "Lucía Gómez",
+"phone": "809-304-9842"
+},
+{
+"city": "La Romana",
+"name": "Pedro Díaz",
+"phone": "809-891-3677"
+},
+{
+"city": "La Romana",
+"name": "Juan Ramos",
+"phone": "809-281-5516"
+},
+{
+"city": "La Romana",
+"name": "Miguel Ochoa",
+"phone": "809-782-7390"
+},
+{
+"city": "La Romana",
+"name": "Carmen Ochoa",
+"phone": "809-323-0555"
+},
+{
+"city": "La Romana",
+"name": "Elena Ochoa",
+"phone": "809-522-9418"
+},
+{
+"city": "La Romana",
+"name": "María Fermín",
+"phone": "809-548-1401"
+},
+{
+"city": "La Romana",
+"name": "Rafael Díaz",
+"phone": "809-803-2124"
+},
+{
+"city": "Puerto Plata",
+"name": "Carmen Fermín",
+"phone": "809-675-5674"
+},
+{
+"city": "Puerto Plata",
+"name": "Lucía Rodríguez",
+"phone": "809-497-6877"
+},
+{
+"city": "Puerto Plata",
+"name": "Rafael Rodríguez",
+"phone": "809-236-6770"
+},
+{
+"city": "Puerto Plata",
+"name": "María Ochoa",
+"phone": "809-204-7820"
+},
+{
+"city": "Puerto Plata",
+"name": "Rafael Rodríguez",
+"phone": "809-772-3638"
+},
+{
+"city": "Puerto Plata",
+"name": "Ana Taveras",
+"phone": "809-971-8503"
+},
+{
+"city": "Puerto Plata",
+"name": "Carmen Díaz",
+"phone": "809-432-1115"
+},
+{
+"city": "Puerto Plata",
+"name": "Rafael Fermín",
+"phone": "809-322-4006"
+},
+{
+"city": "Puerto Plata",
+"name": "Ana Pérez",
+"phone": "809-910-8393"
+},
+{
+"city": "Puerto Plata",
+"name": "José Rodríguez",
+"phone": "809-790-0808"
+},
+{
+"city": "Puerto Plata",
+"name": "Ana Taveras",
+"phone": "809-963-1979"
+},
+{
+"city": "Puerto Plata",
+"name": "María Fermín",
+"phone": "809-444-0325"
+},
+{
+"city": "Puerto Plata",
+"name": "Elena Rodríguez",
+"phone": "809-254-1861"
+},
+{
+"city": "Puerto Plata",
+"name": "Pedro Ramos",
+"phone": "809-458-8863"
+},
+{
+"city": "Puerto Plata",
+"name": "Juan Pérez",
+"phone": "809-560-3617"
+},
+{
+"city": "Puerto Plata",
+"name": "José Gómez",
+"phone": "809-747-1953"
+},
+{
+"city": "Puerto Plata",
+"name": "María Ochoa",
+"phone": "809-480-2105"
+},
+{
+"city": "Puerto Plata",
+"name": "Ana Taveras",
+"phone": "809-843-9353"
+},
+{
+"city": "Puerto Plata",
+"name": "Rosa Pérez",
+"phone": "809-974-4446"
+},
+{
+"city": "Puerto Plata",
+"name": "José Fermín",
+"phone": "809-832-8638"
+},
+{
+"city": "Puerto Plata",
+"name": "Elena Rodríguez",
+"phone": "809-252-7747"
+},
+{
+"city": "Puerto Plata",
+"name": "Pedro Pérez",
+"phone": "809-256-2078"
+},
+{
+"city": "Puerto Plata",
+"name": "Ana Gómez",
+"phone": "809-251-1120"
+},
+{
+"city": "Puerto Plata",
+"name": "Juan Pérez",
+"phone": "809-929-1411"
+},
+{
+"city": "Puerto Plata",
+"name": "Elena Taveras",
+"phone": "809-523-2572"
+},
+{
+"city": "Higüey",
+"name": "Luis Díaz",
+"phone": "809-595-6383"
+},
+{
+"city": "Higüey",
+"name": "Rafael Fermín",
+"phone": "809-569-4340"
+},
+{
+"city": "Higüey",
+"name": "José Díaz",
+"phone": "809-638-2027"
+},
+{
+"city": "Higüey",
+"name": "María Pérez",
+"phone": "809-933-6229"
+},
+{
+"city": "Higüey",
+"name": "Luis Ramos",
+"phone": "809-243-6115"
+},
+{
+"city": "Higüey",
+"name": "Juan Rodríguez",
+"phone": "809-851-0711"
+},
+{
+"city": "Higüey",
+"name": "Rafael Rodríguez",
+"phone": "809-254-6101"
+},
+{
+"city": "Higüey",
+"name": "Lucía Taveras",
+"phone": "809-978-5160"
+},
+{
+"city": "Higüey",
+"name": "Rosa Rodríguez",
+"phone": "809-671-0293"
+},
+{
+"city": "Higüey",
+"name": "José Ochoa",
+"phone": "809-748-4425"
+},
+{
+"city": "Higüey",
+"name": "Miguel Gómez",
+"phone": "809-635-3677"
+},
+{
+"city": "Higüey",
+"name": "Rosa Ramos",
+"phone": "809-228-5334"
+},
+{
+"city": "Higüey",
+"name": "Pedro Fermín",
+"phone": "809-324-7604"
+},
+{
+"city": "Higüey",
+"name": "Miguel Gómez",
+"phone": "809-949-8686"
+},
+{
+"city": "Higüey",
+"name": "Rosa Gómez",
+"phone": "809-951-5216"
+},
+{
+"city": "Higüey",
+"name": "Rafael Gómez",
+"phone": "809-801-0080"
+},
+{
+"city": "Higüey",
+"name": "Juan Ramos",
+"phone": "809-441-6368"
+},
+{
+"city": "Higüey",
+"name": "Ana Gómez",
+"phone": "809-777-1626"
+},
+{
+"city": "Higüey",
+"name": "Lucía Rodríguez",
+"phone": "809-383-0384"
+},
+{
+"city": "Higüey",
+"name": "Pedro Gómez",
+"phone": "809-226-1885"
+},
+{
+"city": "Higüey",
+"name": "Lucía Taveras",
+"phone": "809-913-4661"
+},
+{
+"city": "Higüey",
+"name": "Rafael Fermín",
+"phone": "809-290-0594"
+}
+]

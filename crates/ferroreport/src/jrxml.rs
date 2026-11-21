@@ -394,6 +394,7 @@ impl Parser {
                 name: g.attr("name").unwrap_or_default().to_string(),
                 expression: self.child_expr(g, &["groupExpression", "expression"])?,
                 start_new_page: attr(g, &["isStartNewPage", "startNewPage"]).is_some_and(parse_bool),
+                start_new_column: attr(g, &["isStartNewColumn", "startNewColumn"]).is_some_and(parse_bool),
                 reprint_header_on_each_page: attr(g, &["isReprintHeaderOnEachPage", "reprintHeaderOnEachPage"])
                     .is_some_and(parse_bool),
                 min_height_to_start_new_page: attr(g, &["minHeightToStartNewPage"]).and_then(|v| v.parse().ok()).unwrap_or(0.0),
@@ -451,8 +452,8 @@ impl Parser {
             uses_data_source: false,
             warnings: Vec::new(),
         };
-        if report.column_count > 1 {
-            self.warnings.push("multi-column layouts are rendered as a single column".into());
+        if report.column_count > 1 && attr(root, &["printOrder"]) == Some("Horizontal") {
+            self.warnings.push("printOrder=\"Horizontal\" is rendered as \"Vertical\"".into());
         }
         let mut report = report;
         self.warnings.dedup();
@@ -855,7 +856,11 @@ impl Parser {
             }
             "break" => {
                 self.warnings.push("page breaks (<break>) are applied after the band that contains them".into());
-                ElementKind::Break
+                if attr(n, &["type"]) == Some("Column") {
+                    ElementKind::ColumnBreak
+                } else {
+                    ElementKind::Break
+                }
             }
             other => {
                 let label = if other == "componentElement" || other == "component" {

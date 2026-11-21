@@ -99,7 +99,7 @@ std::fs::write("invoice.pdf", pdf)?;
 | Area | Supported | Not yet |
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 element syntax | `.jasper` files (by design), scriptlets, subdatasets, style templates |
-| Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate) | multi-column layout |
+| Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical print order, `isStartNewColumn`, column breaks) | horizontal print order |
 | Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, QR code and Code 128 barcodes (barcode4j components), page break (applied after its band) | chart, crosstab, table, list, other barcode types, Barbecue barcodes |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull` | rotation, styled/HTML markup |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
@@ -122,7 +122,7 @@ Run `ferroreport doctor template.jrxml` to get this verdict for a specific templ
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-17 comparable fixtures match.
+19 comparable fixtures match.
 
 | Fixture | What it exercises | Result |
 |---|---|---|
@@ -144,6 +144,8 @@ than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exa
 | 16-layout-features | conditional styles, justified text, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` | identical |
 | 17-subreports | subreports over nested JSON, parameters, return values, split across pages | identical |
 | 18-barcodes | QR codes (several error-correction levels), Code 128 with and without text | identical |
+| 19-columns | three-column layout with groups, column headers/footers, `COLUMN_NUMBER`/`COLUMN_COUNT` | identical |
+| 20-columns-summary | summary after a report that ends in the second column | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -176,7 +178,7 @@ also smaller (1.1 MB instead of 4.5 MB for 09-large).
 ## Roadmap
 
 - **Phase 2 (in progress):** done: band splitting, images, subreports, conditional styles,
-  justified text, QR codes and Code 128. Next: styled text markup, multi-column layout, more
+  justified text, QR codes, Code 128 and multi-column layout. Next: styled text markup, more
   barcode types, constant memory for huge reports (streaming pages to the PDF).
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.

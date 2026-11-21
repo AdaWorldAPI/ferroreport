@@ -84,6 +84,7 @@ pub struct Group {
     pub name: String,
     pub expression: Option<Expr>,
     pub start_new_page: bool,
+    pub start_new_column: bool,
     pub reprint_header_on_each_page: bool,
     pub min_height_to_start_new_page: f32,
     pub header: Vec<Band>,
@@ -297,6 +298,8 @@ pub enum ElementKind {
     Content(Arc<Vec<crate::print::Segment>>),
     /// A page break (`<break>`).
     Break,
+    /// A column break (`<break type="Column">`).
+    ColumnBreak,
     /// An element this engine cannot render yet; it is skipped and reported by `doctor`.
     Unsupported(String),
 }

@@ -220,7 +220,7 @@ fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, u
                     walk(children, counts);
                     "frame".into()
                 }
-                ElementKind::Break => "break".into(),
+                ElementKind::Break | ElementKind::ColumnBreak => "break".into(),
                 ElementKind::Image(_) => "image".into(),
                 ElementKind::Subreport(_) | ElementKind::Content(_) => "subreport".into(),
                 ElementKind::Barcode(b) => match b.symbology {
