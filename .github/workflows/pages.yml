@@ -30,7 +30,7 @@ jobs:
           echo "WASM_BINDGEN=wasm-bindgen-cli@$V" >> "$GITHUB_ENV"
       - uses: taiki-e/install-action@v2
         with:
-          tool: ${{ env.WASM_BINDGEN }},binaryen
+          tool: ${{ env.WASM_BINDGEN }}
       - run: bindings/wasm/build.sh
       - name: Assemble the site
         run: |
