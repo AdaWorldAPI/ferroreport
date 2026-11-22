@@ -65,3 +65,14 @@ usps 01234567094987654321 30
 usps 0123456709498765432101234 30
 usps 01234567094987654321012345678 30
 usps 0123456709498765432101234567891 30
+pdf417 JasperReports 20
+pdf417 ABCDE 14
+pdf417 Hello,_World! 14 - none
+pdf417 1234567890123456789 16
+pdf417 Invoice_2024-00017_total_$1,234.56 14 - - - mincols=1 maxcols=30
+pdf417 mixed/text?with;punct.and_12345 30 1 - - mincols=3 maxcols=6 ecl=2
+pdf417 Ship_to:_Calle_12_#150,_Santo_Domingo 40 - - - mincols=1 maxcols=30 ecl=1
+pdf417 ab 14 0.5 - 8 mincols=1 maxcols=4 ratio=2 ecl=3
+pdf417 12345678901234567890123456789012345678901234567890 16 - - - mincols=1 maxcols=10 ecl=4
+pdf417 A 14 - - - quiet=4 vquiet=2
+pdf417 lower_UPPER_lower_123_~`|{}_end 20 - - - mincols=2 maxcols=8 ecl=5

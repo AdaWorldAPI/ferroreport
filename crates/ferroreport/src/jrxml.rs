@@ -1200,6 +1200,7 @@ fn barcode_node(n: &Node) -> Option<&Node> {
         "POSTNET",
         "RoyalMailCustomer",
         "USPSIntelligentMail",
+        "PDF417",
     ];
     n.children.iter().find(|c| {
         SUPPORTED.contains(&c.name.as_str())
@@ -2018,6 +2019,22 @@ impl Parser {
                         quiet_zone: num("quietZone"),
                         vertical_quiet_zone: num("verticalQuietZone"),
                         checksum: checksum(&mut self.warnings),
+                    }
+                } else if name == "PDF417" {
+                    let int = |a: &str| c.attr(a).and_then(number::<f64>).map(|v| v.max(0.0) as usize);
+                    Symbology::Pdf417 {
+                        spec: crate::barcode::Pdf417Spec {
+                            module_width: num("moduleWidth"),
+                            quiet_zone: num("quietZone"),
+                            vertical_quiet_zone: num("verticalQuietZone"),
+                            min_columns: int("minColumns"),
+                            max_columns: int("maxColumns"),
+                            min_rows: int("minRows"),
+                            max_rows: int("maxRows"),
+                            ratio: num("widthToHeightRatio"),
+                            level: int("errorCorrectionLevel").map(|l| l.min(8) as u8),
+                        },
+                        text_position: position,
                     }
                 } else if name == "DataMatrix" {
                     Symbology::DataMatrix {

@@ -16,6 +16,7 @@ import org.krysalis.barcode4j.impl.code128.*;
 import org.krysalis.barcode4j.impl.datamatrix.*;
 import org.krysalis.barcode4j.impl.postnet.*;
 import org.krysalis.barcode4j.impl.fourstate.*;
+import org.krysalis.barcode4j.impl.pdf417.*;
 import org.krysalis.barcode4j.output.svg.*;
 import org.krysalis.barcode4j.tools.UnitConv;
 import org.krysalis.barcode4j.*;
@@ -36,6 +37,7 @@ public class Barcode4jCorpus {
       case "postnet": b = new POSTNETBean(); break;
       case "royalmail": b = new RoyalMailCBCBean(); break;
       case "usps": b = new USPSIntelligentMailBean(); break;
+      case "pdf417": b = new PDF417Bean(); break;
       default: b = new Code128Bean();
     }
     b.setFontName("Helvetica");
@@ -73,6 +75,12 @@ public class Barcode4jCorpus {
         case "fgap": ((AbstractFourStateBean)b).setIntercharGapWidth(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
         case "echecksum": ((EAN128Bean)b).setChecksumMode(ChecksumMode.byName(kv[1])); break;
         case "vquiet": b.setVerticalQuietZone(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
+        case "mincols": ((PDF417Bean)b).setMinCols(Integer.parseInt(kv[1])); break;
+        case "maxcols": ((PDF417Bean)b).setMaxCols(Integer.parseInt(kv[1])); break;
+        case "minrows": ((PDF417Bean)b).setMinRows(Integer.parseInt(kv[1])); break;
+        case "maxrows": ((PDF417Bean)b).setMaxRows(Integer.parseInt(kv[1])); break;
+        case "ratio": ((PDF417Bean)b).setWidthToHeightRatio(Double.parseDouble(kv[1])); break;
+        case "ecl": ((PDF417Bean)b).setErrorCorrectionLevel(Integer.parseInt(kv[1])); break;
         case "quiet": b.doQuietZone(true); b.setQuietZone(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
       }
     }

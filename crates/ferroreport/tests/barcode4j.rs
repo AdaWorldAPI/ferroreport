@@ -79,6 +79,21 @@ fn generate(args: &str) -> Result<Symbol, String> {
             let (data, human) = ean128_message(a[1], checksum)?;
             return code128_layout(&data, Some(&human), num(3), height, position, font, extra_num("quiet"), extra_num("vquiet"));
         }
+        "pdf417" => {
+            let int = |k: &str| extra(k).map(|v| v.parse::<usize>().unwrap());
+            let spec = ferroreport::barcode::Pdf417Spec {
+                module_width: num(3),
+                quiet_zone: extra_num("quiet"),
+                vertical_quiet_zone: extra_num("vquiet"),
+                min_columns: int("mincols"),
+                max_columns: int("maxcols"),
+                min_rows: int("minrows"),
+                max_rows: int("maxrows"),
+                ratio: extra_num("ratio"),
+                level: extra("ecl").map(|v| v.parse().unwrap()),
+            };
+            return ferroreport::barcode::pdf417_symbol(a[1], &spec, height, position, font);
+        }
         "datamatrix" => {
             let shape = extra("shape").map(datamatrix::Shape::from_name).unwrap_or_default();
             return datamatrix_symbol(a[1], num(3), shape);

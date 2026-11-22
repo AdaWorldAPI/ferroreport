@@ -573,6 +573,11 @@ pub enum Symbology {
         vertical_quiet_zone: Option<f64>,
         checksum: crate::barcode::linear::Checksum,
     },
+    /// PDF417, with barcode4j's settings.
+    Pdf417 {
+        spec: crate::barcode::Pdf417Spec,
+        text_position: crate::barcode::TextPosition,
+    },
     DataMatrix {
         module_width: Option<f64>,
         shape: crate::barcode::datamatrix::Shape,
@@ -604,6 +609,7 @@ impl Symbology {
             Symbology::Linear(spec) => spec.kind.component(),
             Symbology::Ean128 { .. } => "EAN128",
             Symbology::DataMatrix { .. } => "DataMatrix",
+            Symbology::Pdf417 { .. } => "PDF417",
             Symbology::Postnet { .. } => "POSTNET",
             Symbology::FourState { usps: true, .. } => "USPSIntelligentMail",
             Symbology::FourState { .. } => "RoyalMailCustomer",
