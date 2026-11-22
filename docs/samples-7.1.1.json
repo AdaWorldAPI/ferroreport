@@ -1,0 +1,1925 @@
+{
+ "jasperreports": "7.1.1",
+ "templates": 171,
+ "same": 41,
+ "differs": 40,
+ "not_rendered": 20,
+ "no_reference": 70,
+ "compared": 101,
+ "threshold": 0.0015,
+ "results": [
+  {
+   "template": "accessible/reports/AccessibleReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 5.78,
+   "result": "not rendered",
+   "reason": "unsupported feature: image format (only PNG, JPEG and GIF are supported)"
+  },
+  {
+   "template": "alterdesign/reports/AlterDesignReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.58,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0008
+  },
+  {
+   "template": "antcompile/reports/com/bar/BarReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 4.66,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeBarClass.isToPrint()"
+  },
+  {
+   "template": "antcompile/reports/com/foo/FooReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 8.16,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeFooClass.isToPrint()"
+  },
+  {
+   "template": "antupdate/reports/com/bar/BarReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 9.21,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeBarClass.isToPrint()"
+  },
+  {
+   "template": "antupdate/reports/com/foo/FooReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.07,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeFooClass.isToPrint()"
+  },
+  {
+   "template": "barbecue/reports/BarbecueReport.jrxml",
+   "issues": [
+    "<component> elements are not supported yet and are skipped"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 11.17,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.8933,
+   "reason": "<component> elements are not supported yet and are skipped"
+  },
+  {
+   "template": "barcode4j/reports/Barcode4JReport.jrxml",
+   "issues": [
+    "<component> elements are not supported yet and are skipped"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 16.54,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.065,
+   "reason": "<component> elements are not supported yet and are skipped"
+  },
+  {
+   "template": "batchexport/reports/Report1.jrxml",
+   "issues": [],
+   "rows": 2,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 9.69,
+   "result": "same",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0
+  },
+  {
+   "template": "batchexport/reports/Report2.jrxml",
+   "issues": [],
+   "rows": 2,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 10.05,
+   "result": "same",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0001
+  },
+  {
+   "template": "batchexport/reports/Report3.jrxml",
+   "issues": [],
+   "rows": 2,
+   "ferroreport_seconds": 0.019,
+   "jasper_seconds": 8.35,
+   "result": "same",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0
+  },
+  {
+   "template": "book/reports/BookReport.jrxml",
+   "issues": [],
+   "rows": 9,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 9.49,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "java.lang.NoClassDefFoundError: org/apache/commons/beanutils2/NestedNullException",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "book/reports/OrdersReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.048,
+   "jasper_seconds": 11.18,
+   "result": "not rendered",
+   "reason": "error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab"
+  },
+  {
+   "template": "book/reports/PieChartReport.jrxml",
+   "issues": [],
+   "rows": 0,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 12.66,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "book/reports/TocReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 11.67,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "chartcustomizers/reports/ChartCustomizersReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.165,
+   "jasper_seconds": 8.27,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "charts/reports/AreaChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.095,
+   "jasper_seconds": 25.01,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0481,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/Bar3DChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.142,
+   "jasper_seconds": 25.94,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0909,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/BarChartReport.jrxml",
+   "issues": [
+    "chart customizers (customizerClass) are ignored"
+   ],
+   "rows": 830,
+   "ferroreport_seconds": 0.262,
+   "jasper_seconds": 20.46,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0967,
+   "reason": "chart customizers (customizerClass) are ignored"
+  },
+  {
+   "template": "charts/reports/BubbleChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.173,
+   "jasper_seconds": 24.84,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.2235,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/CandlestickChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.229,
+   "jasper_seconds": 22.35,
+   "result": "differs",
+   "pages_jasper": 18,
+   "pages_ferroreport": 18,
+   "worst_page": 0.0769,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/GanttChartReport.jrxml",
+   "issues": [],
+   "rows": 16,
+   "ferroreport_seconds": 0.025,
+   "jasper_seconds": 13.7,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.1106,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/HighLowChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.058,
+   "jasper_seconds": 20.95,
+   "result": "differs",
+   "pages_jasper": 18,
+   "pages_ferroreport": 18,
+   "worst_page": 0.1333,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/LineChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.283,
+   "jasper_seconds": 24.75,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0479,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/MeterChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.077,
+   "jasper_seconds": 15.9,
+   "result": "differs",
+   "pages_jasper": 16,
+   "pages_ferroreport": 16,
+   "worst_page": 0.2126,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/MultipleAxisChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.071,
+   "jasper_seconds": 12.75,
+   "result": "differs",
+   "pages_jasper": 24,
+   "pages_ferroreport": 24,
+   "worst_page": 0.1913,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/Pie3DChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.082,
+   "jasper_seconds": 17.48,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.1106,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/PieChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.141,
+   "jasper_seconds": 23.65,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0934,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/ScatterChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.22,
+   "jasper_seconds": 27.44,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.1687,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/StackedAreaChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.078,
+   "jasper_seconds": 19.43,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.1932,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/StackedBar3DChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.066,
+   "jasper_seconds": 18.56,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0795,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/StackedBarChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 1.206,
+   "jasper_seconds": 21.7,
+   "result": "differs",
+   "pages_jasper": 13,
+   "pages_ferroreport": 13,
+   "worst_page": 0.0426,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/SubDatasetChartReport.jrxml",
+   "issues": [],
+   "rows": 21,
+   "ferroreport_seconds": 0.036,
+   "jasper_seconds": 20.98,
+   "result": "differs",
+   "pages_jasper": 7,
+   "pages_ferroreport": 7,
+   "worst_page": 0.3287,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/ThermometerChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.153,
+   "jasper_seconds": 19.13,
+   "result": "differs",
+   "pages_jasper": 16,
+   "pages_ferroreport": 16,
+   "worst_page": 0.0901,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/TimeSeriesChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 2.825,
+   "jasper_seconds": 25.85,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.1979,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/XYAreaChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.093,
+   "jasper_seconds": 28.48,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.4297,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/XYBarChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.301,
+   "jasper_seconds": 26.91,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.3503,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/XYBarChartTimePeriodReport.jrxml",
+   "issues": [],
+   "rows": 809,
+   "ferroreport_seconds": 0.339,
+   "jasper_seconds": 26.72,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.1501,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/XYBarChartTimeSeriesReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.105,
+   "jasper_seconds": 22.24,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.1855,
+   "reason": ""
+  },
+  {
+   "template": "charts/reports/XYLineChartReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.053,
+   "jasper_seconds": 24.85,
+   "result": "differs",
+   "pages_jasper": 19,
+   "pages_ferroreport": 19,
+   "worst_page": 0.1171,
+   "reason": ""
+  },
+  {
+   "template": "chartthemes/reports/AllChartsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.122,
+   "jasper_seconds": 7.59,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "02:18:23.896 [main] ERROR net.sf.jasperreports.extensions.DefaultExtensionsRegistry - Error instantiating extensions registry for xml.chart.themes from file:/tmp/j7dl/jasperreports-7.1.1/demo/samples/chartthemes/src/jasperreports_extension.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "crosstabs/reports/LateOrdersReport.jrxml",
+   "issues": [],
+   "rows": 809,
+   "ferroreport_seconds": 0.02,
+   "jasper_seconds": 9.1,
+   "ferroreport_error": "error evaluating expression: NullPointerException: cannot call toString() on null",
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "crosstabs/reports/OrdersReport.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.152,
+   "jasper_seconds": 6.13,
+   "ferroreport_error": "error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab",
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "crosstabs/reports/ProductsReport.jrxml",
+   "issues": [],
+   "rows": 12,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 7.87,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "crosstabs/reports/ShipmentsReport.jrxml",
+   "issues": [],
+   "rows": 21,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 4.35,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "csvdatasource/reports/CsvDataSourceReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.017,
+   "jasper_seconds": 10.68,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "csvdatasource/reports/CsvQueryExecuterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 6.95,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "datasource/reports/DataSourceReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 6.25,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "daterange/reports/DateRangeReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 9.29,
+   "result": "not rendered",
+   "reason": "cannot parse expression `DATERANGE(\"1996-09-01\")`: unknown identifier `DATERANGE`"
+  },
+  {
+   "template": "ejbql/reports/JRMDbCastSubreport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.021,
+   "jasper_seconds": 5.9,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"ejbql\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "ejbql/reports/JRMDbReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.013,
+   "jasper_seconds": 6.92,
+   "result": "no reference",
+   "reason": "its rows come from a ejbql query",
+   "detail": "a ejbql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "ejbql/reports/JRMDbVariaSubreport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.24,
+   "result": "no reference",
+   "reason": "its rows come from a ejbql query",
+   "detail": "a ejbql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "ejbql-j2ee/reports/JRMDbCastSubreport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.021,
+   "jasper_seconds": 4.23,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"ejbql\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "ejbql-j2ee/reports/JRMDbReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 5.02,
+   "result": "no reference",
+   "reason": "its rows come from a ejbql query",
+   "detail": "a ejbql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "ejbql-j2ee/reports/JRMDbVariaSubreport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 5.58,
+   "result": "no reference",
+   "reason": "its rows come from a ejbql query",
+   "detail": "a ejbql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "exceldataadapter/reports/ExcelXlsDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 5.48,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "exceldataadapter/reports/ExcelXlsQeDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.023,
+   "jasper_seconds": 6.81,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xlsx\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "exceldataadapter/reports/ExcelXlsxDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.019,
+   "jasper_seconds": 3.27,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "exceldataadapter/reports/ExcelXlsxQeDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.024,
+   "jasper_seconds": 7.5,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "exceldatasource/reports/ExcelDataSourceReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 9.03,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "fastexceldatasource/reports/FastExcelDataSourceReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 7.17,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "fonts/reports/FontsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.045,
+   "jasper_seconds": 6.38,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "java.util.ServiceConfigurationError: net.sf.jasperreports.pdf.common.PdfProducerFactory: Provider net.sf.jasperreports.pdf.classic.producer.StandardPdfProducerFactory could not be instantiated",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "forms/reports/FormsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 8.18,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.3351,
+   "reason": ""
+  },
+  {
+   "template": "functions/reports/FunctionsReport.jrxml",
+   "issues": [
+    "tables with a connectionExpression get no rows (only data sources are supported)"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 8.3,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "net.sf.jasperreports.engine.fill.JRExpressionEvalException: Error evaluating expression for source text: new JRBeanCollectionDataSource($F{functions})",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "genericelement/reports/GenericElementReport.jrxml",
+   "issues": [
+    "<generic> elements are not supported yet and are skipped"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 7.72,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "groovy/reports/GroovyReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.31,
+   "ferroreport_error": "cannot parse expression `[5, 6, 7, 8, 9].findAll{it % 2 == 1}`: unexpected character `[`",
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Could not instantiate report compiler: net.sf.jasperreports.groovy.JRGroovyCompiler.",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "hibernate/reports/AddressesReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.82,
+   "result": "no reference",
+   "reason": "its rows come from a hql query",
+   "detail": "a hql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hibernate/reports/DocumentsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.17,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"hql\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hibernate/reports/HibernateQueryReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.77,
+   "result": "no reference",
+   "reason": "its rows come from a hql query",
+   "detail": "a hql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hibernate-j2ee/reports/AddressesReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.83,
+   "result": "no reference",
+   "reason": "its rows come from a hql query",
+   "detail": "a hql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hibernate-j2ee/reports/DocumentsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.35,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"hql\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hibernate-j2ee/reports/HibernateQueryReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 2.46,
+   "result": "no reference",
+   "reason": "its rows come from a hql query",
+   "detail": "a hql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "horizontal/reports/HorizontalReport.jrxml",
+   "issues": [],
+   "rows": 253,
+   "ferroreport_seconds": 0.038,
+   "jasper_seconds": 6.47,
+   "result": "same",
+   "pages_jasper": 20,
+   "pages_ferroreport": 20,
+   "worst_page": 0.0
+  },
+  {
+   "template": "httpdataadapter/reports/JsonHttpDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.12,
+   "ferroreport_error": "error evaluating expression: NullPointerException: arithmetic on a null value",
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: net.sf.jasperreports.json.query.JsonQLQueryExecuterFactory",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "httpdataadapter/reports/XmlHttpDataAdapterReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.38,
+   "result": "no reference",
+   "reason": "its rows come from a xPath query",
+   "detail": "a xPath query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "hyperlink/reports/HyperlinkReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.02,
+   "jasper_seconds": 4.64,
+   "result": "same",
+   "pages_jasper": 3,
+   "pages_ferroreport": 3,
+   "worst_page": 0.0012
+  },
+  {
+   "template": "i18n/reports/I18nReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 4.11,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported method String.getDisplayName()"
+  },
+  {
+   "template": "iconlabel/reports/IconLabelReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.013,
+   "jasper_seconds": 4.74,
+   "result": "differs",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.4909,
+   "reason": ""
+  },
+  {
+   "template": "images/reports/ImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape",
+    "scaleImage=\"RealSize\" is rendered as RetainShape",
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 6.04,
+   "ferroreport_error": "unsupported feature: image format (only PNG, JPEG and GIF are supported)",
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "net.sf.jasperreports.engine.JRException: Null dimension is not allowed by this SVG renderer implementation.",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "images/reports/scale/ClipNarrowShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 4.49,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/ClipNarrowTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 4.83,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/ClipWideShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 4.56,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/ClipWideTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 3.94,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/FillFrameNarrowShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 3.63,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/FillFrameNarrowTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.24,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/FillFrameWideShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 3.85,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/FillFrameWideTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 4.43,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealHeightNarrowShortImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.95,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealHeightNarrowTallImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 4.39,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealHeightWideShortImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.013,
+   "jasper_seconds": 4.79,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealHeightWideTallImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.021,
+   "jasper_seconds": 4.11,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealSizeNarrowShortImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealSize\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 4.21,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealSizeNarrowTallImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealSize\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 4.08,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealSizeWideShortImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealSize\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 4.24,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RealSizeWideTallImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealSize\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 4.46,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RetainShapeNarrowShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 4.39,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RetainShapeNarrowTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.017,
+   "jasper_seconds": 4.21,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RetainShapeWideShortImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 4.66,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "images/reports/scale/RetainShapeWideTallImagesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.96,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "jasper/reports/FirstJasper.jrxml",
+   "issues": [],
+   "rows": 253,
+   "ferroreport_seconds": 0.057,
+   "jasper_seconds": 5.81,
+   "result": "differs",
+   "pages_jasper": 9,
+   "pages_ferroreport": 9,
+   "worst_page": 0.0154,
+   "reason": ""
+  },
+  {
+   "template": "java1.5/reports/Java5Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 3.86,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static field Greeting.bye"
+  },
+  {
+   "template": "javascript/reports/JavaScriptReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.38,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Could not instantiate report compiler: net.sf.jasperreports.javascript.JavaScriptClassCompiler.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "jfreechart/reports/JFreeChartReport.jrxml",
+   "issues": [
+    "<scriptlet> is not supported yet"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 3.0,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRRuntimeException: java.lang.ClassNotFoundException: JFreeChartScriptlet",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "jsondatasource/reports/JsonCustomersReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 1.9,
+   "result": "no reference",
+   "reason": "its rows come from a json query",
+   "detail": "a json query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "jsondatasource/reports/JsonOrdersReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 2.4,
+   "result": "no reference",
+   "reason": "its rows come from a json query",
+   "detail": "a json query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "jsonqldatasource/reports/NorthwindOrdersReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 2.44,
+   "result": "no reference",
+   "reason": "its rows come from a jsonql query",
+   "detail": "a jsonql query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "landscape/reports/LandscapeReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 3.33,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "list/reports/HorizontalListReport.jrxml",
+   "issues": [],
+   "rows": 12,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 3.97,
+   "result": "same",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0
+  },
+  {
+   "template": "list/reports/ListReport.jrxml",
+   "issues": [],
+   "rows": 12,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.35,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "markup/reports/MarkupReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 3.9,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0016,
+   "reason": ""
+  },
+  {
+   "template": "maven/src/main/reports/com/bar/BarReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 3.93,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeBarClass.isToPrint()"
+  },
+  {
+   "template": "maven/src/main/reports/com/foo/FooReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 4.39,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method SomeFooClass.isToPrint()"
+  },
+  {
+   "template": "maven/src/test/reports/com/bar/BarTestReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.88,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method BarTestClass.isToPrint()"
+  },
+  {
+   "template": "maven/src/test/reports/com/foo/FooTestReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 4.6,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported static method FooTestClass.isToPrint()"
+  },
+  {
+   "template": "mondrian/reports/AdventureWorks-Olap4jXMLA-XJoinColumnsReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.45,
+   "result": "no reference",
+   "reason": "its rows come from a olap4j query",
+   "detail": "a olap4j query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/AdventureWorks-Olap4jXMLAReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 2.75,
+   "result": "no reference",
+   "reason": "its rows come from a olap4j query",
+   "detail": "a olap4j query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/AdventureWorks-XMLA-XJoinColumnsReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.41,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/AdventureWorks-XMLAReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.002,
+   "jasper_seconds": 2.61,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/FoodMartSales-XMLAReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.22,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/FoodMartSalesWeekly-XMLAReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.59,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/MondrianFoodMartSalesOlap4jReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.45,
+   "result": "no reference",
+   "reason": "its rows come from a olap4j query",
+   "detail": "a olap4j query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/MondrianFoodMartSalesReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.48,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "mondrian/reports/MondrianReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.45,
+   "result": "no reference",
+   "reason": "its rows come from a mdx query",
+   "detail": "a mdx query",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "nopagebreak/reports/NoPageBreakReport.jrxml",
+   "issues": [],
+   "rows": 252,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.88,
+   "result": "not rendered",
+   "reason": "error evaluating expression: unsupported constructor new ArrayList()"
+  },
+  {
+   "template": "osgi/reports/ExcelXlsDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 3.35,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "osgi/reports/ExcelXlsQeDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 3.29,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Could not instantiate report compiler: net.sf.jasperreports.groovy.JRGroovyCompiler.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "osgi/reports/GroovyReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.19,
+   "ferroreport_error": "cannot parse expression `[5, 6, 7, 8, 9].findAll{it % 2 == 1}`: unexpected character `[`",
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "osgi/reports/ImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape",
+    "scaleImage=\"RealSize\" is rendered as RetainShape",
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.55,
+   "ferroreport_error": "invalid data: `dukesign.jpg` not found in the resource directories",
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "osgi/reports/JavaScriptReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 3.6,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "paragraphs/reports/ParagraphsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 4.49,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.8451,
+   "reason": ""
+  },
+  {
+   "template": "pdfa/reports/PdfA1Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 4.22,
+   "ferroreport_error": "unsupported feature: image format (only PNG, JPEG and GIF are supported)",
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "02:27:20.797 [main] ERROR net.sf.jasperreports.engine.fonts.SimpleFontExtensionHelper - Error loading font family",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "pdfa/reports/PdfA2Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 2.54,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "02:27:23.387 [main] ERROR net.sf.jasperreports.engine.fonts.SimpleFontExtensionHelper - Error loading font family",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "pdfa/reports/PdfA3Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 2.62,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "02:27:25.976 [main] ERROR net.sf.jasperreports.engine.fonts.SimpleFontExtensionHelper - Error loading font family",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "pdfa/reports/TabularPdfA1Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.4,
+   "result": "not rendered",
+   "reason": "unsupported feature: image format (only PNG, JPEG and GIF are supported)"
+  },
+  {
+   "template": "pdfa/reports/TaggedPdfA1Report.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 3.64,
+   "result": "not rendered",
+   "reason": "unsupported feature: image format (only PNG, JPEG and GIF are supported)"
+  },
+  {
+   "template": "pdfencrypt/reports/PdfEncryptReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.18,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "query/reports/QueryReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.59,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.1073,
+   "reason": ""
+  },
+  {
+   "template": "rotation/reports/RotationReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 1.87,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0127,
+   "reason": ""
+  },
+  {
+   "template": "scriptlet/reports/ScriptletReport.jrxml",
+   "issues": [],
+   "rows": 50,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 1.85,
+   "ferroreport_error": "error evaluating expression: NullPointerException: cannot call hello() on null",
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "shapes/reports/ShapesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.27,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.001
+  },
+  {
+   "template": "spiderchartcomponent/reports/SpiderChart.jrxml",
+   "issues": [
+    "<component> elements are not supported yet and are skipped"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.26,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "net.sf.jasperreports.engine.JRRuntimeException: Category series name is null.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "springboot/reports/AllChartsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 1.92,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "springboot/reports/ExcelXlsDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 1.89,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "springboot/reports/ExcelXlsQeDataAdapterReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.41,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "springboot/reports/ImagesReport.jrxml",
+   "issues": [
+    "scaleImage=\"RealHeight\" is rendered as RetainShape",
+    "scaleImage=\"RealSize\" is rendered as RetainShape",
+    "scaleImage=\"RealHeight\" is rendered as RetainShape"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 1.25,
+   "ferroreport_error": "unsupported feature: image format (only PNG, JPEG and GIF are supported)",
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "springboot/reports/StretchReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 1.97,
+   "result": "no reference",
+   "reason": "runs SQL through a live database connection inside the report",
+   "detail": "net.sf.jasperreports.jackson.util.JacksonRuntimeException: com.fasterxml.jackson.databind.JsonMappingException: No query executer factory registered for the \"xls\" language.",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "stretch/reports/StretchReport.jrxml",
+   "issues": [],
+   "rows": 20,
+   "ferroreport_seconds": 0.016,
+   "jasper_seconds": 2.64,
+   "result": "differs",
+   "pages_jasper": 14,
+   "pages_ferroreport": 21,
+   "worst_page": 1.0,
+   "reason": "a different number of pages"
+  },
+  {
+   "template": "styledtext/reports/StyledTextReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 2.79,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0278,
+   "reason": ""
+  },
+  {
+   "template": "subreport/reports/AddressReport.jrxml",
+   "issues": [],
+   "rows": 0,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 2.82,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "subreport/reports/MasterReport.jrxml",
+   "issues": [
+    "subreports with a connectionExpression get no rows (only data sources are supported)"
+   ],
+   "rows": 12,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.83,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.5887,
+   "reason": "subreports with a connectionExpression get no rows (only data sources are supported)"
+  },
+  {
+   "template": "subreport/reports/ProductReport.jrxml",
+   "issues": [],
+   "rows": 0,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.85,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "table/reports/TableReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.8,
+   "result": "differs",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0363,
+   "reason": ""
+  },
+  {
+   "template": "tableofcontents/reports/TableOfContentsReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.003,
+   "jasper_seconds": 2.55,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "java.lang.NoClassDefFoundError: org/apache/commons/beanutils2/NestedNullException",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "tableofcontents/reports/TablePart.jrxml",
+   "issues": [],
+   "rows": 830,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 3.17,
+   "result": "not rendered",
+   "reason": "error evaluating expression: variable `MASTER_CURRENT_PAGE` is not declared"
+  },
+  {
+   "template": "tableofcontents/reports/TocPart.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 2.75,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "tabular/reports/TabularReport.jrxml",
+   "issues": [],
+   "rows": 50,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 2.95,
+   "result": "not rendered",
+   "reason": "unsupported feature: image format (only PNG, JPEG and GIF are supported)"
+  },
+  {
+   "template": "templates/reports/StylesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.52,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "text/reports/TextReport.jrxml",
+   "issues": [],
+   "rows": 39,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.8,
+   "result": "same",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.0
+  },
+  {
+   "template": "unicode/reports/NumberFormatReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.78,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.2583,
+   "reason": ""
+  },
+  {
+   "template": "unicode/reports/UnicodeReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 2.97,
+   "result": "differs",
+   "pages_jasper": 2,
+   "pages_ferroreport": 2,
+   "worst_page": 0.9571,
+   "reason": ""
+  },
+  {
+   "template": "virtualizer/reports/VirtualizerReport.jrxml",
+   "issues": [],
+   "rows": 1000,
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 3.1,
+   "result": "same",
+   "pages_jasper": 27,
+   "pages_ferroreport": 27,
+   "worst_page": 0.0
+  },
+  {
+   "template": "webapp/src/main/webapp/reports/WebappReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.59,
+   "ferroreport_error": "cannot parse expression `((scriptlets.WebappScriptlet)$P{REPORT_SCRIPTLET}).hello()`: expected RParen, found Param(\"REPORT_SCRIPTLET\")",
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRException: Errors were encountered when compiling report expressions class file:",
+   "ferroreport_renders": false
+  },
+  {
+   "template": "xchart/reports/XChartReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 3.56,
+   "result": "no reference",
+   "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
+   "detail": "net.sf.jasperreports.engine.JRRuntimeException: java.lang.ClassNotFoundException: XChartScriptlet",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "xchartcomponent/reports/XYChart.jrxml",
+   "issues": [
+    "<component> elements are not supported yet and are skipped"
+   ],
+   "rows": 1,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 2.61,
+   "result": "no reference",
+   "reason": "JasperReports fails on it without the sample's own program",
+   "detail": "02:29:27.709 [main] ERROR net.sf.jasperreports.extensions.DefaultExtensionsRegistry - Error instantiating extensions registry for xchart from file:/tmp/j7dl/jasperreports-7.1.1/demo/samples/xchartcomponent/src/jasperreports_extension.proper",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "xlsfeatures/reports/ExcelNames.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.017,
+   "jasper_seconds": 5.19,
+   "result": "differs",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.08,
+   "reason": ""
+  },
+  {
+   "template": "xlsfeatures/reports/FormatPatternsMap.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 5.06,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "xlsfeatures/reports/MacroReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.013,
+   "jasper_seconds": 5.49,
+   "result": "not rendered",
+   "reason": "error evaluating expression: NullPointerException: cannot call substring() on null"
+  },
+  {
+   "template": "xlsfeatures/reports/XlsFeaturesReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 5.24,
+   "result": "not rendered",
+   "reason": "error evaluating expression: NullPointerException: cannot call substring() on null"
+  },
+  {
+   "template": "xlsformula/reports/XlsFormulaReport.jrxml",
+   "issues": [],
+   "rows": 1,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 4.36,
+   "result": "same",
+   "pages_jasper": 1,
+   "pages_ferroreport": 1,
+   "worst_page": 0.0
+  },
+  {
+   "template": "xmldatasource/reports/CustomersReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 3.99,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  },
+  {
+   "template": "xmldatasource/reports/OrdersReport.jrxml",
+   "issues": [],
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 4.19,
+   "result": "no reference",
+   "reason": "JasperReports draws nothing for it without the sample's own program",
+   "detail": "1 blank page(s)",
+   "ferroreport_renders": true
+  }
+ ]
+}

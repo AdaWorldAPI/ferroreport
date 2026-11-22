@@ -1,22 +1,19 @@
 {
  "jasperreports": "6.20.6",
  "templates": 140,
- "same": 17,
- "differs": 53,
- "not_rendered": 17,
+ "same": 29,
+ "differs": 42,
+ "not_rendered": 16,
  "no_reference": 53,
  "compared": 87,
- "compared_naming_fonts": 67,
- "same_naming_fonts": 17,
  "threshold": 0.0015,
  "results": [
   {
    "template": "accessible/reports/AccessibleReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.014,
-   "jasper_seconds": 2.25,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 5.28,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -25,10 +22,9 @@
   {
    "template": "alterdesign/reports/AlterDesignReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.33,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 4.43,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -37,133 +33,106 @@
   {
    "template": "antcompile/reports/com/bar/BarReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.38,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 4.78,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported static method SomeBarClass.isToPrint()"
   },
   {
    "template": "antcompile/reports/com/foo/FooReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.41,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 5.3,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported static method SomeFooClass.isToPrint()"
   },
   {
    "template": "antupdate/reports/com/bar/BarReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.25,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 8.22,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported static method SomeBarClass.isToPrint()"
   },
   {
    "template": "antupdate/reports/com/foo/FooReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.27,
+   "ferroreport_seconds": 0.031,
+   "jasper_seconds": 11.59,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported static method SomeFooClass.isToPrint()"
   },
   {
    "template": "barbecue/reports/BarbecueReport.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<barbecue> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.52,
+   "ferroreport_seconds": 0.053,
+   "jasper_seconds": 10.27,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.9539,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans; <barbecue> elements are not supported yet and are skipped"
+   "worst_page": 0.8933,
+   "reason": "<barbecue> elements are not supported yet and are skipped"
   },
   {
    "template": "barcode4j/reports/Barcode4JReport.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
-    "<DataMatrix> elements are not supported yet and are skipped",
-    "<EAN128> elements are not supported yet and are skipped",
-    "<USPSIntelligentMail> elements are not supported yet and are skipped",
-    "<RoyalMailCustomer> elements are not supported yet and are skipped",
-    "<UPCE> elements are not supported yet and are skipped",
-    "<POSTNET> elements are not supported yet and are skipped",
     "<PDF417> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 3.06,
+   "ferroreport_seconds": 0.026,
+   "jasper_seconds": 10.08,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.4248,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans; <DataMatrix> elements are not supported yet and are skipped; <EAN128> elements are not supported yet and are skipped; <USPSIntelligentMail> elements are not supported yet and are skipped"
+   "worst_page": 0.065,
+   "reason": "<PDF417> elements are not supported yet and are skipped"
   },
   {
    "template": "batchexport/reports/Report1.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 2,
-   "ferroreport_seconds": 0.01,
-   "jasper_seconds": 2.54,
-   "result": "differs",
+   "ferroreport_seconds": 0.141,
+   "jasper_seconds": 8.24,
+   "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
-   "worst_page": 0.1445,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "batchexport/reports/Report2.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 2,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.75,
-   "result": "differs",
+   "ferroreport_seconds": 0.016,
+   "jasper_seconds": 11.48,
+   "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
-   "worst_page": 0.4227,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0001
   },
   {
    "template": "batchexport/reports/Report3.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 2,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.75,
-   "result": "differs",
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 9.8,
+   "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
-   "worst_page": 0.4911,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "book/reports/BookReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 9,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.73,
+   "ferroreport_seconds": 0.028,
+   "jasper_seconds": 12.94,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -173,20 +142,18 @@
   {
    "template": "book/reports/OrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 5.51,
+   "ferroreport_seconds": 0.024,
+   "jasper_seconds": 13.93,
    "result": "not rendered",
    "reason": "error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab"
   },
   {
    "template": "book/reports/PieChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 0,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 4.5,
+   "ferroreport_seconds": 0.109,
+   "jasper_seconds": 13.24,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -195,10 +162,9 @@
   {
    "template": "book/reports/TOCPart.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.008,
-   "jasper_seconds": 5.54,
+   "ferroreport_seconds": 0.013,
+   "jasper_seconds": 10.79,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -206,13 +172,10 @@
   },
   {
    "template": "chartcustomizers/reports/ChartCustomizersReport.jrxml",
-   "issues": [
-    "chart datasets run on a subdataset (datasetRun) are empty"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 4.58,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 8.76,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -221,23 +184,21 @@
   {
    "template": "charts/reports/AreaChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.036,
-   "jasper_seconds": 8.76,
+   "ferroreport_seconds": 0.097,
+   "jasper_seconds": 28.29,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
-   "worst_page": 0.0386,
+   "worst_page": 0.0345,
    "reason": ""
   },
   {
    "template": "charts/reports/Bar3DChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.042,
-   "jasper_seconds": 9.35,
+   "ferroreport_seconds": 0.088,
+   "jasper_seconds": 27.7,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
@@ -249,10 +210,9 @@
    "issues": [
     "chart customizers (customizerClass) are ignored"
    ],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.034,
-   "jasper_seconds": 8.97,
+   "ferroreport_seconds": 0.279,
+   "jasper_seconds": 24.63,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
@@ -261,71 +221,58 @@
   },
   {
    "template": "charts/reports/BubbleChartReport.jrxml",
-   "issues": [
-    "<bubbleChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.045,
-   "jasper_seconds": 15.75,
+   "ferroreport_seconds": 0.059,
+   "jasper_seconds": 35.67,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
-   "worst_page": 0.2384,
-   "reason": "<bubbleChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1914,
+   "reason": ""
   },
   {
    "template": "charts/reports/CandlestickChartReport.jrxml",
-   "issues": [
-    "<candlestickChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.034,
-   "jasper_seconds": 9.2,
+   "ferroreport_seconds": 0.213,
+   "jasper_seconds": 32.3,
    "result": "differs",
    "pages_jasper": 18,
    "pages_ferroreport": 18,
-   "worst_page": 0.6083,
-   "reason": "<candlestickChart> elements are not supported yet and are skipped"
+   "worst_page": 0.0665,
+   "reason": ""
   },
   {
    "template": "charts/reports/GanttChartReport.jrxml",
-   "issues": [
-    "<ganttChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 16,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 5.34,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 27.31,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.3273,
-   "reason": "<ganttChart> elements are not supported yet and are skipped"
+   "worst_page": 0.122,
+   "reason": ""
   },
   {
    "template": "charts/reports/HighLowChartReport.jrxml",
-   "issues": [
-    "<highLowChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.033,
-   "jasper_seconds": 7.45,
+   "ferroreport_seconds": 0.213,
+   "jasper_seconds": 29.11,
    "result": "differs",
    "pages_jasper": 18,
    "pages_ferroreport": 18,
-   "worst_page": 0.09,
-   "reason": "<highLowChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1165,
+   "reason": ""
   },
   {
    "template": "charts/reports/LineChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.048,
-   "jasper_seconds": 6.35,
+   "ferroreport_seconds": 0.071,
+   "jasper_seconds": 13.26,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
@@ -334,67 +281,58 @@
   },
   {
    "template": "charts/reports/MeterChartReport.jrxml",
-   "issues": [
-    "<meterChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.035,
-   "jasper_seconds": 6.63,
+   "ferroreport_seconds": 0.102,
+   "jasper_seconds": 19.49,
    "result": "differs",
    "pages_jasper": 16,
    "pages_ferroreport": 16,
-   "worst_page": 0.5167,
-   "reason": "<meterChart> elements are not supported yet and are skipped"
+   "worst_page": 0.2126,
+   "reason": ""
   },
   {
    "template": "charts/reports/MultipleAxisChartReport.jrxml",
-   "issues": [
-    "<multiAxisChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.046,
-   "jasper_seconds": 7.95,
+   "ferroreport_seconds": 0.09,
+   "jasper_seconds": 30.8,
    "result": "differs",
    "pages_jasper": 24,
    "pages_ferroreport": 24,
-   "worst_page": 0.8734,
-   "reason": "<multiAxisChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1733,
+   "reason": ""
   },
   {
    "template": "charts/reports/Pie3DChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.036,
-   "jasper_seconds": 6.83,
+   "ferroreport_seconds": 0.091,
+   "jasper_seconds": 27.91,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
-   "worst_page": 0.1076,
+   "worst_page": 0.1094,
    "reason": ""
   },
   {
    "template": "charts/reports/PieChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.035,
-   "jasper_seconds": 7.01,
+   "ferroreport_seconds": 0.053,
+   "jasper_seconds": 26.32,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
-   "worst_page": 0.0927,
+   "worst_page": 0.0957,
    "reason": ""
   },
   {
    "template": "charts/reports/ScatterChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.053,
-   "jasper_seconds": 8.64,
+   "ferroreport_seconds": 0.215,
+   "jasper_seconds": 39.49,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
@@ -404,10 +342,9 @@
   {
    "template": "charts/reports/StackedAreaChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.035,
-   "jasper_seconds": 6.5,
+   "ferroreport_seconds": 0.116,
+   "jasper_seconds": 30.65,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
@@ -417,10 +354,9 @@
   {
    "template": "charts/reports/StackedBar3DChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.041,
-   "jasper_seconds": 6.38,
+   "ferroreport_seconds": 0.273,
+   "jasper_seconds": 26.68,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
@@ -430,69 +366,57 @@
   {
    "template": "charts/reports/StackedBarChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.036,
-   "jasper_seconds": 6.71,
+   "ferroreport_seconds": 0.088,
+   "jasper_seconds": 20.94,
    "result": "differs",
    "pages_jasper": 13,
    "pages_ferroreport": 13,
-   "worst_page": 0.0329,
+   "worst_page": 0.0311,
    "reason": ""
   },
   {
    "template": "charts/reports/SubDatasetChartReport.jrxml",
-   "issues": [
-    "<timeSeriesChart> elements are not supported yet and are skipped",
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 21,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 5.54,
+   "ferroreport_seconds": 3.13,
+   "jasper_seconds": 24.96,
    "result": "differs",
    "pages_jasper": 7,
    "pages_ferroreport": 7,
-   "worst_page": 0.2818,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans; <timeSeriesChart> elements are not supported yet and are skipped"
+   "worst_page": 0.3245,
+   "reason": ""
   },
   {
    "template": "charts/reports/ThermometerChartReport.jrxml",
-   "issues": [
-    "<thermometerChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.033,
-   "jasper_seconds": 6.75,
+   "ferroreport_seconds": 0.117,
+   "jasper_seconds": 26.78,
    "result": "differs",
    "pages_jasper": 16,
    "pages_ferroreport": 16,
-   "worst_page": 0.1796,
-   "reason": "<thermometerChart> elements are not supported yet and are skipped"
+   "worst_page": 0.0921,
+   "reason": ""
   },
   {
    "template": "charts/reports/TimeSeriesChartReport.jrxml",
-   "issues": [
-    "<timeSeriesChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.037,
-   "jasper_seconds": 8.17,
+   "ferroreport_seconds": 0.087,
+   "jasper_seconds": 31.97,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
-   "worst_page": 0.1501,
-   "reason": "<timeSeriesChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1724,
+   "reason": ""
   },
   {
    "template": "charts/reports/XYAreaChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.039,
-   "jasper_seconds": 7.22,
+   "ferroreport_seconds": 0.105,
+   "jasper_seconds": 25.54,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
@@ -501,56 +425,46 @@
   },
   {
    "template": "charts/reports/XYBarChartReport.jrxml",
-   "issues": [
-    "<xyBarChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.033,
-   "jasper_seconds": 7.39,
+   "ferroreport_seconds": 0.145,
+   "jasper_seconds": 31.09,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
-   "worst_page": 0.364,
-   "reason": "<xyBarChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1123,
+   "reason": ""
   },
   {
    "template": "charts/reports/XYBarChartTimePeriodReport.jrxml",
-   "issues": [
-    "<xyBarChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 809,
-   "ferroreport_seconds": 0.033,
-   "jasper_seconds": 8.13,
+   "ferroreport_seconds": 0.587,
+   "jasper_seconds": 33.35,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
-   "worst_page": 0.15,
-   "reason": "<xyBarChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1303,
+   "reason": ""
   },
   {
    "template": "charts/reports/XYBarChartTimeSeriesReport.jrxml",
-   "issues": [
-    "<xyBarChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 830,
-   "ferroreport_seconds": 0.034,
-   "jasper_seconds": 7.4,
+   "ferroreport_seconds": 0.14,
+   "jasper_seconds": 21.63,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
-   "worst_page": 0.2226,
-   "reason": "<xyBarChart> elements are not supported yet and are skipped"
+   "worst_page": 0.1654,
+   "reason": ""
   },
   {
    "template": "charts/reports/XYLineChartReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.041,
-   "jasper_seconds": 8.05,
+   "ferroreport_seconds": 0.231,
+   "jasper_seconds": 29.32,
    "result": "differs",
    "pages_jasper": 19,
    "pages_ferroreport": 19,
@@ -559,52 +473,40 @@
   },
   {
    "template": "chartthemes/reports/AllChartsReport.jrxml",
-   "issues": [
-    "chart datasets run on a subdataset (datasetRun) are empty",
-    "<xyBarChart> elements are not supported yet and are skipped",
-    "chart datasets run on a subdataset (datasetRun) are empty",
-    "<bubbleChart> elements are not supported yet and are skipped",
-    "<timeSeriesChart> elements are not supported yet and are skipped",
-    "<highLowChart> elements are not supported yet and are skipped",
-    "<meterChart> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 3.25,
+   "ferroreport_seconds": 0.045,
+   "jasper_seconds": 11.58,
    "result": "differs",
    "pages_jasper": 10,
    "pages_ferroreport": 10,
-   "worst_page": 0.9698,
-   "reason": "chart datasets run on a subdataset (datasetRun) are empty; <xyBarChart> elements are not supported yet and are skipped; chart datasets run on a subdataset (datasetRun) are empty"
+   "worst_page": 0.9097,
+   "reason": ""
   },
   {
    "template": "crosstabs/reports/LateOrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 809,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 4.27,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 15.4,
    "result": "not rendered",
    "reason": "error evaluating expression: NullPointerException: cannot call toString() on null"
   },
   {
    "template": "crosstabs/reports/OrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 3.35,
+   "ferroreport_seconds": 0.027,
+   "jasper_seconds": 13.06,
    "result": "not rendered",
    "reason": "error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab"
   },
   {
    "template": "crosstabs/reports/ProductsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 12,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.98,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 11.23,
    "result": "differs",
    "pages_jasper": 3,
    "pages_ferroreport": 3,
@@ -614,10 +516,9 @@
   {
    "template": "crosstabs/reports/ShipmentsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 21,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 3.16,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 9.01,
    "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
@@ -626,10 +527,9 @@
   {
    "template": "csvdatasource/reports/CsvDataSourceReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.52,
+   "ferroreport_seconds": 0.022,
+   "jasper_seconds": 10.37,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -638,10 +538,9 @@
   {
    "template": "csvdatasource/reports/CsvQueryExecuterReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.62,
+   "ferroreport_seconds": 0.031,
+   "jasper_seconds": 7.46,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -650,13 +549,11 @@
   {
    "template": "customvisualization/reports/D3Rectangle.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.0,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 9.71,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Input stream not found at: d3rectangle/d3rectangle.min.js.",
@@ -665,13 +562,11 @@
   {
    "template": "customvisualization/reports/Figures.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
    "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.22,
+   "jasper_seconds": 7.76,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Input stream not found at: figures/figures.min.js.",
@@ -680,13 +575,11 @@
   {
    "template": "customvisualization/reports/LeafletMarkers.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.78,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 5.02,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRException: Resource not found at: /data/JsonDataAdapter.jrdax.",
@@ -695,13 +588,11 @@
   {
    "template": "customvisualization/reports/RadialProgress.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 3.32,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.72,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Input stream not found at: radialprogress/radialprogress.min.js.",
@@ -710,13 +601,11 @@
   {
    "template": "customvisualization/reports/SimpleRectangle.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 3.35,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.7,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Input stream not found at: simplerectangle/simplerectangle.min.js.",
@@ -725,13 +614,11 @@
   {
    "template": "customvisualization/reports/Sparkline.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<customvisualization> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 3.07,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.77,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Input stream not found at: sparkline/sparkline.min.js.",
@@ -740,10 +627,9 @@
   {
    "template": "datasource/reports/DataSourceReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.48,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.48,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -752,19 +638,17 @@
   {
    "template": "daterange/reports/DateRangeReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.93,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.5,
    "result": "not rendered",
    "reason": "cannot parse expression `DATERANGE(\"1996-09-01\")`: unknown identifier `DATERANGE`"
   },
   {
    "template": "ejbql/reports/JRMDbCastSubreport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.01,
-   "jasper_seconds": 3.29,
+   "ferroreport_seconds": 0.019,
+   "jasper_seconds": 5.38,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -773,9 +657,8 @@
   {
    "template": "ejbql/reports/JRMDbReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.76,
+   "jasper_seconds": 4.89,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -784,9 +667,8 @@
   {
    "template": "ejbql/reports/JRMDbVariaSubreport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.72,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 5.01,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -795,10 +677,9 @@
   {
    "template": "exceldataadapter/reports/ExcelXlsDataAdapterReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 3.04,
+   "ferroreport_seconds": 0.018,
+   "jasper_seconds": 4.94,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -807,10 +688,9 @@
   {
    "template": "exceldataadapter/reports/ExcelXlsQeDataAdapterReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.76,
+   "ferroreport_seconds": 0.017,
+   "jasper_seconds": 5.62,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -819,10 +699,9 @@
   {
    "template": "exceldataadapter/reports/ExcelXlsxDataAdapterReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.007,
-   "jasper_seconds": 2.62,
+   "jasper_seconds": 5.27,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -831,10 +710,9 @@
   {
    "template": "exceldataadapter/reports/ExcelXlsxQeDataAdapterReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.78,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 5.29,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -843,10 +721,9 @@
   {
    "template": "exceldatasource/reports/ExcelDataSourceReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.41,
+   "jasper_seconds": 4.6,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -855,10 +732,9 @@
   {
    "template": "fastexceldatasource/reports/FastExcelDataSourceReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.007,
-   "jasper_seconds": 2.7,
+   "jasper_seconds": 4.63,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -866,13 +742,10 @@
   },
   {
    "template": "fonts/reports/FontsReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.016,
-   "jasper_seconds": 2.32,
+   "ferroreport_seconds": 0.018,
+   "jasper_seconds": 4.04,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "ExceptionConverter: java.io.IOException: ../../ext/fonts/net/sf/jasperreports/fonts/dejavu/DejaVuSans-Oblique.ttf not found as file or resource.",
@@ -880,29 +753,24 @@
   },
   {
    "template": "forms/reports/FormsReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.008,
-   "jasper_seconds": 2.95,
+   "jasper_seconds": 4.73,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.4569,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.3359,
+   "reason": ""
   },
   {
    "template": "functions/reports/FunctionsReport.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "tables with a connectionExpression get no rows (only data sources are supported)"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 2.95,
+   "ferroreport_seconds": 0.016,
+   "jasper_seconds": 5.18,
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
    "detail": "net.sf.jasperreports.engine.JRException: Resource not found at: /data/functions.jrdax.",
@@ -911,26 +779,22 @@
   {
    "template": "genericelement/reports/GenericElementReport.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<genericElement> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.27,
-   "result": "differs",
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.58,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.8611,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans; <genericElement> elements are not supported yet and are skipped"
+   "worst_page": 0.0
   },
   {
    "template": "groovy/reports/GroovyReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.59,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 4.6,
    "ferroreport_error": "cannot parse expression `[5, 6, 7, 8, 9].findAll{it % 2 == 1}`: unexpected character `[`",
    "result": "no reference",
    "reason": "JasperReports fails on it without the sample's own program",
@@ -940,9 +804,8 @@
   {
    "template": "hibernate/reports/AddressesReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.95,
+   "ferroreport_seconds": 0.017,
+   "jasper_seconds": 5.29,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -951,10 +814,9 @@
   {
    "template": "hibernate/reports/DocumentsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.93,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.46,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -963,9 +825,8 @@
   {
    "template": "hibernate/reports/HibernateQueryReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.009,
-   "jasper_seconds": 3.0,
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 5.82,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -974,10 +835,9 @@
   {
    "template": "horizontal/reports/HorizontalReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 253,
-   "ferroreport_seconds": 0.021,
-   "jasper_seconds": 3.5,
+   "ferroreport_seconds": 0.022,
+   "jasper_seconds": 7.27,
    "result": "differs",
    "pages_jasper": 20,
    "pages_ferroreport": 20,
@@ -987,28 +847,23 @@
   {
    "template": "htmlcomponent/reports/HtmlComponentReport.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<html> elements are not supported yet and are skipped",
     "<genericElement> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 1.47,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 2.86,
    "result": "no reference",
    "reason": "JasperReports fails on it without the sample's own program",
-   "detail": "22:49:03.056 [main] ERROR net.sf.jasperreports.extensions.DefaultExtensionsRegistry - Error instantiating extensions registry for htmlelement from file:/tmp/big/jr/src/jasperreports/demo/samples/htmlcomponent/src/jasperreports_extension.pro",
+   "detail": "02:25:02.047 [main] ERROR net.sf.jasperreports.extensions.DefaultExtensionsRegistry - Error instantiating extensions registry for htmlelement from file:/home/claude/ferroreport/target/jasper-samples/6.20.6/jasperreports/demo/samples/htmlcom",
    "ferroreport_renders": true
   },
   {
    "template": "httpdataadapter/reports/JsonHttpDataAdapterReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.46,
+   "jasper_seconds": 4.38,
    "ferroreport_error": "error evaluating expression: NullPointerException: arithmetic on a null value",
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
@@ -1017,12 +872,9 @@
   },
   {
    "template": "httpdataadapter/reports/XmlHttpDataAdapterReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.26,
+   "issues": [],
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 4.21,
    "result": "no reference",
    "reason": "its rows come from a xPath query",
    "detail": "a xPath query",
@@ -1030,45 +882,35 @@
   },
   {
    "template": "hyperlink/reports/HyperlinkReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.009,
-   "jasper_seconds": 3.23,
-   "result": "differs",
+   "jasper_seconds": 4.64,
+   "result": "same",
    "pages_jasper": 3,
    "pages_ferroreport": 3,
-   "worst_page": 0.5948,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "i18n/reports/I18nReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.51,
+   "ferroreport_seconds": 0.014,
+   "jasper_seconds": 4.95,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported method String.getDisplayName()"
   },
   {
    "template": "iconlabel/reports/IconLabelReport.jrxml",
-   "issues": [
-    "<iconLabel> elements are not supported yet and are skipped"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.72,
+   "ferroreport_seconds": 0.011,
+   "jasper_seconds": 4.7,
    "result": "differs",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
-   "worst_page": 0.7128,
-   "reason": "<iconLabel> elements are not supported yet and are skipped"
+   "worst_page": 0.343,
+   "reason": ""
   },
   {
    "template": "images/reports/ImagesReport.jrxml",
@@ -1077,74 +919,61 @@
     "scaleImage=\"RealSize\" is rendered as RetainShape",
     "scaleImage=\"RealHeight\" is rendered as RetainShape"
    ],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 7.12,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 9.65,
    "result": "not rendered",
    "reason": "unsupported feature: image format (only PNG, JPEG and GIF are supported)"
   },
   {
    "template": "jasper/reports/FirstJasper.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 253,
-   "ferroreport_seconds": 0.02,
-   "jasper_seconds": 3.39,
-   "result": "differs",
+   "ferroreport_seconds": 0.025,
+   "jasper_seconds": 6.88,
+   "result": "same",
    "pages_jasper": 9,
    "pages_ferroreport": 9,
-   "worst_page": 0.007,
-   "reason": ""
+   "worst_page": 0.0001
   },
   {
    "template": "java1.5/reports/Java5Report.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.38,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 5.27,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported static field Greeting.bye"
   },
   {
    "template": "javascript/reports/JavaScriptReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.23,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 4.28,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.7221,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0341,
+   "reason": ""
   },
   {
    "template": "jfreechart/reports/JFreeChartReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.42,
+   "jasper_seconds": 5.3,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.3408,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.2949,
+   "reason": ""
   },
   {
    "template": "jsondatasource/reports/JsonCustomersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.68,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.93,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1153,9 +982,8 @@
   {
    "template": "jsondatasource/reports/JsonOrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.45,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 4.39,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1164,9 +992,8 @@
   {
    "template": "jsonqldatasource/reports/NorthwindOrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.49,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 4.58,
    "result": "no reference",
    "reason": "its rows come from a jsonql query",
    "detail": "a jsonql query",
@@ -1174,26 +1001,21 @@
   },
   {
    "template": "landscape/reports/LandscapeReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.05,
-   "result": "differs",
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.25,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.0408,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "list/reports/HorizontalListReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 12,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.69,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.78,
    "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
@@ -1202,10 +1024,9 @@
   {
    "template": "list/reports/ListReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 12,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.67,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 5.1,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1214,10 +1035,9 @@
   {
    "template": "map/reports/MapReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.54,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 7.45,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1229,9 +1049,8 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
+   "ferroreport_seconds": 0.004,
    "jasper_seconds": 120,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
@@ -1244,10 +1063,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.28,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 5.82,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1259,10 +1077,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.07,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 6.13,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1274,10 +1091,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.35,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 6.14,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1289,10 +1105,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.37,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.7,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1304,10 +1119,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.42,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.9,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1319,10 +1133,9 @@
    "issues": [
     "<map> elements are not supported yet and are skipped"
    ],
-   "names_fonts": true,
    "rows": 7,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.32,
+   "jasper_seconds": 5.5,
    "ferroreport_error": "error evaluating expression: parameter `REPORT_CONTEXT` is not declared",
    "result": "no reference",
    "reason": "needs files that the sample's program provides",
@@ -1331,25 +1144,21 @@
   },
   {
    "template": "markup/reports/MarkupReport.jrxml",
-   "issues": [
-    "markup=\"rtf\" is rendered as plain text"
-   ],
-   "names_fonts": true,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.008,
-   "jasper_seconds": 2.23,
+   "ferroreport_seconds": 0.009,
+   "jasper_seconds": 4.6,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
    "worst_page": 0.0016,
-   "reason": "markup=\"rtf\" is rendered as plain text"
+   "reason": ""
   },
   {
    "template": "mondrian/reports/AdventureWorks-Olap4jXMLA-XJoinColumnsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.49,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 5.83,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1358,9 +1167,8 @@
   {
    "template": "mondrian/reports/AdventureWorks-Olap4jXMLAReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.38,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 5.72,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1369,9 +1177,8 @@
   {
    "template": "mondrian/reports/AdventureWorks-XMLA-XJoinColumnsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.87,
+   "jasper_seconds": 4.33,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1380,9 +1187,8 @@
   {
    "template": "mondrian/reports/AdventureWorks-XMLAReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.91,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.32,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1391,9 +1197,8 @@
   {
    "template": "mondrian/reports/FoodMartSales-XMLAReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.96,
+   "jasper_seconds": 3.36,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1402,9 +1207,8 @@
   {
    "template": "mondrian/reports/FoodMartSalesWeekly-XMLAReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.23,
+   "jasper_seconds": 3.38,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1413,9 +1217,8 @@
   {
    "template": "mondrian/reports/MondrianFoodMartSalesOlap4jReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.3,
+   "jasper_seconds": 3.47,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1424,9 +1227,8 @@
   {
    "template": "mondrian/reports/MondrianFoodMartSalesReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.57,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.63,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1435,9 +1237,8 @@
   {
    "template": "mondrian/reports/MondrianReport.jrxml",
    "issues": [],
-   "names_fonts": true,
-   "ferroreport_seconds": 0.003,
-   "jasper_seconds": 3.27,
+   "ferroreport_seconds": 0.004,
+   "jasper_seconds": 3.38,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1446,20 +1247,18 @@
   {
    "template": "nopagebreak/reports/NoPageBreakReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 252,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.14,
+   "ferroreport_seconds": 0.003,
+   "jasper_seconds": 3.22,
    "result": "not rendered",
    "reason": "error evaluating expression: unsupported constructor new ArrayList()"
   },
   {
    "template": "paragraphs/reports/ParagraphsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.96,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.82,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1468,25 +1267,20 @@
   },
   {
    "template": "pdfencrypt/reports/PdfEncryptReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.09,
-   "result": "differs",
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.22,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.8684,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "query/reports/QueryReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.009,
-   "jasper_seconds": 2.59,
+   "jasper_seconds": 2.74,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1495,10 +1289,9 @@
   {
    "template": "rotation/reports/RotationReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.18,
+   "jasper_seconds": 2.22,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1508,38 +1301,31 @@
   {
    "template": "scriptlet/reports/ScriptletReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 50,
-   "ferroreport_seconds": 0.007,
-   "jasper_seconds": 2.64,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.72,
    "result": "not rendered",
    "reason": "error evaluating expression: NullPointerException: cannot call hello() on null"
   },
   {
    "template": "shapes/reports/ShapesReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.24,
-   "result": "differs",
+   "jasper_seconds": 2.38,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.5015,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0009
   },
   {
    "template": "spiderchartcomponent/reports/SpiderChart.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<spiderChart> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.35,
+   "jasper_seconds": 2.4,
    "result": "no reference",
    "reason": "JasperReports fails on it without the sample's own program",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: Category series name is null.",
@@ -1547,26 +1333,22 @@
   },
   {
    "template": "stretch/reports/StretchReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 20,
-   "ferroreport_seconds": 0.021,
-   "jasper_seconds": 2.9,
+   "ferroreport_seconds": 0.024,
+   "jasper_seconds": 3.24,
    "result": "differs",
    "pages_jasper": 14,
    "pages_ferroreport": 21,
    "worst_page": 1.0,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "reason": "a different number of pages"
   },
   {
    "template": "styledtext/reports/StyledTextReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.011,
-   "jasper_seconds": 2.59,
+   "ferroreport_seconds": 0.012,
+   "jasper_seconds": 2.91,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1576,10 +1358,9 @@
   {
    "template": "subreport/reports/AddressReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 0,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 2.62,
+   "ferroreport_seconds": 0.003,
+   "jasper_seconds": 2.72,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1590,10 +1371,9 @@
    "issues": [
     "subreports with a connectionExpression get no rows (only data sources are supported)"
    ],
-   "names_fonts": true,
    "rows": 12,
    "ferroreport_seconds": 0.008,
-   "jasper_seconds": 3.27,
+   "jasper_seconds": 3.23,
    "result": "differs",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1603,10 +1383,9 @@
   {
    "template": "subreport/reports/ProductReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 0,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.86,
+   "jasper_seconds": 2.98,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1615,10 +1394,9 @@
   {
    "template": "table/reports/TableReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 50,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.61,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.74,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1627,10 +1405,9 @@
   {
    "template": "tableofcontents/reports/TableOfContentsReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.98,
+   "jasper_seconds": 2.97,
    "result": "differs",
    "pages_jasper": 2,
    "pages_ferroreport": 1,
@@ -1640,20 +1417,18 @@
   {
    "template": "tableofcontents/reports/TablePart.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 830,
-   "ferroreport_seconds": 0.008,
-   "jasper_seconds": 3.53,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 4.21,
    "result": "not rendered",
    "reason": "error evaluating expression: variable `MASTER_CURRENT_PAGE` is not declared"
   },
   {
    "template": "tableofcontents/reports/TocPart.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.79,
+   "ferroreport_seconds": 0.006,
+   "jasper_seconds": 2.93,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1662,10 +1437,9 @@
   {
    "template": "tabular/reports/TabularReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 50,
-   "ferroreport_seconds": 0.009,
-   "jasper_seconds": 2.73,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 3.04,
    "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
@@ -1673,26 +1447,21 @@
   },
   {
    "template": "templates/reports/StylesReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.009,
-   "jasper_seconds": 2.64,
-   "result": "differs",
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.95,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.2001,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "text/reports/TextReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 39,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.97,
+   "ferroreport_seconds": 0.008,
+   "jasper_seconds": 2.57,
    "result": "same",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
@@ -1700,36 +1469,33 @@
   },
   {
    "template": "unicode/reports/UnicodeReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.008,
-   "jasper_seconds": 4.83,
+   "ferroreport_seconds": 0.01,
+   "jasper_seconds": 2.95,
    "result": "differs",
    "pages_jasper": 2,
    "pages_ferroreport": 2,
    "worst_page": 0.9575,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "reason": ""
   },
   {
    "template": "virtualizer/reports/VirtualizerReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1000,
-   "ferroreport_seconds": 0.005,
-   "jasper_seconds": 3.07,
-   "result": "not rendered",
-   "reason": "error evaluating expression: unsupported static method Math.log()"
+   "ferroreport_seconds": 0.015,
+   "jasper_seconds": 2.9,
+   "result": "same",
+   "pages_jasper": 27,
+   "pages_ferroreport": 27,
+   "worst_page": 0.0
   },
   {
    "template": "webapp/web/reports/WebappReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.44,
+   "jasper_seconds": 2.47,
    "ferroreport_error": "cannot parse expression `((scriptlets.WebappScriptlet)$P{REPORT_SCRIPTLET}).hello()`: expected RParen, found Param(\"REPORT_SCRIPTLET\")",
    "result": "no reference",
    "reason": "JasperReports fails on it without the sample's own program",
@@ -1738,13 +1504,10 @@
   },
   {
    "template": "xchart/reports/XChartReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 1.91,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.23,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "net.sf.jasperreports.engine.JRRuntimeException: java.lang.ClassNotFoundException: XChartScriptlet",
@@ -1753,27 +1516,22 @@
   {
    "template": "xchartcomponent/reports/XYChart.jrxml",
    "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both",
     "<XYChart> elements are not supported yet and are skipped"
    ],
-   "names_fonts": false,
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 1.43,
+   "jasper_seconds": 1.57,
    "result": "no reference",
    "reason": "JasperReports fails on it without the sample's own program",
-   "detail": "org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'componentsBundle' defined in URL [file:/tmp/big/jr/src/jasperreports/demo/samples/xchartcomponent/src/xchart/xchart_beans.xml]: Cannot resolve reference",
+   "detail": "org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'componentsBundle' defined in URL [file:/home/claude/ferroreport/target/jasper-samples/6.20.6/jasperreports/demo/samples/xchartcomponent/src/xchart/xchar",
    "ferroreport_renders": true
   },
   {
    "template": "xlsfeatures/reports/ExcelNames.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
-   "ferroreport_seconds": 0.006,
-   "jasper_seconds": 2.93,
+   "ferroreport_seconds": 0.007,
+   "jasper_seconds": 2.89,
    "result": "no reference",
    "reason": "needs Java classes that are not at hand (the sample's own, or libraries it adds)",
    "detail": "java.lang.NoClassDefFoundError: org/exolab/castor/xml/MarshalException",
@@ -1782,10 +1540,9 @@
   {
    "template": "xlsfeatures/reports/FormatPatternsMap.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
    "ferroreport_seconds": 0.006,
-   "jasper_seconds": 3.25,
+   "jasper_seconds": 3.87,
    "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
@@ -1794,44 +1551,37 @@
   {
    "template": "xlsfeatures/reports/MacroReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.28,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 3.56,
    "result": "not rendered",
    "reason": "error evaluating expression: NullPointerException: cannot call substring() on null"
   },
   {
    "template": "xlsfeatures/reports/XlsFeaturesReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "rows": 1,
-   "ferroreport_seconds": 0.004,
-   "jasper_seconds": 3.06,
+   "ferroreport_seconds": 0.005,
+   "jasper_seconds": 2.92,
    "result": "not rendered",
    "reason": "error evaluating expression: NullPointerException: cannot call substring() on null"
   },
   {
    "template": "xlsformula/reports/XlsFormulaReport.jrxml",
-   "issues": [
-    "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font (DejaVu Sans, or one you register) to get the same pages from both"
-   ],
-   "names_fonts": false,
+   "issues": [],
    "rows": 1,
    "ferroreport_seconds": 0.005,
-   "jasper_seconds": 2.3,
-   "result": "differs",
+   "jasper_seconds": 2.78,
+   "result": "same",
    "pages_jasper": 1,
    "pages_ferroreport": 1,
-   "worst_page": 0.412,
-   "reason": "names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"
+   "worst_page": 0.0
   },
   {
    "template": "xmldatasource/reports/CustomersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.4,
+   "jasper_seconds": 2.73,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",
@@ -1840,9 +1590,8 @@
   {
    "template": "xmldatasource/reports/OrdersReport.jrxml",
    "issues": [],
-   "names_fonts": true,
    "ferroreport_seconds": 0.003,
-   "jasper_seconds": 2.57,
+   "jasper_seconds": 2.8,
    "result": "no reference",
    "reason": "JasperReports draws nothing for it without the sample's own program",
    "detail": "1 blank page(s)",

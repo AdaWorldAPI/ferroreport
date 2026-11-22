@@ -18,10 +18,10 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 38 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 40 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
 > subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 40 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
+> estilo de JFreeChart. Las 42 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
 > algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
@@ -32,8 +32,8 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   las páginas salen sin acumularse: un reporte de un millón de filas usa la memoria de uno de
   diez.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 38 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 40 coinciden.
+  píxel: hoy los 40 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 42 coinciden.
 - **PDF, Excel, CSV y HTML.** La misma plantilla da un PDF, un `.xlsx` armado como el de
   JasperReports (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y
   gráficos), un CSV o una página web que se ve como el PDF, para vistas previas.
@@ -107,26 +107,34 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 
 ## Qué soporta
 
-- Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`).
+- Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`), y un
+  título que no cabe en una página y sigue en las siguientes, como en JasperReports.
 - Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG, JPEG y GIF,
-  subreportes, y códigos de los componentes barcode4j: QR, Code 128, Code 39 (con ASCII completo),
-  EAN-13, EAN-8, UPC-A, Interleaved 2 of 5 y Codabar. Cada barra se verifica contra barcode4j.
+  subreportes, icon labels, y códigos de los componentes barcode4j: QR, DataMatrix, Code 128,
+  EAN-128, Code 39 (con ASCII completo), EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5,
+  Codabar, POSTNET, Royal Mail y USPS Intelligent Mail. Cada barra se verifica contra barcode4j.
+- Campos de formulario PDF (`net.sf.jasperreports.export.pdf.field.*`): texto, listas
+  desplegables, casillas y botones de opción.
 - Estilos con herencia y estilos condicionales, texto justificado, `isRemoveLineWhenBlank`,
   `isPrintRepeatedValues`, grupos, variables y tiempos de evaluación.
 - Los QR se codifican igual que ZXing (misma versión, máscara y módulos) y se dibujan como los
   dibuja JasperReports: sirven para facturas electrónicas impresas, como el sello del e-CF
   dominicano.
-- Reportes de varias columnas (orden vertical).
-- Texto con formato (markup `styled` y `html`): negritas, cursivas, fuentes, tamaños, colores,
-  resaltado, superíndices, saltos de línea y listas, también cuando el texto sigue en otra página.
+- Reportes de varias columnas (orden vertical y horizontal).
+- Texto con formato (markup `styled`, `html` y `rtf`): negritas, cursivas, fuentes, tamaños,
+  colores, resaltado, superíndices, saltos de línea y listas HTML (con viñetas o numeradas, una
+  dentro de otra), también cuando el texto sigue en otra página.
+- Texto sin fuente disponible escrito como lo escribe JasperReports: en la fuente estándar del PDF
+  que diga su `pdfFontName` (Helvetica por defecto).
 - Texto rotado (izquierda, derecha, de cabeza).
-- Gráficos: pastel (también 3D), barras (también 3D y apiladas), líneas, áreas, XY y dispersión, con
-  títulos, leyendas y datasets por registro, grupo o reporte. Siguen el estilo de JFreeChart, aunque
-  no son idénticos píxel por píxel.
+- Gráficos: pastel (también 3D), barras (también 3D y apiladas), líneas, áreas, XY, dispersión,
+  burbujas, series de tiempo, velas (candlestick), máximo-mínimo, Gantt, medidor, termómetro y
+  de varios ejes, con títulos, leyendas y datasets por registro, grupo o reporte, también desde un
+  subdataset. Siguen el estilo de JFreeChart, aunque no son idénticos píxel por píxel.
 - Tablas (`jr:table`) como las crea el asistente de Jaspersoft Studio: grupos de columnas, encabezados
   y pies de tabla, de columna y de grupo, columnas ocultas, celda sin datos, y encabezados que se
   repiten en cada página.
-- Listas (`jr:list`) verticales, también cuando siguen en otra página.
+- Listas (`jr:list`) verticales y horizontales, también cuando siguen en otra página.
 - Exportación a Excel (XLSX) y CSV como la de JasperReports con su configuración por defecto: todas
   las páginas en una hoja con el nombre del reporte, cada texto en las celdas que cubre
   (combinadas) con su fuente, colores, bordes y alineación; líneas como bordes, imágenes sobre sus
@@ -138,8 +146,11 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
   orden por totales (`orderByExpression`), totales con `$V{medida_grupo_ALL}`,
   parámetros, datos del reporte o de un subdataset. Si no caben a lo ancho se parten en bloques de
   columnas, y si no caben a lo alto siguen en la página siguiente con las cabeceras repetidas.
-- Aún no: comparadores propios en crosstabs, listas horizontales, orden horizontal de columnas,
-  conexiones JDBC.
+- PDF etiquetado para lectores de pantalla (`--tagged`): párrafos y títulos, imágenes con su
+  descripción, tablas y crosstabs con celdas de encabezado y las columnas y filas que abarca
+  cada celda, y listas HTML como listas.
+- Aún no: comparadores propios en crosstabs, PDF417, códigos Barbecue, personalizadores de
+  gráficos, conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -213,13 +224,19 @@ reporte con más filas de las que caben en una hoja (1,048,576) se detiene con u
   páginas salen sin acumularse), límites de páginas y tiempo, pruebas de mutación.
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
-- **Fase 4:** más tipos de gráficos; listo: exportación a Excel (XLSX) y CSV.
+- **Fase 4:** listo: exportación a Excel (XLSX) y CSV, todos los tipos de gráfico de JasperReports.
+- **Listo en 0.10:** los nueve tipos de gráfico que faltaban, markup RTF, listas HTML, DataMatrix,
+  EAN-128, UPC-E y códigos postales, campos de formulario PDF, icon labels, Helvetica para el
+  texto sin fuente, listas y celdas combinadas en PDF etiquetado, títulos de varias páginas;
+  verificado también contra las muestras de JasperReports 7.1.1.
 - **Listo en 0.8:** salida HTML para vistas previas, librería de Java que lee un `ResultSet`
   fila por fila, filas desde cualquier base de datos por tubería o iterador, y un servidor que
   se niega a quedar abierto a la red y puede limitar a cada cliente.
-- **Siguiente:** la librería de Java en Maven Central (hoy la construye JitPack), Excel escrito
-  por partes, salida a Word y un diseñador visual (mientras tanto, Jaspersoft Studio sirve para
-  diseñar las plantillas).
+- **Siguiente:** un formato de plantilla propio, corto y legible como Markdown, que se compila al
+  mismo motor y es accesible por defecto; `ferroreport convert` entre ese formato y JRXML (y de
+  JRXML 6 a 7); la librería de Java en Maven Central (hoy la construye JitPack), Excel escrito
+  por partes, salida a Word, PDF417 y un diseñador visual (mientras tanto, Jaspersoft Studio
+  sirve para diseñar las plantillas).
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

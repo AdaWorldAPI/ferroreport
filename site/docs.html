@@ -543,7 +543,8 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p>A PDF is a picture of pages unless it also says what is on them. With tagging on, the document carries that description
         (a <i>tagged PDF</i>): each text element is a paragraph and each image, chart and barcode a figure, in reading order; tables
         and crosstabs are tables, with their rows, their data cells and their header cells, each header saying whether it names a
-        column or a row; lines, borders and backgrounds are marked as decoration, so a screen reader skips them; and the document
+        column or a row and each cell how many columns and rows it spans; the lists of an HTML text are lists, each item with its
+        bullet or number and its body; lines, borders and backgrounds are marked as decoration, so a screen reader skips them; and the document
         has its title and the language of the locale. The pages look exactly the same.</p>
       <table>
         <tr><th>From</th><th>How</th></tr>
@@ -563,7 +564,7 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       </table>
       <p>What this is and is not yet: the structure is read correctly by PDF tools (Poppler's <code>pdfinfo -struct-text</code> prints
         it), every tagged test report has the same pixels as the untagged one, and every table in them has its cells in rows and
-        its rows in the table. Lists are tagged as paragraphs, and a cell that spans several columns or rows does not say so. The
+        its rows in the table. The
         files do not claim PDF/UA conformance: that needs a validator's verdict, which this project will publish when it has one. A
         tagged PDF is larger (an entry per text) and a value known only later, such as "page 3 of 240", makes its page wait instead
         of being added afterwards.</p>
@@ -664,7 +665,7 @@ invoice.jrxml: report `invoice`
         templates your users upload.</p>
 
       <h2 id="support">What is supported</h2>
-      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
+      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, every JasperReports chart type, barcodes (QR, DataMatrix, Code 128, EAN-128, Code 39, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail, USPS Intelligent Mail), PDF form fields, icon labels, styled, HTML and RTF text,
         rotation, multi-column layouts in either print order, conditional styles and style templates, exported to PDF, Excel, CSV or HTML. The
         <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
         feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
