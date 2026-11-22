@@ -1398,10 +1398,11 @@ impl<W: std::io::Write> PdfStream<W> {
                 e.finish();
                 return self.put(id, &chunk).map(|_| id);
             }
-            // Texts are most of a report: written as tightly as the format allows, they are
-            // a third of the size.
+            // Texts are most of a report: written as tightly as the format allows (with the
+            // line breaks around obj and endobj that PDF/A asks for), they are a third of the
+            // size.
             let line = format!(
-                "{} 0 obj<</S/{}/P {} 0 R/Pg {} 0 R/K {number}>>endobj\n",
+                "{} 0 obj\n<</S/{}/P {} 0 R/Pg {} 0 R/K {number}>>\nendobj\n",
                 id.get(),
                 node.role.name(),
                 parent.get(),
