@@ -10,7 +10,7 @@ import java.util.*;
 /**
  * Reference renderer: compiles a JRXML with JasperReports, fills it with rows from a JSON
  * array (field values converted to each field's declared class) and exports a PDF.
- * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf|out.xlsx|out.csv|out.jrpxml> [params.json]
+ * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf|out.xlsx|out.docx|out.csv|out.jrpxml> [params.json]
  */
 public class Oracle {
     public static void main(String[] args) throws Exception {
@@ -50,6 +50,11 @@ public class Oracle {
         long t2 = System.nanoTime();
         if (args[2].endsWith(".xlsx")) {
             net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter x = new net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter();
+            x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
+            x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
+            x.exportReport();
+        } else if (args[2].endsWith(".docx")) {
+            net.sf.jasperreports.engine.export.ooxml.JRDocxExporter x = new net.sf.jasperreports.engine.export.ooxml.JRDocxExporter();
             x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
             x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
             x.exportReport();

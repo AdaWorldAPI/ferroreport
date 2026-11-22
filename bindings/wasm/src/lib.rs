@@ -32,7 +32,7 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
-///   format?: "pdf" | "xlsx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
+///   format?: "pdf" | "xlsx" | "docx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
 ///   tagged?: boolean }` (`tagged` writes a tagged PDF, for screen readers).
 ///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
 ///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
@@ -79,7 +79,7 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
     }
     let format = match get(&options, "format").as_string() {
         Some(f) => ferroreport::Format::parse(&f)
-            .ok_or_else(|| JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, csv or html)")))?,
+            .ok_or_else(|| JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, docx, csv or html)")))?,
         None => ferroreport::Format::Pdf,
     };
     r.render_json_as(template, &rows, &params, format).map_err(js_err)

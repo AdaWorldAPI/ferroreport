@@ -19,6 +19,7 @@ pub mod chart;
 pub mod crosstab;
 pub mod csv;
 pub mod data;
+pub mod docx;
 pub mod error;
 pub mod expr;
 pub mod fill;
@@ -72,16 +73,19 @@ pub enum Format {
     Csv,
     /// A web page with every page of the report drawn as it is in the PDF, for previews.
     Html,
+    /// Word document, laid out like JasperReports' DOCX exporter.
+    Docx,
 }
 
 impl Format {
-    /// `pdf`, `xlsx`, `csv` or `html` (any case).
+    /// `pdf`, `xlsx`, `csv`, `html` or `docx` (any case).
     pub fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
             "xlsx" | "excel" => Some(Format::Xlsx),
             "csv" => Some(Format::Csv),
             "html" | "htm" => Some(Format::Html),
+            "docx" | "word" => Some(Format::Docx),
             _ => None,
         }
     }
@@ -92,6 +96,7 @@ impl Format {
             Format::Xlsx => "xlsx",
             Format::Csv => "csv",
             Format::Html => "html",
+            Format::Docx => "docx",
         }
     }
 
@@ -101,6 +106,7 @@ impl Format {
             Format::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             Format::Csv => "text/csv; charset=utf-8",
             Format::Html => "text/html; charset=utf-8",
+            Format::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         }
     }
 }
@@ -292,6 +298,12 @@ impl Renderer {
                 sink.finish()?;
                 Ok(stats)
             }
+            Format::Docx => {
+                let mut sink = docx::DocxStream::new(out, &report.name, report.page_width, report.page_height, report.landscape)?;
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish()?;
+                Ok(stats)
+            }
             Format::Xlsx => {
                 let mut count = 0;
                 let rows = rows.inspect(|_| count += 1);
@@ -393,6 +405,7 @@ impl Renderer {
             Format::Xlsx => self.to_xlsx(doc, &self.xlsx)?,
             Format::Csv => self.to_csv(doc, &self.csv).into_bytes(),
             Format::Html => html::write_html(doc, &self.fonts, &self.html)?.into_bytes(),
+            Format::Docx => docx::write_docx(doc, &self.fonts)?,
         })
     }
 

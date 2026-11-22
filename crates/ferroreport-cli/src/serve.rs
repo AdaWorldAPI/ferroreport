@@ -818,7 +818,7 @@ fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) 
                 None => ferroreport::Format::Pdf,
                 Some(f) => match ferroreport::Format::parse(&f) {
                     Some(f) => f,
-                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, csv or html)")),
+                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, docx, csv or html)")),
                 },
             };
             let m = &state.metrics;

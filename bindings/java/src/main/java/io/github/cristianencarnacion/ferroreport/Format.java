@@ -8,7 +8,9 @@ public enum Format {
     /** Comma-separated values, laid out like JasperReports' CSV exporter. */
     CSV("csv", "text/csv; charset=utf-8"),
     /** A web page that looks like the PDF, for previews. */
-    HTML("html", "text/html; charset=utf-8");
+    HTML("html", "text/html; charset=utf-8"),
+    /** A Word document, laid out like JasperReports' DOCX exporter. */
+    DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     private final String id;
     private final String mediaType;
@@ -18,7 +20,7 @@ public enum Format {
         this.mediaType = mediaType;
     }
 
-    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}. */
+    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}, {@code docx}. */
     public String id() {
         return id;
     }

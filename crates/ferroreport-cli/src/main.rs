@@ -23,8 +23,8 @@ RENDER OPTIONS:
                                 as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
-                                extension picks the format: .pdf, .xlsx, .csv or .html
-    -f, --format <pdf|xlsx|csv|html>
+                                extension picks the format: .pdf, .xlsx, .docx, .csv or .html
+    -f, --format <pdf|xlsx|docx|csv|html>
                                 Output format, when the file name does not say it. html is a
                                 web page that looks like the PDF, for previews
         --xlsx-numbers          In XLSX, write numbers as numbers (default: as formatted text,
@@ -48,7 +48,7 @@ DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
-add format xlsx, csv or html to the request for Excel, CSV or a web preview):
+add format xlsx, docx, csv or html to the request for Excel, Word, CSV or a web preview):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
@@ -175,7 +175,7 @@ fn render(args: &[String]) -> CliResult {
     }
     let template = template.ok_or("missing template path")?;
     let format = match format {
-        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx, csv or html)"))?,
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, csv or html)"))?,
         None => output
             .as_deref()
             .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))

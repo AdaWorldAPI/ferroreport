@@ -892,7 +892,7 @@ fn border_correction(pen: Pen) -> i32 {
 }
 
 /// Encodes decoded samples (gray or RGB, optional alpha) as PNG.
-fn encode_png(width: u32, height: u32, samples: &[u8], gray: bool, alpha: Option<&[u8]>) -> Option<Vec<u8>> {
+pub(crate) fn encode_png(width: u32, height: u32, samples: &[u8], gray: bool, alpha: Option<&[u8]>) -> Option<Vec<u8>> {
     let channels = if gray { 1 } else { 3 };
     let (color, data) = match alpha {
         None => (if gray { png::ColorType::Grayscale } else { png::ColorType::Rgb }, samples.to_vec()),
