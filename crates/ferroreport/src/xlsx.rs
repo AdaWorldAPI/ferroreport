@@ -873,7 +873,15 @@ impl Pictures {
                 let Some(png) = crate::raster::render_png(drawn, fonts, area, PICTURE_SCALE) else { return };
                 let name = format!("img_0_{page}_{}.png", self.media.len());
                 self.media.push((name.clone(), png));
-                (name, scale, HAlign::Left, VAlign::Top, pw, ph)
+                match symbol {
+                    // A drawing of whole pixels (Barbecue): Jasper cuts both fitted sides to whole
+                    // points, floating-point error included.
+                    Some((sw, sh)) if sw.fract() == 0.0 && sh.fract() == 0.0 && *sw > 0.0 && *sh > 0.0 => {
+                        let k = (aw / sw).min(ah / sh);
+                        (name, ScaleImage::Clip, HAlign::Left, VAlign::Top, (sw * k).trunc(), (sh * k).trunc())
+                    }
+                    _ => (name, scale, HAlign::Left, VAlign::Top, pw, ph),
+                }
             }
             _ => return,
         };
