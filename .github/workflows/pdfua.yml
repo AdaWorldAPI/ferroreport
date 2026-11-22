@@ -1,0 +1,24 @@
+name: PDF/UA
+
+# Tagged PDFs checked against PDF/UA-1 by veraPDF, the validator the PDF Association maintains.
+on:
+  push:
+    branches: [main, pdfua]
+  workflow_dispatch:
+
+jobs:
+  verapdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p ferroreport-cli
+      - run: tools/pdfua.sh
+      - if: always()
+        run: |
+          docker run --rm -v "$PWD/target/pdfua":/data verapdf/cli:latest --flavour ua1 --format xml /data > target/pdfua/report.xml 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: pdfua
+          path: target/pdfua/report.*

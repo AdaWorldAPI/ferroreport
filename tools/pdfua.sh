@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Renders every fixture as a tagged PDF and checks it against PDF/UA-1 with veraPDF.
+#
+#   cargo build --release
+#   tools/pdfua.sh                 # needs Docker (image verapdf/cli)
+#
+# Writes target/pdfua/<fixture>.pdf and target/pdfua/report.txt; exit status 1 when a file fails.
+set -u
+root=$(cd "$(dirname "$0")/.." && pwd)
+bin=${FERROREPORT_BIN:-$root/target/release/ferroreport}
+out=$root/target/pdfua
+rm -rf "$out" && mkdir -p "$out"
+for dir in "$root"/fixtures/*/; do
+  name=$(basename "$dir")
+  args=("$dir/report.jrxml" --tagged -q -o "$out/$name.pdf" --now 2024-01-15T10:30:00)
+  [ -f "$dir/data.json" ] && args+=(-d "$dir/data.json")
+  [ -f "$dir/params.json" ] && args+=(-p "$dir/params.json")
+  "$bin" render "${args[@]}" 2>/dev/null || echo "$name: not rendered"
+done
+docker run --rm -v "$out":/data verapdf/cli:latest --flavour ua1 --format text /data > "$out/report.txt" 2>&1
+cat "$out/report.txt"
+! grep -q "^FAIL" "$out/report.txt"
