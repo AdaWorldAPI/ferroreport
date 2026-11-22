@@ -168,6 +168,24 @@ impl Raster<'_> {
                 }
             }
             PrintItem::Image { x, y, w, h, clip, image } => {
+                let mask = |width: u32, height: u32| {
+                    clip.and_then(|[cx, cy, cw, ch]| {
+                        let mut m = tiny_skia::Mask::new(width, height)?;
+                        let r = PathBuilder::from_rect(Rect::from_xywh(cx, cy, cw, ch)?);
+                        m.fill_path(&r, FillRule::Winding, true, t);
+                        Some(m)
+                    })
+                };
+                if let Pixels::Svg(svg) = &image.pixels {
+                    // Drawn at the scale of the page, then laid on it through the clip.
+                    let size = svg.tree.size();
+                    let place = t.pre_concat(Transform::from_row(w / size.width(), 0.0, 0.0, h / size.height(), *x, *y));
+                    let Some(mut layer) = Pixmap::new(self.pixmap.width(), self.pixmap.height()) else { return };
+                    resvg::render(&svg.tree, place, &mut layer.as_mut());
+                    let m = mask(self.pixmap.width(), self.pixmap.height());
+                    self.pixmap.draw_pixmap(0, 0, layer.as_ref(), &PixmapPaint::default(), Transform::identity(), m.as_ref());
+                    return;
+                }
                 // Decoded images only (charts do not hold JPEG files).
                 let Pixels::Raw { samples, gray, alpha } = &image.pixels else { return };
                 let Some(size) = IntSize::from_wh(image.width, image.height) else { return };
@@ -181,12 +199,7 @@ impl Raster<'_> {
                 }
                 let Some(src) = Pixmap::from_vec(rgba, size) else { return };
                 let place = t.pre_concat(Transform::from_row(w / image.width as f32, 0.0, 0.0, h / image.height as f32, *x, *y));
-                let mask = clip.and_then(|[cx, cy, cw, ch]| {
-                    let mut m = tiny_skia::Mask::new(self.pixmap.width(), self.pixmap.height())?;
-                    let r = PathBuilder::from_rect(Rect::from_xywh(cx, cy, cw, ch)?);
-                    m.fill_path(&r, FillRule::Winding, true, t);
-                    Some(m)
-                });
+                let mask = mask(self.pixmap.width(), self.pixmap.height());
                 self.pixmap.draw_pixmap(0, 0, src.as_ref(), &PixmapPaint::default(), place, mask.as_ref());
             }
         }

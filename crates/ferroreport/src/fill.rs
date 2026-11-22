@@ -1122,6 +1122,11 @@ fn place_image(img: &ImageElement, data: Arc<ImageData>, x: f32, y: f32, w: f32,
     match img.scale {
         ScaleImage::FillFrame => PrintItem::Image { x: bx, y: by, w: bw, h: bh, clip: None, image: data },
         ScaleImage::RetainShape => {
+            // An SVG keeps its exact proportions (its size in whole points is for Clip).
+            let (iw, ih) = match &data.pixels {
+                crate::image::Pixels::Svg(svg) => (svg.tree.size().width(), svg.tree.size().height()),
+                _ => (iw, ih),
+            };
             let ratio = (bw / iw).min(bh / ih);
             let (dw, dh) = (iw * ratio, ih * ratio);
             let ox = (hfactor * (bw - dw)).trunc();
