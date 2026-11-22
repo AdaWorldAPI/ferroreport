@@ -142,7 +142,13 @@ pub struct JsonRows<R: std::io::Read> {
     done: bool,
     /// No text at all means no rows, instead of an error.
     empty_ok: bool,
+    /// Largest a single row may be, in bytes of JSON.
+    max_row: usize,
 }
+
+/// Largest a single row may be by default (256 MiB of JSON): enough for rows that carry
+/// pictures, and a stop for data that is one endless value.
+pub const MAX_ROW_BYTES: usize = 256 << 20;
 
 #[derive(PartialEq)]
 enum Shape {
@@ -165,7 +171,14 @@ impl<R: std::io::Read> JsonRows<R> {
             keep_row: report.uses_data_source,
             done: false,
             empty_ok: false,
+            max_row: MAX_ROW_BYTES,
         }
+    }
+
+    /// Stops with an error at a row larger than `bytes` of JSON, before reading more of it.
+    pub fn max_row_bytes(mut self, bytes: usize) -> JsonRows<R> {
+        self.max_row = bytes.max(1);
+        self
     }
 
     /// Takes text with nothing in it as no rows. For rows that follow something else (the
@@ -179,6 +192,10 @@ impl<R: std::io::Read> JsonRows<R> {
     fn more(&mut self) -> Result<()> {
         self.buf.drain(..self.pos);
         self.pos = 0;
+        // What is buffered now is one row not yet complete.
+        if self.buf.len() > self.max_row {
+            return Err(Error::Limit(format!("row {} is larger than {} MB of JSON", self.index + 1, self.max_row >> 20)));
+        }
         let old = self.buf.len();
         self.buf.resize(old + old.max(256 * 1024), 0);
         let n = loop {
@@ -313,6 +330,17 @@ mod stream_tests {
 
     fn read(text: &str, step: usize) -> Result<Vec<String>> {
         JsonRows::new(&report(), Drip(text.as_bytes(), step)).collect::<Result<Vec<Record>>>().map(show)
+    }
+
+    #[test]
+    fn stops_at_a_row_larger_than_the_limit() {
+        let big = format!("[{{\"id\": 1, \"name\": \"{}\"}}]", "x".repeat(3 << 20));
+        let rows = JsonRows::new(&report(), Drip(big.as_bytes(), 64 << 10)).max_row_bytes(1 << 20);
+        let e = rows.collect::<Result<Vec<Record>>>().unwrap_err();
+        assert!(e.to_string().contains("row 1 is larger than 1 MB"), "{e}");
+        // Under the limit, the same row is read.
+        let rows = JsonRows::new(&report(), Drip(big.as_bytes(), 64 << 10)).max_row_bytes(8 << 20);
+        assert_eq!(rows.count(), 1);
     }
 
     #[test]

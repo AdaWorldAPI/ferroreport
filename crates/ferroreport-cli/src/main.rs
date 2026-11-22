@@ -18,6 +18,7 @@ USAGE:
     ferroreport doctor <template.jrxml|template.ferro>
     ferroreport serve [OPTIONS]
     ferroreport convert <template> [-o <output>] [--to ferro|jrxml]
+    ferroreport migrate <folder|template...> [--report <file.md|file.json>] [--resources <folder>] [--to ferro|jrxml --out <folder>]
 
 RENDER OPTIONS:
     -d, --data <file.json>      Rows: a JSON array of objects, or one JSON object per line
@@ -42,6 +43,7 @@ RENDER OPTIONS:
                                 texts as paragraphs, images as figures, the rest as decoration
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
+        --max-row <MB>          Stop at a row of data larger than this (default: 256)
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
@@ -53,6 +55,14 @@ RENDER OPTIONS:
 
 DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
+
+MIGRATE:
+    Checks every template of a folder (and its subfolders) before moving to ferroreport:
+    whether it loads, what it uses, what is not supported yet, and whether it renders with
+    no rows (pictures are looked for next to each template, in its parent folder and in
+    every --resources folder). Prints a summary; --report writes every template's result as Markdown or JSON.
+    With --to and --out it also writes each template converted, in the same folders.
+    Exits with 1 when a template cannot be loaded.
 
 CONVERT:
     Rewrites a template: JRXML (JasperReports 6 or 7) as a .ferro template, ferroreport's own
@@ -107,6 +117,7 @@ fn run() -> ExitCode {
         Some("doctor") => doctor(&args[1..]),
         Some("serve") => serve(&args[1..]),
         Some("convert") => convert(&args[1..]),
+        Some("migrate") => migrate(&args[1..]),
         Some("-V") | Some("--version") => {
             println!("ferroreport {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -145,6 +156,259 @@ impl Drop for RemoveOnDrop {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
     }
+}
+
+/// A note that only says rows come from the caller, not from the template's SQL query.
+fn about_data(warning: &str) -> bool {
+    warning.contains("query is ignored")
+}
+
+/// What `migrate` found in one template.
+struct Checked {
+    path: String,
+    version: &'static str,
+    name: String,
+    /// The template cannot be loaded: why.
+    error: Option<String>,
+    warnings: Vec<String>,
+    elements: std::collections::BTreeMap<String, usize>,
+    /// Rendering it with no rows failed: why.
+    render: Option<String>,
+    converted: Option<String>,
+}
+
+fn find_templates(path: &Path, out: &mut Vec<PathBuf>) {
+    if path.is_file() {
+        out.push(path.to_path_buf());
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else { return };
+    let mut entries: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    entries.sort();
+    for p in entries {
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if name.starts_with('.') || name == "node_modules" || name == "target" {
+            continue;
+        }
+        if p.is_dir() {
+            find_templates(&p, out);
+        } else if matches!(p.extension().and_then(|e| e.to_str()), Some("jrxml" | "ferro")) {
+            out.push(p);
+        }
+    }
+}
+
+fn migrate(args: &[String]) -> CliResult {
+    let mut inputs = Vec::new();
+    let mut report_file = None;
+    let mut to = None;
+    let mut out_dir = None;
+    let mut resources: Vec<PathBuf> = Vec::new();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--report" => report_file = it.next().cloned(),
+            "--to" => to = it.next().cloned(),
+            "--out" => out_dir = it.next().cloned(),
+            "--resources" => resources.push(it.next().ok_or("--resources needs a folder")?.into()),
+            s if s.starts_with('-') => return Err(format!("unknown option {s}").into()),
+            s => inputs.push(PathBuf::from(s)),
+        }
+    }
+    if inputs.is_empty() {
+        return Err("migrate needs a folder or templates: ferroreport migrate reports/".into());
+    }
+    if to.is_some() != out_dir.is_some() {
+        return Err("--to and --out go together: ferroreport migrate reports/ --to ferro --out converted/".into());
+    }
+    let mut files = Vec::new();
+    for input in &inputs {
+        find_templates(input, &mut files);
+    }
+    let base = inputs.first().filter(|p| p.is_dir()).cloned().unwrap_or_default();
+    let mut results = Vec::with_capacity(files.len());
+    for file in &files {
+        let path = file.to_string_lossy().into_owned();
+        let source = match std::fs::read_to_string(file) {
+            Ok(s) => s,
+            Err(e) => {
+                results.push(Checked {
+                    path,
+                    version: "?",
+                    name: String::new(),
+                    error: Some(e.to_string()),
+                    warnings: Vec::new(),
+                    elements: Default::default(),
+                    render: None,
+                    converted: None,
+                });
+                continue;
+            }
+        };
+        let version = if ferroreport::template::is_template(&source) {
+            ".ferro"
+        } else {
+            match ferroreport::convert::jrxml_version(&source) {
+                Ok(ferroreport::convert::JrxmlVersion::V6) => "JRXML 6",
+                Ok(ferroreport::convert::JrxmlVersion::V7) => "JRXML 7",
+                Err(_) => "?",
+            }
+        };
+        let dir = file.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        // Projects often keep pictures next to the folder of their templates.
+        let mut renderer = Renderer::new().resource_dir(dir);
+        if let Some(parent) = dir.parent().filter(|d| !d.as_os_str().is_empty()) {
+            renderer = renderer.resource_dir(parent);
+        }
+        for r in &resources {
+            renderer = renderer.resource_dir(r);
+        }
+        let mut renderer =
+            renderer.limits(ferroreport::Limits { max_pages: Some(50), timeout: Some(std::time::Duration::from_secs(10)) });
+        let mut checked = Checked {
+            path,
+            version,
+            name: String::new(),
+            error: None,
+            warnings: Vec::new(),
+            elements: Default::default(),
+            render: None,
+            converted: None,
+        };
+        match renderer.parse(&source) {
+            Err(e) => checked.error = Some(e.to_string()),
+            Ok(report) => {
+                checked.name = report.name.clone();
+                checked.warnings = report.warnings.clone();
+                let bands = [
+                    &report.background,
+                    &report.title,
+                    &report.page_header,
+                    &report.column_header,
+                    &report.column_footer,
+                    &report.page_footer,
+                    &report.last_page_footer,
+                    &report.summary,
+                    &report.no_data,
+                ];
+                for b in bands.into_iter().flatten().chain(report.detail.iter()) {
+                    count_elements(b, &mut checked.elements);
+                }
+                for g in &report.groups {
+                    for b in g.header.iter().chain(&g.footer) {
+                        count_elements(b, &mut checked.elements);
+                    }
+                }
+                // With no rows, every expression of the title, page bands and summary runs.
+                let empty: ferroreport::RowIter = Box::new(std::iter::empty());
+                if let Err(e) = renderer.render_to(&report, empty, Default::default(), ferroreport::Format::Pdf, std::io::sink())
+                {
+                    checked.render = Some(e.to_string());
+                }
+            }
+        }
+        if let (Some(to), Some(out)) = (&to, &out_dir) {
+            let converted = match to.as_str() {
+                "ferro" if version == ".ferro" => Ok(source.clone()),
+                "ferro" => ferroreport::template::from_jrxml(&source),
+                "jrxml" if version == ".ferro" => ferroreport::template::to_jrxml(&source),
+                "jrxml" => ferroreport::convert::jrxml_to_v7(&source),
+                other => return Err(format!("--to {other}: say ferro or jrxml").into()),
+            };
+            match converted {
+                Ok(text) => {
+                    let rel = file.strip_prefix(&base).unwrap_or(file);
+                    let target = Path::new(out).join(rel).with_extension(if to == "ferro" { "ferro" } else { "jrxml" });
+                    if let Some(parent) = target.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+                    }
+                    std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
+                    checked.converted = Some(target.to_string_lossy().into_owned());
+                }
+                Err(e) => {
+                    checked.error.get_or_insert_with(|| format!("cannot be converted: {e}"));
+                }
+            }
+        }
+        results.push(checked);
+    }
+    let failed = results.iter().filter(|r| r.error.is_some()).count();
+    let partial = results.iter().filter(|r| r.error.is_none() && r.warnings.iter().any(|w| !about_data(w))).count();
+    let data_only = results
+        .iter()
+        .filter(|r| r.error.is_none() && !r.warnings.is_empty() && r.warnings.iter().all(|w| about_data(w)))
+        .count();
+    let render_fail = results.iter().filter(|r| r.error.is_none() && r.render.is_some()).count();
+    let ready = results.len() - failed - partial - data_only;
+    let status = |r: &Checked| {
+        if r.error.is_some() {
+            ("✗", "cannot be loaded")
+        } else if r.warnings.iter().any(|w| !about_data(w)) {
+            ("!", "partly supported")
+        } else if !r.warnings.is_empty() {
+            ("✓", "supported; its rows come from you")
+        } else {
+            ("✓", "supported")
+        }
+    };
+    for r in &results {
+        let (mark, _) = status(r);
+        println!("{mark} {} ({})", r.path, r.version);
+        if let Some(e) = &r.error {
+            println!("    cannot be loaded: {e}");
+        }
+        for w in &r.warnings {
+            println!("    - {w}");
+        }
+        if let Some(e) = &r.render {
+            println!("    with no rows: {e}");
+        }
+    }
+    println!(
+        "\n{} templates: {ready} supported, {data_only} supported once you pass the rows their SQL query gave, {partial} use features not supported yet, {failed} cannot be loaded; {render_fail} stop when rendered with no rows (they may need rows, parameters or pictures)",
+        results.len()
+    );
+    if let Some(file) = report_file {
+        let text = if file.ends_with(".json") {
+            let list: Vec<serde_json::Value> = results
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "path": r.path, "version": r.version, "name": r.name,
+                        "loads": r.error.is_none(), "error": r.error,
+                        "unsupported": r.warnings, "elements": r.elements,
+                        "rendersWithoutRows": r.error.is_none() && r.render.is_none(), "renderError": r.render,
+                        "converted": r.converted,
+                    })
+                })
+                .collect();
+            serde_json::to_string_pretty(&serde_json::json!({
+                "templates": results.len(), "supported": ready, "supportedWithRows": data_only, "partial": partial, "failed": failed, "results": list
+            }))?
+        } else {
+            let mut md = format!(
+                "# Migration report\n\n{} templates: **{ready}** supported, **{data_only}** supported once you pass the rows their SQL query gave, **{partial}** use features not supported yet, **{failed}** cannot be loaded.\n\n| Template | Format | Result | Notes |\n|---|---|---|---|\n",
+                results.len()
+            );
+            for r in &results {
+                let (_, result) = status(r);
+                let mut notes: Vec<String> = r.error.iter().cloned().collect();
+                notes.extend(r.warnings.iter().cloned());
+                if let Some(e) = &r.render {
+                    notes.push(format!("with no rows: {e}"));
+                }
+                let notes = notes.join("; ").replace('|', "\\|").replace('\n', " ");
+                md.push_str(&format!("| `{}` | {} | {result} | {notes} |\n", r.path, r.version));
+            }
+            md
+        };
+        std::fs::write(&file, text).map_err(|e| format!("{file}: {e}"))?;
+        println!("report written to {file}");
+    }
+    if failed > 0 {
+        return Err(format!("{failed} template(s) cannot be loaded").into());
+    }
+    Ok(())
 }
 
 /// The MIME type of an attached file, by its extension.
@@ -222,6 +486,7 @@ fn render(args: &[String]) -> CliResult {
     let mut csv_safe = false;
     let mut tagged = false;
     let mut pdfa = None;
+    let mut max_row = ferroreport::data::MAX_ROW_BYTES;
     let mut attachments = Vec::new();
     let mut limits = ferroreport::Limits::default();
     let mut it = args.iter();
@@ -239,6 +504,10 @@ fn render(args: &[String]) -> CliResult {
                     Some(ferroreport::pdf::PdfA::parse(&v).ok_or_else(|| format!("--pdfa {v}: say 2b, 2u, 2a, 3b, 3u or 3a"))?);
             }
             "--attach" => attachments.push(value(a)?),
+            "--max-row" => {
+                let mb: f64 = value(a)?.parse().map_err(|_| "--max-row expects megabytes")?;
+                max_row = (mb.max(0.001) * 1048576.0) as usize;
+            }
             "--max-pages" => limits.max_pages = Some(value(a)?.parse().map_err(|_| "--max-pages expects a number")?),
             "--timeout" => {
                 let secs: f64 = value(a)?.parse().map_err(|_| "--timeout expects seconds")?;
@@ -334,10 +603,10 @@ fn render(args: &[String]) -> CliResult {
     };
     let mut rows = || -> ferroreport::Result<ferroreport::RowIter> {
         Ok(match data.as_deref() {
-            Some("-") => Box::new(ferroreport::JsonRows::new(&report, std::io::stdin().lock())),
+            Some("-") => Box::new(ferroreport::JsonRows::new(&report, std::io::stdin().lock()).max_row_bytes(max_row)),
             Some(path) => {
                 let file = std::fs::File::open(path).map_err(|e| ferroreport::Error::Io(format!("{path}: {e}")))?;
-                Box::new(ferroreport::JsonRows::new(&report, file))
+                Box::new(ferroreport::JsonRows::new(&report, file).max_row_bytes(max_row))
             }
             None => Box::new(std::iter::empty()),
         })
