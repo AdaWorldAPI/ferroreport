@@ -3235,6 +3235,52 @@ impl<'a> Filler<'a> {
         Ok(false)
     }
 
+    /// Prints the title. A title taller than what is left of the page, down to its bottom
+    /// margin, goes on on the next pages, which get no page header or footer of their own
+    /// (as in JasperReports).
+    fn print_title(&mut self, band: &Band) -> Result<()> {
+        let Some(full) = self.layout(band, Values::Committed)? else { return Ok(()) };
+        let limit = self.report.page_height - self.report.margins.bottom;
+        if self.flow.is_some() || full.height <= limit - self.offset_y + 1e-3 {
+            let (y, h) = (self.offset_y, full.height);
+            self.emit(full, y);
+            self.offset_y += h;
+            return Ok(());
+        }
+        let mut elements: Vec<Element> = band.elements.clone();
+        let mut design_h = band.height;
+        let mut first = Some(full);
+        loop {
+            let space = limit - self.offset_y;
+            let part = self.layout_elems(&elements, design_h, Values::Committed, Some(space))?;
+            if part.items.is_empty() {
+                // Nothing fits even on a new page: print it whole rather than loop forever.
+                let whole = match first.take() {
+                    Some(l) => l,
+                    None => self.layout_elems(&elements, design_h, Values::Committed, None)?,
+                };
+                let (y, h) = (self.offset_y, whole.height);
+                self.emit(whole, y);
+                self.offset_y += h;
+                return Ok(());
+            }
+            first = None;
+            let rest = part.rest.clone().unwrap_or_default();
+            let (y, h) = (self.offset_y, part.height);
+            self.emit(part, y);
+            self.offset_y += h;
+            self.page_has_content = true;
+            if rest.is_empty() {
+                return Ok(());
+            }
+            self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), Values::Committed)?;
+            self.new_page()?;
+            elements = rest;
+            let moved = move_to_top(&mut elements);
+            design_h = (design_h - moved).max(0.0);
+        }
+    }
+
     fn page_headers(&mut self) -> Result<()> {
         self.flow_header = true;
         if let Some(b) = &self.report.page_header {
@@ -3740,7 +3786,7 @@ impl<'a> Filler<'a> {
         self.reset_where(|_| true)?;
         self.new_page()?;
         if let Some(t) = &r.title {
-            self.print_band_at_offset(t, Values::Committed)?;
+            self.print_title(t)?;
             if r.title_new_page {
                 self.footers_done = true;
                 self.new_page()?;
