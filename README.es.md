@@ -18,12 +18,15 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 40 plantillas comparables de la batería de pruebas salen píxel por
-> píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
-> subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 42 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
-> algunas funciones; ver
-> [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
+> Estado: **beta, versión 0.10.** Las 40 plantillas comparables de la batería de pruebas salen
+> píxel por píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas,
+> imágenes, subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y
+> varias columnas; los gráficos siguen de cerca el estilo de JFreeChart. Las 42 también exportan
+> el mismo Excel y CSV que Jasper, y las muestras del propio JasperReports se comparan contra
+> 6.20.6 y 7.1.1. `ferroreport doctor` te dice si todo lo de tu plantilla está soportado; lo que
+> aún falta está en [compatibilidad](README.md#compatibility). Hasta la 1.0 la API todavía puede
+> cambiar, y cada cambio va en las notas de la versión. No está afiliado a Jaspersoft ni a Cloud
+> Software Group.
 
 ## Por qué
 

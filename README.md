@@ -18,11 +18,14 @@ a report. Against JasperReports itself it is about **250× faster from a cold st
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
 
-> Status: **preview.** All 40 comparable test templates render pixel for pixel like
+> Status: **beta, version 0.10.** All 40 comparable test templates render pixel for pixel like
 > JasperReports 6.20, including band splitting, images, subreports, tables, lists, crosstabs, QR codes and barcodes, styled text and
 > multi-column layouts; charts follow JFreeChart's look closely. All 42 also export the same
-> Excel and CSV files as Jasper. Some features are still missing; see
-> [compatibility](#compatibility). Not affiliated with Jaspersoft or Cloud Software Group.
+> Excel and CSV files as Jasper, and JasperReports' own samples are checked against 6.20.6 and
+> 7.1.1. `ferroreport doctor` tells you whether everything in your template is supported; what
+> is not yet is listed under [compatibility](#compatibility). Until 1.0 the API can still
+> change, and every change is in the release notes. Not affiliated with Jaspersoft or Cloud
+> Software Group.
 
 ## Why
 
