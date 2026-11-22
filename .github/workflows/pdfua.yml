@@ -15,10 +15,7 @@ jobs:
       - run: cargo build --release -p ferroreport-cli
       - run: tools/pdfua.sh
       - if: always()
-        run: |
-          docker run --rm -v "$PWD/target/pdfua":/data verapdf/cli:latest --flavour ua1 --format xml /data > target/pdfua/report.xml 2>&1 || true
-      - if: always()
         uses: actions/upload-artifact@v5
         with:
           name: pdfua
-          path: target/pdfua/report.*
+          path: target/pdfua/report.xml
