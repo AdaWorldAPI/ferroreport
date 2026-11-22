@@ -316,6 +316,7 @@ pub fn chart_report(chart: crate::chart::ChartElement, run: &DatasetRun, width: 
         print_when_group_changes: None,
         conditional: None,
         tag: None,
+        link: None,
         kind: ElementKind::Chart(Box::new(chart)),
     };
     Report {

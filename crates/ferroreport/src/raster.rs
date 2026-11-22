@@ -80,7 +80,7 @@ impl Raster<'_> {
             PrintItem::Transform([a, b, c, d, e, f], items) => {
                 self.items(items, t.pre_concat(Transform::from_row(*a, *b, *c, *d, *e, *f)))
             }
-            PrintItem::Element(_) => {}
+            PrintItem::Element(_) | PrintItem::Link(_) => {}
             PrintItem::Path { ops, fill, stroke, dash } => {
                 let Some(p) = path(ops) else { return };
                 if let Some(color) = fill {

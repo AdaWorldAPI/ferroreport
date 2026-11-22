@@ -115,6 +115,28 @@ pub struct XlsxStream<W: std::io::Write> {
     pages_done: usize,
     name: String,
     tail: String,
+    /// `<hyperlink>` entries, the external targets they name (by relationship number) and
+    /// the anchors (defined names), as JasperReports' exporter writes them.
+    hyperlinks: String,
+    targets: Vec<String>,
+    anchors: Vec<(String, String)>,
+}
+
+/// An anchor as an Excel name: only the letters, digits and underscores of it (Java's `\\W`
+/// removed, as JasperReports does).
+pub(crate) fn excel_name(anchor: &str) -> String {
+    anchor.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect()
+}
+
+/// The links and anchors among `items`, in order.
+pub(crate) fn links(items: &[PrintItem], out: &mut Vec<std::sync::Arc<crate::print::LinkInfo>>) {
+    for item in items {
+        match item {
+            PrintItem::Link(l) => out.push(l.clone()),
+            PrintItem::Group(inner) | PrintItem::Paragraphs(_, inner) => links(inner, out),
+            _ => {}
+        }
+    }
 }
 
 impl<W: std::io::Write> XlsxStream<W> {
@@ -178,6 +200,9 @@ impl<W: std::io::Write> XlsxStream<W> {
             pages_done: 0,
             name: sheet_name(name),
             tail,
+            hyperlinks: String::new(),
+            targets: Vec::new(),
+            anchors: Vec::new(),
         })
     }
 
@@ -239,6 +264,52 @@ impl<W: std::io::Write> XlsxStream<W> {
             }
             rows.push_str("</row>\n");
         }
+        // Links on the cell where their element starts; anchors as names of that cell.
+        let mut found = Vec::new();
+        links(items, &mut found);
+        for link in found {
+            let col = self.xcuts.index(link.x.round() as i32).min(self.names.len().saturating_sub(1));
+            let row = first + g.rows.index(link.y.round() as i32) + 1;
+            let Some(column) = self.names.get(col) else { continue };
+            if let Some(anchor) = &link.anchor {
+                let name = excel_name(anchor);
+                if !name.is_empty() && !self.anchors.iter().any(|(n, _)| *n == name) {
+                    self.anchors.push((name, format!("${column}${row}")));
+                }
+            }
+            use crate::print::LinkTarget;
+            let external = |t: &mut Vec<String>, target: String| -> usize {
+                match t.iter().position(|x| *x == target) {
+                    Some(i) => i,
+                    None => {
+                        t.push(target);
+                        t.len() - 1
+                    }
+                }
+            };
+            let at = format!("{column}{row}");
+            match &link.target {
+                Some(LinkTarget::Url(url)) => {
+                    let i = external(&mut self.targets, url.clone());
+                    let _ = writeln!(self.hyperlinks, "<hyperlink ref=\"{at}\" r:id=\"rIdLnk{i}\"/>");
+                }
+                Some(LinkTarget::RemoteAnchor { file, anchor }) => {
+                    let i = external(&mut self.targets, format!("{file}#{anchor}"));
+                    let _ = writeln!(self.hyperlinks, "<hyperlink ref=\"{at}\" r:id=\"rIdLnk{i}\"/>");
+                }
+                Some(LinkTarget::RemotePage { file, page }) => {
+                    let i = external(&mut self.targets, format!("{file}#JR_PAGE_ANCHOR_0_{page}"));
+                    let _ = writeln!(self.hyperlinks, "<hyperlink ref=\"{at}\" r:id=\"rIdLnk{i}\"/>");
+                }
+                Some(LinkTarget::Anchor(a)) => {
+                    let _ = writeln!(self.hyperlinks, "<hyperlink ref=\"{at}\" location=\"{}\"/>", escape(&excel_name(a)));
+                }
+                Some(LinkTarget::Page(p)) => {
+                    let _ = writeln!(self.hyperlinks, "<hyperlink ref=\"{at}\" location=\"JR_PAGE_ANCHOR_0_{p}\"/>");
+                }
+                None => {}
+            }
+        }
         drop(g);
         self.row_no = row_no;
         self.pages_done += 1;
@@ -252,6 +323,11 @@ impl<W: std::io::Write> XlsxStream<W> {
             end.push_str("<mergeCells>\n");
             end.push_str(&self.merges);
             end.push_str("</mergeCells>\n");
+        }
+        if !self.hyperlinks.is_empty() {
+            end.push_str("<hyperlinks>\n");
+            end.push_str(&self.hyperlinks);
+            end.push_str("</hyperlinks>\n");
         }
         end.push_str(&self.tail);
         let zip = &mut self.zip;
@@ -271,16 +347,29 @@ impl<W: std::io::Write> XlsxStream<W> {
         zip.add(
             "xl/workbook.xml",
             format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{1}'!$A$1</definedName>\n</definedNames>\n</workbook>\n",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{1}'!$A$1</definedName>\n{2}</definedNames>\n</workbook>\n",
                 escape(name),
-                escape(&name.replace('\'', "''"))
+                escape(&name.replace('\'', "''")),
+                self.anchors
+                    .iter()
+                    .map(|(n, cell)| format!("<definedName name=\"{n}\">'{}'!{cell}</definedName>\n", escape(&name.replace('\'', "''"))))
+                    .collect::<String>()
             )
             .as_bytes(),
         )
         .map_err(io)?;
         zip.add("xl/_rels/workbook.xml.rels", WORKBOOK_RELS.as_bytes()).map_err(io)?;
         zip.add("xl/styles.xml", self.styles.xml().as_bytes()).map_err(io)?;
-        zip.add("xl/worksheets/_rels/sheet1.xml.rels", SHEET_RELS.as_bytes()).map_err(io)?;
+        let mut rels = SHEET_RELS.replace("</Relationships>\n", "");
+        for (i, target) in self.targets.iter().enumerate() {
+            let _ = writeln!(
+                rels,
+                " <Relationship Id=\"rIdLnk{i}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"{}\" TargetMode=\"External\"/>",
+                escape(target)
+            );
+        }
+        rels.push_str("</Relationships>\n");
+        zip.add("xl/worksheets/_rels/sheet1.xml.rels", rels.as_bytes()).map_err(io)?;
         zip.add("xl/drawings/drawing1.xml", self.pictures.drawing().as_bytes()).map_err(io)?;
         zip.add("xl/drawings/_rels/drawing1.xml.rels", self.pictures.rels().as_bytes()).map_err(io)?;
         for (name, bytes) in &self.pictures.media {

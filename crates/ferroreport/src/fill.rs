@@ -369,7 +369,7 @@ pub struct FillStats {
 fn may_touch(item: &PrintItem, b: [f32; 4]) -> bool {
     let hit = |x: f32, y: f32, w: f32, h: f32| x < b[2] && x + w > b[0] && y < b[3] && y + h > b[1];
     match item {
-        PrintItem::Element(_) => false,
+        PrintItem::Element(_) | PrintItem::Link(_) => false,
         PrintItem::Cell(info, _) => hit(info.x, info.y, info.w, info.h),
         PrintItem::Group(items) | PrintItem::Paragraphs(_, items) => items.iter().any(|i| may_touch(i, b)),
         PrintItem::Rect { x, y, w, h, fill, stroke, .. } => match (fill, stroke) {
@@ -503,6 +503,11 @@ fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
             }
         }
         PrintItem::Element(info) => {
+            let info = Arc::make_mut(info);
+            info.x += dx;
+            info.y += dy;
+        }
+        PrintItem::Link(info) => {
             let info = Arc::make_mut(info);
             info.x += dx;
             info.y += dy;
@@ -1060,6 +1065,44 @@ fn open_mark(out: &mut Vec<Laid>, el: &Element, shape: Shape, boxed: Option<BoxS
     out.len() - 1
 }
 
+/// Where an element's link leads, the anchor it is and its bookmark, evaluated now.
+fn link_info(le: &mut LayoutEnv, link: &crate::model::Hyperlink, x: f32, y: f32, w: f32, h: f32) -> Result<Option<LinkInfo>> {
+    use crate::model::LinkKind;
+    let text = |e: &Option<Expr>| -> Result<Option<String>> {
+        Ok(match e {
+            Some(e) => match eval(e, le.scope, le.env)? {
+                Value::Null => None,
+                v => Some(v.to_java_string()).filter(|s| !s.is_empty()),
+            },
+            None => None,
+        })
+    };
+    let reference = text(&link.reference)?;
+    let anchor = text(&link.anchor)?;
+    let page = text(&link.page)?.and_then(|p| p.trim().parse::<f64>().ok()).filter(|p| *p >= 1.0).map(|p| p as u32);
+    let target = match link.kind {
+        LinkKind::None => None,
+        LinkKind::Reference => reference.map(LinkTarget::Url),
+        LinkKind::LocalAnchor => anchor.map(LinkTarget::Anchor),
+        LinkKind::LocalPage => page.map(LinkTarget::Page),
+        LinkKind::RemoteAnchor => reference.zip(anchor).map(|(file, anchor)| LinkTarget::RemoteAnchor { file, anchor }),
+        LinkKind::RemotePage => reference.zip(page).map(|(file, page)| LinkTarget::RemotePage { file, page }),
+    };
+    let tooltip = text(&link.tooltip)?;
+    let anchor_name = text(&link.anchor_name)?;
+    let bookmark = match &link.bookmark_level_expr {
+        Some(e) => match eval(e, le.scope, le.env)? {
+            Value::Null => link.bookmark_level,
+            v => v.to_java_string().trim().parse::<f64>().map(|v| v.max(0.0) as u32).unwrap_or(link.bookmark_level),
+        },
+        None => link.bookmark_level,
+    };
+    if target.is_none() && anchor_name.is_none() {
+        return Ok(None);
+    }
+    Ok(Some(LinkInfo { x, y, w, h, target, tooltip, anchor: anchor_name, bookmark }))
+}
+
 fn close_mark(out: &mut [Laid], mark: usize) {
     let len = out.len() - mark - 1;
     if let PrintItem::Element(info) = &mut out[mark].item {
@@ -1547,6 +1590,11 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             }
             if el.print_when_detail_overflows {
                 reprint.push(freeze(el, m.text.clone()));
+            }
+        }
+        if let Some(link) = &el.link {
+            if let Some(info) = link_info(le, link, x, y, w, h)? {
+                out.items.push(Laid { item: PrintItem::Link(Arc::new(info)), deferred: None });
             }
         }
         match &el.kind {

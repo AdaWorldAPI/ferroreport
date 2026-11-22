@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 use crate::fonts::{FaceId, FontSet};
 use crate::image::{ImageData, Pixels};
 use crate::model::{Color, LineStyle, Pen};
-use crate::print::{PathOp, PrintDocument, PrintItem};
+use crate::print::{LinkInfo, LinkTarget, PathOp, PrintDocument, PrintItem};
 use pdf_writer::types::{CidFontType, FontFlags, FunctionShadingType, LineCapStyle, SystemInfo};
 use pdf_writer::{Chunk, Content, Filter, Finish, Name, Rect, Ref, Str, TextStr};
 use std::collections::{BTreeMap, BTreeSet};
@@ -131,6 +131,8 @@ fn subset_tag(face: FaceId, glyphs: &BTreeSet<u16>) -> String {
 /// One drawing step: an item, or entering/leaving a transformed coordinate system.
 enum Draw<'a> {
     Item(&'a PrintItem),
+    /// A link, anchor or bookmark where an element is.
+    Link(&'a LinkInfo),
     /// A text element written as a form field.
     Field(&'a crate::print::CellInfo),
     Push([f32; 6]),
@@ -160,6 +162,8 @@ enum Role {
     ListItem,
     ListLabel,
     ListBody,
+    /// A link: it holds the link's annotation.
+    Link,
     /// The page itself, while its structure is gathered.
     Group,
 }
@@ -194,6 +198,7 @@ impl Role {
             Role::ListItem => "LI",
             Role::ListLabel => "Lbl",
             Role::ListBody => "LBody",
+            Role::Link => "Link",
             Role::Group => "Div",
         }
     }
@@ -226,12 +231,14 @@ struct Node {
     h: f32,
     /// How many columns and rows of its table a cell spans.
     span: (u16, u16),
+    /// For a link, its annotation among those of the page.
+    annot: Option<usize>,
     kids: Vec<Node>,
 }
 
 impl Node {
     fn new(role: Role, [x, y, w, h]: [f32; 4], kids: Vec<Node>) -> Node {
-        Node { role, alt: None, content: None, y, x, w, h, span: (1, 1), kids }
+        Node { role, alt: None, content: None, y, x, w, h, span: (1, 1), annot: None, kids }
     }
 }
 
@@ -345,6 +352,7 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
         let tagging = tagged && !open.iter().any(|&(_, picture)| picture);
         match item {
             PrintItem::Group(inner) => flatten(inner, tagging, out),
+            PrintItem::Link(info) => out.push(Draw::Link(info)),
             PrintItem::Cell(info, _) if info.field.is_some() => out.push(Draw::Field(info)),
             PrintItem::Cell(info, inner) if tagging && matches!(**inner, PrintItem::Paragraphs(..)) => {
                 if let PrintItem::Paragraphs(kinds, paras) = &**inner {
@@ -608,7 +616,33 @@ pub struct PdfStream<W: std::io::Write> {
     /// The form fields of each page, and those of the page being drawn.
     fields: Vec<Vec<Widget>>,
     pending_fields: Vec<Widget>,
+    /// The links of each page, and those of the page being drawn.
+    links: Vec<Vec<PageLink>>,
+    pending_links: Vec<PageLink>,
+    /// Anchors (named destinations): name, page and top, in the order they are met.
+    dests: Vec<(String, usize, f32)>,
+    /// Bookmarks: level, title, page and top.
+    bookmarks: Vec<(u32, String, usize, f32)>,
+    /// In a tagged PDF, the parent tree key of each link annotation and its structure element.
+    link_parents: Vec<(i32, Ref)>,
     tags: Option<Tags>,
+}
+
+/// Named destinations: name and object.
+type NamedDests = Vec<(String, Ref)>;
+
+/// Parent tree keys of link annotations start here, after any page's.
+const LINK_KEYS: i32 = 1 << 24;
+
+/// A link annotation on a page.
+struct PageLink {
+    rect: Rect,
+    target: LinkTarget,
+    /// What the link is, in words (its tooltip, or where it leads).
+    contents: String,
+    /// Its object and parent tree key, given when it is tagged.
+    id: Option<Ref>,
+    key: Option<i32>,
 }
 
 /// The structure tree of a tagged PDF, as far as it has been written.
@@ -640,6 +674,11 @@ impl<W: std::io::Write> PdfStream<W> {
             standard: Default::default(),
             fields: Vec::new(),
             pending_fields: Vec::new(),
+            links: Vec::new(),
+            pending_links: Vec::new(),
+            dests: Vec::new(),
+            bookmarks: Vec::new(),
+            link_parents: Vec::new(),
             images: BTreeMap::new(),
             pages: Vec::new(),
             tags: None,
@@ -885,6 +924,38 @@ impl<W: std::io::Write> PdfStream<W> {
                     self.pending_fields.push(Widget::of(info, ph, self.options.page_offsets[page % 2]));
                     continue;
                 }
+                Draw::Link(info) => {
+                    let [ox, oy] = self.options.page_offsets[page % 2];
+                    let top = ph - info.y - oy;
+                    if let Some(name) = &info.anchor {
+                        if !self.dests.iter().any(|(n, _, _)| n == name) {
+                            self.dests.push((name.clone(), page, top));
+                        }
+                        if info.bookmark > 0 {
+                            self.bookmarks.push((info.bookmark, name.clone(), page, top));
+                        }
+                    }
+                    if let Some(target) = &info.target {
+                        let rect = Rect::new(info.x + ox, top - info.h, info.x + info.w + ox, top);
+                        let contents = info.tooltip.clone().unwrap_or_else(|| match target {
+                            LinkTarget::Url(u) => u.clone(),
+                            LinkTarget::Anchor(a) => a.clone(),
+                            LinkTarget::Page(p) => format!("Page {p}"),
+                            LinkTarget::RemoteAnchor { file, anchor } => format!("{file}#{anchor}"),
+                            LinkTarget::RemotePage { file, page } => format!("{file}, page {page}"),
+                        });
+                        if tagged {
+                            if let Some(parent) = nodes.last_mut() {
+                                parent.kids.push(Node {
+                                    annot: Some(self.pending_links.len()),
+                                    ..Node::new(Role::Link, [info.x, info.y, info.w, info.h], Vec::new())
+                                });
+                            }
+                        }
+                        self.pending_links.push(PageLink { rect, target: target.clone(), contents, id: None, key: None });
+                    }
+                    continue;
+                }
                 Draw::Item(item) => {
                     if tagged && !inside && !decoration && !matches!(item, PrintItem::Element(_)) {
                         c.begin_marked_content(Name(b"Artifact"));
@@ -955,6 +1026,7 @@ impl<W: std::io::Write> PdfStream<W> {
                 | PrintItem::Paragraphs(..)
                 | PrintItem::Transform(..)
                 | PrintItem::Cell(..)
+                | PrintItem::Link(_)
                 | PrintItem::Element(_) => {}
                 PrintItem::Path { ops, fill, stroke, dash } => {
                     if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
@@ -1184,6 +1256,7 @@ impl<W: std::io::Write> PdfStream<W> {
         let id = self.content_stream(&raw)?;
         self.pages.push(vec![id]);
         self.fields.push(std::mem::take(&mut self.pending_fields));
+        self.links.push(std::mem::take(&mut self.pending_links));
         if self.tags.is_some() {
             self.tag_page(&nodes, numbered)?;
         }
@@ -1233,6 +1306,22 @@ impl<W: std::io::Write> PdfStream<W> {
     fn tag_node(&mut self, node: &Node, parent: Ref, page: Ref, back: &mut [Ref]) -> Result<Ref> {
         use pdf_writer::types::{StructRole, TableHeaderScope};
         let id = self.next_id();
+        if let Some(index) = node.annot {
+            // A link holds its annotation, which leads back to it through the parent tree.
+            let annot = self.next_id();
+            let key = LINK_KEYS + self.link_parents.len() as i32;
+            self.link_parents.push((key, id));
+            if let Some(link) = self.links.last_mut().and_then(|l| l.get_mut(index)) {
+                link.id = Some(annot);
+                link.key = Some(key);
+            }
+            let mut chunk = Chunk::new();
+            let mut e = chunk.struct_element(id);
+            e.kind(StructRole::Link).parent(parent).page(page);
+            e.children().object_ref().object(annot).page(page);
+            e.finish();
+            return self.put(id, &chunk).map(|_| id);
+        }
         if let Some(number) = node.content {
             back[number] = id;
             if let Some(alt) = &node.alt {
@@ -1325,12 +1414,140 @@ impl<W: std::io::Write> PdfStream<W> {
         if let Some(f) = self.fields.get_mut(page) {
             f.extend(late);
         }
+        let late = std::mem::take(&mut self.pending_links);
+        if let Some(l) = self.links.get_mut(page) {
+            l.extend(late);
+        }
         Ok(())
     }
 
     /// Pages added so far.
     pub fn page_count(&self) -> usize {
         self.pages.len()
+    }
+
+    /// Writes the link annotations of each page.
+    fn write_links(&mut self, page_ids: &[Ref]) -> Result<Vec<Vec<Ref>>> {
+        use pdf_writer::types::ActionType;
+        let mut out = Vec::new();
+        for list in std::mem::take(&mut self.links) {
+            let mut refs = Vec::with_capacity(list.len());
+            for link in list {
+                let id = match link.id {
+                    Some(id) => id,
+                    None => self.next_id(),
+                };
+                let mut chunk = Chunk::new();
+                let mut a = chunk.annotation(id);
+                a.subtype(pdf_writer::types::AnnotationType::Link)
+                    .rect(link.rect)
+                    .border(0.0, 0.0, 0.0, None)
+                    .contents(TextStr(&link.contents))
+                    .flags(pdf_writer::types::AnnotationFlags::PRINT);
+                if let Some(key) = link.key {
+                    a.struct_parent(key);
+                }
+                match &link.target {
+                    LinkTarget::Url(url) => {
+                        a.action().action_type(ActionType::Uri).uri(Str(url.as_bytes()));
+                    }
+                    LinkTarget::Anchor(name) => {
+                        a.pair(Name(b"Dest"), Str(name.as_bytes()));
+                    }
+                    LinkTarget::Page(p) => {
+                        let page = page_ids.get(*p as usize - 1).or(page_ids.last()).copied();
+                        if let Some(page) = page {
+                            a.insert(Name(b"Dest")).start::<pdf_writer::writers::Destination>().page(page).xyz(
+                                0.0,
+                                self.page_height,
+                                None,
+                            );
+                        }
+                    }
+                    LinkTarget::RemoteAnchor { file, anchor } => {
+                        let mut act = a.action();
+                        act.action_type(ActionType::RemoteGoTo);
+                        act.pair(Name(b"F"), Str(file.as_bytes()));
+                        act.pair(Name(b"D"), Str(anchor.as_bytes()));
+                    }
+                    LinkTarget::RemotePage { file, page } => {
+                        let mut act = a.action();
+                        act.action_type(ActionType::RemoteGoTo);
+                        act.pair(Name(b"F"), Str(file.as_bytes()));
+                        act.insert(Name(b"D")).array().item(page.saturating_sub(1) as i32).item(Name(b"Fit"));
+                    }
+                }
+                a.finish();
+                self.put(id, &chunk)?;
+                refs.push(id);
+            }
+            out.push(refs);
+        }
+        Ok(out)
+    }
+
+    /// Writes the anchors (as named destinations, sorted by name as the name tree wants them)
+    /// and the bookmarks (as the document outline).
+    fn write_destinations(&mut self, page_ids: &[Ref]) -> Result<(NamedDests, Option<Ref>)> {
+        let mut dests = Vec::new();
+        let mut list = std::mem::take(&mut self.dests);
+        list.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+        for (name, page, top) in list {
+            let Some(page) = page_ids.get(page).copied() else { continue };
+            let id = self.next_id();
+            let mut chunk = Chunk::new();
+            chunk.destination(id).page(page).xyz(0.0, top, None);
+            self.put(id, &chunk)?;
+            dests.push((name, id));
+        }
+        let marks = std::mem::take(&mut self.bookmarks);
+        if marks.is_empty() {
+            return Ok((dests, None));
+        }
+        // Each bookmark goes under the last one of a lower level before it.
+        let root = self.next_id();
+        let ids: Vec<Ref> = marks.iter().map(|_| self.next_id()).collect();
+        let mut parent: Vec<Option<usize>> = Vec::with_capacity(marks.len());
+        let mut open: Vec<usize> = Vec::new();
+        for (i, (level, ..)) in marks.iter().enumerate() {
+            while open.last().is_some_and(|&j| marks[j].0 >= *level) {
+                open.pop();
+            }
+            parent.push(open.last().copied());
+            open.push(i);
+        }
+        let kids = |p: Option<usize>| -> Vec<usize> { (0..marks.len()).filter(|&i| parent[i] == p).collect() };
+        for (i, (_, title, page, top)) in marks.iter().enumerate() {
+            let siblings = kids(parent[i]);
+            let at = siblings.iter().position(|&s| s == i).unwrap_or(0);
+            let children = kids(Some(i));
+            let mut chunk = Chunk::new();
+            let mut item = chunk.outline_item(ids[i]);
+            item.title(TextStr(title)).parent(parent[i].map(|p| ids[p]).unwrap_or(root));
+            if at > 0 {
+                item.prev(ids[siblings[at - 1]]);
+            }
+            if let Some(&next) = siblings.get(at + 1) {
+                item.next(ids[next]);
+            }
+            if let (Some(&first), Some(&last)) = (children.first(), children.last()) {
+                item.first(ids[first]).last(ids[last]).count(-(children.len() as i32));
+            }
+            if let Some(page) = page_ids.get(*page).copied() {
+                item.dest().page(page).xyz(0.0, *top, None);
+            }
+            item.finish();
+            self.put(ids[i], &chunk)?;
+        }
+        let top_level = kids(None);
+        let mut chunk = Chunk::new();
+        let mut outline = chunk.outline(root);
+        if let (Some(&first), Some(&last)) = (top_level.first(), top_level.last()) {
+            outline.first(ids[first]).last(ids[last]).count(top_level.len() as i32);
+        }
+        outline.finish();
+        self.put(root, &chunk)?;
+        Ok((dests, Some(root)))
     }
 
     /// Writes the fonts, the page tree and the trailer, and returns the output.
@@ -1677,15 +1894,27 @@ impl<W: std::io::Write> PdfStream<W> {
         self.put(resources, &chunk)?;
 
         let (catalog_id, tree_id, info_id) = (Ref::new(1), Ref::new(2), Ref::new(3));
-        let (annots, acroform) = self.write_fields()?;
+        let (mut annots, acroform) = self.write_fields()?;
+        // Every page's object first: links and bookmarks lead to them.
         let mut page_ids = Vec::with_capacity(self.pages.len());
-        for (number, contents) in std::mem::take(&mut self.pages).into_iter().enumerate() {
+        for number in 0..self.pages.len() {
             let tagged = self.tags.as_ref().and_then(|t| t.pages.get(number).copied());
-            let page_id = match tagged {
+            page_ids.push(match tagged {
                 Some((id, _)) => id,
                 None => self.next_id(),
-            };
-            page_ids.push(page_id);
+            });
+        }
+        let link_annots = self.write_links(&page_ids)?;
+        for (number, list) in link_annots.into_iter().enumerate() {
+            if annots.len() <= number {
+                annots.resize(number + 1, Vec::new());
+            }
+            annots[number].extend(list);
+        }
+        let (dests, outline) = self.write_destinations(&page_ids)?;
+        for (number, contents) in std::mem::take(&mut self.pages).into_iter().enumerate() {
+            let tagged = self.tags.as_ref().and_then(|t| t.pages.get(number).copied());
+            let page_id = page_ids[number];
             let mut chunk = Chunk::new();
             let mut p = chunk.page(page_id);
             p.parent(tree_id).media_box(Rect::new(0.0, 0.0, self.page_width, self.page_height));
@@ -1738,9 +1967,13 @@ impl<W: std::io::Write> PdfStream<W> {
                     numbers.insert(number as i32, *back);
                 }
             }
+            for (key, element) in &self.link_parents {
+                numbers.insert(*key, *element);
+            }
             numbers.finish();
             tree.finish();
-            root.parent_tree_next_key(tags.pages.len() as i32);
+            let next = self.link_parents.last().map(|(k, _)| k + 1).unwrap_or(0);
+            root.parent_tree_next_key((tags.pages.len() as i32).max(next));
             root.finish();
             self.put(tags.root, &chunk)?;
             // The title where assistive software looks for it.
@@ -1768,6 +2001,18 @@ impl<W: std::io::Write> PdfStream<W> {
         }
         if let Some(form) = acroform {
             catalog.pair(Name(b"AcroForm"), form);
+        }
+        if !dests.is_empty() {
+            let mut names = catalog.names();
+            let mut tree = names.destinations();
+            let mut entries = tree.names();
+            for (name, id) in &dests {
+                entries.insert(Str(name.as_bytes()), *id);
+            }
+        }
+        if let Some(outline) = outline {
+            catalog.outlines(outline);
+            catalog.page_mode(pdf_writer::types::PageMode::UseOutlines);
         }
         catalog.finish();
         self.put(catalog_id, &chunk)?;

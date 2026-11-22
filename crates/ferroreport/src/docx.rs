@@ -38,6 +38,10 @@ pub struct DocxStream<W: std::io::Write> {
     /// Pictures of images already written, by image identifier.
     names: HashMap<usize, String>,
     buf: String,
+    /// The links and anchors of the page being written, by where their element starts.
+    links: HashMap<(i32, i32), std::sync::Arc<crate::print::LinkInfo>>,
+    /// Bookmarks written so far (each has a number).
+    bookmarks: usize,
 }
 
 impl<W: std::io::Write> DocxStream<W> {
@@ -52,6 +56,8 @@ impl<W: std::io::Write> DocxStream<W> {
             landscape,
             title: title.to_string(),
             pages: 0,
+            links: HashMap::new(),
+            bookmarks: 0,
             media: Vec::new(),
             names: HashMap::new(),
             buf: String::new(),
@@ -107,6 +113,9 @@ impl<W: std::io::Write> DocxStream<W> {
         // Each page has its own columns.
         let mut xcuts = grid::x_cuts(std::slice::from_ref(&nodes), width, NATURE);
         let g = grid::layout(&nodes, &mut xcuts, height, NATURE);
+        let mut found = Vec::new();
+        crate::xlsx::links(items, &mut found);
+        self.links = found.into_iter().map(|l| ((l.x.round() as i32, l.y.round() as i32), l)).collect();
         let mut out = std::mem::take(&mut self.buf);
         out.clear();
         // Pages after the first start on a new page: a paragraph of almost no height breaks
@@ -178,6 +187,11 @@ impl<W: std::io::Write> DocxStream<W> {
             out.push_str("   </w:tr>\n");
         }
         out.push_str("  </w:tbl>\n");
+        // The page's own bookmark (what links to a page lead to), in its first paragraph.
+        if let Some(at) = out.find("</w:pPr>") {
+            let mark = self.bookmark(&format!("JR_PAGE_ANCHOR_0_{}", self.pages + 1));
+            out.insert_str(at + "</w:pPr>".len(), &mark);
+        }
         self.buf = out;
     }
 
@@ -187,7 +201,10 @@ impl<W: std::io::Write> DocxStream<W> {
             What::Text(t) => {
                 cell_style(out, style, Some(t));
                 out.push_str("</w:tcPr>");
-                text_paragraphs(out, t);
+                let link = self.links.get(&(node.x, node.y)).cloned();
+                let mark = link.as_ref().and_then(|l| l.anchor.as_deref()).map(|a| self.bookmark(&crate::xlsx::excel_name(a)));
+                let field = link.as_ref().and_then(|l| l.target.as_ref()).map(|target| hyperlink_field(target, l_tooltip(&link)));
+                text_paragraphs(out, t, mark.as_deref(), field.as_deref());
             }
             What::Shape(e, _, drawn) => {
                 let mut style = style.clone();
@@ -246,6 +263,13 @@ impl<W: std::io::Write> DocxStream<W> {
                 }
             }
         }
+    }
+
+    /// A bookmark (an empty range) called `name`.
+    fn bookmark(&mut self, name: &str) -> String {
+        let id = self.bookmarks;
+        self.bookmarks += 1;
+        format!("<w:bookmarkStart w:id=\"{id}\" w:name=\"{}\"/><w:bookmarkEnd w:id=\"{id}\"/>", escape(name))
     }
 
     /// The media file of an image, written once however often it is used.
@@ -404,7 +428,30 @@ fn text_run(out: &mut String, text: &str, props: &str) {
     }
 }
 
-fn text_paragraphs(out: &mut String, t: &CellInfo) {
+fn l_tooltip(link: &Option<std::sync::Arc<crate::print::LinkInfo>>) -> Option<&str> {
+    link.as_ref().and_then(|l| l.tooltip.as_deref())
+}
+
+/// The field code of a link, as JasperReports' DOCX exporter writes it.
+fn hyperlink_field(target: &crate::print::LinkTarget, tooltip: Option<&str>) -> String {
+    use crate::print::LinkTarget;
+    let quote = |s: &str| s.replace('"', "\\\"");
+    let mut code = match target {
+        LinkTarget::Url(url) => format!(" HYPERLINK \"{}\"", quote(url)),
+        LinkTarget::RemoteAnchor { file, anchor } => format!(" HYPERLINK \"{}#{}\"", quote(file), quote(anchor)),
+        LinkTarget::RemotePage { file, page } => format!(" HYPERLINK \"{}#JR_PAGE_ANCHOR_0_{page}\"", quote(file)),
+        LinkTarget::Anchor(a) => format!(" HYPERLINK \\l \"{}\"", crate::xlsx::excel_name(a)),
+        LinkTarget::Page(p) => format!(" HYPERLINK \\l \"JR_PAGE_ANCHOR_0_{p}\""),
+    };
+    code.push_str(" \\t \"_self\"");
+    if let Some(t) = tooltip {
+        code.push_str(&format!(" \\o \"{}\"", quote(t)));
+    }
+    code.push(' ');
+    code
+}
+
+fn text_paragraphs(out: &mut String, t: &CellInfo, bookmark: Option<&str>, field: Option<&str>) {
     let jc = match t.halign {
         HAlign::Center => Some("center"),
         HAlign::Right => Some("right"),
@@ -416,6 +463,16 @@ fn text_paragraphs(out: &mut String, t: &CellInfo) {
         let _ = write!(out, "<w:jc w:val=\"{jc}\"/>");
     }
     out.push_str("</w:pPr>");
+    if let Some(b) = bookmark {
+        out.push_str(b);
+    }
+    if let Some(code) = field {
+        let _ = write!(
+            out,
+            "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\">{}</w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>",
+            escape(code)
+        );
+    }
     if t.runs.is_empty() {
         let mut props = String::new();
         run_props(&mut props, &t.font, t.color, None, crate::rich::Script::Normal);
@@ -427,6 +484,9 @@ fn text_paragraphs(out: &mut String, t: &CellInfo) {
             run_props(&mut props, &run.style.font, run.style.color, run.style.back, run.style.script);
             text_run(out, piece, &props);
         }
+    }
+    if field.is_some() {
+        out.push_str("<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>");
     }
     out.push_str("</w:p>");
 }

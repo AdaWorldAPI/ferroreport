@@ -412,7 +412,46 @@ pub struct Element {
     /// What the element is in the structure of a tagged PDF, when it is more than a text or
     /// a picture.
     pub tag: Option<Tag>,
+    /// Where the element leads when clicked, the anchor it is and its bookmark, if any.
+    pub link: Option<Box<Hyperlink>>,
     pub kind: ElementKind,
+}
+
+/// What a text field, image or chart links to (`hyperlinkType`), the anchor it sets
+/// (`anchorNameExpression`) and the level of its bookmark (`bookmarkLevel`).
+#[derive(Debug, Clone, Default)]
+pub struct Hyperlink {
+    pub kind: LinkKind,
+    /// `hyperlinkReferenceExpression`: a URL, or the file of a remote anchor or page.
+    pub reference: Option<Expr>,
+    /// `hyperlinkAnchorExpression`.
+    pub anchor: Option<Expr>,
+    /// `hyperlinkPageExpression`: a page number, from 1.
+    pub page: Option<Expr>,
+    /// `hyperlinkTooltipExpression`.
+    pub tooltip: Option<Expr>,
+    /// `anchorNameExpression`: the anchor the element is, for links and bookmarks.
+    pub anchor_name: Option<Expr>,
+    /// `bookmarkLevel` (0: no bookmark), or `bookmarkLevelExpression`.
+    pub bookmark_level: u32,
+    pub bookmark_level_expr: Option<Expr>,
+}
+
+/// Where a link leads (`hyperlinkType`).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum LinkKind {
+    #[default]
+    None,
+    /// A URL.
+    Reference,
+    /// An anchor of this document.
+    LocalAnchor,
+    /// A page of this document.
+    LocalPage,
+    /// An anchor of another document.
+    RemoteAnchor,
+    /// A page of another document.
+    RemotePage,
 }
 
 /// What an element is in the structure of a tagged PDF: set with the property

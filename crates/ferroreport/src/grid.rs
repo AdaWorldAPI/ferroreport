@@ -99,7 +99,7 @@ impl Cuts {
         }
     }
 
-    fn index(&self, v: i32) -> usize {
+    pub(crate) fn index(&self, v: i32) -> usize {
         self.offsets.binary_search(&v).unwrap_or_else(|i| i)
     }
 

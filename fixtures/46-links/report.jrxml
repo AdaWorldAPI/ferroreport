@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="links" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<style name="Link" style="Base" forecolor="#1A4FB5" isUnderline="true"/>
+	<field name="region" class="java.lang.String"/>
+	<field name="city" class="java.lang.String"/>
+	<field name="seller" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<group name="region" isStartNewPage="true">
+		<groupExpression><![CDATA[$F{region}]]></groupExpression>
+		<groupHeader>
+			<band height="30">
+				<textField bookmarkLevel="1">
+					<reportElement mode="Opaque" x="0" y="4" width="400" height="22" forecolor="#FFFFFF" backcolor="#1F6F5C"/>
+					<box leftPadding="6"/>
+					<textElement verticalAlignment="Middle"><font size="12" isBold="true"/></textElement>
+					<textFieldExpression><![CDATA["Region " + $F{region}]]></textFieldExpression>
+					<anchorNameExpression><![CDATA["Region " + $F{region}]]></anchorNameExpression>
+				</textField>
+				<textField hyperlinkType="LocalPage">
+					<reportElement style="Link" x="410" y="4" width="125" height="22"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA["Back to the index"]]></textFieldExpression>
+					<hyperlinkPageExpression><![CDATA[1]]></hyperlinkPageExpression>
+					<hyperlinkTooltipExpression><![CDATA["Page 1"]]></hyperlinkTooltipExpression>
+				</textField>
+			</band>
+		</groupHeader>
+	</group>
+	<group name="city">
+		<groupExpression><![CDATA[$F{city}]]></groupExpression>
+		<groupHeader>
+			<band height="18">
+				<textField bookmarkLevel="2">
+					<reportElement x="10" y="2" width="300" height="14"/>
+					<textElement><font size="9" isBold="true"/></textElement>
+					<textFieldExpression><![CDATA[$F{city}]]></textFieldExpression>
+					<anchorNameExpression><![CDATA[$F{region} + " / " + $F{city}]]></anchorNameExpression>
+				</textField>
+			</band>
+		</groupHeader>
+	</group>
+	<title>
+		<band height="120">
+			<staticText>
+				<reportElement x="0" y="0" width="535" height="26"/>
+				<textElement><font size="16" isBold="true"/></textElement>
+				<text><![CDATA[Sales, with links]]></text>
+			</staticText>
+			<textField hyperlinkType="Reference" hyperlinkTarget="Blank">
+				<reportElement style="Link" x="0" y="30" width="300" height="14"/>
+				<textFieldExpression><![CDATA["https://github.com/cristianEncarnacion/ferroreport"]]></textFieldExpression>
+				<hyperlinkReferenceExpression><![CDATA["https://github.com/cristianEncarnacion/ferroreport"]]></hyperlinkReferenceExpression>
+			</textField>
+			<textField hyperlinkType="LocalAnchor">
+				<reportElement style="Link" x="0" y="50" width="200" height="14"/>
+				<textFieldExpression><![CDATA["Go to the Este region"]]></textFieldExpression>
+				<hyperlinkAnchorExpression><![CDATA["Region Este"]]></hyperlinkAnchorExpression>
+			</textField>
+			<textField hyperlinkType="LocalAnchor">
+				<reportElement style="Link" x="0" y="68" width="200" height="14"/>
+				<textFieldExpression><![CDATA["Go to the Norte region"]]></textFieldExpression>
+				<hyperlinkAnchorExpression><![CDATA["Region Norte"]]></hyperlinkAnchorExpression>
+			</textField>
+			<textField hyperlinkType="RemoteAnchor">
+				<reportElement style="Link" x="0" y="86" width="250" height="14"/>
+				<textFieldExpression><![CDATA["The totals, in another document"]]></textFieldExpression>
+				<hyperlinkReferenceExpression><![CDATA["totals.pdf"]]></hyperlinkReferenceExpression>
+				<hyperlinkAnchorExpression><![CDATA["Totals"]]></hyperlinkAnchorExpression>
+			</textField>
+		</band>
+	</title>
+	<detail>
+		<band height="14">
+			<textField>
+				<reportElement x="20" y="0" width="250" height="14"/>
+				<textFieldExpression><![CDATA[$F{seller}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00" hyperlinkType="Reference">
+				<reportElement style="Link" x="300" y="0" width="120" height="14"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+				<hyperlinkReferenceExpression><![CDATA["https://example.com/sales?seller=" + $F{seller}.replace(" ", "%20")]]></hyperlinkReferenceExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

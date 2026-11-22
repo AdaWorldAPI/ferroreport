@@ -1761,8 +1761,36 @@ impl Parser {
             print_in_first_whole_band: attr(re, &["isPrintInFirstWholeBand", "printInFirstWholeBand"]).is_some_and(parse_bool),
             print_when_group_changes: re.attr("printWhenGroupChanges").map(str::to_string),
             conditional,
+            link: self.hyperlink(n)?,
             kind: parts.kind,
         })
+    }
+
+    /// The link, anchor and bookmark of an element: attributes and expressions of the element
+    /// itself in JRXML 6 (`hyperlinkType`) and 7 (`linkType`).
+    fn hyperlink(&self, n: &Node) -> Result<Option<Box<Hyperlink>>> {
+        let kind = match attr(n, &["hyperlinkType", "linkType"]) {
+            Some("Reference") => LinkKind::Reference,
+            Some("LocalAnchor") => LinkKind::LocalAnchor,
+            Some("LocalPage") => LinkKind::LocalPage,
+            Some("RemoteAnchor") => LinkKind::RemoteAnchor,
+            Some("RemotePage") => LinkKind::RemotePage,
+            _ => LinkKind::None,
+        };
+        let anchor_name = self.child_expr(n, &["anchorNameExpression"])?;
+        if kind == LinkKind::None && anchor_name.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(Box::new(Hyperlink {
+            kind,
+            reference: self.child_expr(n, &["hyperlinkReferenceExpression"])?,
+            anchor: self.child_expr(n, &["hyperlinkAnchorExpression"])?,
+            page: self.child_expr(n, &["hyperlinkPageExpression"])?,
+            tooltip: self.child_expr(n, &["hyperlinkTooltipExpression"])?,
+            bookmark_level: attr(n, &["bookmarkLevel"]).and_then(|v| v.trim().parse().ok()).unwrap_or(0),
+            bookmark_level_expr: self.child_expr(n, &["bookmarkLevelExpression"])?,
+            anchor_name,
+        })))
     }
 
     /// Builds the style-dependent parts of an element from its resolved properties.

@@ -118,8 +118,44 @@ pub struct ElementInfo {
     pub tag: Option<crate::model::Tag>,
 }
 
+/// Where a link, an anchor or a bookmark sits on the page (the element's box).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkInfo {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    /// Where a click leads.
+    pub target: Option<LinkTarget>,
+    /// What the link says when pointed at (its tooltip).
+    pub tooltip: Option<String>,
+    /// The anchor the element is: links and bookmarks lead here.
+    pub anchor: Option<String>,
+    /// The level of the element's bookmark (0: none).
+    pub bookmark: u32,
+}
+
+/// Where a link leads.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LinkTarget {
+    Url(String),
+    Anchor(String),
+    /// A page of this document, from 1.
+    Page(u32),
+    RemoteAnchor {
+        file: String,
+        anchor: String,
+    },
+    RemotePage {
+        file: String,
+        page: u32,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub enum PrintItem {
+    /// A link, anchor or bookmark: what the next items draw leads somewhere. Draws nothing.
+    Link(Arc<LinkInfo>),
     /// A printed text element: the item drawing it, with the data exporters other than PDF use.
     Cell(Arc<CellInfo>, Box<PrintItem>),
     /// Where a non-text element starts, for exporters other than PDF. Draws nothing.

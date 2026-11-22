@@ -142,6 +142,22 @@ struct Pages {
     /// Images already written (each is defined once and reused).
     images: HashSet<usize>,
     count: usize,
+    /// The links of the page being written: drawn last, over what they cover.
+    links: String,
+}
+
+/// An anchor as an `id` or a `#fragment`: letters, digits and `-_.` as they are, the rest
+/// as `_` followed by its code.
+fn anchor_id(name: &str) -> String {
+    let mut out = String::from("a-");
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+            out.push(c);
+        } else {
+            let _ = write!(out, "_{:x}_", c as u32);
+        }
+    }
+    out
 }
 
 impl Pages {
@@ -149,20 +165,59 @@ impl Pages {
         self.count += 1;
         let _ = writeln!(
             out,
-            "<svg class=\"page\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {w} {h}\" width=\"{w}pt\" height=\"{h}pt\" role=\"img\" aria-label=\"Page {}\">",
-            self.count,
+            "<svg class=\"page\" id=\"page-{c}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {w} {h}\" width=\"{w}pt\" height=\"{h}pt\" role=\"img\" aria-label=\"Page {c}\">",
+            c = self.count,
             w = n(self.width),
             h = n(self.height)
         );
         self.items(items, fonts, out)?;
+        out.push_str(&std::mem::take(&mut self.links));
         out.push_str("</svg>\n");
         Ok(())
+    }
+
+    /// An anchor where the element is, and a link over it.
+    fn link(&mut self, link: &crate::print::LinkInfo) {
+        use crate::print::LinkTarget;
+        let rect = format!("x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"", n(link.x), n(link.y), n(link.w), n(link.h));
+        if let Some(name) = &link.anchor {
+            let _ = writeln!(self.links, "<rect id=\"{}\" {rect} fill=\"none\"/>", anchor_id(name));
+        }
+        let href = match &link.target {
+            Some(LinkTarget::Url(url)) => {
+                // Only links a browser opens as pages: no scripts from the data.
+                let lower = url.trim_start().to_ascii_lowercase();
+                if lower.starts_with("javascript:") || lower.starts_with("data:") || lower.starts_with("vbscript:") {
+                    return;
+                }
+                url.clone()
+            }
+            Some(LinkTarget::Anchor(a)) => format!("#{}", anchor_id(a)),
+            Some(LinkTarget::Page(p)) => format!("#page-{p}"),
+            Some(LinkTarget::RemoteAnchor { file, anchor }) => format!("{file}#{}", anchor_id(anchor)),
+            Some(LinkTarget::RemotePage { file, page }) => format!("{file}#page-{page}"),
+            None => return,
+        };
+        self.links.push_str("<a href=\"");
+        escape(&href, &mut self.links);
+        self.links.push('"');
+        if matches!(link.target, Some(LinkTarget::Url(_))) {
+            self.links.push_str(" target=\"_blank\" rel=\"noopener noreferrer\"");
+        }
+        self.links.push('>');
+        if let Some(t) = &link.tooltip {
+            self.links.push_str("<title>");
+            escape(t, &mut self.links);
+            self.links.push_str("</title>");
+        }
+        let _ = writeln!(self.links, "<rect {rect} fill=\"transparent\"/></a>");
     }
 
     fn items(&mut self, items: &[PrintItem], fonts: &FontSet, out: &mut String) -> Result<()> {
         for item in items {
             match item {
                 PrintItem::Element(_) => {}
+                PrintItem::Link(link) => self.link(link),
                 PrintItem::Cell(_, inner) => self.items(std::slice::from_ref(inner), fonts, out)?,
                 PrintItem::Group(inner) | PrintItem::Paragraphs(_, inner) => self.items(inner, fonts, out)?,
                 PrintItem::Transform([a, b, c, d, e, f], inner) => {
@@ -395,7 +450,8 @@ pub fn write_html(doc: &PrintDocument, fonts: &FontSet, options: &HtmlOptions) -
     if !options.fragment {
         head(options.title.as_deref().unwrap_or(&doc.name), &mut out);
     }
-    let mut pages = Pages { width: doc.page_width, height: doc.page_height, images: HashSet::new(), count: 0 };
+    let mut pages =
+        Pages { width: doc.page_width, height: doc.page_height, images: HashSet::new(), count: 0, links: String::new() };
     for page in &doc.pages {
         pages.page(&page.items, fonts, &mut out)?;
     }
@@ -424,7 +480,7 @@ impl<W: std::io::Write> HtmlStream<W> {
             head(options.title.as_deref().unwrap_or(name), &mut text);
             out.write_all(text.as_bytes()).map_err(io)?;
         }
-        let pages = Pages { width: page_width, height: page_height, images: HashSet::new(), count: 0 };
+        let pages = Pages { width: page_width, height: page_height, images: HashSet::new(), count: 0, links: String::new() };
         Ok(HtmlStream { out, pages, fragment: options.fragment, buf: String::new() })
     }
 
