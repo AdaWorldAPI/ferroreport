@@ -256,6 +256,8 @@ impl Canvas<'_> {
             underline: false,
             strike: false,
             lines: vec![PrintLine { text: text.to_string(), x, baseline: top + ascent, width, word_spacing: 0.0 }],
+            standard: None,
+            halign: crate::model::HAlign::Left,
         }));
     }
     fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, fill: Option<Color>, stroke: Option<Pen>) {

@@ -30,6 +30,8 @@ pub enum Measure {
     Fill,
     /// Exporting: decides the drawn line breaks and alignment.
     Render,
+    /// Exporting text in a PDF standard font: iText breaks it with that font's widths.
+    Standard(u8),
 }
 
 /// The text of the first `k` lines of [`break_lines`] (the part that fits in a box).
@@ -48,6 +50,7 @@ fn measure(face: &FaceData, size: f32, mode: Measure, s: &str) -> f32 {
     match mode {
         Measure::Fill => face.fill_width(s, size),
         Measure::Render => face.text_width(s, size),
+        Measure::Standard(font) => crate::standard::width(font, s, size),
     }
 }
 
@@ -104,6 +107,73 @@ fn units(paragraph: &str) -> Vec<&str> {
     out
 }
 
+/// Splits a paragraph where Java's line `BreakIterator` allows a break, as JasperReports
+/// does when it fills: after spaces; after closing punctuation (`! " % ) , - . : ; ? ] }`)
+/// that follows a word, unless a `.` or `,` sits between the digits of a number; and before
+/// opening brackets (`( [ {`).
+pub(crate) fn java_units(paragraph: &str) -> Vec<&str> {
+    #[derive(PartialEq, Clone, Copy)]
+    enum Class {
+        Space,
+        Pre,
+        Post,
+        Other,
+    }
+    fn class(c: char) -> Class {
+        match c {
+            ' ' | '\t' => Class::Space,
+            '(' | '[' | '{' | '\u{2018}' | '\u{201C}' | '\u{00AB}' => Class::Pre,
+            '!' | '"' | '%' | ')' | ',' | '-' | '.' | ':' | ';' | '?' | ']' | '}' | '\u{2019}' | '\u{201D}' | '\u{00BB}'
+            | '\u{2010}' | '\u{2013}' | '\u{2014}' => Class::Post,
+            _ => Class::Other,
+        }
+    }
+    let chars: Vec<(usize, char)> = paragraph.char_indices().collect();
+    let mut out = Vec::new();
+    let mut start = 0;
+    // Whether the current word has had a letter or digit (or other) character yet, and
+    // whether it is a number (begins with a digit).
+    let mut seen_other = chars.first().is_some_and(|&(_, c)| class(c) == Class::Other);
+    let mut number = chars.first().is_some_and(|&(_, c)| c.is_ascii_digit());
+    for k in 1..chars.len() {
+        let (i, c) = chars[k];
+        let prev = chars[k - 1].1;
+        let (pc, cc) = (class(prev), class(c));
+        let brk = match (pc, cc) {
+            (Class::Space, Class::Space) => false,
+            (Class::Space, _) => true,
+            (_, Class::Space) => false,
+            (Class::Post, Class::Other | Class::Pre) => {
+                let numeric =
+                    number && matches!(prev, '.' | ',') && c.is_ascii_digit() && k >= 2 && chars[k - 2].1.is_ascii_digit();
+                // A quote that opens a word does not end it.
+                let opening_quote = prev == '"' && !seen_other;
+                seen_other && !numeric && !opening_quote || (prev != '"' && !seen_other && cc == Class::Other)
+            }
+            (Class::Other, Class::Pre) => true,
+            _ => false,
+        };
+        if brk {
+            out.push(&paragraph[start..i]);
+            start = i;
+            seen_other = false;
+            number = false;
+        }
+        if class(c) == Class::Other {
+            if !seen_other {
+                number = c.is_ascii_digit();
+            } else if !c.is_ascii_digit() {
+                number = false;
+            }
+            seen_other = true;
+        }
+    }
+    if start < paragraph.len() || out.is_empty() {
+        out.push(&paragraph[start..]);
+    }
+    out
+}
+
 fn break_paragraph(
     paragraph: &str,
     base: usize,
@@ -116,7 +186,11 @@ fn break_paragraph(
     let fits = |s: &str| measure(face, size, mode, s.trim_end_matches(' ')) <= max_width + 1e-3;
     let push = |lines: &mut Vec<Line>, from: usize, to: usize| {
         let text = paragraph[from..to].trim_end_matches(' ');
-        lines.push(Line { text: text.to_string(), width: face.text_width(text, size), start: base + from });
+        let width = match mode {
+            Measure::Standard(font) => crate::standard::width(font, text, size),
+            _ => face.text_width(text, size),
+        };
+        lines.push(Line { text: text.to_string(), width, start: base + from });
     };
     // Most texts are one line that fits: widths only grow with length, so when the whole
     // paragraph fits there is nothing to break.
@@ -127,7 +201,8 @@ fn break_paragraph(
     // `line_start..pos` is the current line, as byte offsets into `paragraph`.
     let mut line_start = 0;
     let mut pos = 0;
-    for unit in units(paragraph) {
+    let pieces = if mode == Measure::Fill { java_units(paragraph) } else { units(paragraph) };
+    for unit in pieces {
         let unit_end = pos + unit.len();
         if fits(&paragraph[line_start..unit_end]) {
             pos = unit_end;
@@ -222,6 +297,39 @@ impl VerticalMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn java_break_opportunities() {
+        // What java.text.BreakIterator.getLineInstance() gives for these.
+        let cases = [
+            (
+                r#"<line direction="BottomUp"><reportElement x="0" y="150"/>"#,
+                vec![
+                    r#"<line "#,
+                    r#"direction=""#,
+                    r#"BottomUp""#,
+                    r#"><reportElement "#,
+                    r#"x=""#,
+                    r#"0" "#,
+                    r#"y=""#,
+                    r#"150""#,
+                    "/>",
+                ],
+            ),
+            (
+                r#"a-b 12.5 x/y (p) q,r "s" #FFF a+b"#,
+                vec!["a-", "b ", "12.5 ", "x/y ", "(p) ", "q,", "r ", "\"s\" ", "#FFF ", "a+b"],
+            ),
+            (
+                "a.5 5.a 5,a x(5) a--b a -b 100%x",
+                vec!["a.", "5 ", "5.", "a ", "5,", "a ", "x", "(5) ", "a--", "b ", "a ", "-", "b ", "100%", "x"],
+            ),
+            ("1,5 1.5 1:5 10,000.50 v1.2 \"q\"r", vec!["1,5 ", "1.5 ", "1:", "5 ", "10,000.50 ", "v1.", "2 ", "\"q\"", "r"]),
+        ];
+        for (text, want) in cases {
+            assert_eq!(java_units(text), want, "{text}");
+        }
+    }
     use crate::fonts::FontSet;
     use crate::model::FontSpec;
 
@@ -234,6 +342,7 @@ mod tests {
             italic: false,
             underline: false,
             strike: false,
+            pdf_font: None,
         });
         (fonts, id)
     }

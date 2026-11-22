@@ -197,6 +197,7 @@ impl PenProps {
 #[derive(Debug, Clone, Default)]
 struct StyleProps {
     font_name: Option<String>,
+    pdf_font_name: Option<String>,
     font_size: Option<f32>,
     bold: Option<bool>,
     italic: Option<bool>,
@@ -230,6 +231,7 @@ impl StyleProps {
             self,
             base,
             font_name,
+            pdf_font_name,
             font_size,
             bold,
             italic,
@@ -258,6 +260,9 @@ impl StyleProps {
     fn read_font_attrs(&mut self, n: &Node) {
         if let Some(v) = attr(n, &["fontName"]) {
             self.font_name = Some(v.to_string());
+        }
+        if let Some(v) = attr(n, &["pdfFontName"]) {
+            self.pdf_font_name = Some(v.to_string());
         }
         if let Some(v) = attr(n, &["size", "fontSize"]).and_then(number) {
             self.font_size = Some(v);
@@ -393,6 +398,8 @@ struct Parser {
     /// `<subDataset>`s by name, parsed before the bands so tables can use them.
     datasets: HashMap<String, Dataset>,
     page_height: f32,
+    /// The report's `<property>` values, defaults for element properties.
+    report_properties: Vec<(String, String)>,
 }
 
 /// Most conditional styles one element may combine (variants are precomputed per subset).
@@ -471,6 +478,13 @@ impl Parser {
             warnings: Vec::new(),
             datasets: HashMap::new(),
             page_height: attr(root, &["pageHeight"]).and_then(number).unwrap_or(842.0),
+            report_properties: root
+                .children_named("property")
+                .filter_map(|p| {
+                    let value = p.attr("value").map(str::to_string).unwrap_or_else(|| p.text.clone());
+                    p.attr("name").map(|n| (n.to_string(), value))
+                })
+                .collect(),
         };
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
@@ -1044,6 +1058,9 @@ fn font_from(node: Option<&Node>, base: &FontSpec) -> FontSpec {
         if let Some(v) = n.attr("fontName") {
             f.name = v.to_string();
         }
+        if let Some(v) = n.attr("pdfFontName") {
+            f.pdf_font = Some(v.to_string());
+        }
         if let Some(v) = attr(n, &["size", "fontSize"]).and_then(number) {
             f.size = v;
         }
@@ -1399,15 +1416,6 @@ impl Parser {
 
         let element_kind = match kind {
             "staticText" | "textField" => {
-                if props.font_name.is_none() {
-                    let note =
-                        "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's \
-                                SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font \
-                                (DejaVu Sans, or one you register) to get the same pages from both";
-                    if !self.warnings.iter().any(|w| w == note) {
-                        self.warnings.push(note.into());
-                    }
-                }
                 let font = FontSpec {
                     name: props.font_name.clone().unwrap_or_else(|| "SansSerif".into()),
                     size: props.font_size.unwrap_or(10.0),
@@ -1415,6 +1423,7 @@ impl Parser {
                     italic: props.italic.unwrap_or(false),
                     underline: props.underline.unwrap_or(false),
                     strike: props.strike.unwrap_or(false),
+                    pdf_font: props.pdf_font_name.clone(),
                 };
                 let rotation = match n.child("textElement").and_then(|t| t.attr("rotation")).or_else(|| n.attr("rotation")) {
                     Some("Left") => Rotation::Left,
@@ -1463,7 +1472,20 @@ impl Parser {
                         evaluation_group: n.attr("evaluationGroup").map(str::to_string),
                     }
                 };
-                ElementKind::Text(TextElement { content, style, boxed: props.box_style(forecolor), stretch, markup })
+                let property = |name: &str| {
+                    let holder = n.child("reportElement").unwrap_or(n);
+                    holder
+                        .children_named("property")
+                        .find(|p| p.attr("name") == Some(name))
+                        .map(|p| p.attr("value").map(str::to_string).unwrap_or_else(|| p.text.clone()))
+                        .or_else(|| self.report_properties.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone()))
+                };
+                let truncate = crate::model::Truncate {
+                    at_char: property("net.sf.jasperreports.text.truncate.at.char").is_some_and(|v| parse_bool(&v)),
+                    suffix: property("net.sf.jasperreports.text.truncate.suffix").filter(|v| !v.is_empty()),
+                    keep_full: property("net.sf.jasperreports.print.keep.full.text").is_some_and(|v| parse_bool(&v)),
+                };
+                ElementKind::Text(TextElement { content, style, boxed: props.box_style(forecolor), stretch, markup, truncate })
             }
             "line" => ElementKind::Line {
                 direction: if n.attr("direction") == Some("BottomUp") { LineDirection::BottomUp } else { LineDirection::TopDown },
@@ -1553,6 +1575,7 @@ impl Parser {
                     italic: false,
                     underline: false,
                     strike: false,
+                    pdf_font: props.pdf_font_name.clone(),
                 };
                 ElementKind::Chart(Box::new(self.chart(n, tag, base_font, props.box_style(forecolor))?))
             }

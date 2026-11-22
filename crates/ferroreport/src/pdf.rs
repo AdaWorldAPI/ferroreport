@@ -342,6 +342,75 @@ impl FaceUse {
     }
 }
 
+/// Draws text in a standard font the way JasperReports does: its lines broken where the
+/// face put them, each line aligned with the standard font's own widths.
+fn draw_standard(c: &mut Content, t: &crate::print::PrintText, style: crate::standard::Standard, ph: f32) {
+    use crate::model::HAlign;
+    let font = style.font;
+    let (r, g, b) = rgb(t.color);
+    let resource = format!("S{font}");
+    let mut placed = Vec::with_capacity(t.lines.len());
+    // iText's simulated italic slants by this much.
+    let skew = if style.italic { 0.21256 } else { 0.0 };
+    c.set_fill_rgb(r, g, b);
+    c.begin_text();
+    c.set_font(Name(resource.as_bytes()), t.size);
+    if style.bold {
+        // iText's simulated bold: the outline stroked as well, a thirtieth of the size wide.
+        c.set_text_rendering_mode(pdf_writer::types::TextRenderingMode::FillStroke);
+        c.set_line_width(t.size / 30.0);
+        c.set_stroke_rgb(r, g, b);
+    }
+    for line in &t.lines {
+        if line.text.is_empty() {
+            continue;
+        }
+        let natural = crate::standard::width(font, &line.text, t.size);
+        let spaces = line.text.matches(' ').count() as f32;
+        let (x, spacing, width) = if line.word_spacing.abs() > 1e-4 && spaces > 0.0 {
+            // Justified: the words spread over the same width.
+            (line.x, (line.width - natural) / spaces, line.width)
+        } else {
+            let x = match t.halign {
+                HAlign::Center => line.x + (line.width - natural) / 2.0,
+                HAlign::Right => line.x + line.width - natural,
+                _ => line.x,
+            };
+            (x, 0.0, natural)
+        };
+        let bytes: Vec<u8> = line.text.chars().filter_map(crate::standard::encode).collect();
+        if spacing != 0.0 {
+            c.set_word_spacing(r2(spacing));
+        }
+        c.set_text_matrix([1.0, 0.0, skew, 1.0, r2(x), r2(ph - line.baseline)]);
+        c.show(Str(&bytes));
+        if spacing != 0.0 {
+            c.set_word_spacing(0.0);
+        }
+        placed.push((x, line.baseline, width));
+    }
+    if style.bold {
+        c.set_text_rendering_mode(pdf_writer::types::TextRenderingMode::Fill);
+    }
+    c.end_text();
+    if t.underline || t.strike {
+        let thick = t.size / 18.0;
+        for (x, baseline, width) in placed {
+            for (on, offset) in [(t.underline, -t.size / 12.0), (t.strike, t.size / 3.0)] {
+                if on && width > 0.0 {
+                    let y = ph - baseline + offset;
+                    c.set_stroke_rgb(r, g, b);
+                    c.set_line_width(thick);
+                    c.set_dash_pattern([], 0.0);
+                    c.move_to(x, y);
+                    c.line_to(x + width, y);
+                    c.stroke();
+                }
+            }
+        }
+    }
+}
+
 /// Writes a PDF page by page: each page's content goes to `out` as soon as it arrives, and
 /// fonts (subsetted to the glyphs used), the page tree and the cross-reference table follow
 /// at the end. Memory use does not grow with the number of pages.
@@ -354,6 +423,8 @@ pub struct PdfStream<W: std::io::Write> {
     page_width: f32,
     page_height: f32,
     faces: BTreeMap<FaceId, FaceUse>,
+    /// The standard fonts used (index into `standard::STANDARD`).
+    standard: std::collections::BTreeSet<u8>,
     images: BTreeMap<usize, (String, Ref)>,
     /// The content streams of each page.
     pages: Vec<Vec<Ref>>,
@@ -386,6 +457,7 @@ impl<W: std::io::Write> PdfStream<W> {
             page_width,
             page_height,
             faces: BTreeMap::new(),
+            standard: Default::default(),
             images: BTreeMap::new(),
             pages: Vec::new(),
             tags: None,
@@ -717,6 +789,11 @@ impl<W: std::io::Write> PdfStream<W> {
                     if t.lines.iter().all(|l| l.text.is_empty()) {
                         continue;
                     }
+                    if let Some(font) = t.standard {
+                        self.standard.insert(font.font);
+                        draw_standard(&mut c, t, font, ph);
+                        continue;
+                    }
                     let next = self.faces.len() + 1;
                     let used = self.faces.entry(t.face).or_insert_with(|| FaceUse::new(next));
                     let resource = used.resource.clone();
@@ -1008,6 +1085,18 @@ impl<W: std::io::Write> PdfStream<W> {
             self.put(file, &chunk)?;
 
             font_refs.push((used.resource, type0));
+        }
+
+        // The standard fonts, not embedded, as iText writes them.
+        for font in std::mem::take(&mut self.standard) {
+            let id = self.next_id();
+            let mut chunk = Chunk::new();
+            chunk
+                .type1_font(id)
+                .base_font(Name(crate::standard::STANDARD[font as usize].0.as_bytes()))
+                .encoding_predefined(Name(b"WinAnsiEncoding"));
+            self.put(id, &chunk)?;
+            font_refs.push((format!("S{font}"), id));
         }
 
         // One resource dictionary shared by every page.

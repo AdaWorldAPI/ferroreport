@@ -496,15 +496,21 @@ fn glyphs(st: &StyledText, fonts: &mut FontSet, mode: Measure) -> Glyphs {
     prefix.push(0.0f32);
     let mut acc = 0.0f32;
     for run in &st.runs {
+        // Text written in a PDF standard font is measured with its widths when exporting.
+        let standard = match mode {
+            Measure::Fill => None,
+            _ => fonts.standard(&run.style.font, &st.text[run.start..run.end]),
+        };
         let id = resolve(fonts, &run.style);
         let face = fonts.face(id);
         let size = run.style.draw_size();
         for (i, c) in st.text[run.start..run.end].char_indices() {
             offsets.push(run.start + i);
             let c = if c == '\t' { ' ' } else { c };
-            acc += match mode {
-                Measure::Fill => face.fill_char_width(c, size),
-                Measure::Render => face.char_width(c, size),
+            acc += match (mode, standard) {
+                (Measure::Fill, _) => face.fill_char_width(c, size),
+                (_, Some(st)) => crate::standard::width(st.font, c.encode_utf8(&mut [0; 4]), size),
+                _ => face.char_width(c, size),
             };
             prefix.push(acc);
         }
@@ -532,9 +538,23 @@ pub struct RLine {
     pub width: f32,
 }
 
-fn break_units(text: &str, from: usize, to: usize) -> Vec<usize> {
+fn break_units(text: &str, from: usize, to: usize, mode: Measure) -> Vec<usize> {
     // Ends of break units (same rules as plain text).
     let para = &text[from..to];
+    if mode == Measure::Fill {
+        let mut end = from;
+        let mut ends: Vec<usize> = crate::text::java_units(para)
+            .into_iter()
+            .map(|u| {
+                end += u.len();
+                end
+            })
+            .collect();
+        if ends.last() != Some(&to) {
+            ends.push(to);
+        }
+        return ends;
+    }
     let chars: Vec<(usize, char)> = para.char_indices().collect();
     let mut ends = Vec::new();
     for (k, &(i, c)) in chars.iter().enumerate() {
@@ -577,7 +597,7 @@ pub fn break_rich(st: &StyledText, fonts: &mut FontSet, max_width: f32, mode: Me
             let e = trim_end(text, a, b);
             lines.push(RLine { start: a, end: e, next: b, width: render_w(a, e) });
         };
-        for unit_end in break_units(text, para_start, para_end) {
+        for unit_end in break_units(text, para_start, para_end, mode) {
             if fits(line_start, unit_end) {
                 pos = unit_end;
                 continue;
@@ -859,6 +879,8 @@ pub fn layout(
                     width: seg_w,
                     word_spacing,
                 }],
+                standard: fonts.standard(&r.style.font, seg),
+                halign: HAlign::Left,
             }));
             px += seg_w;
         }
@@ -885,6 +907,7 @@ mod tests {
                 italic: false,
                 underline: false,
                 strike: false,
+                pdf_font: None,
             },
             color: Color::BLACK,
             back: None,

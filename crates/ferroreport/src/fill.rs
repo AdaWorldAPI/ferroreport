@@ -736,7 +736,12 @@ fn printed_text(
     let vm = vertical_metrics(face, size, te.style.line_spacing);
     let lines = break_lines(text, face, size, cw, Measure::Fill);
     let fit = vm.lines_that_fit(ch).min(lines.len());
+    if te.truncate.keep_full {
+        return (text.to_string(), Vec::new());
+    }
+    let cut = if fit < lines.len() { cut_text(text, &lines, fit, face, size, cw, &te.truncate) } else { None };
     let text = match lines.get(fit) {
+        _ if cut.is_some() => cut.unwrap_or_default(),
         // Jasper keeps the spaces the last line ends with.
         Some(next) => {
             let normalized = crate::text::normalize(text);
@@ -746,6 +751,60 @@ fn printed_text(
         None => text.to_string(),
     };
     (text, Vec::new())
+}
+
+/// What JasperReports keeps of a text cut after `fit` of its fill `lines` when the element
+/// asks for more than the default cut after the last whole line: the last line filled up to
+/// the last character that fits (`truncate.at.char`), and a suffix that takes the place of
+/// the last words or characters it needs room for (`truncate.suffix`). `None`: the default.
+fn cut_text(
+    text: &str,
+    lines: &[crate::text::Line],
+    fit: usize,
+    face: &crate::fonts::FaceData,
+    size: f32,
+    cw: f32,
+    t: &crate::model::Truncate,
+) -> Option<String> {
+    if !t.at_char && t.suffix.is_none() {
+        return None;
+    }
+    let normalized = crate::text::normalize(text);
+    if fit == 0 {
+        return Some(t.suffix.clone().unwrap_or_default());
+    }
+    let start = lines[fit - 1].start;
+    let mut end = lines.get(fit).map(|l| l.start).unwrap_or(normalized.len());
+    if normalized[..end].ends_with('\n') {
+        end -= 1;
+    }
+    let paragraph_end = normalized[start..].find('\n').map(|i| start + i).unwrap_or(normalized.len());
+    let fits = |s: &str| face.fill_width(s, size) <= cw + 1e-3;
+    if t.at_char {
+        let from = end;
+        for (i, c) in normalized[from..paragraph_end].char_indices() {
+            let next = from + i + c.len_utf8();
+            if !fits(&normalized[start..next]) {
+                break;
+            }
+            end = next;
+        }
+        end = end.max(lines[fit - 1].start);
+    }
+    let suffix = t.suffix.as_deref().unwrap_or("");
+    if !suffix.is_empty() {
+        while end > start && !fits(&format!("{}{suffix}", &normalized[start..end])) {
+            if t.at_char {
+                end = normalized[..end].char_indices().next_back().map(|(i, _)| i).unwrap_or(start).max(start);
+            } else {
+                // Drop the last word, keeping the space before it.
+                let units = crate::text::java_units(&normalized[start..end]);
+                let last = units.last().map(|u| u.len()).unwrap_or(end - start);
+                end -= last;
+            }
+        }
+    }
+    Some(format!("{}{suffix}", &normalized[..end]))
 }
 
 /// The base style of a text element's runs.
@@ -816,7 +875,8 @@ fn plain_text_item(
     clip: bool,
 ) -> (PrintText, f32) {
     let face_id = fonts.resolve(&te.style.font);
-    let face = fonts.face(face_id);
+    let face_arc = fonts.faces()[face_id].clone();
+    let face = &*face_arc;
     let size = te.style.font.size;
     let p = te.boxed.padding;
     let (cx, cy, cw, ch) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), h - p.top - p.bottom);
@@ -826,8 +886,19 @@ fn plain_text_item(
     let fill_lines = break_lines(text, face, size, cw, Measure::Fill);
     let needed = p.top + p.bottom + vm.block_height(fill_lines.len());
     let fit = if clip { vm.lines_that_fit(ch).min(fill_lines.len()) } else { fill_lines.len() };
-    let rendered_text = if fit < fill_lines.len() { text_before_line(text, &fill_lines, fit) } else { text.to_string() };
-    let mut lines = break_lines(&rendered_text, face, size, cw, Measure::Render);
+    let rendered_text = if fit < fill_lines.len() {
+        cut_text(text, &fill_lines, fit, face, size, cw, &te.truncate).unwrap_or_else(|| text_before_line(text, &fill_lines, fit))
+    } else {
+        text.to_string()
+    };
+    // Text JasperReports writes in a PDF standard font: iText breaks it again with that
+    // font's widths.
+    let standard = fonts.standard(&te.style.font, &rendered_text);
+    let render = match standard {
+        Some(st) => Measure::Standard(st.font),
+        None => Measure::Render,
+    };
+    let mut lines = break_lines(&rendered_text, face, size, cw, render);
     if clip {
         lines.truncate(vm.lines_that_fit(ch));
     }
@@ -857,7 +928,10 @@ fn plain_text_item(
             let spaces = l.text.matches(' ').count();
             // iText lets 40% of a trailing , . ; or : hang into the margin.
             let hanging = match l.text.chars().last() {
-                Some(c @ (',' | '.' | ';' | ':')) => 0.4 * face_ref.char_width(c, size),
+                Some(c @ (',' | '.' | ';' | ':')) => match render {
+                    Measure::Standard(font) => 0.4 * crate::standard::width(font, c.encode_utf8(&mut [0; 4]), size),
+                    _ => 0.4 * face_ref.char_width(c, size),
+                },
                 _ => 0.0,
             };
             word_spacing = if !ends_paragraph && spaces > 0 {
@@ -884,7 +958,11 @@ fn plain_text_item(
         });
     }
     let f = &te.style.font;
-    (PrintText { face: face_id, size, color, underline: f.underline, strike: f.strike, lines: print_lines }, needed)
+    let halign = te.style.halign;
+    (
+        PrintText { face: face_id, size, color, underline: f.underline, strike: f.strike, lines: print_lines, standard, halign },
+        needed,
+    )
 }
 
 /// Whether JasperReports prints the element's content in a frame (tables and lists do,
@@ -1437,6 +1515,8 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                             underline: false,
                             strike: false,
                             lines: Vec::new(),
+                            standard: None,
+                            halign: te.style.halign,
                         };
                         out.items.push(Laid {
                             item: PrintItem::Text(placeholder),
@@ -1716,6 +1796,7 @@ fn place_symbol(
             italic: false,
             underline: false,
             strike: false,
+            pdf_font: None,
         };
         let id = fonts.resolve(&spec);
         let face = fonts.face(id);

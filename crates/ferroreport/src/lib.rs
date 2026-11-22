@@ -33,6 +33,7 @@ pub mod pdf;
 pub mod print;
 mod raster;
 pub mod rich;
+pub mod standard;
 pub mod table;
 pub mod text;
 pub mod value;

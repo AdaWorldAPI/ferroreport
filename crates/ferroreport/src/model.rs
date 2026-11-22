@@ -208,6 +208,9 @@ pub struct FontSpec {
     pub italic: bool,
     pub underline: bool,
     pub strike: bool,
+    /// The PDF font JasperReports writes this text in when the family is not one it has as a
+    /// font extension (`pdfFontName`; Helvetica when not given).
+    pub pdf_font: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -260,6 +263,19 @@ pub struct TextElement {
     pub boxed: BoxStyle,
     pub stretch: bool,
     pub markup: crate::rich::Markup,
+    pub truncate: Truncate,
+}
+
+/// How a text that does not fit its box is cut (`net.sf.jasperreports.text.truncate.*` and
+/// `net.sf.jasperreports.print.keep.full.text`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Truncate {
+    /// Cut at the last character that fits, not the last word.
+    pub at_char: bool,
+    /// Appended where the text is cut (an ellipsis, usually).
+    pub suffix: Option<String>,
+    /// Spreadsheet and CSV output get the whole text.
+    pub keep_full: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

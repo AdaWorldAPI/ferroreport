@@ -311,6 +311,20 @@ impl FontSet {
         id
     }
 
+    /// The PDF standard font JasperReports writes text of `spec` in, if any. JasperReports
+    /// draws a family it has no font extension for (anything but DejaVu, unless registered)
+    /// in the font its `pdfFontName` names, Helvetica by default, not embedded, while laying
+    /// it out with the Java runtime's font (DejaVu on Linux). Text with a character that the
+    /// standard fonts lack, or a `pdfFontName` that is a font file, stays in the embedded face.
+    pub fn standard(&mut self, spec: &FontSpec, text: &str) -> Option<crate::standard::Standard> {
+        let id = self.resolve(spec);
+        if self.faces[id].family.eq_ignore_ascii_case(spec.name.trim()) {
+            return None;
+        }
+        let font = crate::standard::pick(spec.pdf_font.as_deref().unwrap_or("Helvetica"), spec.bold, spec.italic)?;
+        text.chars().all(|c| c.is_control() || crate::standard::encode(c).is_some()).then_some(font)
+    }
+
     /// Picks the face used for `spec`, substituting a bundled family when needed.
     pub fn resolve(&mut self, spec: &FontSpec) -> FaceId {
         let key = (spec.name.to_ascii_lowercase(), spec.bold, spec.italic);
@@ -348,8 +362,15 @@ mod tests {
     #[test]
     fn dejavu_metrics_match_awt() {
         let mut fonts = FontSet::new();
-        let spec =
-            FontSpec { name: "DejaVu Sans".into(), size: 10.0, bold: false, italic: false, underline: false, strike: false };
+        let spec = FontSpec {
+            name: "DejaVu Sans".into(),
+            size: 10.0,
+            bold: false,
+            italic: false,
+            underline: false,
+            strike: false,
+            pdf_font: None,
+        };
         let id = fonts.resolve(&spec);
         let f = fonts.face(id);
         // Values observed in PDFs produced by JasperReports 6.20.
@@ -360,8 +381,15 @@ mod tests {
     #[test]
     fn styles_resolve_after_regular_is_loaded() {
         let mut fonts = FontSet::new();
-        let mut spec =
-            FontSpec { name: "DejaVu Sans".into(), size: 10.0, bold: false, italic: false, underline: false, strike: false };
+        let mut spec = FontSpec {
+            name: "DejaVu Sans".into(),
+            size: 10.0,
+            bold: false,
+            italic: false,
+            underline: false,
+            strike: false,
+            pdf_font: None,
+        };
         fonts.resolve(&spec);
         spec.bold = true;
         spec.italic = true;
@@ -372,7 +400,15 @@ mod tests {
     #[test]
     fn substitutes_unknown_families() {
         let mut fonts = FontSet::new();
-        let spec = FontSpec { name: "Comic Sans".into(), size: 10.0, bold: true, italic: false, underline: false, strike: false };
+        let spec = FontSpec {
+            name: "Comic Sans".into(),
+            size: 10.0,
+            bold: true,
+            italic: false,
+            underline: false,
+            strike: false,
+            pdf_font: None,
+        };
         let id = fonts.resolve(&spec);
         assert_eq!(fonts.face(id).family, "DejaVu Sans");
         assert!(fonts.face(id).bold);

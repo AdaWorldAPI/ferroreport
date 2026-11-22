@@ -27,6 +27,12 @@ pub struct PrintText {
     pub underline: bool,
     pub strike: bool,
     pub lines: Vec<PrintLine>,
+    /// The PDF standard font (an index into `standard::STANDARD`) to write the text in instead
+    /// of `face`, as JasperReports does for families it does not have.
+    pub standard: Option<crate::standard::Standard>,
+    /// How the lines are aligned, so that a standard font, whose widths differ from the
+    /// face's, is aligned the same way.
+    pub halign: crate::model::HAlign,
 }
 
 /// What spreadsheet and text exporters need to know about a printed text element: its box,

@@ -11,4 +11,6 @@ if [ ! -f "$OUT/Oracle.class" ] || [ "$DIR/Oracle.java" -nt "$OUT/Oracle.class" 
   mkdir -p "$OUT"
   javac -proc:none -nowarn -cp "$LIB/*" -d "$OUT" "$DIR/Oracle.java" 2>&1 | grep -v "Picked up" || true
 fi
-exec java -Djava.awt.headless=true -cp "$OUT:$LIB/*" Oracle "$@" 2>&1 | grep -v "Picked up\|^WARNING\|log4j\|SLF4J" >&2
+# The Java runtime's logical fonts (SansSerif...) as on a stock Linux server: DejaVu.
+export FONTCONFIG_FILE="$DIR/fonts.conf"
+exec java -Djava.awt.headless=true -Duser.home="$OUT/home" -cp "$OUT:$LIB/*" Oracle "$@" 2>&1 | grep -v "Picked up\|^WARNING\|log4j\|SLF4J" >&2
