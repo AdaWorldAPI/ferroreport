@@ -258,6 +258,35 @@ fn spans(rows: &mut [Node]) {
             cell.span = (count(&xs, cell.x, cell.w).clamp(1, 1000) as u16, count(&ys, cell.y, cell.h).clamp(1, 1000) as u16);
         }
     }
+    // Every row accounts for every column: where no cell covers one (nothing printed
+    // there), an empty cell stands in, as PDF/UA asks.
+    if xs.is_empty() || rows.iter().any(|r| !r.y.is_finite() || r.kids.iter().any(|c| !c.x.is_finite())) {
+        return;
+    }
+    let at = |v: &[f32], p: f32| v.iter().position(|q| (q - p).abs() < 0.5);
+    let mut taken = vec![vec![false; xs.len()]; ys.len()];
+    for row in rows.iter() {
+        let Some(r0) = at(&ys, row.y) else { return };
+        for cell in &row.kids {
+            let Some(c0) = at(&xs, cell.x) else { return };
+            for line in taken.iter_mut().skip(r0).take(cell.span.1 as usize) {
+                for slot in line.iter_mut().skip(c0).take(cell.span.0 as usize) {
+                    *slot = true;
+                }
+            }
+        }
+    }
+    for row in rows.iter_mut() {
+        let Some(r0) = at(&ys, row.y) else { continue };
+        let missing: Vec<usize> = (0..xs.len()).filter(|&c| !taken[r0][c]).collect();
+        if missing.is_empty() {
+            continue;
+        }
+        for c in missing {
+            row.kids.push(Node::new(Role::DataCell, [xs[c], row.y, 0.0, 0.0], Vec::new()));
+        }
+        row.kids.sort_by(|a, b| a.x.total_cmp(&b.x));
+    }
 }
 
 /// The cells of a table gathered into rows (cells at the same height), in order. Anything
@@ -1718,7 +1747,7 @@ impl<W: std::io::Write> PdfStream<W> {
             let id = self.next_id();
             let title = self.options.title.clone().unwrap_or_default();
             let packet = format!(
-                "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\">\n<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>\n<pdf:Producer>ferroreport {}</pdf:Producer>\n</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>",
+                "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\" xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\">\n<pdfuaid:part>1</pdfuaid:part>\n<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>\n<pdf:Producer>ferroreport {}</pdf:Producer>\n</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>",
                 crate::xlsx::escape(&title),
                 env!("CARGO_PKG_VERSION")
             );
