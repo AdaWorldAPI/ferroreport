@@ -1814,12 +1814,14 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Barcode(bc) => {
                 // The size of the barcode's picture in points (barcode4j works in mm).
                 let unit = match bc.symbology {
-                    Symbology::Qr { .. } => 1.0,
+                    Symbology::Qr { .. } | Symbology::Barbecue { .. } => 1.0,
                     _ => 72.0 / 25.4,
                 };
                 let symbol = m.symbol.as_ref().map(|s| (s.width * unit, s.height * unit));
                 let mark = open_mark(&mut out.items, el, Shape::Picture { symbol }, Some(bc.boxed), x, y, w, h);
-                if el.mode == Mode::Opaque {
+                // JasperReports draws no background behind a Barbecue barcode (which paints its
+                // own white).
+                if el.mode == Mode::Opaque && !matches!(bc.symbology, Symbology::Barbecue { .. }) {
                     out.items.push(Laid {
                         item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },
                         deferred: None,
@@ -1896,6 +1898,12 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
             crate::barcode::pdf417_symbol(&code, spec, el.height as f64, *text_position, bc.font_size.map(|s| s as f64))
         }
         Symbology::DataMatrix { module_width, shape } => crate::barcode::datamatrix_symbol(&code, *module_width, *shape),
+        Symbology::Barbecue { spec, rotation } => {
+            if !crate::barcode::barbecue::TYPES.contains(&spec.kind.as_str()) {
+                return Ok(None);
+            }
+            crate::barcode::barbecue::symbol(spec, &code).map(|s| rotate_symbol(s, *rotation))
+        }
         Symbology::Postnet { module_width, short_bar, gap, add_checksum } => {
             let mm = crate::barcode::pt2mm;
             let bar = module_width.map(mm).unwrap_or(0.508);
@@ -1944,6 +1952,22 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
         }
     };
     symbol.map(Some).map_err(|e| Error::eval(format!("barcode `{code}`: {e}")))
+}
+
+/// A symbol turned a quarter left or right, or upside down.
+fn rotate_symbol(s: crate::barcode::Symbol, rotation: Rotation) -> crate::barcode::Symbol {
+    let (w, h) = (s.width, s.height);
+    let turn = |[x, y, rw, rh]: [f64; 4]| match rotation {
+        Rotation::None => [x, y, rw, rh],
+        Rotation::Left => [y, w - x - rw, rh, rw],
+        Rotation::Right => [h - y - rh, x, rh, rw],
+        Rotation::UpsideDown => [w - x - rw, h - y - rh, rw, rh],
+    };
+    let (width, height) = match rotation {
+        Rotation::Left | Rotation::Right => (h, w),
+        _ => (w, h),
+    };
+    crate::barcode::Symbol { width, height, rects: s.rects.into_iter().map(turn).collect(), texts: s.texts }
 }
 
 /// Scales a symbol into its box like Jasper scales the SVG image (RetainShape, top-left).
@@ -2004,8 +2028,31 @@ fn place_symbol(
             prefix += adv;
         }
     }
+    let (mut oy, mut scale) = (oy, scale);
+    if let Symbology::Barbecue { .. } = bc.symbology {
+        // JasperReports draws the barcode into a form scaled by a factor iText writes with two
+        // decimals (five below 1), from the form's bottom edge.
+        let digits = if scale >= 1.0 { 100.0 } else { 100_000.0 };
+        let written = (scale * digits).round() / digits;
+        oy += (sym.height * (scale - written)) as f32;
+        scale = written;
+        // Barbecue paints its spaces and quiet zones white.
+        out.push(Laid {
+            item: PrintItem::Rect {
+                x: ox,
+                y: oy,
+                w: (sym.width * scale) as f32,
+                h: (sym.height * scale) as f32,
+                fill: Some(Color::WHITE),
+                stroke: None,
+                radius: 0.0,
+                path: false,
+            },
+            deferred: None,
+        });
+    }
     let (rects, path) = match bc.symbology {
-        Symbology::Qr { .. } => (sym.rects, path),
+        Symbology::Qr { .. } | Symbology::Barbecue { .. } => (sym.rects, path),
         _ => snap_like_jasper(sym.rects, path, sym.height),
     };
     out.push(Laid {

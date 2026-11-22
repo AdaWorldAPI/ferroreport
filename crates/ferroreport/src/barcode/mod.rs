@@ -4,6 +4,7 @@
 //! (pixels for QR codes, millimetres for barcode4j), so they can be scaled into the element
 //! exactly like Jasper scales its SVG image.
 
+pub mod barbecue;
 pub mod code128;
 pub mod datamatrix;
 pub mod linear;

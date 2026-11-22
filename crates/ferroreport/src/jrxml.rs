@@ -1266,6 +1266,7 @@ fn barcode_node(n: &Node) -> Option<&Node> {
         "RoyalMailCustomer",
         "USPSIntelligentMail",
         "PDF417",
+        "barbecue",
     ];
     n.children.iter().find(|c| {
         SUPPORTED.contains(&c.name.as_str())
@@ -2106,7 +2107,31 @@ impl Parser {
                     Some("top") => crate::barcode::TextPosition::Top,
                     _ => crate::barcode::TextPosition::Bottom,
                 };
-                let symbology = if name == "EAN128" {
+                let symbology = if name == "barbecue" {
+                    let kind = c.attr("type").unwrap_or("Code128").to_string();
+                    if !crate::barcode::barbecue::TYPES.contains(&kind.as_str()) {
+                        self.warnings.push(format!("barbecue type `{kind}` is not supported yet and is skipped"));
+                    }
+                    if c.child("applicationIdentifierExpression").is_some() {
+                        self.warnings.push("barbecue applicationIdentifierExpression is ignored".into());
+                    }
+                    let whole = |a: &str| c.attr(a).and_then(number::<f64>).filter(|v| *v > 0.0).map(|v| v as u32);
+                    Symbology::Barbecue {
+                        spec: crate::barcode::barbecue::Spec {
+                            kind,
+                            draw_text: !c.attr("drawText").is_some_and(|v| v.eq_ignore_ascii_case("false")),
+                            checksum: c.attr("checksumRequired").is_some_and(|v| v.eq_ignore_ascii_case("true")),
+                            bar_width: whole("barWidth"),
+                            bar_height: whole("barHeight"),
+                        },
+                        rotation: match c.attr("rotation") {
+                            Some("Left") => Rotation::Left,
+                            Some("Right") => Rotation::Right,
+                            Some("UpsideDown") => Rotation::UpsideDown,
+                            _ => Rotation::None,
+                        },
+                    }
+                } else if name == "EAN128" {
                     Symbology::Ean128 {
                         module_width: num("moduleWidth"),
                         text_position: position,

@@ -196,8 +196,8 @@ fn push_pattern(out: &mut Vec<(bool, f64)>, pattern: &str, narrow: f64, wide: f6
 
 // ---------------------------------------------------------------- Code 39
 
-const CODE39_CHARS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
-const CODE39: [&str; 43] = [
+pub(crate) const CODE39_CHARS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
+pub(crate) const CODE39: [&str; 43] = [
     "000110100",
     "100100001",
     "001100001",
@@ -242,7 +242,7 @@ const CODE39: [&str; 43] = [
     "010001010",
     "000101010",
 ];
-const CODE39_STAR: &str = "010010100";
+pub(crate) const CODE39_STAR: &str = "010010100";
 
 /// Full-ASCII Code 39: each character as one or two characters of the basic set.
 fn code39_escape(c: char) -> Result<String, String> {
@@ -331,16 +331,16 @@ fn code39(spec: &Spec, msg: &str, geo: &Geometry) -> Result<Symbol, String> {
 
 // ---------------------------------------------------------------- Interleaved 2 of 5
 
-const I25: [&str; 10] = ["00110", "10001", "01001", "11000", "00101", "10100", "01100", "00011", "10010", "01010"];
+pub(crate) const I25: [&str; 10] = ["00110", "10001", "01001", "11000", "00101", "10100", "01100", "00011", "10010", "01010"];
 
 /// UPC/EAN check digit: weights 3, 1, 3, ... from the rightmost digit.
-fn mod10(digits: &[u8]) -> u8 {
+pub(crate) fn mod10(digits: &[u8]) -> u8 {
     let sum: u32 = digits.iter().rev().enumerate().map(|(i, &d)| d as u32 * if i % 2 == 0 { 3 } else { 1 }).sum();
     ((10 - sum % 10) % 10) as u8
 }
 
 /// Interleaved 2 of 5 check digit as barcode4j computes it: weights 3, 1, 3, ... from the left.
-fn mod10_left(digits: &[u8]) -> u8 {
+pub(crate) fn mod10_left(digits: &[u8]) -> u8 {
     let sum: u32 = digits.iter().enumerate().map(|(i, &d)| d as u32 * if i % 2 == 0 { 3 } else { 1 }).sum();
     ((10 - sum % 10) % 10) as u8
 }
@@ -392,8 +392,8 @@ fn interleaved(spec: &Spec, msg: &str, geo: &Geometry) -> Result<Symbol, String>
 
 // ---------------------------------------------------------------- Codabar
 
-const CODABAR_CHARS: &str = "0123456789-$:/.+abcd";
-const CODABAR: [&str; 20] = [
+pub(crate) const CODABAR_CHARS: &str = "0123456789-$:/.+abcd";
+pub(crate) const CODABAR: [&str; 20] = [
     "0000011", "0000110", "0001001", "1100000", "0010010", "1000010", "0100001", "0100100", "0110000", "1001000", "0001100",
     "0011000", "1000101", "1010001", "1010100", "0010101", "0011010", "0101001", "0001011", "0001110",
 ];
@@ -433,12 +433,12 @@ fn codabar(spec: &Spec, msg: &str, geo: &Geometry) -> Result<Symbol, String> {
 
 // ---------------------------------------------------------------- UPC / EAN
 
-const UPC_L: [&str; 10] =
+pub(crate) const UPC_L: [&str; 10] =
     ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
-const EAN13_PARITY: [&str; 10] =
+pub(crate) const EAN13_PARITY: [&str; 10] =
     ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
 
-fn upc_code(digit: u8, set: char) -> String {
+pub(crate) fn upc_code(digit: u8, set: char) -> String {
     let l = UPC_L[digit as usize];
     match set {
         'L' => l.to_string(),

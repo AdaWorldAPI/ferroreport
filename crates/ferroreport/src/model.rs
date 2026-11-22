@@ -644,6 +644,11 @@ pub enum Symbology {
         gap: Option<f64>,
         add_checksum: bool,
     },
+    /// The `barbecue` component (the Barbecue library), drawn rotated by `rotation`.
+    Barbecue {
+        spec: crate::barcode::barbecue::Spec,
+        rotation: Rotation,
+    },
     /// Royal Mail 4-state (`usps: false`) or USPS Intelligent Mail (sizes in points).
     FourState {
         usps: bool,
@@ -667,6 +672,7 @@ impl Symbology {
             Symbology::Pdf417 { .. } => "PDF417",
             Symbology::Postnet { .. } => "POSTNET",
             Symbology::FourState { usps: true, .. } => "USPSIntelligentMail",
+            Symbology::Barbecue { .. } => "barbecue",
             Symbology::FourState { .. } => "RoyalMailCustomer",
         }
     }

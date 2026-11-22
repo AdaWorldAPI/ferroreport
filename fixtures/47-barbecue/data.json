@@ -1,0 +1,82 @@
+[
+ {
+  "sku": "SKU-1000-A",
+  "name": "Item 1"
+ },
+ {
+  "sku": "SKU-1037-B",
+  "name": "Item 2"
+ },
+ {
+  "sku": "SKU-1074-C",
+  "name": "Item 3"
+ },
+ {
+  "sku": "SKU-1111-D",
+  "name": "Item 4"
+ },
+ {
+  "sku": "SKU-1148-E",
+  "name": "Item 5"
+ },
+ {
+  "sku": "SKU-1185-F",
+  "name": "Item 6"
+ },
+ {
+  "sku": "SKU-1222-G",
+  "name": "Item 7"
+ },
+ {
+  "sku": "SKU-1259-H",
+  "name": "Item 8"
+ },
+ {
+  "sku": "SKU-1296-I",
+  "name": "Item 9"
+ },
+ {
+  "sku": "SKU-1333-J",
+  "name": "Item 10"
+ },
+ {
+  "sku": "SKU-1370-K",
+  "name": "Item 11"
+ },
+ {
+  "sku": "SKU-1407-L",
+  "name": "Item 12"
+ },
+ {
+  "sku": "SKU-1444-M",
+  "name": "Item 13"
+ },
+ {
+  "sku": "SKU-1481-N",
+  "name": "Item 14"
+ },
+ {
+  "sku": "SKU-1518-O",
+  "name": "Item 15"
+ },
+ {
+  "sku": "SKU-1555-P",
+  "name": "Item 16"
+ },
+ {
+  "sku": "SKU-1592-Q",
+  "name": "Item 17"
+ },
+ {
+  "sku": "SKU-1629-R",
+  "name": "Item 18"
+ },
+ {
+  "sku": "SKU-1666-S",
+  "name": "Item 19"
+ },
+ {
+  "sku": "SKU-1703-T",
+  "name": "Item 20"
+ }
+]
