@@ -15,6 +15,8 @@ What it checks:
   a client leaves    half way through a report: the render stops and nothing is left behind
   a row is wrong     the whole-document answer is an error and not one byte of document; the
                      as-it-renders answer ends in a way no client takes for a complete document
+  answers on time    a client offering HTTP/2 gets its answer; a wrong template sent with many
+                     rows gets its error every time, not a reset connection
   speed              POST /render for small reports, to compare with another build (--against)
 
 Exit status 0 when every check passes. Linux only (reads /proc for memory).
@@ -22,6 +24,7 @@ Exit status 0 when every check passes. Linux only (reads /proc for memory).
 import argparse
 import hashlib
 import http.client
+import itertools
 import json
 import os
 import pathlib
@@ -337,6 +340,31 @@ def speed(server, runs=400):
     return out
 
 
+def answers_on_time(server, checks):
+    """A client offering HTTP/2 (Java's HttpClient does on its first request) keeps its connection
+    open after its body: it gets its answer all the same. A wrong template sent with many rows is
+    answered with its error, the rows read and discarded rather than left to reset the connection."""
+    body = json.dumps({"template": '<jasperReport name="t"/>'}).encode()
+    sock = socket.create_connection(("127.0.0.1", server.port), timeout=10)
+    try:
+        sock.sendall((f"POST /inspect HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\n"
+                      f"HTTP2-Settings: AAEAAEAAAAIAAAABAAMAAABkAAQBAAAAAAUAAEAA\r\nAuthorization: Bearer {TOKEN}\r\n"
+                      f"Content-Length: {len(body)}\r\n\r\n").encode() + body)
+        got = sock.recv(64)
+    except OSError as e:
+        got = repr(e).encode()
+    finally:
+        sock.close()
+    checks.add("a client that offers HTTP/2 is answered", got.startswith(b"HTTP/1.1 200"), got.decode(errors="replace").split("\r\n")[0])
+    answered = 0
+    for _ in range(10):
+        rows = many_rows(50_000)()
+        head = json.dumps({"template": "<jasperReport"}).encode() + b"\n"
+        status, _, got = server.request("POST", "/render", itertools.chain([head], rows), {"Content-Type": NDJSON})
+        answered += status == 422 and b"XML" in got
+    checks.add("a wrong template sent with rows is answered", answered == 10, f"{answered} of 10 times with its error")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bin", default=str(ROOT / "target" / "release" / "ferroreport"))
@@ -353,6 +381,7 @@ def main():
     try:
         same_documents(binary, server, checks, tmp)
         a_row_is_wrong(server, checks, 20_000)
+        answers_on_time(server, checks)
         a_client_leaves(server, checks, max(args.rows // 5, 50_000))
     finally:
         server.stop()

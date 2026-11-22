@@ -965,8 +965,15 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
 /// Reads what the client is still sending of a request answered before its end (a wrong
 /// template, a row that fails): a connection closed with data left unread is reset, and the
 /// client can lose the answer with it. Up to a limit, past which the answer goes as it is.
+/// Not for a client that offers to switch protocols: its body is read by its length, and what
+/// follows on its connection only ends when the client closes it.
 fn drain(req: &mut Request) {
     const LIMIT: u64 = 256 * 1024 * 1024;
+    let upgrade =
+        req.headers().iter().any(|h| h.field.equiv("Connection") && h.value.as_str().to_ascii_lowercase().contains("upgrade"));
+    if upgrade {
+        return;
+    }
     let _ = std::io::copy(&mut req.as_reader().take(LIMIT), &mut std::io::sink());
 }
 
