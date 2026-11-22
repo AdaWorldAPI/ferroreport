@@ -142,3 +142,18 @@ def test_own_template_format(tmp_path):
     assert '<element kind="textField"' in ferroreport.convert(ferro, to="jrxml")
     with pytest.raises(ferroreport.FerroreportError):
         ferroreport.convert(ferro, to="docx")
+
+
+def test_pdfa_with_an_attachment(tmp_path):
+    fx = FIXTURES / "02-invoice"
+    import json
+
+    data = json.loads((fx / "data.json").read_text())
+    params = json.loads((fx / "params.json").read_text())
+    xml = tmp_path / "invoice.xml"
+    xml.write_text("<invoice/>")
+    pdf = ferroreport.render(fx / "report.jrxml", data, params, pdfa="3b", attachments=[xml, ("notes.txt", "hello", "text/plain")])
+    assert b"<pdfaid:part>3</pdfaid:part>" in pdf
+    assert b"/EmbeddedFiles" in pdf and b"(notes.txt)" in pdf
+    with pytest.raises(ferroreport.FerroreportError):
+        ferroreport.render(fx / "report.jrxml", data, params, pdfa="9z")

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Summarizes a veraPDF XML report: each failed rule, how many files fail it, and an example."""
+"""Summarizes a veraPDF XML report: each failed rule, how many files fail it, and an example.
+
+Usage: pdfua_summary.py report.xml [what the files are checked against, default PDF/UA-1]"""
 import sys
 import xml.etree.ElementTree as ET
 
@@ -29,5 +31,6 @@ for job in root.iter("job"):
 for key, e in sorted(rules.items(), key=lambda kv: -len(kv[1]["files"])):
     print(f"{key} ({len(e['files'])} files): {e['description']}")
     print(f"    e.g. {e['files'][0]}: {e['example'][:300]}")
-print(f"\n{passed} of {passed + failed} PDFs comply with PDF/UA-1")
+standard = sys.argv[2] if len(sys.argv) > 2 else "PDF/UA-1"
+print(f"\n{passed} of {passed + failed} PDFs comply with {standard}")
 sys.exit(1 if failed else 0)

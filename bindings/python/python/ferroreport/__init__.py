@@ -61,6 +61,26 @@ def _load_template(template: Union[PathLike, str]) -> "tuple[str, Optional[str]]
     return source, os.path.dirname(os.path.abspath(text))
 
 
+_MIME = {".xml": "text/xml", ".json": "application/json", ".csv": "text/csv", ".txt": "text/plain", ".pdf": "application/pdf"}
+
+
+def _attachments(files: Optional[Iterable[Any]]) -> "list[tuple[str, bytes, str]]":
+    """(name, bytes, mime type) for each attachment, given as such a tuple or as a path."""
+    out = []
+    for f in files or []:
+        if isinstance(f, tuple):
+            name, data = f[0], f[1]
+            mime = f[2] if len(f) > 2 else "application/octet-stream"
+            out.append((str(name), data.encode("utf-8") if isinstance(data, str) else bytes(data), mime))
+        else:
+            path = os.fspath(f)
+            with open(path, "rb") as fh:
+                data = fh.read()
+            ext = os.path.splitext(path)[1].lower()
+            out.append((os.path.basename(path), data, _MIME.get(ext, "application/octet-stream")))
+    return out
+
+
 def _is_stream(data: Any) -> bool:
     """Whether `data` is rows that arrive one at a time (a generator, a database cursor)
     rather than a list or JSON text."""
@@ -124,6 +144,8 @@ def render(
     timeout: Optional[float] = None,
     csv_safe: bool = False,
     tagged: bool = False,
+    pdfa: Optional[str] = None,
+    attachments: Optional[Iterable[Any]] = None,
     xlsx_numbers: bool = False,
 ) -> bytes:
     """Renders a template and returns the file's bytes: PDF by default, or an Excel workbook
@@ -148,6 +170,10 @@ def render(
         other people.
     csv_safe: in CSV, put an apostrophe before values a spreadsheet would run as a formula.
     tagged: in PDF, say what the content is (tagged PDF), for screen readers.
+    pdfa: write PDF/A, for archiving: "2b", "2u", "2a", "3b", "3u" or "3a" (level a is also
+        tagged). Every font must be inside the document.
+    attachments: files carried inside the PDF (PDF/A-3 allows them), as (name, bytes, mime
+        type) tuples or paths, such as the XML of an electronic invoice.
     xlsx_numbers: in Excel, write numbers as numbers instead of formatted text.
     """
     source, dirs, mem = _prepare(template, resources, resource_dirs)
@@ -168,6 +194,8 @@ def render(
             xlsx_numbers,
             spooled.path if spooled else None,
             tagged=tagged,
+            pdfa=pdfa,
+            attachments=_attachments(attachments),
         )[0]
     except ValueError as e:
         raise FerroreportError(str(e)) from None
@@ -192,6 +220,8 @@ def render_to_file(
     timeout: Optional[float] = None,
     csv_safe: bool = False,
     tagged: bool = False,
+    pdfa: Optional[str] = None,
+    attachments: Optional[Iterable[Any]] = None,
     xlsx_numbers: bool = False,
 ) -> dict:
     """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
@@ -230,6 +260,8 @@ def render_to_file(
             os.fspath(data_file) if data_file is not None else None,
             os.fspath(output),
             tagged=tagged,
+            pdfa=pdfa,
+            attachments=_attachments(attachments),
         )
     except ValueError as e:
         raise FerroreportError(str(e)) from None

@@ -642,6 +642,20 @@ impl Parser {
                     ],
                     tagged: property("tagged").is_some_and(|v| v.trim().eq_ignore_ascii_case("true")),
                     language: property("tag.language").map(|v| v.trim().replace('_', "-")).filter(|v| !v.is_empty()),
+                    pdfa: root
+                        .children_named("property")
+                        .find(|p| p.attr("name") == Some("net.sf.jasperreports.export.pdfa.conformance"))
+                        .and_then(|p| p.attr("value"))
+                        .map(str::trim)
+                        .filter(|v| !v.is_empty() && !v.eq_ignore_ascii_case("none"))
+                        .map(|v| {
+                            crate::pdf::PdfA::parse(v).ok_or_else(|| {
+                                Error::template(format!(
+                                    "net.sf.jasperreports.export.pdfa.conformance=\"{v}\": say pdfa2b, pdfa2u, pdfa2a, pdfa3b, pdfa3u or pdfa3a"
+                                ))
+                            })
+                        })
+                        .transpose()?,
                 }
             },
             warnings: Vec::new(),

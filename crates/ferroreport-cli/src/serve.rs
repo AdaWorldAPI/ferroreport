@@ -293,6 +293,7 @@ struct Job {
     now: Option<String>,
     csv_safe: bool,
     tagged: bool,
+    pdfa: Option<ferroreport::pdf::PdfA>,
     xlsx_numbers: bool,
     limits: ferroreport::Limits,
     params: serde_json::Value,
@@ -395,6 +396,12 @@ fn prepare(
         now,
         csv_safe: flag("csvSafe"),
         tagged: flag("tagged"),
+        pdfa: match body.get("pdfa").and_then(|v| v.as_str()) {
+            Some(v) => {
+                Some(ferroreport::pdf::PdfA::parse(v).ok_or_else(|| bad(format!("pdfa \"{v}\": say 2b, 2u, 2a, 3b, 3u or 3a")))?)
+            }
+            None => None,
+        },
         xlsx_numbers: flag("xlsxNumbers"),
         limits: cfg.limits,
         params: body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default())),
@@ -414,6 +421,7 @@ impl Job {
             .locale(&self.locale)
             .limits(self.limits)
             .tagged(self.tagged)
+            .pdfa(self.pdfa)
             .csv_options(ferroreport::csv::CsvOptions { guard_formulas: self.csv_safe, ..Default::default() })
             .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: self.xlsx_numbers });
         for d in &self.dirs {

@@ -33,7 +33,10 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
 ///   format?: "pdf" | "xlsx" | "docx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
-///   tagged?: boolean }` (`tagged` writes a tagged PDF, for screen readers).
+///   tagged?: boolean, pdfa?: "2b" | "2u" | "2a" | "3b" | "3u" | "3a",
+///   attachments?: { name: string, data: Uint8Array | string, mime?: string }[] }`
+///   (`tagged` writes a tagged PDF, for screen readers; `pdfa` a PDF/A document, for archiving;
+///   `attachments` are files carried inside the PDF, which PDF/A-3 allows).
 ///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
 ///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
 ///   numbers in Excel instead of formatted text.
@@ -50,6 +53,30 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
         .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: get(&options, "xlsxNumbers").is_truthy() })
         .tagged(get(&options, "tagged").is_truthy())
         .csv_options(ferroreport::csv::CsvOptions { guard_formulas: get(&options, "csvSafe").is_truthy(), ..Default::default() });
+    if let Some(p) = get(&options, "pdfa").as_string() {
+        let pdfa = ferroreport::pdf::PdfA::parse(&p)
+            .ok_or_else(|| JsError::new(&format!("pdfa \"{p}\": say 2b, 2u, 2a, 3b, 3u or 3a")))?;
+        r = r.pdfa(Some(pdfa));
+    }
+    let files = get(&options, "attachments");
+    if js_sys::Array::is_array(&files) {
+        for f in js_sys::Array::from(&files).iter() {
+            let name = get(&f, "name").as_string().ok_or_else(|| JsError::new("an attachment needs a name"))?;
+            let data = get(&f, "data");
+            let bytes = match data.as_string() {
+                Some(s) => s.into_bytes(),
+                None => js_sys::Uint8Array::new(&data).to_vec(),
+            };
+            let mime = get(&f, "mime").as_string().unwrap_or_else(|| "application/octet-stream".into());
+            r = r.attach(ferroreport::pdf::Attachment {
+                name,
+                data: std::sync::Arc::new(bytes),
+                mime,
+                description: None,
+                relationship: "Data".into(),
+            });
+        }
+    }
 
     // `new Date()` in expressions: the given value, or the current time from JavaScript.
     let now = get(&options, "now");

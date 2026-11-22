@@ -581,6 +581,8 @@ pub struct PdfSettings {
     pub tagged: bool,
     /// `tag.language`: the language of the text (`es-DO`), instead of the renderer's locale.
     pub language: Option<String>,
+    /// `net.sf.jasperreports.export.pdfa.conformance` (`pdfa2b`...): write PDF/A.
+    pub pdfa: Option<crate::pdf::PdfA>,
 }
 
 impl Report {

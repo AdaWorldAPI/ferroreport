@@ -33,6 +33,11 @@ RENDER OPTIONS:
                                 like JasperReports)
         --csv-safe              In CSV, put an apostrophe before values a spreadsheet would
                                 run as a formula (use it when the data comes from other people)
+        --pdfa <2b|2u|2a|3b|3u|3a>
+                                Write PDF/A, for archiving (every font embedded, sRGB, the
+                                conformance in the metadata; level a is also tagged)
+        --attach <file[:mime]>  Carry a file inside the PDF (repeatable; PDF/A-3 allows it),
+                                such as the XML of an electronic invoice
         --tagged                In PDF, say what the content is (tagged PDF) for screen readers:
                                 texts as paragraphs, images as figures, the rest as decoration
         --max-pages <n>         Stop if the report goes over this many pages
@@ -142,6 +147,21 @@ impl Drop for RemoveOnDrop {
     }
 }
 
+/// The MIME type of an attached file, by its extension.
+fn guess_mime(path: &str) -> &'static str {
+    match Path::new(path).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("xml") => "text/xml",
+        Some("json") => "application/json",
+        Some("csv") => "text/csv",
+        Some("txt") => "text/plain",
+        Some("pdf") => "application/pdf",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        _ => "application/octet-stream",
+    }
+}
+
 fn convert(args: &[String]) -> CliResult {
     let mut input = None;
     let mut output = None;
@@ -201,6 +221,8 @@ fn render(args: &[String]) -> CliResult {
     let mut xlsx_numbers = false;
     let mut csv_safe = false;
     let mut tagged = false;
+    let mut pdfa = None;
+    let mut attachments = Vec::new();
     let mut limits = ferroreport::Limits::default();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -211,6 +233,12 @@ fn render(args: &[String]) -> CliResult {
             "--xlsx-numbers" => xlsx_numbers = true,
             "--csv-safe" => csv_safe = true,
             "--tagged" => tagged = true,
+            "--pdfa" => {
+                let v = value(a)?;
+                pdfa =
+                    Some(ferroreport::pdf::PdfA::parse(&v).ok_or_else(|| format!("--pdfa {v}: say 2b, 2u, 2a, 3b, 3u or 3a"))?);
+            }
+            "--attach" => attachments.push(value(a)?),
             "--max-pages" => limits.max_pages = Some(value(a)?.parse().map_err(|_| "--max-pages expects a number")?),
             "--timeout" => {
                 let secs: f64 = value(a)?.parse().map_err(|_| "--timeout expects seconds")?;
@@ -251,7 +279,24 @@ fn render(args: &[String]) -> CliResult {
         .limits(limits)
         .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
         .tagged(tagged)
+        .pdfa(pdfa)
         .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
+    for spec in &attachments {
+        // file[:mime type]
+        let (path, mime) = match spec.rsplit_once(':').filter(|(_, m)| m.contains('/')) {
+            Some((p, m)) => (p, m.to_string()),
+            None => (spec.as_str(), guess_mime(spec).to_string()),
+        };
+        let data = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+        let name = Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
+        renderer = renderer.attach(ferroreport::pdf::Attachment {
+            name,
+            data: std::sync::Arc::new(data),
+            mime,
+            description: None,
+            relationship: "Data".into(),
+        });
+    }
     for dir in &resources {
         renderer = renderer.resource_dir(dir);
     }

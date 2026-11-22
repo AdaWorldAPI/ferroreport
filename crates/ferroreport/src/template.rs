@@ -338,6 +338,7 @@ const SECTIONS: &[&str] = &["detail", "groupHeader", "groupFooter"];
 const TAG_PROPERTY: &str = "net.sf.jasperreports.export.accessibility.tag";
 const TAGGED_PROPERTY: &str = "net.sf.jasperreports.export.pdf.tagged";
 const LANGUAGE_PROPERTY: &str = "net.sf.jasperreports.export.pdf.tag.language";
+const PDFA_PROPERTY: &str = "net.sf.jasperreports.export.pdfa.conformance";
 
 /// Classes that may be written without their package.
 const CLASSES: &[(&str, &str)] = &[
@@ -417,6 +418,7 @@ fn report(root: &Item) -> Result<Node> {
     let mut margins: Option<String> = None;
     let mut lang = None;
     let mut tagged = true;
+    let mut pdfa = None;
     let mut attrs = Vec::new();
     for (k, v) in std::mem::take(&mut out.attrs) {
         match k.as_str() {
@@ -434,6 +436,7 @@ fn report(root: &Item) -> Result<Node> {
             "margins" => margins = Some(v),
             "lang" => lang = Some(v),
             "tagged" => tagged = v != "false",
+            "pdfa" => pdfa = Some(v),
             _ => attrs.push((k, v)),
         }
     }
@@ -481,6 +484,10 @@ fn report(root: &Item) -> Result<Node> {
     }
     if let Some(lang) = lang.filter(|_| !has_prop(&out, LANGUAGE_PROPERTY)) {
         props.push(property(LANGUAGE_PROPERTY, &lang));
+    }
+    if let Some(p) = pdfa.filter(|_| !has_prop(&out, PDFA_PROPERTY)) {
+        let value = if p.to_ascii_lowercase().starts_with("pdfa") { p } else { format!("pdfa{p}") };
+        props.push(property(PDFA_PROPERTY, &value));
     }
     out.children.splice(0..0, props);
     order_report(&mut out);
@@ -780,6 +787,13 @@ impl Writer {
         if let Some(i) = prop(LANGUAGE_PROPERTY) {
             if let Some(v) = root.children[i].attr("value") {
                 extra.insert(0, ("lang".to_string(), v.to_string()));
+                skip.push(i);
+            }
+        }
+        if let Some(i) = prop(PDFA_PROPERTY) {
+            if let Some(v) = root.children[i].attr("value") {
+                let v = v.trim();
+                extra.push(("pdfa".to_string(), v.strip_prefix("pdfa").unwrap_or(v).to_string()));
                 skip.push(i);
             }
         }

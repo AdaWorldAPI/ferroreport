@@ -29,7 +29,55 @@ pub struct PdfOptions {
     pub lang: Option<String>,
     /// Where pages are moved to, odd pages then even ones (x right, y down, in points).
     pub page_offsets: [[f32; 2]; 2],
+    /// Write a PDF/A document (for archiving): fonts embedded, an sRGB output intent, the
+    /// conformance declared in the metadata.
+    pub pdfa: Option<PdfA>,
+    /// Files carried inside the document (PDF/A-3 allows them; an e-invoice's XML, say).
+    pub attachments: Vec<Attachment>,
 }
+
+/// A PDF/A conformance: part 2 or 3, level A (tagged), B (basic) or U (text extractable).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PdfA {
+    pub part: u8,
+    pub level: char,
+}
+
+impl PdfA {
+    /// `2b`, `pdfa3u`, `PDF/A-2a`... (`1a` and `1b` are written as part 2, which keeps their
+    /// rules and allows transparency).
+    pub fn parse(s: &str) -> Option<PdfA> {
+        let t: String = s.to_ascii_lowercase().chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let t = t.strip_prefix("pdfa").unwrap_or(&t);
+        let mut chars = t.chars();
+        let part = chars.next()?.to_digit(10)? as u8;
+        let level = chars.next()?.to_ascii_uppercase();
+        if chars.next().is_some() || !matches!(level, 'A' | 'B' | 'U') {
+            return None;
+        }
+        match part {
+            1 | 2 => Some(PdfA { part: 2, level }),
+            3 => Some(PdfA { part: 3, level }),
+            _ => None,
+        }
+    }
+}
+
+/// A file carried inside a PDF.
+#[derive(Debug, Clone)]
+pub struct Attachment {
+    pub name: String,
+    pub data: std::sync::Arc<Vec<u8>>,
+    /// Its MIME type (`text/xml`).
+    pub mime: String,
+    pub description: Option<String>,
+    /// How it relates to the document: `Data`, `Source`, `Alternative`, `Supplement` or
+    /// `Unspecified` (PDF/A-3's `AFRelationship`).
+    pub relationship: String,
+}
+
+/// The sRGB profile of PDF/A output intents (CC0, see assets/icc/README.md).
+const SRGB_ICC: &[u8] = include_bytes!("../assets/icc/sRGB-v4.icc");
 
 /// Compresses a stream. Level 3 is about twice as fast as the default level 6 and only
 /// ~8% larger (still a quarter of the size of JasperReports' output).
@@ -683,6 +731,17 @@ impl<W: std::io::Write> PdfStream<W> {
             pages: Vec::new(),
             tags: None,
         };
+        if let Some(a) = pdf.options.pdfa {
+            // Level A is about the structure: the document is tagged.
+            if a.level == 'A' {
+                pdf.options.tagged = true;
+            }
+            if a.part == 2 && !pdf.options.attachments.is_empty() {
+                return Err(Error::Unsupported(
+                    "PDF/A-2 allows only PDF/A documents as attachments: ask for PDF/A-3 (3b) to attach other files".into(),
+                ));
+            }
+        }
         if pdf.options.tagged {
             let (root, document) = (pdf.next_id(), pdf.next_id());
             pdf.tags = Some(Tags { root, document, pages: Vec::new() });
@@ -1176,6 +1235,13 @@ impl<W: std::io::Write> PdfStream<W> {
                         continue;
                     }
                     if let Some(font) = t.standard {
+                        if self.options.pdfa.is_some() {
+                            return Err(Error::Unsupported(format!(
+                                "PDF/A needs every font inside the document, and the text \"{}\" is in {}, a PDF standard font that is not: give it a font that is available (fontName; DejaVu Sans, Serif and Mono are bundled, others with --font), as JasperReports also requires",
+                                t.lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" ").chars().take(40).collect::<String>(),
+                                crate::standard::STANDARD[font.font as usize].0
+                            )));
+                        }
                         self.standard.insert(font.font);
                         draw_standard(&mut c, t, font, ph);
                         continue;
@@ -1424,6 +1490,78 @@ impl<W: std::io::Write> PdfStream<W> {
     /// Pages added so far.
     pub fn page_count(&self) -> usize {
         self.pages.len()
+    }
+
+    /// The document's metadata packet: its title and producer, and what it conforms to
+    /// (PDF/UA-1 when tagged, the PDF/A part and level when asked).
+    fn xmp(&self, tagged: bool) -> String {
+        let title = crate::xlsx::escape(self.options.title.as_deref().unwrap_or(""));
+        let mut ids = String::new();
+        let mut namespaces = String::new();
+        if let Some(a) = self.options.pdfa {
+            namespaces.push_str(" xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\"");
+            ids.push_str(&format!(
+                "<pdfaid:part>{}</pdfaid:part>\n<pdfaid:conformance>{}</pdfaid:conformance>\n",
+                a.part, a.level
+            ));
+        }
+        if tagged {
+            namespaces.push_str(" xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\"");
+            ids.push_str("<pdfuaid:part>1</pdfuaid:part>\n");
+        }
+        // PDF/A knows the properties of its own time; PDF/UA's is described for it.
+        let extension = if tagged && self.options.pdfa.is_some() {
+            "<rdf:Description rdf:about=\"\" xmlns:pdfaExtension=\"http://www.aiim.org/pdfa/ns/extension/\" xmlns:pdfaSchema=\"http://www.aiim.org/pdfa/ns/schema#\" xmlns:pdfaProperty=\"http://www.aiim.org/pdfa/ns/property#\">\n<pdfaExtension:schemas><rdf:Bag><rdf:li rdf:parseType=\"Resource\">\n<pdfaSchema:schema>PDF/UA Universal Accessibility Schema</pdfaSchema:schema>\n<pdfaSchema:namespaceURI>http://www.aiim.org/pdfua/ns/id/</pdfaSchema:namespaceURI>\n<pdfaSchema:prefix>pdfuaid</pdfaSchema:prefix>\n<pdfaSchema:property><rdf:Seq><rdf:li rdf:parseType=\"Resource\">\n<pdfaProperty:name>part</pdfaProperty:name>\n<pdfaProperty:valueType>Integer</pdfaProperty:valueType>\n<pdfaProperty:category>internal</pdfaProperty:category>\n<pdfaProperty:description>Indicates, which part of ISO 14289 standard is followed</pdfaProperty:description>\n</rdf:li></rdf:Seq></pdfaSchema:property>\n</rdf:li></rdf:Bag></pdfaExtension:schemas>\n</rdf:Description>\n"
+        } else {
+            ""
+        };
+        format!(
+            "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n{extension}<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"{namespaces}>\n{ids}<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{title}</rdf:li></rdf:Alt></dc:title>\n<pdf:Producer>ferroreport {}</pdf:Producer>\n</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>",
+            env!("CARGO_PKG_VERSION")
+        )
+    }
+
+    /// The file identifier of the trailer: a hash of what makes this document what it is.
+    fn file_id(&self) -> String {
+        let feed = |mut h: u64, bytes: &[u8]| {
+            for b in bytes {
+                h = (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3);
+            }
+            h
+        };
+        let mut h = feed(0xcbf2_9ce4_8422_2325, self.options.title.as_deref().unwrap_or("").as_bytes());
+        h = feed(h, &self.pos.to_le_bytes());
+        h = feed(h, &(self.offsets.len() as u64).to_le_bytes());
+        let b = feed(h, b"ferroreport");
+        format!("{h:016X}{b:016X}")
+    }
+
+    /// Writes the attached files; returns each one's name and file specification.
+    fn write_attachments(&mut self) -> Result<Vec<(String, Ref)>> {
+        let mut out = Vec::new();
+        for file in std::mem::take(&mut self.options.attachments) {
+            let (spec, data) = (self.next_id(), self.next_id());
+            let compressed = deflate(&file.data);
+            let mut chunk = Chunk::new();
+            let mut ef = chunk.embedded_file(data, &compressed);
+            ef.filter(Filter::FlateDecode);
+            ef.subtype(Name(file.mime.as_bytes()));
+            ef.params().size(file.data.len() as i32);
+            ef.finish();
+            self.put(data, &chunk)?;
+            let mut chunk = Chunk::new();
+            let mut fs = chunk.file_spec(spec);
+            fs.path(Str(file.name.as_bytes())).unic_file(TextStr(&file.name));
+            fs.insert(Name(b"EF")).dict().pair(Name(b"F"), data).pair(Name(b"UF"), data);
+            if let Some(d) = &file.description {
+                fs.description(TextStr(d));
+            }
+            fs.pair(Name(b"AFRelationship"), Name(file.relationship.as_bytes()));
+            fs.finish();
+            self.put(spec, &chunk)?;
+            out.push((file.name, spec));
+        }
+        Ok(out)
     }
 
     /// Writes the link annotations of each page.
@@ -1942,7 +2080,7 @@ impl<W: std::io::Write> PdfStream<W> {
         self.put(tree_id, &chunk)?;
         // The structure tree of a tagged PDF: the document, a section per page, and the way
         // back from each page's content.
-        let mut metadata = None;
+        let mut structure = None;
         if let Some(tags) = self.tags.take() {
             use pdf_writer::types::StructRole;
             let mut chunk = Chunk::new();
@@ -1976,38 +2114,76 @@ impl<W: std::io::Write> PdfStream<W> {
             root.parent_tree_next_key((tags.pages.len() as i32).max(next));
             root.finish();
             self.put(tags.root, &chunk)?;
-            // The title where assistive software looks for it.
+            structure = Some(tags.root);
+        }
+        // The metadata: the title where assistive software looks for it, and what the
+        // document conforms to.
+        let metadata = if structure.is_some() || self.options.pdfa.is_some() {
             let id = self.next_id();
-            let title = self.options.title.clone().unwrap_or_default();
-            let packet = format!(
-                "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\" xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\">\n<pdfuaid:part>1</pdfuaid:part>\n<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>\n<pdf:Producer>ferroreport {}</pdf:Producer>\n</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>",
-                crate::xlsx::escape(&title),
-                env!("CARGO_PKG_VERSION")
-            );
+            let packet = self.xmp(structure.is_some());
             let mut chunk = Chunk::new();
             chunk.metadata(id, packet.as_bytes());
             self.put(id, &chunk)?;
-            metadata = Some((id, tags.root));
-        }
+            Some(id)
+        } else {
+            None
+        };
+        // PDF/A: the colors are sRGB.
+        let intent = if self.options.pdfa.is_some() {
+            let id = self.next_id();
+            let mut chunk = Chunk::new();
+            chunk.icc_profile(id, SRGB_ICC).n(3).range([0.0, 1.0, 0.0, 1.0, 0.0, 1.0]);
+            self.put(id, &chunk)?;
+            Some(id)
+        } else {
+            None
+        };
+        let attached = self.write_attachments()?;
         let mut chunk = Chunk::new();
         let mut catalog = chunk.indirect(catalog_id).start::<pdf_writer::writers::Catalog>();
         catalog.pages(tree_id);
-        if let Some((xmp, root)) = metadata {
+        if let Some(xmp) = metadata {
+            catalog.metadata(xmp);
+        }
+        if let Some(root) = structure {
             catalog.pair(Name(b"StructTreeRoot"), root);
             catalog.mark_info().marked(true);
-            catalog.metadata(xmp);
             catalog.viewer_preferences().display_doc_title(true);
             catalog.lang(TextStr(self.options.lang.as_deref().unwrap_or("en-US")));
+        }
+        if let Some(profile) = intent {
+            let mut intents = catalog.output_intents();
+            intents
+                .push()
+                .subtype(pdf_writer::types::OutputIntentSubtype::PDFA)
+                .output_condition_identifier(TextStr("sRGB"))
+                .registry_name(TextStr("http://www.color.org"))
+                .info(TextStr("sRGB IEC61966-2.1"))
+                .dest_output_profile(profile);
+        }
+        if !attached.is_empty() {
+            catalog.insert(Name(b"AF")).array().items(attached.iter().map(|(_, id)| *id));
         }
         if let Some(form) = acroform {
             catalog.pair(Name(b"AcroForm"), form);
         }
-        if !dests.is_empty() {
+        if !dests.is_empty() || !attached.is_empty() {
             let mut names = catalog.names();
-            let mut tree = names.destinations();
-            let mut entries = tree.names();
-            for (name, id) in &dests {
-                entries.insert(Str(name.as_bytes()), *id);
+            if !dests.is_empty() {
+                let mut tree = names.destinations();
+                let mut entries = tree.names();
+                for (name, id) in &dests {
+                    entries.insert(Str(name.as_bytes()), *id);
+                }
+            }
+            if !attached.is_empty() {
+                let mut tree = names.embedded_files();
+                let mut entries = tree.names();
+                let mut sorted = attached.clone();
+                sorted.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+                for (name, id) in &sorted {
+                    entries.insert(Str(name.as_bytes()), *id);
+                }
             }
         }
         if let Some(outline) = outline {
@@ -2033,9 +2209,10 @@ impl<W: std::io::Write> PdfStream<W> {
         }
         end.extend_from_slice(
             format!(
-                "trailer\n<<\n  /Size {}\n  /Root 1 0 R\n  /Info 3 0 R\n>>\nstartxref\n{}\n%%EOF",
+                "trailer\n<<\n  /Size {}\n  /Root 1 0 R\n  /Info 3 0 R\n  /ID [<{id}> <{id}>]\n>>\nstartxref\n{}\n%%EOF",
                 self.offsets.len() + 1,
-                self.pos
+                self.pos,
+                id = self.file_id()
             )
             .as_bytes(),
         );

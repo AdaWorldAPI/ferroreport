@@ -125,6 +125,8 @@ pub struct Renderer {
     csv: csv::CsvOptions,
     html: html::HtmlOptions,
     tagged: bool,
+    pdfa: Option<pdf::PdfA>,
+    attachments: Vec<pdf::Attachment>,
 }
 
 impl Default for Renderer {
@@ -143,6 +145,8 @@ impl Renderer {
             limits: Limits::default(),
             xlsx: Default::default(),
             tagged: false,
+            pdfa: None,
+            attachments: Vec::new(),
             csv: Default::default(),
             html: Default::default(),
         }
@@ -176,8 +180,26 @@ impl Renderer {
         self
     }
 
+    /// Writes PDF/A documents, for archiving: every font inside the document (a text in a PDF
+    /// standard font is an error, as in JasperReports), an sRGB output intent, the conformance
+    /// in the metadata. Level A also tags the document. Overrides the template's
+    /// `net.sf.jasperreports.export.pdfa.conformance`.
+    pub fn pdfa(mut self, pdfa: Option<pdf::PdfA>) -> Renderer {
+        self.pdfa = pdfa;
+        self
+    }
+
+    /// Carries a file inside the PDFs written (an e-invoice's XML, say). With PDF/A, only
+    /// PDF/A-3 allows it.
+    pub fn attach(mut self, file: pdf::Attachment) -> Renderer {
+        self.attachments.push(file);
+        self
+    }
+
     fn pdf_options(&self, title: &str, settings: &model::PdfSettings) -> pdf::PdfOptions {
         pdf::PdfOptions {
+            pdfa: self.pdfa.or(settings.pdfa),
+            attachments: self.attachments.clone(),
             title: Some(title.to_string()),
             compress: true,
             tagged: self.tagged || settings.tagged,

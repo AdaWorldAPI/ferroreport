@@ -1,6 +1,7 @@
 name: PDF/UA
 
-# Tagged PDFs checked against PDF/UA-1 by veraPDF, the validator the PDF Association maintains.
+# Tagged PDFs checked against PDF/UA-1, and PDF/A documents against PDF/A-2a and PDF/A-3b, by
+# veraPDF, the validator the PDF Association maintains.
 on:
   push:
     branches: [main]
@@ -15,6 +16,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release -p ferroreport-cli
       - run: tools/pdfua.sh
+      - if: always()
+        run: tools/pdfa.sh
       - if: always()
         uses: actions/upload-artifact@v5
         with:

@@ -49,6 +49,8 @@ public final class Report {
     private LocalDateTime now;
     private boolean csvSafe;
     private boolean tagged;
+    private String pdfa;
+    private final java.util.List<Path> attachments = new java.util.ArrayList<>();
     private boolean xlsxNumbers;
 
     Report(Ferroreport engine, Path template, String source, String name) {
@@ -125,6 +127,21 @@ public final class Report {
     /** Fixes the value of {@code new Date()} in the template's expressions, for reproducible output. */
     public Report now(LocalDateTime now) {
         this.now = Objects.requireNonNull(now, "now");
+        return this;
+    }
+
+    /**
+     * Writes PDF/A, for archiving: {@code "2b"}, {@code "2u"}, {@code "2a"}, {@code "3b"}, {@code "3u"} or
+     * {@code "3a"} (level a is also tagged). Every font must be inside the document.
+     */
+    public Report pdfa(String conformance) {
+        this.pdfa = conformance;
+        return this;
+    }
+
+    /** Carries a file inside the PDF (PDF/A-3 allows it), such as the XML of an electronic invoice. Local engine only. */
+    public Report attach(Path file) {
+        this.attachments.add(file);
         return this;
     }
 
@@ -243,6 +260,14 @@ public final class Report {
             if (tagged) {
                 cmd.add("--tagged");
             }
+            if (pdfa != null) {
+                cmd.add("--pdfa");
+                cmd.add(pdfa);
+            }
+            for (Path file : attachments) {
+                cmd.add("--attach");
+                cmd.add(file.toString());
+            }
             if (csvSafe) {
                 cmd.add("--csv-safe");
             }
@@ -352,6 +377,10 @@ public final class Report {
             }
             if (tagged) {
                 head.append(",\"tagged\":true");
+            }
+            if (pdfa != null) {
+                head.append(",\"pdfa\":");
+                Json.string(pdfa, head);
             }
             if (csvSafe) {
                 head.append(",\"csvSafe\":true");
