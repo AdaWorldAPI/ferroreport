@@ -364,7 +364,44 @@ pub struct Element {
     pub print_when_group_changes: Option<String>,
     /// Style variants selected by conditional-style expressions.
     pub conditional: Option<Box<ConditionalStyles>>,
+    /// What the element is in the structure of a tagged PDF, when it is more than a text or
+    /// a picture.
+    pub tag: Option<Tag>,
     pub kind: ElementKind,
+}
+
+/// What an element is in the structure of a tagged PDF: set with the property
+/// `net.sf.jasperreports.export.accessibility.tag` (`h1` to `h6`, `table`, `th`, `td`), and
+/// by tables and crosstabs for their own cells.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Tag {
+    /// A heading of this level (1 to 6).
+    Heading(u8),
+    Table,
+    /// A cell that names a column.
+    HeaderCell,
+    /// A cell that names a row.
+    RowHeaderCell,
+    DataCell,
+}
+
+impl Tag {
+    /// The tag a property value names.
+    pub fn parse(value: &str) -> Option<Tag> {
+        Some(match value.trim().to_ascii_lowercase().as_str() {
+            "h1" => Tag::Heading(1),
+            "h2" => Tag::Heading(2),
+            "h3" => Tag::Heading(3),
+            "h4" => Tag::Heading(4),
+            "h5" => Tag::Heading(5),
+            "h6" => Tag::Heading(6),
+            "table" => Tag::Table,
+            "th" | "columnheader" => Tag::HeaderCell,
+            "rowheader" => Tag::RowHeaderCell,
+            "td" => Tag::DataCell,
+            _ => return None,
+        })
+    }
 }
 
 /// The style-dependent parts of an element.

@@ -427,6 +427,8 @@ struct DeferredText {
     group: Option<String>,
     /// For `evaluationTime="Auto"`: what the element still waits for.
     auto: Option<Box<Auto>>,
+    /// What the text is in a tagged PDF (a heading).
+    tag: Option<Tag>,
 }
 
 /// A text field with `evaluationTime="Auto"`: each variable of its expression is read at the
@@ -643,6 +645,14 @@ fn text_value_full(content: &TextContent, scope: &dyn Scope, env: &EvalEnv) -> R
     }
 }
 
+/// A text item with what it is in a tagged PDF (a heading), when its element says so.
+fn tagged(mut item: PrintItem, tag: Option<Tag>) -> PrintItem {
+    if let (Some(_), PrintItem::Cell(info, _)) = (tag, &mut item) {
+        Arc::make_mut(info).tag = tag;
+    }
+    item
+}
+
 /// Wraps the item drawing a text element with what non-PDF exporters need.
 #[allow(clippy::too_many_arguments)]
 fn cell_item(
@@ -659,6 +669,7 @@ fn cell_item(
 ) -> PrintItem {
     let (text, runs) = printed_text(fonts, te, color, w, h, &value.text);
     let info = CellInfo {
+        tag: None,
         x,
         y,
         w,
@@ -898,6 +909,8 @@ fn open_mark(out: &mut Vec<Laid>, el: &Element, shape: Shape, boxed: Option<BoxS
         boxed,
         len: 0,
         alt: None,
+        // A table is what its element says it is, whatever its content.
+        tag: el.tag.or(matches!(el.kind, ElementKind::Table(_)).then_some(Tag::Table)),
     };
     out.push(Laid { item: PrintItem::Element(Arc::new(info)), deferred: None });
     out.len() - 1
@@ -1399,7 +1412,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         let item = if le.images.skip_cells {
                             item
                         } else {
-                            cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item)
+                            tagged(cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item), el.tag)
                         };
                         out.items.push(Laid { item, deferred: None });
                     }
@@ -1431,6 +1444,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                                 time,
                                 group,
                                 auto: None,
+                                tag: el.tag,
                             }),
                         });
                     }
@@ -1584,6 +1598,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                             time: ch.evaluation_time,
                             group: ch.evaluation_group.clone(),
                             auto: None,
+                            tag: None,
                         }),
                     });
                 }
@@ -2237,6 +2252,7 @@ fn render_crosstab(
     let (chunks, _, _) = f.plan(at.part, at.row, room);
     let mut outer = el.clone();
     outer.mode = Mode::Transparent;
+    outer.tag = outer.tag.or(Some(Tag::Table));
     let none: &[Value] = &[];
     for ch in chunks {
         let top = y + ch.y;
@@ -2253,6 +2269,7 @@ fn render_crosstab(
                     (0.0, 0.0),
                     &CellScope { filled: f, row: none, column: none, outer: le.scope },
                     out,
+                    Tag::HeaderCell,
                 )?;
             }
             for hc in f.column_headers(ch.part) {
@@ -2260,7 +2277,7 @@ fn render_crosstab(
                 let g = &f.crosstab.column_groups[hc.group];
                 let dx = if hc.total { 0.0 } else { header_offset(g.header_position, hc.w, f.design_width(hc.group)) };
                 let scope = CellScope { filled: f, row: none, column: &hc.values, outer: le.scope };
-                place_cell(le, c, [x + hc.x, top + hc.y, hc.w, hc.h], (dx, 0.0), &scope, out)?;
+                place_cell(le, c, [x + hc.x, top + hc.y, hc.w, hc.h], (dx, 0.0), &scope, out, Tag::HeaderCell)?;
             }
         }
         let mut ry = top + hh;
@@ -2272,7 +2289,7 @@ fn render_crosstab(
                     let g = &f.crosstab.row_groups[hc.group];
                     let dy = if hc.total { 0.0 } else { header_offset(g.header_position, hc.h, f.design_height(hc.group)) };
                     let scope = CellScope { filled: f, row: &hc.values, column: none, outer: le.scope };
-                    place_cell(le, c, [x + hc.x, hc.y, hc.w, hc.h], (0.0, dy), &scope, out)?;
+                    place_cell(le, c, [x + hc.x, hc.y, hc.w, hc.h], (0.0, dy), &scope, out, Tag::RowHeaderCell)?;
                 }
             }
             let mut cx = x + hw;
@@ -2281,7 +2298,7 @@ fn render_crosstab(
                 let w = f.column_widths[c];
                 if let Some(contents) = f.cell_contents(row, column) {
                     let scope = CellScope { filled: f, row: &row.values, column: &column.values, outer: le.scope };
-                    place_cell(le, contents, [cx, ry, w, f.row_heights[r]], (0.0, 0.0), &scope, out)?;
+                    place_cell(le, contents, [cx, ry, w, f.row_heights[r]], (0.0, 0.0), &scope, out, Tag::DataCell)?;
                 }
                 cx += w;
             }
@@ -2302,6 +2319,7 @@ fn header_offset(position: HeaderPosition, span: f32, extent: f32) -> f32 {
 }
 
 /// Lays out a cell's contents frame at `[x, y, w, h]`, its elements moved by `shift`.
+#[allow(clippy::too_many_arguments)]
 fn place_cell(
     le: &mut LayoutEnv,
     contents: &Element,
@@ -2309,8 +2327,10 @@ fn place_cell(
     shift: (f32, f32),
     scope: &dyn Scope,
     out: &mut Vec<Laid>,
+    tag: Tag,
 ) -> Result<()> {
     let mut frame = contents.clone();
+    frame.tag = frame.tag.or(Some(tag));
     frame.x = x;
     frame.y = y;
     frame.width = w;
@@ -3138,7 +3158,7 @@ impl<'a> Filler<'a> {
                     if self.images.skip_cells {
                         item
                     } else {
-                        cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item)
+                        tagged(cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item), d.tag)
                     }
                 }
                 Deferred::Chart(ch) => {

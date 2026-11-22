@@ -123,7 +123,9 @@ fn reverse(col: &FillColumn, cell_of: &CellOf, x: &mut f32, y: f32, out: &mut Ve
 
 /// The band for one table row, or `None` when no printed column has a cell in it (or the
 /// cells have no height), as in Jasper.
-fn band(columns: &[FillColumn], cell_of: &CellOf, bottom_up: bool) -> Option<Band> {
+/// A band of the table from one cell of each column. `tag` is what those cells are in a
+/// tagged PDF: header cells or data cells.
+fn band(columns: &[FillColumn], cell_of: &CellOf, bottom_up: bool, tag: Tag) -> Option<Band> {
     let mut elements = Vec::new();
     let mut x = 0.0;
     for col in columns {
@@ -136,6 +138,9 @@ fn band(columns: &[FillColumn], cell_of: &CellOf, bottom_up: bool) -> Option<Ban
     let height = elements.iter().map(|e| e.y + e.height).fold(0.0, f32::max);
     if height <= 0.0 {
         return None;
+    }
+    for e in &mut elements {
+        e.tag = e.tag.or(Some(tag));
     }
     Some(Band { height, split_type: SplitType::Prevent, print_when: None, elements })
 }
@@ -154,17 +159,17 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         variables: Vec::new(),
         groups: Vec::new(),
     });
-    let detail = band(columns, &|c| c.detail.as_ref(), false);
-    let column_header = band(columns, &|c| c.column_header.as_ref(), false);
-    let title = band(columns, &|c| c.table_header.as_ref(), false);
-    let summary = band(columns, &|c| c.table_footer.as_ref(), true);
-    let page_footer = band(columns, &|c| c.column_footer.as_ref(), true);
+    let detail = band(columns, &|c| c.detail.as_ref(), false, Tag::DataCell);
+    let column_header = band(columns, &|c| c.column_header.as_ref(), false, Tag::HeaderCell);
+    let title = band(columns, &|c| c.table_header.as_ref(), false, Tag::HeaderCell);
+    let summary = band(columns, &|c| c.table_footer.as_ref(), true, Tag::DataCell);
+    let page_footer = band(columns, &|c| c.column_footer.as_ref(), true, Tag::DataCell);
 
     let mut groups = dataset.groups;
     for g in &mut groups {
         let name = g.name.clone();
-        g.header = band(columns, &|c| group_cell(&c.group_headers, &name), false).into_iter().collect();
-        g.footer = band(columns, &|c| group_cell(&c.group_footers, &name), true).into_iter().collect();
+        g.header = band(columns, &|c| group_cell(&c.group_headers, &name), false, Tag::HeaderCell).into_iter().collect();
+        g.footer = band(columns, &|c| group_cell(&c.group_footers, &name), true, Tag::DataCell).into_iter().collect();
     }
 
     // With both column footers and a table footer, the last column footers go in the footer of

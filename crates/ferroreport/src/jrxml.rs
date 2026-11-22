@@ -1247,6 +1247,11 @@ impl Parser {
         };
 
         Ok(Element {
+            tag: re
+                .children_named("property")
+                .find(|p| p.attr("name") == Some("net.sf.jasperreports.export.accessibility.tag"))
+                .and_then(|p| p.attr("value").map(str::to_string).or_else(|| Some(p.text.clone())))
+                .and_then(|v| Tag::parse(&v)),
             key: re.attr("key").map(str::to_string),
             x: num("x")?,
             y: num("y")?,

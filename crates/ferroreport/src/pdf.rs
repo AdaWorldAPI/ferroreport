@@ -134,29 +134,143 @@ enum Draw<'a> {
     /// What follows, up to `End`, is one piece of content of the document (tagged PDFs).
     Begin(Mark),
     End,
+    /// What follows, up to `Close`, is in a table or one of its cells, whose top is given.
+    Open(Role, f32),
+    Close,
 }
 
-/// A piece of content in the structure of a tagged PDF.
+/// What a piece of a tagged PDF's structure is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Role {
+    Paragraph,
+    Heading(u8),
+    Figure,
+    Table,
+    Row,
+    HeaderCell,
+    RowHeaderCell,
+    DataCell,
+    /// The page itself, while its structure is gathered.
+    Group,
+}
+
+impl Role {
+    fn of(tag: crate::model::Tag) -> Role {
+        match tag {
+            crate::model::Tag::Heading(level) => Role::Heading(level.clamp(1, 6)),
+            crate::model::Tag::Table => Role::Table,
+            crate::model::Tag::HeaderCell => Role::HeaderCell,
+            crate::model::Tag::RowHeaderCell => Role::RowHeaderCell,
+            crate::model::Tag::DataCell => Role::DataCell,
+        }
+    }
+
+    /// The name of the role in a PDF.
+    fn name(self) -> &'static str {
+        match self {
+            Role::Paragraph => "P",
+            Role::Heading(1) => "H1",
+            Role::Heading(2) => "H2",
+            Role::Heading(3) => "H3",
+            Role::Heading(4) => "H4",
+            Role::Heading(5) => "H5",
+            Role::Heading(_) => "H6",
+            Role::Figure => "Figure",
+            Role::Table => "Table",
+            Role::Row => "TR",
+            Role::HeaderCell | Role::RowHeaderCell => "TH",
+            Role::DataCell => "TD",
+            Role::Group => "Div",
+        }
+    }
+
+    fn is_cell(self) -> bool {
+        matches!(self, Role::HeaderCell | Role::RowHeaderCell | Role::DataCell)
+    }
+}
+
+/// A piece of content in the content stream of a tagged PDF: a text or a picture.
 #[derive(Debug, Clone)]
 struct Mark {
-    figure: bool,
+    role: Role,
     /// What a figure shows, for those who cannot see it.
     alt: Option<String>,
 }
 
+/// A node of the structure of one page: a piece of content (it has a number in the page's
+/// content stream), or a table, a row or a cell holding others.
+#[derive(Debug)]
+struct Node {
+    role: Role,
+    alt: Option<String>,
+    content: Option<usize>,
+    /// Top of a cell on the page: cells at the same height are a row.
+    y: f32,
+    kids: Vec<Node>,
+}
+
+/// The cells of a table gathered into rows (cells at the same height), in order. Anything
+/// in a table that is not in a cell gets a row and a cell of its own.
+fn rows(kids: Vec<Node>) -> Vec<Node> {
+    let mut out: Vec<Node> = Vec::new();
+    for kid in kids {
+        let cell = if kid.role.is_cell() {
+            kid
+        } else if kid.role == Role::Row {
+            out.push(kid);
+            continue;
+        } else {
+            Node { role: Role::DataCell, alt: None, content: None, y: f32::NAN, kids: vec![kid] }
+        };
+        match out.last_mut() {
+            Some(row) if row.role == Role::Row && (row.y - cell.y).abs() < 0.5 => row.kids.push(cell),
+            _ => out.push(Node { role: Role::Row, alt: None, content: None, y: cell.y, kids: vec![cell] }),
+        }
+    }
+    out
+}
+
+/// Cells that are not in a table become one: a table that goes on to another page is
+/// drawn there as its cells alone, and so are cells tagged by hand without a table.
+fn adopt(kids: Vec<Node>) -> Vec<Node> {
+    let mut out: Vec<Node> = Vec::new();
+    let mut cells: Vec<Node> = Vec::new();
+    let table = |cells: &mut Vec<Node>, out: &mut Vec<Node>| {
+        if !cells.is_empty() {
+            out.push(Node { role: Role::Table, alt: None, content: None, y: cells[0].y, kids: rows(std::mem::take(cells)) });
+        }
+    };
+    for kid in kids {
+        if kid.role.is_cell() {
+            cells.push(kid);
+        } else {
+            table(&mut cells, &mut out);
+            out.push(kid);
+        }
+    }
+    table(&mut cells, &mut out);
+    out
+}
+
 /// Items in drawing order with groups expanded. With `tagged`, text elements and pictures
-/// are bracketed by `Begin` and `End`.
+/// are bracketed by `Begin` and `End`, and tables and their cells by `Open` and `Close`.
 fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
     use crate::print::Shape;
-    // Where the picture being drawn ends: the items after an element's mark are its own.
-    let mut picture_ends = None;
+    // Where the elements being drawn end (the items after an element's mark are its own),
+    // and whether each is a picture: what a picture is made of is not content of its own.
+    let mut open: Vec<(usize, bool)> = Vec::new();
     for (i, item) in items.iter().enumerate() {
+        let tagging = tagged && !open.iter().any(|&(_, picture)| picture);
         match item {
-            PrintItem::Group(inner) => flatten(inner, tagged, out),
+            PrintItem::Group(inner) => flatten(inner, tagging, out),
             PrintItem::Cell(info, inner) => {
-                let mark = tagged && picture_ends.is_none() && !info.text.trim().is_empty();
+                let mark = tagging && !info.text.trim().is_empty();
                 if mark {
-                    out.push(Draw::Begin(Mark { figure: false, alt: None }));
+                    let role = match info.tag {
+                        Some(crate::model::Tag::Heading(level)) => Role::Heading(level.clamp(1, 6)),
+                        _ => Role::Paragraph,
+                    };
+                    out.push(Draw::Begin(Mark { role, alt: None }));
                 }
                 flatten(std::slice::from_ref(inner), false, out);
                 if mark {
@@ -165,30 +279,34 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
             }
             PrintItem::Transform(m, inner) => {
                 out.push(Draw::Push(*m));
-                flatten(inner, tagged && picture_ends.is_none(), out);
+                flatten(inner, tagging, out);
                 out.push(Draw::Pop);
             }
-            PrintItem::Element(info) if tagged && picture_ends.is_none() && info.len > 0 => {
-                let what = match &info.shape {
+            PrintItem::Element(info) if tagging && info.len > 0 => {
+                let picture = match &info.shape {
                     Shape::Image { data: Some(_), .. } => Some("Image"),
                     Shape::Picture { symbol: Some(_) } => Some("Barcode"),
                     Shape::Picture { symbol: None } => Some("Chart"),
                     _ => None,
                 };
-                if let Some(what) = what {
-                    out.push(Draw::Begin(Mark { figure: true, alt: Some(info.alt.clone().unwrap_or_else(|| what.to_string())) }));
-                    picture_ends = Some(i + info.len);
+                if let Some(what) = picture {
+                    let alt = info.alt.clone().unwrap_or_else(|| what.to_string());
+                    out.push(Draw::Begin(Mark { role: Role::Figure, alt: Some(alt) }));
+                    open.push((i + info.len, true));
+                } else if let Some(tag) = info.tag.filter(|t| !matches!(t, crate::model::Tag::Heading(_))) {
+                    out.push(Draw::Open(Role::of(tag), info.y));
+                    open.push((i + info.len, false));
                 }
             }
             other => out.push(Draw::Item(other)),
         }
-        if picture_ends == Some(i) {
-            out.push(Draw::End);
-            picture_ends = None;
+        while open.last().is_some_and(|&(end, _)| end <= i) {
+            let (_, picture) = open.pop().unwrap_or((0, false));
+            out.push(if picture { Draw::End } else { Draw::Close });
         }
     }
-    if picture_ends.is_some() {
-        out.push(Draw::End);
+    for (_, picture) in open.into_iter().rev() {
+        out.push(if picture { Draw::End } else { Draw::Close });
     }
 }
 
@@ -359,14 +477,17 @@ impl<W: std::io::Write> PdfStream<W> {
     /// The content stream that draws `items`.
     /// The content stream of `items`, and with tagging the pieces of content in it, in the
     /// order of their marked-content numbers.
-    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<(Vec<u8>, Vec<Mark>)> {
+    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<(Vec<u8>, Vec<Node>, usize)> {
         let tagged = self.tags.is_some();
         let mut flat = Vec::with_capacity(items.len());
         flatten(items, tagged, &mut flat);
         let ph = self.page_height;
         let mut c = Content::new();
         c.set_line_cap(LineCapStyle::ButtCap);
-        let mut marks: Vec<Mark> = Vec::new();
+        // The structure of the page as it is drawn: the pieces of content, numbered in
+        // order, inside the tables and cells that are open.
+        let mut numbered = 0usize;
+        let mut nodes: Vec<Node> = vec![Node { role: Role::Group, alt: None, content: None, y: 0.0, kids: Vec::new() }];
         // In a tagged PDF everything drawn is either a piece of content or decoration.
         let (mut inside, mut decoration) = (false, false);
         // How many coordinate systems deep the drawing is, and was when decoration began.
@@ -386,10 +507,35 @@ impl<W: std::io::Write> PdfStream<W> {
                         c.end_marked_content();
                         decoration = false;
                     }
-                    let tag = if mark.figure { Name(b"Figure") } else { Name(b"P") };
-                    c.begin_marked_content_with_properties(tag).properties().pair(Name(b"MCID"), marks.len() as i32);
-                    marks.push(mark.clone());
+                    c.begin_marked_content_with_properties(Name(mark.role.name().as_bytes()))
+                        .properties()
+                        .pair(Name(b"MCID"), numbered as i32);
+                    if let Some(parent) = nodes.last_mut() {
+                        parent.kids.push(Node {
+                            role: mark.role,
+                            alt: mark.alt.clone(),
+                            content: Some(numbered),
+                            y: 0.0,
+                            kids: Vec::new(),
+                        });
+                    }
+                    numbered += 1;
                     inside = true;
+                    continue;
+                }
+                Draw::Open(role, y) => {
+                    nodes.push(Node { role: *role, alt: None, content: None, y: *y, kids: Vec::new() });
+                    continue;
+                }
+                Draw::Close => {
+                    if nodes.len() > 1 {
+                        let mut node = nodes.pop().unwrap_or_else(|| unreachable!());
+                        node.kids = if node.role == Role::Table { rows(node.kids) } else { adopt(node.kids) };
+                        // An empty table or cell says nothing.
+                        if let (false, Some(parent)) = (node.kids.is_empty(), nodes.last_mut()) {
+                            parent.kids.push(node);
+                        }
+                    }
                     continue;
                 }
                 Draw::End => {
@@ -622,89 +768,129 @@ impl<W: std::io::Write> PdfStream<W> {
         if decoration {
             c.end_marked_content();
         }
-        Ok((c.finish().to_vec(), marks))
+        // Anything left open ends with the page.
+        while nodes.len() > 1 {
+            let mut node = nodes.pop().unwrap_or_else(|| unreachable!());
+            node.kids = if node.role == Role::Table { rows(node.kids) } else { adopt(node.kids) };
+            if let (false, Some(parent)) = (node.kids.is_empty(), nodes.last_mut()) {
+                parent.kids.push(node);
+            }
+        }
+        let top = adopt(nodes.pop().map(|n| n.kids).unwrap_or_default());
+        Ok((c.finish().to_vec(), top, numbered))
     }
 
     /// Adds the next page.
     pub fn page(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
-        let (raw, marks) = self.draw(items, fonts)?;
+        let (raw, nodes, numbered) = self.draw(items, fonts)?;
         let id = self.content_stream(&raw)?;
         self.pages.push(vec![id]);
         if self.tags.is_some() {
-            self.tag_page(&marks)?;
+            self.tag_page(&nodes, numbered)?;
         }
         Ok(())
     }
 
     /// Writes the part of the structure tree that describes the page just drawn: a section
-    /// holding one element per piece of content, in reading order.
-    fn tag_page(&mut self, marks: &[Mark]) -> Result<()> {
+    /// holding its texts, pictures and tables, in reading order.
+    fn tag_page(&mut self, nodes: &[Node], numbered: usize) -> Result<()> {
         use pdf_writer::types::StructRole;
         let page = self.next_id();
         let Some(document) = self.tags.as_ref().map(|t| t.document) else { return Ok(()) };
-        if marks.is_empty() {
+        if nodes.is_empty() {
             if let Some(tags) = &mut self.tags {
                 tags.pages.push((page, None));
             }
             return Ok(());
         }
         let section = self.next_id();
-        let mut elements = Vec::with_capacity(marks.len());
-        let mut compact = Vec::new();
-        for (number, mark) in marks.iter().enumerate() {
-            let id = self.next_id();
-            if mark.figure {
-                // What is waiting goes out first: its place in the file is already noted.
-                self.out.write_all(&compact).map_err(io)?;
-                self.pos += compact.len() as u64;
-                compact.clear();
-                let mut chunk = Chunk::new();
-                let mut e = chunk.struct_element(id);
-                e.kind(StructRole::Figure).parent(section).page(page);
-                if let Some(alt) = &mark.alt {
-                    e.alt(TextStr(alt));
-                }
-                e.children().marked_content_id(number as i32);
-                e.finish();
-                self.put(id, &chunk)?;
-            } else {
-                // Paragraphs are most of a report, one per text: written as tightly as the
-                // format allows, they are a third of the size.
-                self.offsets[id.get() as usize - 1] = self.pos + compact.len() as u64;
-                use std::io::Write as _;
-                let _ = writeln!(
-                    compact,
-                    "{} 0 obj<</S/P/P {} 0 R/Pg {} 0 R/K {number}>>endobj",
-                    id.get(),
-                    section.get(),
-                    page.get()
-                );
-            }
-            elements.push(id);
-        }
-        if !compact.is_empty() {
-            self.out.write_all(&compact).map_err(io)?;
-            self.pos += compact.len() as u64;
+        // From the numbers in the page's content back to the elements that hold them.
+        let mut back = vec![section; numbered];
+        let mut kids = Vec::with_capacity(nodes.len());
+        for node in nodes {
+            kids.push(self.tag_node(node, section, page, &mut back)?);
         }
         let mut chunk = Chunk::new();
         let mut e = chunk.struct_element(section);
         e.kind(StructRole::Sect).parent(document);
         let mut children = e.children();
-        for id in &elements {
+        for id in &kids {
             children.struct_element(*id);
         }
         children.finish();
         e.finish();
         self.put(section, &chunk)?;
-        // From the numbers in the page's content back to the elements.
-        let back = self.next_id();
+        let array = self.next_id();
         let mut chunk = Chunk::new();
-        chunk.indirect(back).array().items(elements.iter().copied());
-        self.put(back, &chunk)?;
+        chunk.indirect(array).array().items(back.iter().copied());
+        self.put(array, &chunk)?;
         if let Some(tags) = &mut self.tags {
-            tags.pages.push((page, Some((section, back))));
+            tags.pages.push((page, Some((section, array))));
         }
         Ok(())
+    }
+
+    /// Writes one element of the structure and what it holds; returns its object.
+    fn tag_node(&mut self, node: &Node, parent: Ref, page: Ref, back: &mut [Ref]) -> Result<Ref> {
+        use pdf_writer::types::{StructRole, TableHeaderScope};
+        let id = self.next_id();
+        if let Some(number) = node.content {
+            back[number] = id;
+            if let Some(alt) = &node.alt {
+                let mut chunk = Chunk::new();
+                let mut e = chunk.struct_element(id);
+                e.kind(StructRole::Figure).parent(parent).page(page).alt(TextStr(alt));
+                e.children().marked_content_id(number as i32);
+                e.finish();
+                return self.put(id, &chunk).map(|_| id);
+            }
+            // Texts are most of a report: written as tightly as the format allows, they are
+            // a third of the size.
+            let line = format!(
+                "{} 0 obj<</S/{}/P {} 0 R/Pg {} 0 R/K {number}>>endobj\n",
+                id.get(),
+                node.role.name(),
+                parent.get(),
+                page.get()
+            );
+            self.offsets[id.get() as usize - 1] = self.pos;
+            self.out.write_all(line.as_bytes()).map_err(io)?;
+            self.pos += line.len() as u64;
+            return Ok(id);
+        }
+        let mut kids = Vec::with_capacity(node.kids.len());
+        for kid in &node.kids {
+            kids.push(self.tag_node(kid, id, page, back)?);
+        }
+        let mut chunk = Chunk::new();
+        let mut e = chunk.struct_element(id);
+        e.kind(match node.role {
+            Role::Table => StructRole::Table,
+            Role::Row => StructRole::TR,
+            Role::HeaderCell | Role::RowHeaderCell => StructRole::TH,
+            Role::DataCell => StructRole::TD,
+            _ => StructRole::Div,
+        })
+        .parent(parent)
+        .page(page);
+        // A header cell says what it names: its column or its row.
+        match node.role {
+            Role::HeaderCell => {
+                e.attributes().push().table().scope(TableHeaderScope::Column);
+            }
+            Role::RowHeaderCell => {
+                e.attributes().push().table().scope(TableHeaderScope::Row);
+            }
+            _ => {}
+        }
+        let mut children = e.children();
+        for kid in &kids {
+            children.struct_element(*kid);
+        }
+        children.finish();
+        e.finish();
+        self.put(id, &chunk)?;
+        Ok(id)
     }
 
     /// Draws `items` on top of a page added earlier (numbered from 0).
@@ -713,7 +899,7 @@ impl<W: std::io::Write> PdfStream<W> {
             // A tagged page is complete when it is written: its structure goes with it.
             return Err(Error::Io("content cannot be added to a page of a tagged PDF once it is written".into()));
         }
-        let (raw, _) = self.draw(items, fonts)?;
+        let (raw, _, _) = self.draw(items, fonts)?;
         let id = self.content_stream(&raw)?;
         if let Some(p) = self.pages.get_mut(page) {
             p.push(id);

@@ -33,6 +33,8 @@ pub struct PrintText {
 /// its text, the number behind it, and its style. PDF ignores it and draws the wrapped item.
 #[derive(Debug, Clone)]
 pub struct CellInfo {
+    /// What the text is in a tagged PDF, when it is more than a paragraph (a heading).
+    pub tag: Option<crate::model::Tag>,
     pub x: f32,
     pub y: f32,
     pub w: f32,
@@ -96,6 +98,8 @@ pub struct ElementInfo {
     pub len: usize,
     /// What a picture shows, in words (an image's tooltip), for tagged PDFs.
     pub alt: Option<String>,
+    /// What the element is in a tagged PDF (a table, one of its cells).
+    pub tag: Option<crate::model::Tag>,
 }
 
 #[derive(Debug, Clone)]

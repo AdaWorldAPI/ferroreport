@@ -260,3 +260,45 @@ fn a_tagged_pdf_describes_its_content() {
         assert_eq!(count(&plain, "/StructTreeRoot"), 0);
     }
 }
+
+/// In a tagged PDF a table is a table: rows of header cells that say what they name and of
+/// data cells, each holding its texts. A text can be marked as a heading.
+#[test]
+fn a_tagged_pdf_has_tables_and_headings() {
+    let count = |pdf: &[u8], what: &str| pdf.windows(what.len()).filter(|w| *w == what.as_bytes()).count();
+    let tagged = |name: &str| {
+        let fx = load(name);
+        let rows: RowIter = Box::new(JsonRows::new(&fx.report, fx.data.as_bytes()));
+        let params = ferroreport::params_from_json(&fx.report, &fx.params).unwrap();
+        let mut out = Vec::new();
+        fx.renderer().tagged(true).render_to(&fx.report, rows, params, Format::Pdf, &mut out).unwrap();
+        out
+    };
+    let table = tagged("27-table");
+    assert!(count(&table, "/S /Table") >= 1);
+    assert!(count(&table, "/S /TR") > count(&table, "/S /Table"), "rows");
+    assert!(count(&table, "/S /TH") >= 1 && count(&table, "/S /TD") > count(&table, "/S /TH"), "cells");
+    assert_eq!(count(&table, "/Scope /Column"), count(&table, "/S /TH"), "the header cells of a table name columns");
+    let crosstab = tagged("30-crosstab");
+    assert!(count(&crosstab, "/Scope /Row") >= 1 && count(&crosstab, "/Scope /Column") >= 1, "a crosstab has headers both ways");
+    // Nothing sits in a table outside a row, or in a row outside a cell.
+    for pdf in [&table, &crosstab] {
+        assert_eq!(count(pdf, "/S /Div"), 0);
+    }
+
+    let template = r#"<jasperReport name="Headings" whenNoDataType="AllSectionsNoDetail" pageWidth="300" pageHeight="200" columnWidth="260" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+  <style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+  <title><band height="60">
+    <staticText><reportElement x="0" y="0" width="260" height="20"><property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/></reportElement><text><![CDATA[Sales]]></text></staticText>
+    <textField><reportElement x="0" y="20" width="260" height="20"><property name="net.sf.jasperreports.export.accessibility.tag" value="h2"/></reportElement><textFieldExpression><![CDATA["By " + "region"]]></textFieldExpression></textField>
+    <staticText><reportElement x="0" y="40" width="260" height="20"/><text><![CDATA[Plain text]]></text></staticText>
+  </band></title>
+</jasperReport>"#;
+    let report = ferroreport::parse(template).unwrap();
+    let mut out = Vec::new();
+    Renderer::new()
+        .tagged(true)
+        .render_to(&report, Box::new(std::iter::empty()), Default::default(), Format::Pdf, &mut out)
+        .unwrap();
+    assert_eq!((count(&out, "/S/H1/P "), count(&out, "/S/H2/P "), count(&out, "/S/P/P ")), (1, 1, 1));
+}

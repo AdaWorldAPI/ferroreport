@@ -534,9 +534,10 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
 
       <h2 id="tagged">Accessible PDFs</h2>
       <p>A PDF is a picture of pages unless it also says what is on them. With tagging on, the document carries that description
-        (a <i>tagged PDF</i>): each text element is a paragraph and each image, chart and barcode a figure, in reading order; lines,
-        borders and backgrounds are marked as decoration, so a screen reader skips them; and the document has its title and the
-        language of the locale. The pages look exactly the same.</p>
+        (a <i>tagged PDF</i>): each text element is a paragraph and each image, chart and barcode a figure, in reading order; tables
+        and crosstabs are tables, with their rows, their data cells and their header cells, each header saying whether it names a
+        column or a row; lines, borders and backgrounds are marked as decoration, so a screen reader skips them; and the document
+        has its title and the language of the locale. The pages look exactly the same.</p>
       <table>
         <tr><th>From</th><th>How</th></tr>
         <tr><td>Command line</td><td><code>--tagged</code></td></tr>
@@ -546,13 +547,19 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td>JavaScript</td><td><code>{ tagged: true }</code></td></tr>
         <tr><td>Rust</td><td><code>Renderer::new().tagged(true)</code></td></tr>
       </table>
-      <p>Give every image that says something a description: its <code>&lt;hyperlinkTooltipExpression&gt;</code> becomes the figure's
-        alternative text, as in JasperReports. Images without one are announced as "Image", charts as "Chart", barcodes as "Barcode".</p>
+      <p>Two things are yours to say in the template, the way JasperReports has them:</p>
+      <table>
+        <tr><th>What</th><th>How</th></tr>
+        <tr><td>What an image shows</td><td>Its <code>&lt;hyperlinkTooltipExpression&gt;</code> becomes the figure's alternative text. Images without one are announced as "Image", charts as "Chart", barcodes as "Barcode"</td></tr>
+        <tr><td>Headings</td><td><code>&lt;property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/&gt;</code> inside the text's <code>&lt;reportElement&gt;</code>, with <code>h1</code> to <code>h6</code></td></tr>
+        <tr><td>A table drawn by hand with frames</td><td>The same property on the frames: <code>table</code> on the outer one, <code>th</code> (or <code>columnheader</code>, <code>rowheader</code>) and <code>td</code> on its cells. Cells at the same height are a row. <code>jr:table</code> and crosstabs need nothing</td></tr>
+      </table>
       <p>What this is and is not yet: the structure is read correctly by PDF tools (Poppler's <code>pdfinfo -struct-text</code> prints
-        it) and every tagged test report has the same pixels as the untagged one, but tables and crosstabs are tagged as paragraphs,
-        not as tables with header cells, and there are no heading levels. The files do not claim PDF/UA conformance: that needs a
-        validator's verdict, which this project will publish when it has one. A tagged PDF is larger (an entry per text) and a value
-        known only later, such as "page 3 of 240", makes its page wait instead of being added afterwards.</p>
+        it), every tagged test report has the same pixels as the untagged one, and every table in them has its cells in rows and
+        its rows in the table. Lists are tagged as paragraphs, and a cell that spans several columns or rows does not say so. The
+        files do not claim PDF/UA conformance: that needs a validator's verdict, which this project will publish when it has one. A
+        tagged PDF is larger (an entry per text) and a value known only later, such as "page 3 of 240", makes its page wait instead
+        of being added afterwards.</p>
 
       <h2 id="html">HTML previews</h2>
       <p>Ask for <code>html</code> (<code>-o report.html</code>, <code>format="html"</code>, <code>Format::Html</code>,
