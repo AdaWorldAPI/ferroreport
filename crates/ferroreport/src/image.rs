@@ -18,6 +18,8 @@ pub enum Pixels {
     Jpeg { data: Vec<u8>, components: u8 },
     /// Decoded 8-bit samples (gray or RGB) with an optional 8-bit alpha channel.
     Raw { samples: Vec<u8>, gray: bool, alpha: Option<Vec<u8>> },
+    /// An SVG drawing (its size in points, one SVG pixel to a point).
+    Svg(Arc<crate::svg::SvgImage>),
 }
 
 #[derive(Debug)]
@@ -185,11 +187,42 @@ impl ImageStore {
             decode_jpeg(bytes, id)?
         } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
             decode_gif(bytes, id)?
+        } else if crate::svg::sniff(bytes) {
+            decode_svg(bytes, id)?
         } else {
-            return Err(Error::Unsupported("image format (only PNG, JPEG and GIF are supported)".into()));
+            return Err(Error::Unsupported("image format (only PNG, JPEG, GIF and SVG are supported)".into()));
         };
         Ok(Arc::new(img))
     }
+}
+
+fn decode_svg(bytes: &[u8], id: usize) -> Result<ImageData> {
+    let svg = crate::svg::parse(bytes)?;
+    let size = svg.tree.size();
+    // JasperReports sizes an SVG in whole points, dropping the fraction.
+    Ok(ImageData {
+        id,
+        width: (size.width() as u32).max(1),
+        height: (size.height() as u32).max(1),
+        pixels: Pixels::Svg(Arc::new(svg)),
+    })
+}
+
+/// A picture inside an SVG (PNG, JPEG or GIF), with an identifier no store hands out.
+pub(crate) fn decode_embedded(bytes: &[u8]) -> Result<Arc<ImageData>> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT: AtomicUsize = AtomicUsize::new(1 << 40);
+    let id = NEXT.fetch_add(1, Ordering::Relaxed);
+    let img = if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
+        decode_png(bytes, id)?
+    } else if bytes.starts_with(&[0xFF, 0xD8]) {
+        decode_jpeg(bytes, id)?
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        decode_gif(bytes, id)?
+    } else {
+        return Err(Error::Unsupported("picture inside an SVG".into()));
+    };
+    Ok(Arc::new(img))
 }
 
 pub fn decode_base64(s: &str) -> Result<Vec<u8>> {

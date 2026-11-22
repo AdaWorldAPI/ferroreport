@@ -13,7 +13,7 @@ use crate::fonts::{FaceId, FontSet};
 use crate::image::{ImageData, Pixels};
 use crate::model::{Color, LineStyle, Pen};
 use crate::print::{PathOp, PrintDocument, PrintItem};
-use pdf_writer::types::{CidFontType, FontFlags, LineCapStyle, SystemInfo};
+use pdf_writer::types::{CidFontType, FontFlags, FunctionShadingType, LineCapStyle, SystemInfo};
 use pdf_writer::{Chunk, Content, Filter, Finish, Name, Rect, Ref, Str, TextStr};
 use std::collections::{BTreeMap, BTreeSet};
 use subsetter::GlyphRemapper;
@@ -665,40 +665,166 @@ impl<W: std::io::Write> PdfStream<W> {
                     _ => x.color_space().device_rgb(),
                 };
             }
-            Pixels::Raw { samples, gray, alpha } => {
-                let mask = match alpha {
-                    Some(a) => {
-                        let mr = self.next_id();
-                        let compressed = deflate(a);
-                        let mut mc = Chunk::new();
-                        let mut m = mc.image_xobject(mr, &compressed);
-                        m.filter(Filter::FlateDecode);
-                        m.width(image.width as i32).height(image.height as i32).bits_per_component(8);
-                        m.color_space().device_gray();
-                        m.finish();
-                        self.put(mr, &mc)?;
-                        Some(mr)
+            Pixels::Svg(svg) if crate::svg::needs_raster(&svg.tree) => {
+                // Filters, masks and patterns: a sharp picture of the drawing.
+                let size = svg.tree.size();
+                let k = (4.0f32).min(4096.0 / size.width().max(size.height()).max(1.0));
+                let (w, h) = (((size.width() * k).round() as u32).max(1), ((size.height() * k).round() as u32).max(1));
+                let pixmap =
+                    crate::svg::rasterize(&svg.tree, w, h).ok_or_else(|| Error::Data("SVG: too large to draw".into()))?;
+                let mut samples = Vec::with_capacity((w * h * 3) as usize);
+                let mut alpha = Vec::with_capacity((w * h) as usize);
+                for px in pixmap.pixels() {
+                    let c = px.demultiply();
+                    samples.extend_from_slice(&[c.red(), c.green(), c.blue()]);
+                    alpha.push(c.alpha());
+                }
+                self.raw_image(&mut chunk, r, w, h, &samples, false, Some(&alpha))?;
+            }
+            Pixels::Svg(svg) => {
+                let form = crate::svg::form(&svg.tree);
+                let mut pictures = Vec::with_capacity(form.images.len());
+                for img in &form.images {
+                    self.image_name(img)?;
+                    pictures.push(self.images[&img.id].1);
+                }
+                let mut states = Vec::with_capacity(form.alphas.len());
+                for (fill, stroke) in &form.alphas {
+                    let id = self.next_id();
+                    let mut c = Chunk::new();
+                    c.ext_graphics(id).non_stroking_alpha(*fill).stroking_alpha(*stroke);
+                    self.put(id, &c)?;
+                    states.push(id);
+                }
+                let mut patterns = Vec::with_capacity(form.gradients.len());
+                for g in &form.gradients {
+                    patterns.push(self.gradient(g)?);
+                }
+                let (w, h) = (form.width.max(1e-3), form.height.max(1e-3));
+                let content = if self.options.compress { deflate(&form.content) } else { form.content.clone() };
+                let mut x = chunk.form_xobject(r, &content);
+                if self.options.compress {
+                    x.filter(Filter::FlateDecode);
+                }
+                x.bbox(pdf_writer::Rect::new(0.0, 0.0, w, h));
+                // Drawn into a unit square like a picture, the SVG's top at its top.
+                x.matrix([1.0 / w, 0.0, 0.0, -1.0 / h, 0.0, 1.0]);
+                let mut res = x.resources();
+                if !pictures.is_empty() {
+                    let mut d = res.x_objects();
+                    for (i, p) in pictures.iter().enumerate() {
+                        d.pair(Name(format!("X{}", i + 1).as_bytes()), *p);
                     }
-                    None => None,
-                };
-                let compressed = deflate(samples);
-                let mut x = chunk.image_xobject(r, &compressed);
-                x.filter(Filter::FlateDecode);
-                x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
-                if *gray {
-                    x.color_space().device_gray();
-                } else {
-                    x.color_space().device_rgb();
                 }
-                if let Some(mr) = mask {
-                    x.s_mask(mr);
+                if !states.is_empty() {
+                    let mut d = res.ext_g_states();
+                    for (i, p) in states.iter().enumerate() {
+                        d.pair(Name(format!("G{}", i + 1).as_bytes()), *p);
+                    }
                 }
+                if !patterns.is_empty() {
+                    let mut d = res.patterns();
+                    for (i, p) in patterns.iter().enumerate() {
+                        d.pair(Name(format!("P{}", i + 1).as_bytes()), *p);
+                    }
+                }
+            }
+            Pixels::Raw { samples, gray, alpha } => {
+                self.raw_image(&mut chunk, r, image.width, image.height, samples, *gray, alpha.as_deref())?;
             }
         }
         self.put(r, &chunk)?;
         let name = format!("Im{}", self.images.len() + 1);
         self.images.insert(image.id, (name.clone(), r));
         Ok(name)
+    }
+
+    /// A gradient of an SVG as a shading pattern.
+    fn gradient(&mut self, g: &crate::svg::Gradient) -> Result<Ref> {
+        let mut stops = g.stops.clone();
+        if stops.first().is_some_and(|s| s.0 > 0.0) {
+            stops.insert(0, (0.0, stops[0].1));
+        }
+        if stops.last().is_some_and(|s| s.0 < 1.0) {
+            let last = stops[stops.len() - 1].1;
+            stops.push((1.0, last));
+        }
+        if stops.len() == 1 {
+            stops.push((1.0, stops[0].1));
+        }
+        let mut pieces = Vec::with_capacity(stops.len() - 1);
+        for pair in stops.windows(2) {
+            let id = self.next_id();
+            let mut chunk = Chunk::new();
+            chunk.exponential_function(id).domain([0.0, 1.0]).c0(pair[0].1).c1(pair[1].1).n(1.0);
+            self.put(id, &chunk)?;
+            pieces.push(id);
+        }
+        let function = if pieces.len() == 1 {
+            pieces[0]
+        } else {
+            let id = self.next_id();
+            let bounds: Vec<f32> = stops[1..stops.len() - 1].iter().map(|s| s.0).collect();
+            let encode: Vec<f32> = pieces.iter().flat_map(|_| [0.0, 1.0]).collect();
+            let mut chunk = Chunk::new();
+            chunk.stitching_function(id).domain([0.0, 1.0]).functions(pieces.iter().copied()).bounds(bounds).encode(encode);
+            self.put(id, &chunk)?;
+            id
+        };
+        let id = self.next_id();
+        let mut chunk = Chunk::new();
+        let mut pattern = chunk.shading_pattern(id);
+        let mut shading = pattern.function_shading();
+        shading.shading_type(if g.radial { FunctionShadingType::Radial } else { FunctionShadingType::Axial });
+        shading.color_space().device_rgb();
+        shading.function(function).coords(g.coords.iter().copied()).extend([true, true]);
+        shading.finish();
+        pattern.matrix(g.matrix);
+        pattern.finish();
+        self.put(id, &chunk)?;
+        Ok(id)
+    }
+
+    /// Writes an image XObject of 8-bit samples, with a soft mask for the alpha channel.
+    #[allow(clippy::too_many_arguments)]
+    fn raw_image(
+        &mut self,
+        chunk: &mut Chunk,
+        r: Ref,
+        width: u32,
+        height: u32,
+        samples: &[u8],
+        gray: bool,
+        alpha: Option<&[u8]>,
+    ) -> Result<()> {
+        let mask = match alpha {
+            Some(a) => {
+                let mr = self.next_id();
+                let compressed = deflate(a);
+                let mut mc = Chunk::new();
+                let mut m = mc.image_xobject(mr, &compressed);
+                m.filter(Filter::FlateDecode);
+                m.width(width as i32).height(height as i32).bits_per_component(8);
+                m.color_space().device_gray();
+                m.finish();
+                self.put(mr, &mc)?;
+                Some(mr)
+            }
+            None => None,
+        };
+        let compressed = deflate(samples);
+        let mut x = chunk.image_xobject(r, &compressed);
+        x.filter(Filter::FlateDecode);
+        x.width(width as i32).height(height as i32).bits_per_component(8);
+        if gray {
+            x.color_space().device_gray();
+        } else {
+            x.color_space().device_rgb();
+        }
+        if let Some(mr) = mask {
+            x.s_mask(mr);
+        }
+        Ok(())
     }
 
     /// The content stream that draws `items`.

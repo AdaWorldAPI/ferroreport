@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="svg_images" whenNoDataType="AllSectionsNoDetail" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="30" bottomMargin="30">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<title>
+		<band height="420">
+			<staticText><reportElement x="0" y="0" width="515" height="20"/><textElement><font size="14" isBold="true"/></textElement><text><![CDATA[SVG images]]></text></staticText>
+			<image><reportElement x="0" y="30" width="200" height="120"/><imageExpression><![CDATA["chart.svg"]]></imageExpression></image>
+			<image scaleImage="RetainShape" hAlign="Center" vAlign="Middle"><reportElement x="220" y="30" width="290" height="120"/><box><pen lineWidth="0.5"/></box><imageExpression><![CDATA["chart.svg"]]></imageExpression></image>
+			<image scaleImage="FillFrame"><reportElement x="0" y="170" width="300" height="80"/><imageExpression><![CDATA["chart.svg"]]></imageExpression></image>
+			<image scaleImage="Clip"><reportElement x="320" y="170" width="120" height="80"/><imageExpression><![CDATA["chart.svg"]]></imageExpression></image>
+			<image scaleImage="RetainShape"><reportElement x="0" y="270" width="200" height="60"/><imageExpression><![CDATA["badge.svg"]]></imageExpression></image>
+			<image scaleImage="Clip" hAlign="Right" vAlign="Bottom"><reportElement x="270" y="270" width="245" height="140"/><imageExpression><![CDATA["badge.svg"]]></imageExpression></image>
+		</band>
+	</title>
+</jasperReport>

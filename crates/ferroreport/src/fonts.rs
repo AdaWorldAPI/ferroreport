@@ -239,6 +239,11 @@ const BUILTIN: &[(&str, bool, bool, &[u8])] = &[
     ("DejaVu Sans Mono", true, true, dejavu!("DejaVuSansMono-BoldOblique.ttf")),
 ];
 
+/// The files of the bundled fonts.
+pub(crate) fn builtin_files() -> impl Iterator<Item = &'static [u8]> {
+    BUILTIN.iter().map(|(_, _, _, bytes)| *bytes)
+}
+
 fn builtin_face(i: usize) -> &'static Arc<FaceData> {
     static CACHE: OnceLock<Vec<OnceLock<Arc<FaceData>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| (0..BUILTIN.len()).map(|_| OnceLock::new()).collect());

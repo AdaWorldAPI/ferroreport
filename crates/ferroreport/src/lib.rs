@@ -35,6 +35,7 @@ mod raster;
 pub mod rich;
 pub mod rtf;
 pub mod standard;
+pub mod svg;
 pub mod table;
 pub mod text;
 pub mod value;

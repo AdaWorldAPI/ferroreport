@@ -764,7 +764,12 @@ impl Pictures {
         let (name, scale, halign, valign, nw, nh) = match &e.shape {
             Shape::Image { data: Some(data), scale, halign, valign } => {
                 let Some(name) = self.media_name(data, page) else { return };
-                (name, *scale, *halign, *valign, data.width as f64, data.height as f64)
+                // An SVG at its exact size.
+                let (nw, nh) = match &data.pixels {
+                    Pixels::Svg(svg) => (svg.tree.size().width() as f64, svg.tree.size().height() as f64),
+                    _ => (data.width as f64, data.height as f64),
+                };
+                (name, *scale, *halign, *valign, nw, nh)
             }
             Shape::Picture { symbol } if aw > 0.0 && ah > 0.0 => {
                 // A barcode's picture is its symbol, which keeps its shape in the cells.
@@ -806,11 +811,13 @@ impl Pictures {
             ),
             ScaleImage::RetainShape => {
                 // The fitted size is in whole points.
+                // (Within a hair of a whole point counts as that point: an SVG's size is
+                // known to single precision only.)
                 if nh > 0.0 && ah > 0.0 && nw / nh > aw / ah {
-                    let fit = (aw * nh / nw).trunc();
+                    let fit = (aw * nh / nw + 1e-4).trunc();
                     (0, share(ya * (ah - fit), ah), 0, share((1.0 - ya) * (ah - fit), ah))
                 } else {
-                    let fit = if nh > 0.0 { (ah * nw / nh).trunc() } else { aw };
+                    let fit = if nh > 0.0 { (ah * nw / nh + 1e-4).trunc() } else { aw };
                     (share(xa * (aw - fit), aw), 0, share((1.0 - xa) * (aw - fit), aw), 0)
                 }
             }
@@ -838,6 +845,10 @@ impl Pictures {
             Pixels::Jpeg { data, .. } => ("jpg", data.clone()),
             Pixels::Raw { samples, gray, alpha } => {
                 ("png", encode_png(data.width, data.height, samples, *gray, alpha.as_deref())?)
+            }
+            Pixels::Svg(svg) => {
+                let (w, h) = crate::svg::picture_size(&svg.tree);
+                ("png", crate::svg::png(&svg.tree, w, h)?)
             }
         };
         let name = format!("img_0_{page}_{}.{ext}", self.media.len());

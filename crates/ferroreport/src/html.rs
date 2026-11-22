@@ -108,6 +108,7 @@ fn data_uri(image: &ImageData) -> Result<String> {
     let b64 = base64::engine::general_purpose::STANDARD;
     match &image.pixels {
         Pixels::Jpeg { data, .. } => Ok(format!("data:image/jpeg;base64,{}", b64.encode(data))),
+        Pixels::Svg(svg) => Ok(format!("data:image/svg+xml;base64,{}", b64.encode(&svg.source))),
         Pixels::Raw { samples, gray, alpha } => {
             let channels = if *gray { 1 } else { 3 };
             let (color, bytes) = match alpha {
