@@ -234,3 +234,29 @@ fn a_large_workbook_is_written_in_two_passes_and_is_the_same() {
         assert_eq!(asked.get(), 1, "{format:?}");
     }
 }
+
+/// A tagged PDF carries a structure tree over the same pages: a paragraph per text and a
+/// figure per picture, with the document's language and title.
+#[test]
+fn a_tagged_pdf_describes_its_content() {
+    let count = |pdf: &[u8], what: &str| pdf.windows(what.len()).filter(|w| *w == what.as_bytes()).count();
+    for (name, figures) in [("33-page-x-of-y", 0), ("15-images", 10)] {
+        let fx = load(name);
+        let plain = fx.streamed(Format::Pdf).0;
+        let mut out = Vec::new();
+        let rows: RowIter = Box::new(JsonRows::new(&fx.report, fx.data.as_bytes()));
+        let params = ferroreport::params_from_json(&fx.report, &fx.params).unwrap();
+        fx.renderer().tagged(true).render_to(&fx.report, rows, params, Format::Pdf, &mut out).unwrap();
+        assert_eq!(pages_of(&out), pages_of(&plain), "{name}");
+        for key in
+            ["/Type /StructTreeRoot", "/MarkInfo", "/Lang (en-US)", "/DisplayDocTitle true", "/ParentTreeNextKey", "/S /Document"]
+        {
+            assert_eq!(count(&out, key), 1, "{name}: {key}");
+        }
+        assert!(count(&out, "/S/P/P ") > 0, "{name}: paragraphs");
+        assert_eq!(count(&out, "/S /Figure"), figures, "{name}: figures");
+        assert_eq!(count(&out, "/Alt ("), figures, "{name}: every figure says what it shows");
+        assert_eq!(count(&out, "/StructParents"), count(&out, "/S /Sect"), "{name}: every page with content has its section");
+        assert_eq!(count(&plain, "/StructTreeRoot"), 0);
+    }
+}

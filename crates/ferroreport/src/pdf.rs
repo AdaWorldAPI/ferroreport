@@ -2,6 +2,11 @@
 //!
 //! Fonts are embedded as subsetted CID fonts (Identity-H) with a ToUnicode map, so text stays
 //! selectable and searchable. Content streams are Flate-compressed.
+//!
+//! With [`PdfOptions::tagged`] the document also says what its content is, for screen readers
+//! and for text extraction: every text element is a paragraph and every image, chart and
+//! barcode a figure in the document's structure tree, in reading order, and everything else
+//! (lines, borders, backgrounds) is marked as decoration.
 
 use crate::error::{Error, Result};
 use crate::fonts::{FaceId, FontSet};
@@ -18,6 +23,10 @@ use subsetter::GlyphRemapper;
 pub struct PdfOptions {
     pub title: Option<String>,
     pub compress: bool,
+    /// Write a tagged PDF: a structure tree over the content (see the module documentation).
+    pub tagged: bool,
+    /// The language of the text (`en-US`, `es-DO`), for tagged PDFs.
+    pub lang: Option<String>,
 }
 
 /// Compresses a stream. Level 3 is about twice as fast as the default level 6 and only
@@ -122,21 +131,64 @@ enum Draw<'a> {
     Item(&'a PrintItem),
     Push([f32; 6]),
     Pop,
+    /// What follows, up to `End`, is one piece of content of the document (tagged PDFs).
+    Begin(Mark),
+    End,
 }
 
-/// Items in drawing order with groups expanded.
-fn flatten<'a>(items: &'a [PrintItem], out: &mut Vec<Draw<'a>>) {
-    for item in items {
+/// A piece of content in the structure of a tagged PDF.
+#[derive(Debug, Clone)]
+struct Mark {
+    figure: bool,
+    /// What a figure shows, for those who cannot see it.
+    alt: Option<String>,
+}
+
+/// Items in drawing order with groups expanded. With `tagged`, text elements and pictures
+/// are bracketed by `Begin` and `End`.
+fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
+    use crate::print::Shape;
+    // Where the picture being drawn ends: the items after an element's mark are its own.
+    let mut picture_ends = None;
+    for (i, item) in items.iter().enumerate() {
         match item {
-            PrintItem::Group(inner) => flatten(inner, out),
-            PrintItem::Cell(_, inner) => flatten(std::slice::from_ref(inner), out),
+            PrintItem::Group(inner) => flatten(inner, tagged, out),
+            PrintItem::Cell(info, inner) => {
+                let mark = tagged && picture_ends.is_none() && !info.text.trim().is_empty();
+                if mark {
+                    out.push(Draw::Begin(Mark { figure: false, alt: None }));
+                }
+                flatten(std::slice::from_ref(inner), false, out);
+                if mark {
+                    out.push(Draw::End);
+                }
+            }
             PrintItem::Transform(m, inner) => {
                 out.push(Draw::Push(*m));
-                flatten(inner, out);
+                flatten(inner, tagged && picture_ends.is_none(), out);
                 out.push(Draw::Pop);
+            }
+            PrintItem::Element(info) if tagged && picture_ends.is_none() && info.len > 0 => {
+                let what = match &info.shape {
+                    Shape::Image { data: Some(_), .. } => Some("Image"),
+                    Shape::Picture { symbol: Some(_) } => Some("Barcode"),
+                    Shape::Picture { symbol: None } => Some("Chart"),
+                    _ => None,
+                };
+                if let Some(what) = what {
+                    out.push(Draw::Begin(Mark { figure: true, alt: Some(info.alt.clone().unwrap_or_else(|| what.to_string())) }));
+                    picture_ends = Some(i + info.len);
+                }
             }
             other => out.push(Draw::Item(other)),
         }
+        if picture_ends == Some(i) {
+            out.push(Draw::End);
+            picture_ends = None;
+        }
+    }
+    if picture_ends.is_some() {
+        out.push(Draw::End);
     }
 }
 
@@ -185,6 +237,16 @@ pub struct PdfStream<W: std::io::Write> {
     images: BTreeMap<usize, (String, Ref)>,
     /// The content streams of each page.
     pages: Vec<Vec<Ref>>,
+    tags: Option<Tags>,
+}
+
+/// The structure tree of a tagged PDF, as far as it has been written.
+struct Tags {
+    root: Ref,
+    document: Ref,
+    /// Per page: its object, its section in the tree, and the array that leads from its
+    /// marked content back to the tree (none for a page without content).
+    pages: Vec<(Ref, Option<(Ref, Ref)>)>,
 }
 
 fn io(e: std::io::Error) -> Error {
@@ -196,7 +258,7 @@ impl<W: std::io::Write> PdfStream<W> {
         let header = b"%PDF-1.7\n%\x80\x80\x80\x80\n\n";
         out.write_all(header).map_err(io)?;
         // Objects 1 to 3 are the catalog, the page tree and the document information.
-        Ok(PdfStream {
+        let mut pdf = PdfStream {
             out,
             pos: header.len() as u64,
             offsets: vec![0; 3],
@@ -206,7 +268,13 @@ impl<W: std::io::Write> PdfStream<W> {
             faces: BTreeMap::new(),
             images: BTreeMap::new(),
             pages: Vec::new(),
-        })
+            tags: None,
+        };
+        if pdf.options.tagged {
+            let (root, document) = (pdf.next_id(), pdf.next_id());
+            pdf.tags = Some(Tags { root, document, pages: Vec::new() });
+        }
+        Ok(pdf)
     }
 
     fn next_id(&mut self) -> Ref {
@@ -289,22 +357,60 @@ impl<W: std::io::Write> PdfStream<W> {
     }
 
     /// The content stream that draws `items`.
-    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<Vec<u8>> {
+    /// The content stream of `items`, and with tagging the pieces of content in it, in the
+    /// order of their marked-content numbers.
+    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<(Vec<u8>, Vec<Mark>)> {
+        let tagged = self.tags.is_some();
         let mut flat = Vec::with_capacity(items.len());
-        flatten(items, &mut flat);
+        flatten(items, tagged, &mut flat);
         let ph = self.page_height;
         let mut c = Content::new();
         c.set_line_cap(LineCapStyle::ButtCap);
+        let mut marks: Vec<Mark> = Vec::new();
+        // In a tagged PDF everything drawn is either a piece of content or decoration.
+        let (mut inside, mut decoration) = (false, false);
+        // How many coordinate systems deep the drawing is, and was when decoration began.
+        let (mut depth, mut decoration_depth) = (0usize, 0usize);
         for draw in flat.iter() {
             let item = match draw {
-                Draw::Item(item) => *item,
+                Draw::Item(item) => {
+                    if tagged && !inside && !decoration && !matches!(item, PrintItem::Element(_)) {
+                        c.begin_marked_content(Name(b"Artifact"));
+                        decoration = true;
+                        decoration_depth = depth;
+                    }
+                    *item
+                }
+                Draw::Begin(mark) => {
+                    if decoration {
+                        c.end_marked_content();
+                        decoration = false;
+                    }
+                    let tag = if mark.figure { Name(b"Figure") } else { Name(b"P") };
+                    c.begin_marked_content_with_properties(tag).properties().pair(Name(b"MCID"), marks.len() as i32);
+                    marks.push(mark.clone());
+                    inside = true;
+                    continue;
+                }
+                Draw::End => {
+                    c.end_marked_content();
+                    inside = false;
+                    continue;
+                }
                 Draw::Push([a, b, cc, d, e, f]) => {
                     // Local items are written as if on the page; map them into place.
+                    depth += 1;
                     c.save_state();
                     c.transform([*a, -*b, -*cc, *d, *cc * ph + *e, ph - *d * ph - *f]);
                     continue;
                 }
                 Draw::Pop => {
+                    // Decoration that began inside this coordinate system ends with it.
+                    if decoration && decoration_depth >= depth {
+                        c.end_marked_content();
+                        decoration = false;
+                    }
+                    depth = depth.saturating_sub(1);
                     c.restore_state();
                     continue;
                 }
@@ -513,20 +619,101 @@ impl<W: std::io::Write> PdfStream<W> {
                 }
             }
         }
-        Ok(c.finish().to_vec())
+        if decoration {
+            c.end_marked_content();
+        }
+        Ok((c.finish().to_vec(), marks))
     }
 
     /// Adds the next page.
     pub fn page(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
-        let raw = self.draw(items, fonts)?;
+        let (raw, marks) = self.draw(items, fonts)?;
         let id = self.content_stream(&raw)?;
         self.pages.push(vec![id]);
+        if self.tags.is_some() {
+            self.tag_page(&marks)?;
+        }
+        Ok(())
+    }
+
+    /// Writes the part of the structure tree that describes the page just drawn: a section
+    /// holding one element per piece of content, in reading order.
+    fn tag_page(&mut self, marks: &[Mark]) -> Result<()> {
+        use pdf_writer::types::StructRole;
+        let page = self.next_id();
+        let Some(document) = self.tags.as_ref().map(|t| t.document) else { return Ok(()) };
+        if marks.is_empty() {
+            if let Some(tags) = &mut self.tags {
+                tags.pages.push((page, None));
+            }
+            return Ok(());
+        }
+        let section = self.next_id();
+        let mut elements = Vec::with_capacity(marks.len());
+        let mut compact = Vec::new();
+        for (number, mark) in marks.iter().enumerate() {
+            let id = self.next_id();
+            if mark.figure {
+                // What is waiting goes out first: its place in the file is already noted.
+                self.out.write_all(&compact).map_err(io)?;
+                self.pos += compact.len() as u64;
+                compact.clear();
+                let mut chunk = Chunk::new();
+                let mut e = chunk.struct_element(id);
+                e.kind(StructRole::Figure).parent(section).page(page);
+                if let Some(alt) = &mark.alt {
+                    e.alt(TextStr(alt));
+                }
+                e.children().marked_content_id(number as i32);
+                e.finish();
+                self.put(id, &chunk)?;
+            } else {
+                // Paragraphs are most of a report, one per text: written as tightly as the
+                // format allows, they are a third of the size.
+                self.offsets[id.get() as usize - 1] = self.pos + compact.len() as u64;
+                use std::io::Write as _;
+                let _ = writeln!(
+                    compact,
+                    "{} 0 obj<</S/P/P {} 0 R/Pg {} 0 R/K {number}>>endobj",
+                    id.get(),
+                    section.get(),
+                    page.get()
+                );
+            }
+            elements.push(id);
+        }
+        if !compact.is_empty() {
+            self.out.write_all(&compact).map_err(io)?;
+            self.pos += compact.len() as u64;
+        }
+        let mut chunk = Chunk::new();
+        let mut e = chunk.struct_element(section);
+        e.kind(StructRole::Sect).parent(document);
+        let mut children = e.children();
+        for id in &elements {
+            children.struct_element(*id);
+        }
+        children.finish();
+        e.finish();
+        self.put(section, &chunk)?;
+        // From the numbers in the page's content back to the elements.
+        let back = self.next_id();
+        let mut chunk = Chunk::new();
+        chunk.indirect(back).array().items(elements.iter().copied());
+        self.put(back, &chunk)?;
+        if let Some(tags) = &mut self.tags {
+            tags.pages.push((page, Some((section, back))));
+        }
         Ok(())
     }
 
     /// Draws `items` on top of a page added earlier (numbered from 0).
     pub fn late(&mut self, page: usize, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
-        let raw = self.draw(items, fonts)?;
+        if self.tags.is_some() {
+            // A tagged page is complete when it is written: its structure goes with it.
+            return Err(Error::Io("content cannot be added to a page of a tagged PDF once it is written".into()));
+        }
+        let (raw, _) = self.draw(items, fonts)?;
         let id = self.content_stream(&raw)?;
         if let Some(p) = self.pages.get_mut(page) {
             p.push(id);
@@ -651,12 +838,19 @@ impl<W: std::io::Write> PdfStream<W> {
 
         let (catalog_id, tree_id, info_id) = (Ref::new(1), Ref::new(2), Ref::new(3));
         let mut page_ids = Vec::with_capacity(self.pages.len());
-        for contents in std::mem::take(&mut self.pages) {
-            let page_id = self.next_id();
+        for (number, contents) in std::mem::take(&mut self.pages).into_iter().enumerate() {
+            let tagged = self.tags.as_ref().and_then(|t| t.pages.get(number).copied());
+            let page_id = match tagged {
+                Some((id, _)) => id,
+                None => self.next_id(),
+            };
             page_ids.push(page_id);
             let mut chunk = Chunk::new();
             let mut p = chunk.page(page_id);
             p.parent(tree_id).media_box(Rect::new(0.0, 0.0, self.page_width, self.page_height));
+            if let Some((_, Some(_))) = tagged {
+                p.struct_parents(number as i32).tab_order(pdf_writer::types::TabOrder::StructureOrder);
+            }
             match contents.as_slice() {
                 [one] => {
                     p.contents(*one);
@@ -673,8 +867,62 @@ impl<W: std::io::Write> PdfStream<W> {
         let mut chunk = Chunk::new();
         chunk.pages(tree_id).kids(page_ids.iter().copied()).count(page_ids.len() as i32);
         self.put(tree_id, &chunk)?;
+        // The structure tree of a tagged PDF: the document, a section per page, and the way
+        // back from each page's content.
+        let mut metadata = None;
+        if let Some(tags) = self.tags.take() {
+            use pdf_writer::types::StructRole;
+            let mut chunk = Chunk::new();
+            let mut e = chunk.struct_element(tags.document);
+            e.kind(StructRole::Document).parent(tags.root);
+            let mut children = e.children();
+            for (_, page) in &tags.pages {
+                if let Some((section, _)) = page {
+                    children.struct_element(*section);
+                }
+            }
+            children.finish();
+            e.finish();
+            self.put(tags.document, &chunk)?;
+            let mut chunk = Chunk::new();
+            let mut root = chunk.indirect(tags.root).start::<pdf_writer::writers::StructTreeRoot>();
+            root.child(tags.document);
+            let mut tree = root.parent_tree();
+            let mut numbers = tree.nums();
+            for (number, (_, page)) in tags.pages.iter().enumerate() {
+                if let Some((_, back)) = page {
+                    numbers.insert(number as i32, *back);
+                }
+            }
+            numbers.finish();
+            tree.finish();
+            root.parent_tree_next_key(tags.pages.len() as i32);
+            root.finish();
+            self.put(tags.root, &chunk)?;
+            // The title where assistive software looks for it.
+            let id = self.next_id();
+            let title = self.options.title.clone().unwrap_or_default();
+            let packet = format!(
+                "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\">\n<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>\n<pdf:Producer>ferroreport {}</pdf:Producer>\n</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>",
+                crate::xlsx::escape(&title),
+                env!("CARGO_PKG_VERSION")
+            );
+            let mut chunk = Chunk::new();
+            chunk.metadata(id, packet.as_bytes());
+            self.put(id, &chunk)?;
+            metadata = Some((id, tags.root));
+        }
         let mut chunk = Chunk::new();
-        chunk.indirect(catalog_id).start::<pdf_writer::writers::Catalog>().pages(tree_id);
+        let mut catalog = chunk.indirect(catalog_id).start::<pdf_writer::writers::Catalog>();
+        catalog.pages(tree_id);
+        if let Some((xmp, root)) = metadata {
+            catalog.pair(Name(b"StructTreeRoot"), root);
+            catalog.mark_info().marked(true);
+            catalog.metadata(xmp);
+            catalog.viewer_preferences().display_doc_title(true);
+            catalog.lang(TextStr(self.options.lang.as_deref().unwrap_or("en-US")));
+        }
+        catalog.finish();
         self.put(catalog_id, &chunk)?;
         let mut chunk = Chunk::new();
         let mut info = chunk.indirect(info_id).start::<pdf_writer::writers::DocumentInfo>();
@@ -706,12 +954,15 @@ impl<W: std::io::Write> PdfStream<W> {
 }
 
 impl<W: std::io::Write> crate::fill::PageSink for PdfStream<W> {
+    /// Not in a tagged PDF: there a page is written with its structure, so it waits for
+    /// the values it is missing.
     fn accepts_late(&self) -> bool {
-        true
+        self.tags.is_none()
     }
 
+    /// Tagging needs to know where each text element and picture begins and ends.
     fn wants_cells(&self) -> bool {
-        false
+        self.tags.is_some()
     }
 
     fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> Result<()> {

@@ -89,6 +89,7 @@ byte[] pdf = reports.named("invoice").rows(lines).param("CUSTOMER", "Caribe").re
 | `.format(Format.PDF \| XLSX \| CSV \| HTML)` | The output format (`renderTo(Path)` goes by the extension) |
 | `.maxPages(n)`, `.timeout(Duration)` | Stop a report that grows past what you expect (local engine; a server has its own limits) |
 | `.csvSafe(true)`, `.xlsxNumbers(true)` | Guard CSV against spreadsheet formulas in the data; numbers as numbers in Excel |
+| `.tagged(true)` | A tagged PDF, for screen readers: texts as paragraphs, pictures as figures |
 | `.resources(Path)` | An extra directory for images and subreports |
 | `.render()` | The document's bytes |
 | `.renderTo(Path)` | Writes the file page by page; nothing is left behind if it fails |

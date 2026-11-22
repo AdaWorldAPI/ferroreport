@@ -122,6 +122,7 @@ def render(
     max_pages: Optional[int] = None,
     timeout: Optional[float] = None,
     csv_safe: bool = False,
+    tagged: bool = False,
     xlsx_numbers: bool = False,
 ) -> bytes:
     """Renders a template and returns the file's bytes: PDF by default, or an Excel workbook
@@ -144,6 +145,7 @@ def render(
         or takes longer than this many seconds. Set them when templates or data come from
         other people.
     csv_safe: in CSV, put an apostrophe before values a spreadsheet would run as a formula.
+    tagged: in PDF, say what the content is (tagged PDF), for screen readers.
     xlsx_numbers: in Excel, write numbers as numbers instead of formatted text.
     """
     source, dirs, mem = _prepare(template, resources, resource_dirs)
@@ -163,6 +165,7 @@ def render(
             csv_safe,
             xlsx_numbers,
             spooled.path if spooled else None,
+            tagged=tagged,
         )[0]
     except ValueError as e:
         raise FerroreportError(str(e)) from None
@@ -186,6 +189,7 @@ def render_to_file(
     max_pages: Optional[int] = None,
     timeout: Optional[float] = None,
     csv_safe: bool = False,
+    tagged: bool = False,
     xlsx_numbers: bool = False,
 ) -> dict:
     """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
@@ -223,6 +227,7 @@ def render_to_file(
             xlsx_numbers,
             os.fspath(data_file) if data_file is not None else None,
             os.fspath(output),
+            tagged=tagged,
         )
     except ValueError as e:
         raise FerroreportError(str(e)) from None

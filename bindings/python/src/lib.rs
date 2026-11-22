@@ -16,7 +16,8 @@ fn err(e: impl std::fmt::Display) -> PyErr {
 /// (bytes, pages, rows).
 #[pyfunction]
 #[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None, format=None,
-                    max_pages=None, timeout=None, csv_safe=false, xlsx_numbers=false, data_path=None, output_path=None))]
+                    max_pages=None, timeout=None, csv_safe=false, xlsx_numbers=false, data_path=None, output_path=None,
+                    tagged=false))]
 #[allow(clippy::too_many_arguments)]
 fn render(
     py: Python<'_>,
@@ -34,6 +35,7 @@ fn render(
     xlsx_numbers: bool,
     data_path: Option<String>,
     output_path: Option<String>,
+    tagged: bool,
 ) -> PyResult<(Py<PyBytes>, usize, usize)> {
     let format = match format {
         Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx, csv or html)")))?,
@@ -48,6 +50,7 @@ fn render(
                 .locale(&locale)
                 .limits(limits)
                 .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
+                .tagged(tagged)
                 .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
             if let Some(now) = now {
                 let t = ferroreport::data::parse_datetime(&now).ok_or_else(|| format!("now: cannot parse `{now}`"))?;

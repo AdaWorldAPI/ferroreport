@@ -285,6 +285,8 @@ pub enum OnErrorType {
 #[derive(Debug, Clone)]
 pub struct ImageElement {
     pub expr: Option<Expr>,
+    /// `hyperlinkTooltipExpression`: used as the image's description in tagged PDFs.
+    pub tooltip: Option<Expr>,
     pub scale: ScaleImage,
     pub halign: HAlign,
     pub valign: VAlign,

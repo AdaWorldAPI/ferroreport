@@ -897,6 +897,7 @@ fn open_mark(out: &mut Vec<Laid>, el: &Element, shape: Shape, boxed: Option<BoxS
         fore: el.forecolor,
         boxed,
         len: 0,
+        alt: None,
     };
     out.push(Laid { item: PrintItem::Element(Arc::new(info)), deferred: None });
     out.len() - 1
@@ -1520,6 +1521,13 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Image(img) => {
                 let shape = Shape::Image { data: m.image.clone(), scale: img.scale, halign: img.halign, valign: img.valign };
                 let mark = open_mark(&mut out.items, el, shape, Some(img.boxed), x, y, w, h);
+                // The image's tooltip is what it shows, in words.
+                if let Some(e) = &img.tooltip {
+                    let said = eval(e, le.scope, le.env)?;
+                    if let (false, PrintItem::Element(info)) = (matches!(said, Value::Null), &mut out.items[mark].item) {
+                        Arc::make_mut(info).alt = Some(said.to_java_string());
+                    }
+                }
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
                         item: PrintItem::Rect { x, y, w, h, fill: Some(el.backcolor), stroke: None, radius: 0.0, path: false },

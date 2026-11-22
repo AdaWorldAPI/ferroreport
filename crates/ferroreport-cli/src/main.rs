@@ -31,6 +31,8 @@ RENDER OPTIONS:
                                 like JasperReports)
         --csv-safe              In CSV, put an apostrophe before values a spreadsheet would
                                 run as a formula (use it when the data comes from other people)
+        --tagged                In PDF, say what the content is (tagged PDF) for screen readers:
+                                texts as paragraphs, images as figures, the rest as decoration
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
@@ -144,6 +146,7 @@ fn render(args: &[String]) -> CliResult {
     let mut format = None;
     let mut xlsx_numbers = false;
     let mut csv_safe = false;
+    let mut tagged = false;
     let mut limits = ferroreport::Limits::default();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -153,6 +156,7 @@ fn render(args: &[String]) -> CliResult {
             "-f" | "--format" => format = Some(value(a)?.to_ascii_lowercase()),
             "--xlsx-numbers" => xlsx_numbers = true,
             "--csv-safe" => csv_safe = true,
+            "--tagged" => tagged = true,
             "--max-pages" => limits.max_pages = Some(value(a)?.parse().map_err(|_| "--max-pages expects a number")?),
             "--timeout" => {
                 let secs: f64 = value(a)?.parse().map_err(|_| "--timeout expects seconds")?;
@@ -193,6 +197,7 @@ fn render(args: &[String]) -> CliResult {
         .resource_dir(template_dir)
         .limits(limits)
         .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
+        .tagged(tagged)
         .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
     for dir in &resources {
         renderer = renderer.resource_dir(dir);

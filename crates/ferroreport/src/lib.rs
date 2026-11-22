@@ -111,6 +111,7 @@ pub struct Renderer {
     xlsx: xlsx::XlsxOptions,
     csv: csv::CsvOptions,
     html: html::HtmlOptions,
+    tagged: bool,
 }
 
 impl Default for Renderer {
@@ -128,6 +129,7 @@ impl Renderer {
             now: None,
             limits: Limits::default(),
             xlsx: Default::default(),
+            tagged: false,
             csv: Default::default(),
             html: Default::default(),
         }
@@ -149,6 +151,25 @@ impl Renderer {
     pub fn limits(mut self, limits: Limits) -> Renderer {
         self.limits = limits;
         self
+    }
+
+    /// Writes PDFs that say what their content is (tagged PDF), for screen readers and for
+    /// software that extracts text: each text element is a paragraph and each image, chart
+    /// and barcode a figure, in reading order; lines, borders and backgrounds are marked as
+    /// decoration. An image is described by its `hyperlinkTooltipExpression`. The document
+    /// carries its title and the language of the renderer's locale.
+    pub fn tagged(mut self, tagged: bool) -> Renderer {
+        self.tagged = tagged;
+        self
+    }
+
+    fn pdf_options(&self, title: &str) -> pdf::PdfOptions {
+        pdf::PdfOptions {
+            title: Some(title.to_string()),
+            compress: true,
+            tagged: self.tagged,
+            lang: Some(self.locale.tag.replace('_', "-")),
+        }
     }
 
     /// Options for Excel output from [`Renderer::export`] and the `render` methods.
@@ -247,7 +268,7 @@ impl Renderer {
         let env = self.env(report);
         match format {
             Format::Pdf => {
-                let options = pdf::PdfOptions { title: Some(report.name.clone()), compress: true };
+                let options = self.pdf_options(&report.name);
                 let mut sink = pdf::PdfStream::new(out, report.page_width, report.page_height, options)?;
                 let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
                 sink.finish(&self.fonts)?;
@@ -279,7 +300,7 @@ impl Renderer {
 
     /// Exports a filled document to PDF.
     pub fn to_pdf(&self, doc: &PrintDocument) -> Result<Vec<u8>> {
-        pdf::write_pdf(doc, &self.fonts, &pdf::PdfOptions { title: Some(doc.name.clone()), compress: true })
+        pdf::write_pdf(doc, &self.fonts, &self.pdf_options(&doc.name))
     }
 
     /// Exports a filled document to an Excel workbook (XLSX), laid out like JasperReports'

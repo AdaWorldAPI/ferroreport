@@ -1389,6 +1389,7 @@ impl Parser {
                 };
                 ElementKind::Image(ImageElement {
                     expr: self.child_expr(n, &["imageExpression", "expression"])?,
+                    tooltip: self.child_expr(n, &["hyperlinkTooltipExpression"])?,
                     scale,
                     halign,
                     valign,

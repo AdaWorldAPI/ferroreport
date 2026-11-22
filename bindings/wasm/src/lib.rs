@@ -32,7 +32,8 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
-///   format?: "pdf" | "xlsx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean }`.
+///   format?: "pdf" | "xlsx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
+///   tagged?: boolean }` (`tagged` writes a tagged PDF, for screen readers).
 ///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
 ///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
 ///   numbers in Excel instead of formatted text.
@@ -47,6 +48,7 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
         .locale(&locale)
         .limits(limits)
         .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: get(&options, "xlsxNumbers").is_truthy() })
+        .tagged(get(&options, "tagged").is_truthy())
         .csv_options(ferroreport::csv::CsvOptions { guard_formulas: get(&options, "csvSafe").is_truthy(), ..Default::default() });
 
     // `new Date()` in expressions: the given value, or the current time from JavaScript.

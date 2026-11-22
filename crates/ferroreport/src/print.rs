@@ -94,6 +94,8 @@ pub struct ElementInfo {
     pub fore: Color,
     pub boxed: Option<crate::model::BoxStyle>,
     pub len: usize,
+    /// What a picture shows, in words (an image's tooltip), for tagged PDFs.
+    pub alt: Option<String>,
 }
 
 #[derive(Debug, Clone)]

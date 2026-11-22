@@ -5,7 +5,7 @@
 //!                           "data": [...], "params": {...}, "locale": "es_DO",
 //!                           "resources": {"logo.png": "<base64>"},
 //!                           "format": "pdf" | "xlsx" | "csv",
-//!                           "csvSafe": true, "xlsxNumbers": true}       -> the file
+//!                           "csvSafe": true, "xlsxNumbers": true, "tagged": true} -> the file
 //! POST /render/<name>      {"data": [...], "params": {...}}  (template from --templates)
 //! POST /inspect            {"template": "..."}                          -> JSON
 //! GET  /health                                                          -> JSON
@@ -286,6 +286,7 @@ struct Job {
     resources: Vec<(String, Vec<u8>)>,
     now: Option<String>,
     csv_safe: bool,
+    tagged: bool,
     xlsx_numbers: bool,
     limits: ferroreport::Limits,
     params: serde_json::Value,
@@ -371,6 +372,7 @@ fn prepare(
         resources,
         now,
         csv_safe: flag("csvSafe"),
+        tagged: flag("tagged"),
         xlsx_numbers: flag("xlsxNumbers"),
         limits: cfg.limits,
         params: body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default())),
@@ -389,6 +391,7 @@ impl Job {
         let mut r = Renderer::new()
             .locale(&self.locale)
             .limits(self.limits)
+            .tagged(self.tagged)
             .csv_options(ferroreport::csv::CsvOptions { guard_formulas: self.csv_safe, ..Default::default() })
             .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: self.xlsx_numbers });
         for d in &self.dirs {

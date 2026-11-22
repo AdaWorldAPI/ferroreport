@@ -48,6 +48,7 @@ public final class Report {
     private Duration timeout;
     private LocalDateTime now;
     private boolean csvSafe;
+    private boolean tagged;
     private boolean xlsxNumbers;
 
     Report(Ferroreport engine, Path template, String source, String name) {
@@ -124,6 +125,12 @@ public final class Report {
     /** Fixes the value of {@code new Date()} in the template's expressions, for reproducible output. */
     public Report now(LocalDateTime now) {
         this.now = Objects.requireNonNull(now, "now");
+        return this;
+    }
+
+    /** In PDF, says what the content is (tagged PDF), for screen readers: texts as paragraphs, images as figures. */
+    public Report tagged(boolean on) {
+        this.tagged = on;
         return this;
     }
 
@@ -233,6 +240,9 @@ public final class Report {
                 cmd.add("--now");
                 cmd.add(now.withNano(0).toString().length() == 16 ? now.withNano(0) + ":00" : now.withNano(0).toString());
             }
+            if (tagged) {
+                cmd.add("--tagged");
+            }
             if (csvSafe) {
                 cmd.add("--csv-safe");
             }
@@ -339,6 +349,9 @@ public final class Report {
             if (now != null) {
                 head.append(",\"now\":");
                 Json.string(now.toString(), head);
+            }
+            if (tagged) {
+                head.append(",\"tagged\":true");
             }
             if (csvSafe) {
                 head.append(",\"csvSafe\":true");

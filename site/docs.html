@@ -38,6 +38,7 @@
       <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
       <a href="#html">HTML previews</a>
+      <a href="#tagged">Accessible PDFs</a>
       <a href="#large">Large reports and limits</a>
       <a href="#database">Rows from a database</a>
       <a href="#fonts">Fonts</a>
@@ -125,6 +126,7 @@ ferroreport serve [options]</pre>
         <tr><td><code>-f, --format &lt;pdf|xlsx|csv&gt;</code></td><td>Output format, when the file name does not say it (for example with <code>-o -</code>)</td></tr>
         <tr><td><code>--xlsx-numbers</code></td><td>In Excel, writes numbers as numbers with their format pattern instead of as the formatted text. See <a href="#excel">Excel and CSV</a></td></tr>
         <tr><td><code>--csv-safe</code></td><td>In CSV, puts an apostrophe before values a spreadsheet would run as a formula. Use it when the data comes from other people</td></tr>
+        <tr><td><code>--tagged</code></td><td>In PDF, says what the content is, for screen readers. See <a href="#tagged">Accessible PDFs</a></td></tr>
         <tr><td><code>--max-pages &lt;n&gt;</code></td><td>Stops if the report goes over this many pages. See <a href="#large">Large reports and limits</a></td></tr>
         <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Stops if the render takes longer than this</td></tr>
         <tr><td><code>-l, --locale &lt;tag&gt;</code></td><td>Number and date formatting: <code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
@@ -190,6 +192,7 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>locale</code></td><td><code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>now</code></td><td>Fixed value of <code>new Date()</code>, ISO-8601</td></tr>
         <tr><td><code>format</code></td><td><code>html</code> returns a <a href="#html">web preview</a>; <code>pdf</code> (default), <code>xlsx</code> (returns <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>) or <code>csv</code> (<code>text/csv</code>). Also accepted in the URL: <code>/render/invoice?format=xlsx</code></td></tr>
+        <tr><td><code>tagged</code></td><td><code>true</code> for a tagged PDF. See <a href="#tagged">Accessible PDFs</a></td></tr>
         <tr><td><code>csvSafe</code>, <code>xlsxNumbers</code></td><td><code>true</code> to guard CSV against spreadsheet formulas in the data, or to write numbers as numbers in Excel. See <a href="#excel">Excel and CSV</a></td></tr>
         <tr><td><code>resources</code></td><td>Images and subreport templates as base64, by the path the template uses: <code>{"logo.png": "iVBOR..."}</code></td></tr>
         <tr><td><code>template</code></td><td><code>POST /render</code> and <code>/inspect</code> only: the JRXML source text</td></tr>
@@ -337,7 +340,7 @@ stats = ferroreport.render_to_file("sales.jrxml", "sales.pdf", data_file="sales.
 print(stats)                               # {"pages": 23810, "rows": 1000000}</pre>
       <table>
         <tr><th>Function</th><th>Does</th></tr>
-        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, CSV with <code>format="csv"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect</td></tr>
+        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers, tagged)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, CSV with <code>format="csv"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect</td></tr>
         <tr><td><code>render_to_file(template, output, data=None, params=None, *, data_file, ...)</code></td><td>Same arguments; writes the file to <code>output</code> as it is made and returns <code>{"pages", "rows"}</code>. Without <code>format</code>, the extension (<code>.pdf</code>, <code>.xlsx</code>, <code>.csv</code>) decides. <code>data_file</code> is a file of rows (a JSON array or one object per line) read as the report needs it, instead of <code>data</code></td></tr>
         <tr><td><code>inspect(template)</code></td><td>Returns a dict with <code>name</code>, <code>parameters</code>, <code>fields</code> and <code>warnings</code></td></tr>
         <tr><td><code>FerroreportError</code></td><td>Raised when a template cannot be parsed, filled or exported</td></tr>
@@ -395,7 +398,7 @@ StreamingOutput body = out -&gt; reports.template(Path.of("reports/invoice.jrxml
         <tr><td><code>.template(Path)</code>, <code>.source(String)</code>, <code>.named(String)</code></td><td>A report from a file, from JRXML text, or by the name a server knows it by</td></tr>
         <tr><td><code>.rows(Iterable)</code>, <code>.rows(ResultSet)</code></td><td>The rows, read one at a time: Maps of field name to value (nested Maps and Lists feed subreports and tables), or the columns of a query</td></tr>
         <tr><td><code>.param</code>, <code>.params</code>, <code>.locale</code>, <code>.now</code>, <code>.format</code>, <code>.resources</code></td><td>Parameters, formatting locale, the value of <code>new Date()</code>, output format, extra folders for images and subreports</td></tr>
-        <tr><td><code>.maxPages(n)</code>, <code>.timeout(Duration)</code>, <code>.csvSafe(true)</code>, <code>.xlsxNumbers(true)</code></td><td>Limits and export options, as on the command line</td></tr>
+        <tr><td><code>.maxPages(n)</code>, <code>.timeout(Duration)</code>, <code>.csvSafe(true)</code>, <code>.xlsxNumbers(true)</code>, <code>.tagged(true)</code></td><td>Limits and export options, as on the command line</td></tr>
         <tr><td><code>.render()</code>, <code>.renderTo(Path)</code>, <code>.renderTo(OutputStream)</code></td><td>The document as bytes, as a file written page by page (nothing is left if it fails), or into a stream as it is made</td></tr>
         <tr><td><code>FerroreportException</code></td><td>Thrown with the engine's message when a report cannot be rendered</td></tr>
       </table>
@@ -528,6 +531,28 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <code>-12.50</code> are left alone. It is off by default so the CSV stays exactly what JasperReports writes.</p>
       <p>Not available yet: other exporters (Word, HTML, ODS, the old XLS format) and the <code>net.sf.jasperreports.export.*</code> properties
         other than number detection.</p>
+
+      <h2 id="tagged">Accessible PDFs</h2>
+      <p>A PDF is a picture of pages unless it also says what is on them. With tagging on, the document carries that description
+        (a <i>tagged PDF</i>): each text element is a paragraph and each image, chart and barcode a figure, in reading order; lines,
+        borders and backgrounds are marked as decoration, so a screen reader skips them; and the document has its title and the
+        language of the locale. The pages look exactly the same.</p>
+      <table>
+        <tr><th>From</th><th>How</th></tr>
+        <tr><td>Command line</td><td><code>--tagged</code></td></tr>
+        <tr><td>HTTP</td><td><code>"tagged": true</code> in the request</td></tr>
+        <tr><td>Python</td><td><code>tagged=True</code></td></tr>
+        <tr><td>Java</td><td><code>.tagged(true)</code></td></tr>
+        <tr><td>JavaScript</td><td><code>{ tagged: true }</code></td></tr>
+        <tr><td>Rust</td><td><code>Renderer::new().tagged(true)</code></td></tr>
+      </table>
+      <p>Give every image that says something a description: its <code>&lt;hyperlinkTooltipExpression&gt;</code> becomes the figure's
+        alternative text, as in JasperReports. Images without one are announced as "Image", charts as "Chart", barcodes as "Barcode".</p>
+      <p>What this is and is not yet: the structure is read correctly by PDF tools (Poppler's <code>pdfinfo -struct-text</code> prints
+        it) and every tagged test report has the same pixels as the untagged one, but tables and crosstabs are tagged as paragraphs,
+        not as tables with header cells, and there are no heading levels. The files do not claim PDF/UA conformance: that needs a
+        validator's verdict, which this project will publish when it has one. A tagged PDF is larger (an entry per text) and a value
+        known only later, such as "page 3 of 240", makes its page wait instead of being added afterwards.</p>
 
       <h2 id="html">HTML previews</h2>
       <p>Ask for <code>html</code> (<code>-o report.html</code>, <code>format="html"</code>, <code>Format::Html</code>,
