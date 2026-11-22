@@ -12,15 +12,93 @@ use crate::value::JavaType;
 use crate::xml::{self, Node};
 use std::collections::HashMap;
 
-/// Parses JRXML source into a [`Report`].
+/// Reads a file a template refers to (a style template), by its location; `None` when
+/// there is no such file.
+pub type Loader<'a> = &'a dyn Fn(&str) -> Option<Vec<u8>>;
+
+/// Parses JRXML source into a [`Report`], without the files it refers to.
 pub fn parse_report(source: &str) -> Result<Report> {
+    parse_report_with(source, &|_| None)
+}
+
+/// Parses JRXML source into a [`Report`], reading the style templates it uses with `load`.
+pub fn parse_report_with(source: &str, load: Loader) -> Result<Report> {
     let root = xml::parse(source)?;
     if root.name != "jasperReport" {
         return Err(Error::template(format!("root element is <{}>, expected <jasperReport>", root.name)));
     }
-    let mut report = Parser::new(&root)?.report(&root)?;
+    let mut report = Parser::new(&root, load)?.report(&root)?;
     report.uses_data_source = source.contains("REPORT_DATA_SOURCE");
     Ok(report)
+}
+
+/// Templates within templates go no deeper than this.
+const MAX_STYLE_TEMPLATES: usize = 8;
+
+/// The styles of a report in the order JasperReports takes them: those of each style
+/// template (`<template>`), after the templates it includes, then the report's own.
+fn style_nodes(root: &Node, load: Loader, warnings: &mut Vec<String>) -> Vec<Node> {
+    let mut out = Vec::new();
+    let mut seen = Vec::new();
+    for t in root.children_named("template") {
+        match template_location(root, &t.text) {
+            Some(location) => style_template(&location, None, load, 0, &mut seen, &mut out, warnings),
+            None => warnings.push(format!(
+                "style template `{}`: only a file name in quotes, or a parameter whose default is one, can be read before the report runs",
+                t.text.trim()
+            )),
+        }
+    }
+    out.extend(root.children_named("style").cloned());
+    out
+}
+
+/// The file a `<template>` of a report names: a string, or a parameter with a string default.
+fn template_location(root: &Node, text: &str) -> Option<String> {
+    let literal = |e: &str| match parse_expr(e, false).ok()? {
+        Expr::Lit(crate::value::Value::Str(s)) => Some(s.to_string()),
+        _ => None,
+    };
+    if let Some(location) = literal(text) {
+        return Some(location);
+    }
+    let name = text.trim().strip_prefix("$P{")?.strip_suffix('}')?;
+    let p = root.children_named("parameter").find(|p| p.attr("name") == Some(name))?;
+    literal(&p.child("defaultValueExpression")?.text)
+}
+
+/// Reads one style template and those it includes, adding their styles to `out`.
+fn style_template(
+    location: &str,
+    from: Option<&str>,
+    load: Loader,
+    depth: usize,
+    seen: &mut Vec<String>,
+    out: &mut Vec<Node>,
+    warnings: &mut Vec<String>,
+) {
+    if depth >= MAX_STYLE_TEMPLATES || seen.iter().any(|s| s == location) {
+        warnings.push(format!("style template `{location}` is included again or too deep, and is skipped"));
+        return;
+    }
+    // Next to the template that includes it, or else where the report's resources are.
+    let beside = from.and_then(|f| f.rsplit_once('/')).map(|(dir, _)| format!("{dir}/{location}"));
+    let found = beside.iter().map(String::as_str).chain([location]).find_map(|l| load(l).map(|bytes| (l.to_string(), bytes)));
+    let Some((path, bytes)) = found else {
+        warnings.push(format!("style template `{location}` was not found next to the report or in its resource folders"));
+        return;
+    };
+    let parsed = std::str::from_utf8(&bytes).map_err(|e| e.to_string()).and_then(|t| xml::parse(t).map_err(|e| e.to_string()));
+    let root = match parsed {
+        Ok(root) if root.name == "jasperTemplate" => root,
+        Ok(root) => return warnings.push(format!("style template `{location}`: <{}> is not a <jasperTemplate>", root.name)),
+        Err(e) => return warnings.push(format!("style template `{location}`: {e}")),
+    };
+    seen.push(location.to_string());
+    for t in root.children_named("template") {
+        style_template(t.text.trim(), Some(&path), load, depth + 1, seen, out, warnings);
+    }
+    out.extend(root.children_named("style").cloned());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -321,54 +399,68 @@ struct Parser {
 const MAX_CONDITIONAL_STYLES: usize = 4;
 
 impl Parser {
-    fn new(root: &Node) -> Result<Parser> {
+    fn new(root: &Node, load: Loader) -> Result<Parser> {
         let groovy = root.attr("language").map(|l| l.eq_ignore_ascii_case("groovy")).unwrap_or(false);
-        // Resolve styles in declaration order; parents must be declared first in JRXML.
-        let mut styles: HashMap<String, StyleProps> = HashMap::new();
-        let mut default_style = StyleProps::default();
-        let mut default_name = None;
         let mut warnings = Vec::new();
-        let mut raw_conditionals: Vec<(String, String, StyleProps)> = Vec::new();
-        // A style without a parent takes what it does not set from the default style, as an
-        // element without a style does. The default style and its own ancestors are the
-        // exception: they are what the others fall back on.
+        let nodes = style_nodes(root, load, &mut warnings);
         let parent_of = |s: &Node| attr(s, &["style", "parentStyle"]).map(str::to_string);
-        let named: HashMap<&str, &Node> = root.children_named("style").filter_map(|s| s.attr("name").map(|n| (n, s))).collect();
-        let default_node = root.children_named("style").find(|s| attr(s, &["isDefault", "default"]).is_some_and(parse_bool));
-        let mut base_chain: Vec<&Node> = Vec::new();
-        let mut at = default_node;
-        while let Some(node) = at {
-            if base_chain.iter().any(|seen| std::ptr::eq(*seen, node)) {
-                break;
+        let is_default = |s: &Node| attr(s, &["isDefault", "default"]).is_some_and(parse_bool);
+
+        // Styles are resolved in the order they are defined, and a parent is the style of that
+        // name defined before: a style redefined later (in a report over a style template)
+        // replaces the earlier one for what comes after, not for what already inherited it.
+        // First pass: each style's parent, and the props of each style through its parents.
+        let mut parents: Vec<Option<usize>> = Vec::with_capacity(nodes.len());
+        let mut plain: Vec<StyleProps> = Vec::with_capacity(nodes.len());
+        let mut latest: HashMap<&str, usize> = HashMap::new();
+        for (i, s) in nodes.iter().enumerate() {
+            let parent = parent_of(s).and_then(|p| latest.get(p.as_str()).copied());
+            let props = StyleProps::from_style_node(s);
+            plain.push(match parent {
+                Some(p) => props.over(&plain[p]),
+                None => props,
+            });
+            parents.push(parent);
+            if let Some(name) = s.attr("name") {
+                latest.insert(name, i);
             }
-            base_chain.push(node);
-            at = parent_of(node).and_then(|p| named.get(p.as_str()).copied());
         }
-        let fallback =
-            base_chain.iter().rev().fold(StyleProps::default(), |under, node| StyleProps::from_style_node(node).over(&under));
-        for s in root.children_named("style") {
+        // The default style is the last one marked so. A style without a parent takes what it
+        // does not set from it, as an element without a style does; the default style and its
+        // own ancestors are the exception, since they are what the others fall back on.
+        let default_index = nodes.iter().rposition(is_default);
+        let mut base_chain = Vec::new();
+        let mut at = default_index;
+        while let Some(i) = at.filter(|i| !base_chain.contains(i)) {
+            base_chain.push(i);
+            at = parents[i];
+        }
+        let fallback = default_index.map(|i| plain[i].clone()).unwrap_or_default();
+
+        // Second pass: the styles as elements see them.
+        let mut resolved: Vec<StyleProps> = Vec::with_capacity(nodes.len());
+        let mut styles: HashMap<String, StyleProps> = HashMap::new();
+        let mut raw_conditionals: Vec<(String, String, StyleProps)> = Vec::new();
+        for (i, s) in nodes.iter().enumerate() {
+            let props = StyleProps::from_style_node(s);
+            let props = match parents[i] {
+                Some(p) => props.over(&resolved[p]),
+                None if !base_chain.contains(&i) => props.over(&fallback),
+                None => props,
+            };
+            resolved.push(props.clone());
             let Some(name) = s.attr("name") else { continue };
-            let mut props = StyleProps::from_style_node(s);
-            match parent_of(s) {
-                Some(parent) => {
-                    if let Some(p) = styles.get(&parent) {
-                        props = props.over(p);
-                    }
-                }
-                None if !base_chain.iter().any(|b| std::ptr::eq(*b, s)) => props = props.over(&fallback),
-                None => {}
-            }
+            // A style defined again replaces the conditions of the one before.
+            raw_conditionals.retain(|(n, ..)| n != name);
             for cs in s.children_named("conditionalStyle") {
                 let cond = cs.child("conditionExpression").map(|c| c.text.clone()).unwrap_or_default();
                 let inner = cs.child("style").map(StyleProps::from_style_node).unwrap_or_default();
                 raw_conditionals.push((name.to_string(), cond, inner));
             }
-            if attr(s, &["isDefault", "default"]).is_some_and(parse_bool) {
-                default_style = props.clone();
-                default_name = Some(name.to_string());
-            }
             styles.insert(name.to_string(), props);
         }
+        let default_style = default_index.map(|i| resolved[i].clone()).unwrap_or_default();
+        let default_name = default_index.and_then(|i| nodes[i].attr("name")).map(str::to_string);
         let mut parser = Parser {
             chart_count: 0,
             groovy,
@@ -438,10 +530,8 @@ impl Parser {
             self.datasets.insert(dataset.name.clone(), dataset);
         }
         let Dataset { parameters, fields, variables, groups, .. } = self.dataset(root)?;
-        for unsupported in ["scriptlet", "template"] {
-            if root.child(unsupported).is_some() {
-                self.warnings.push(format!("<{unsupported}> is not supported yet"));
-            }
+        if root.child("scriptlet").is_some() {
+            self.warnings.push("<scriptlet> is not supported yet".into());
         }
         if root.child("queryString").is_some() || root.child("query").is_some() {
             self.warnings.push("embedded SQL query is ignored; data comes from the provided data source".into());
@@ -495,11 +585,24 @@ impl Parser {
             no_data: band(&mut self, "noData")?,
             datasets: Vec::new(),
             uses_data_source: false,
+            horizontal: attr(root, &["printOrder"]) == Some("Horizontal")
+                && attr(root, &["columnCount"]).and_then(number::<u32>).unwrap_or(1) > 1,
+            pdf_page_offsets: {
+                let offset = |name: &str| {
+                    root.children_named("property")
+                        .find(|p| p.attr("name") == Some(&*format!("net.sf.jasperreports.export.pdf.{name}")))
+                        .and_then(|p| p.attr("value"))
+                        .and_then(number::<f32>)
+                        .unwrap_or(0.0)
+                };
+                [
+                    [offset("odd.page.offset.x"), offset("odd.page.offset.y")],
+                    [offset("even.page.offset.x"), offset("even.page.offset.y")],
+                ]
+            },
             warnings: Vec::new(),
         };
-        if report.column_count > 1 && attr(root, &["printOrder"]) == Some("Horizontal") {
-            self.warnings.push("printOrder=\"Horizontal\" is rendered as \"Vertical\"".into());
-        }
+
         let mut report = report;
         let mut datasets: Vec<Dataset> = self.datasets.drain().map(|(_, d)| d).collect();
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
@@ -765,14 +868,16 @@ impl Parser {
     /// A list component (`jr:list`, or `<component kind="list">` in JRXML 7).
     fn list(&mut self, l: &Node) -> Result<ListElement> {
         let run = self.dataset_run(l.child("datasetRun"), "list")?;
-        if attr(l, &["printOrder"]) == Some("Horizontal") {
-            self.warnings.push("lists with printOrder=\"Horizontal\" are rendered vertically".into());
-        }
-        let contents = match l.child("listContents").or_else(|| l.child("contents")) {
+        let node = l.child("listContents").or_else(|| l.child("contents"));
+        let contents = match node {
             Some(c) => self.band(c)?,
             None => Band { height: 0.0, split_type: SplitType::Stretch, print_when: None, elements: Vec::new() },
         };
-        Ok(ListElement { run, contents })
+        let across = (attr(l, &["printOrder"]) == Some("Horizontal"))
+            .then(|| node.and_then(|c| attr(c, &["width"])).and_then(number::<f32>))
+            .flatten()
+            .filter(|w| *w > 0.0);
+        Ok(ListElement { run, contents, across })
     }
 
     /// A table component (`jr:table`, or `<component kind="table">` in JRXML 7).
@@ -1295,8 +1400,10 @@ impl Parser {
         let element_kind = match kind {
             "staticText" | "textField" => {
                 if props.font_name.is_none() {
-                    let note = "text without a font family is drawn in DejaVu Sans; JasperReports uses the JVM's own SansSerif for it, \
-                                which is not embedded and differs between machines, so name a font to get the same pages everywhere";
+                    let note =
+                        "text without a font family is drawn in DejaVu Sans; JasperReports lays it out with the Java runtime's \
+                                SansSerif and writes it in PDF's built-in Helvetica, so the two cannot match: name a font \
+                                (DejaVu Sans, or one you register) to get the same pages from both";
                     if !self.warnings.iter().any(|w| w == note) {
                         self.warnings.push(note.into());
                     }

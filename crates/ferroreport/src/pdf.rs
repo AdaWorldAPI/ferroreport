@@ -27,6 +27,8 @@ pub struct PdfOptions {
     pub tagged: bool,
     /// The language of the text (`en-US`, `es-DO`), for tagged PDFs.
     pub lang: Option<String>,
+    /// Where pages are moved to, odd pages then even ones (x right, y down, in points).
+    pub page_offsets: [[f32; 2]; 2],
 }
 
 /// Compresses a stream. Level 3 is about twice as fast as the default level 6 and only
@@ -477,12 +479,17 @@ impl<W: std::io::Write> PdfStream<W> {
     /// The content stream that draws `items`.
     /// The content stream of `items`, and with tagging the pieces of content in it, in the
     /// order of their marked-content numbers.
-    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<(Vec<u8>, Vec<Node>, usize)> {
+    /// `page` is the page's number from 0: the first page is an odd one.
+    fn draw(&mut self, items: &[PrintItem], fonts: &FontSet, page: usize) -> Result<(Vec<u8>, Vec<Node>, usize)> {
         let tagged = self.tags.is_some();
         let mut flat = Vec::with_capacity(items.len());
         flatten(items, tagged, &mut flat);
         let ph = self.page_height;
         let mut c = Content::new();
+        let [dx, dy] = self.options.page_offsets[page % 2];
+        if dx != 0.0 || dy != 0.0 {
+            c.transform([1.0, 0.0, 0.0, 1.0, dx, -dy]);
+        }
         c.set_line_cap(LineCapStyle::ButtCap);
         // The structure of the page as it is drawn: the pieces of content, numbered in
         // order, inside the tables and cells that are open.
@@ -782,7 +789,7 @@ impl<W: std::io::Write> PdfStream<W> {
 
     /// Adds the next page.
     pub fn page(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
-        let (raw, nodes, numbered) = self.draw(items, fonts)?;
+        let (raw, nodes, numbered) = self.draw(items, fonts, self.pages.len())?;
         let id = self.content_stream(&raw)?;
         self.pages.push(vec![id]);
         if self.tags.is_some() {
@@ -899,7 +906,7 @@ impl<W: std::io::Write> PdfStream<W> {
             // A tagged page is complete when it is written: its structure goes with it.
             return Err(Error::Io("content cannot be added to a page of a tagged PDF once it is written".into()));
         }
-        let (raw, _, _) = self.draw(items, fonts)?;
+        let (raw, _, _) = self.draw(items, fonts, page)?;
         let id = self.content_stream(&raw)?;
         if let Some(p) = self.pages.get_mut(page) {
             p.push(id);

@@ -100,11 +100,17 @@ impl TemplateCache {
         TemplateCache { capacity, entries: Mutex::new((0, HashMap::new())) }
     }
 
-    /// The parsed form of `source`, and whether it came from the cache.
-    fn get(&self, source: &str) -> ferroreport::Result<(Arc<ferroreport::Report>, bool)> {
+    /// The parsed form of `source`, and whether it came from the cache. `parse` reads the
+    /// style templates it uses; a template that uses some is not kept, since they are files
+    /// (or parts of the request) that can change without the template changing.
+    fn get(
+        &self,
+        source: &str,
+        parse: &dyn Fn(&str) -> ferroreport::Result<ferroreport::Report>,
+    ) -> ferroreport::Result<(Arc<ferroreport::Report>, bool)> {
         use std::hash::{Hash, Hasher};
-        if self.capacity == 0 {
-            return Ok((Arc::new(ferroreport::parse(source)?), false));
+        if self.capacity == 0 || source.contains("<template") {
+            return Ok((Arc::new(parse(source)?), false));
         }
         let mut h = std::collections::hash_map::DefaultHasher::new();
         source.hash(&mut h);
@@ -122,7 +128,7 @@ impl TemplateCache {
             }
         }
         // Parsed outside the lock, so a slow template does not hold the others up.
-        let report = Arc::new(ferroreport::parse(source)?);
+        let report = Arc::new(parse(source)?);
         let mut guard = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         let (tick, map) = &mut *guard;
         if map.len() >= self.capacity && !map.contains_key(&key) {
@@ -361,7 +367,19 @@ fn prepare(
     }
     let flag = |name: &str| body.get(name).and_then(|v| v.as_bool()).unwrap_or(false);
     let started = Instant::now();
-    let (report, cached) = state.cache.get(&source).map_err(failed)?;
+    // Style templates are read where images and subreports are: the template's folder, the
+    // resource folders and the files sent with the request.
+    let parse = |text: &str| {
+        let mut r = Renderer::new();
+        for d in &dirs {
+            r = r.resource_dir(d);
+        }
+        for (name, bytes) in &resources {
+            r.add_resource(name, bytes.clone());
+        }
+        r.parse(text)
+    };
+    let (report, cached) = state.cache.get(&source, &parse).map_err(failed)?;
     let counter = if cached { &state.metrics.cache_hits } else { &state.metrics.cache_misses };
     counter.fetch_add(1, Ordering::Relaxed);
     Ok(Job {
@@ -1013,17 +1031,21 @@ mod tests {
             )
         };
         let cache = TemplateCache::new(2);
-        assert!(!cache.get(&t("a")).unwrap().1);
-        assert!(cache.get(&t("a")).unwrap().1);
-        assert!(!cache.get(&t("b")).unwrap().1);
-        assert!(cache.get(&t("a")).unwrap().1);
+        assert!(!cache.get(&t("a"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert!(cache.get(&t("a"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert!(!cache.get(&t("b"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert!(cache.get(&t("a"), &|s| ferroreport::parse(s)).unwrap().1);
         // A third template pushes out the one used longest ago ("b").
-        assert!(!cache.get(&t("c")).unwrap().1);
-        assert!(cache.get(&t("a")).unwrap().1);
-        assert!(!cache.get(&t("b")).unwrap().1);
-        assert_eq!(cache.get(&t("b")).unwrap().0.name, "b");
-        assert!(cache.get("<nonsense").is_err());
-        assert!(!TemplateCache::new(0).get(&t("a")).unwrap().1 && !TemplateCache::new(0).get(&t("a")).unwrap().1);
+        assert!(!cache.get(&t("c"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert!(cache.get(&t("a"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert!(!cache.get(&t("b"), &|s| ferroreport::parse(s)).unwrap().1);
+        assert_eq!(cache.get(&t("b"), &|s| ferroreport::parse(s)).unwrap().0.name, "b");
+        assert!(cache.get("<nonsense", &|s| ferroreport::parse(s)).is_err());
+        let parse = |s: &str| ferroreport::parse(s);
+        assert!(!TemplateCache::new(0).get(&t("a"), &parse).unwrap().1 && !TemplateCache::new(0).get(&t("a"), &parse).unwrap().1);
+        // A template that uses style templates is never kept: they can change on their own.
+        let styled = t("s").replace("/>", "><template><![CDATA[\"s.jrtx\"]]></template></jasperReport>");
+        assert!(!cache.get(&styled, &parse).unwrap().1 && !cache.get(&styled, &parse).unwrap().1);
     }
 
     fn config(addr: &str, token: Option<&str>, allow_anonymous: bool) -> Config {

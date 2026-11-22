@@ -33,7 +33,7 @@
       <a href="#java">Java</a>
       <a href="#rust">Rust</a>
       <b>Reports</b>
-      <a href="#resources">Images and subreports</a>
+      <a href="#resources">Images, subreports, style templates</a>
       <a href="#tables">Tables</a>
       <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
@@ -437,11 +437,11 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td><code>font_substitutions()</code></td><td>Font families the last renders had to replace</td></tr>
       </table>
 
-      <h2 id="resources">Images and subreports</h2>
+      <h2 id="resources">Images, subreports and style templates</h2>
       <p>A template refers to other files by relative path: <code>"logo.png"</code> in an image expression, <code>"lines.jasper"</code> in a
         subreport expression. ferroreport looks for them in the template's folder, then in the resource folders you add, then among the
         resources you pass in memory. A path can never leave those folders, and remote URLs are not fetched.</p>
-      <p>Images are PNG or JPEG. They can also come from the data: a <code>byte[]</code> field with base64 content, or a string field with a
+      <p>Images are PNG, JPEG or GIF (its first picture, with its transparent color). They can also come from the data: a <code>byte[]</code> field with base64 content, or a string field with a
         base64 expression.</p>
       <p>A subreport gets its rows from a nested array in the parent row:</p>
 <pre># Parent row
@@ -453,6 +453,13 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
 &lt;subreportExpression&gt;&lt;![CDATA["lines.jasper"]]&gt;&lt;/subreportExpression&gt;    # read from lines.jrxml</pre>
       <p><code>JRBeanCollectionDataSource</code>, <code>((JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("lines")</code> and
         <code>JREmptyDataSource</code> work the same way. Subreport parameters and return values are supported.</p>
+      <p>Style templates are found the same way: <code>&lt;template&gt;&lt;![CDATA["styles.jrtx"]]&gt;&lt;/template&gt;</code> reads
+        <code>styles.jrtx</code> from the template's folder, a resource folder or the resources in memory (over HTTP, the
+        <code>resources</code> of the request). A <code>.jrtx</code> that includes another is read with it, the included one looked for
+        next to it first. Styles are taken in JasperReports' order: those of each template after the templates it includes, then the
+        report's own; a style defined again replaces the earlier one for what comes after it. The location can be a string or a
+        parameter whose default is one. In Rust, parse with <code>Renderer::parse</code> instead of <code>ferroreport::parse</code>,
+        which does not read files.</p>
 
       <h2 id="tables">Tables</h2>
       <p>Tables (<code>jr:table</code>) work as they do in JasperReports: the table iterates over a <code>&lt;subDataset&gt;</code>
@@ -658,7 +665,7 @@ invoice.jrxml: report `invoice`
 
       <h2 id="support">What is supported</h2>
       <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, charts, barcodes (QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), styled and HTML text,
-        rotation, multi-column layouts and conditional styles, exported to PDF, Excel or CSV. The
+        rotation, multi-column layouts in either print order, conditional styles and style templates, exported to PDF, Excel, CSV or HTML. The
         <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
         feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
     </article>

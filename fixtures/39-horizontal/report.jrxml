@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="Horizontal" columnCount="3" printOrder="Horizontal" pageWidth="400" pageHeight="300" columnWidth="110" columnSpacing="10" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="7"/>
+	<field name="g" class="java.lang.String"/>
+	<field name="n" class="java.lang.Integer"/>
+	<field name="t" class="java.lang.String"/>
+	<group name="G">
+		<groupExpression><![CDATA[$F{g}]]></groupExpression>
+		<groupHeader><band height="14"><textField><reportElement x="0" y="0" width="110" height="14"/><textFieldExpression><![CDATA["GH " + $F{g} + " c" + $V{COLUMN_NUMBER}]]></textFieldExpression></textField></band></groupHeader>
+		<groupFooter><band height="12"><textField><reportElement x="0" y="0" width="110" height="12"/><textFieldExpression><![CDATA["GF " + $F{g} + " c" + $V{COLUMN_NUMBER} + " n" + $V{G_COUNT}]]></textFieldExpression></textField></band></groupFooter>
+	</group>
+	<pageHeader><band height="12"><staticText><reportElement x="0" y="0" width="340" height="12"/><text><![CDATA[PH]]></text></staticText></band></pageHeader>
+	<columnHeader><band height="12"><textField><reportElement x="0" y="0" width="110" height="12"/><textFieldExpression><![CDATA["CH c" + $V{COLUMN_NUMBER}]]></textFieldExpression></textField></band></columnHeader>
+	<detail><band height="12"><textField textAdjust="StretchHeight"><reportElement x="0" y="0" width="110" height="12"/><textFieldExpression><![CDATA["D" + $F{n} + " c" + $V{COLUMN_NUMBER} + " " + $F{t}]]></textFieldExpression></textField></band></detail>
+	<columnFooter><band height="12"><textField><reportElement x="0" y="0" width="110" height="12"/><textFieldExpression><![CDATA["CF c" + $V{COLUMN_NUMBER}]]></textFieldExpression></textField></band></columnFooter>
+	<pageFooter><band height="12"><textField><reportElement x="0" y="0" width="340" height="12"/><textFieldExpression><![CDATA["PF " + $V{PAGE_NUMBER}]]></textFieldExpression></textField></band></pageFooter>
+	<summary><band height="12"><staticText><reportElement x="0" y="0" width="340" height="12"/><text><![CDATA[SUM]]></text></staticText></band></summary>
+</jasperReport>

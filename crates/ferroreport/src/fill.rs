@@ -573,6 +573,9 @@ struct LayoutEnv<'a> {
     /// The report being filled and its rows read so far (crosstabs over the report's data).
     report: &'a Report,
     records: &'a [Row<'a>],
+    /// The least height the band being laid out may end with (the row of a horizontal list
+    /// it shares with taller ones). Only for that band, not for what is inside it.
+    min_height: f32,
 }
 
 /// Evaluates a chart's title, axis labels and range limits.
@@ -1016,6 +1019,7 @@ struct Measured {
 /// below that height is not printed but returned as [`BandLayout::rest`], the way
 /// JasperReports splits a stretching band or frame across pages.
 fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avail: Option<f32>) -> Result<BandLayout> {
+    let min_height = std::mem::take(&mut le.min_height);
     // 0. Pick each element's conditional-style variant.
     let mut resolved: Vec<std::borrow::Cow<Element>> = Vec::with_capacity(original.len());
     for el in original {
@@ -1214,12 +1218,15 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
         new_y[i] = ey[i] + shift.max(0.0);
     }
 
-    // 3. Container height: keep the gap below the lowest element.
-    let design_bottom =
-        (0..elements.len()).filter(|&i| measured[i].visible).map(|i| ey[i] + elements[i].height).fold(0.0f32, f32::max);
-    let new_bottom =
-        (0..elements.len()).filter(|&i| measured[i].visible).map(|i| new_y[i] + measured[i].new_h).fold(0.0f32, f32::max);
-    let height = design_h.max(new_bottom + (design_h - design_bottom).max(0.0));
+    // 3. Container height.
+    // Each element keeps the distance from its bottom to the band's bottom, as in
+    // JasperReports: what stretches pushes the bottom down by its own growth, whatever else
+    // sits lower in the band.
+    let kept = (0..elements.len())
+        .filter(|&i| measured[i].visible)
+        .map(|i| new_y[i] + measured[i].new_h + (design_h - (ey[i] + elements[i].height)).max(0.0))
+        .fold(0.0f32, f32::max);
+    let height = design_h.max(kept).max(min_height);
     let growth = height - design_h;
 
     // 4. Emit primitives, cutting at `avail` when the content does not fit.
@@ -1990,6 +1997,7 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
         let list = ListElement {
             run: run.clone(),
             contents: Band { height: 0.0, split_type: SplitType::Stretch, print_when: None, elements: Vec::new() },
+            across: None,
         };
         let report = crate::table::list_report(&list, el.width);
         for (name, e) in &run.parameters {
@@ -2352,6 +2360,7 @@ fn place_cell(
         charts: le.charts,
         report: le.report,
         records: le.records,
+        min_height: 0.0,
     };
     let layout = layout_elements(&mut cell_le, std::slice::from_ref(&frame), y + h, None)?;
     out.extend(layout.items);
@@ -2467,6 +2476,12 @@ struct Filler<'a> {
     /// once per group: a count with `incrementType="Group"` counts groups.
     stepped: Vec<Option<VarState>>,
     groups_read_variables: bool,
+    /// With `printOrder="Horizontal"`: the row of columns being filled (its top, its height).
+    row: Option<(f32, f32)>,
+    /// The height of each row filled so far, or, given beforehand, the height each row of a
+    /// horizontal list ends with; and which row is being filled.
+    row_heights: Vec<f32>,
+    row_index: usize,
     /// Whether the column/page footer of the current page has been printed already.
     footers_done: bool,
     /// Groups from this index on are starting: their headers must not be reprinted by a
@@ -2647,6 +2662,12 @@ impl<'a> Filler<'a> {
     }
 
     fn layout(&mut self, band: &Band, mode: Values) -> Result<Option<BandLayout>> {
+        self.layout_within(band, mode, None, 0.0)
+    }
+
+    /// Lays out a band, cut at `avail` points when given (what does not fit is dropped),
+    /// and at least `min_height` tall.
+    fn layout_within(&mut self, band: &Band, mode: Values, avail: Option<f32>, min_height: f32) -> Result<Option<BandLayout>> {
         let record = self.rows.record(mode);
         let vars: Vec<VarState> = self.ctx_vars(mode).to_vec();
         let ctx = Ctx {
@@ -2674,8 +2695,9 @@ impl<'a> Filler<'a> {
             charts: &self.chart_data,
             report: self.report,
             records: self.rows.seen(),
+            min_height,
         };
-        let mut layout = layout_elements(&mut le, &band.elements, band.height, None)?;
+        let mut layout = layout_elements(&mut le, &band.elements, band.height, avail)?;
         self.plan_auto(&mut layout, record, &vars);
         Ok(Some(layout))
     }
@@ -2704,6 +2726,7 @@ impl<'a> Filler<'a> {
             charts: &self.chart_data,
             report: self.report,
             records: self.rows.seen(),
+            min_height: 0.0,
         };
         let mut layout = layout_elements(&mut le, elements, design_h, avail)?;
         self.plan_auto(&mut layout, record, &vars);
@@ -2837,6 +2860,7 @@ impl<'a> Filler<'a> {
             page_width: self.report.page_width,
             page_height: self.report.page_height,
             landscape: self.report.landscape,
+            pdf_page_offsets: self.report.pdf_page_offsets,
             pages: self.pages,
         }
     }
@@ -2916,7 +2940,20 @@ impl<'a> Filler<'a> {
             self.print_band_at_offset(b, Values::Committed)?;
         }
         self.column_top = self.offset_y;
-        self.column_header()?;
+        if self.report.horizontal {
+            // Every column has its header at once: the rows run across them.
+            let mut bottom = self.column_top;
+            for c in 0..self.report.column_count.max(1) {
+                self.column = c;
+                self.offset_y = self.column_top;
+                self.column_header()?;
+                bottom = bottom.max(self.offset_y);
+            }
+            self.column = 0;
+            self.offset_y = bottom;
+        } else {
+            self.column_header()?;
+        }
         self.flow_header = false;
         if self.page_number > 1 {
             let limit = self.starting_group.unwrap_or(self.report.groups.len());
@@ -2947,7 +2984,16 @@ impl<'a> Filler<'a> {
             return self.resolve_pending(|t| matches!(t.time, EvaluationTime::Page | EvaluationTime::Column), mode);
         }
         let pf_h = footer.map(|b| b.height).unwrap_or(0.0);
-        self.column_footer(mode, pf_h)?;
+        if r.horizontal {
+            self.end_row();
+            for c in 0..r.column_count.max(1) {
+                self.column = c;
+                self.column_footer(mode, pf_h)?;
+            }
+            self.column = 0;
+        } else {
+            self.column_footer(mode, pf_h)?;
+        }
         if let Some(pf) = footer {
             if let Some(l) = self.layout(pf, mode)? {
                 let y = r.page_height - r.margins.bottom - pf_h;
@@ -2989,7 +3035,9 @@ impl<'a> Filler<'a> {
         if self.flow.is_some() {
             return Ok(());
         }
-        if self.column + 1 >= self.report.column_count.max(1) {
+        // Across the columns, a new column means a new page: the columns are one row.
+        if self.column + 1 >= self.report.column_count.max(1) || self.report.horizontal {
+            self.end_row();
             return self.page_break(mode);
         }
         let pf_h = self.page_footer_band(false).map(|b| b.height).unwrap_or(0.0);
@@ -3007,10 +3055,63 @@ impl<'a> Filler<'a> {
         self.column_header()
     }
 
+    /// With `printOrder="Horizontal"`: the detail bands of the current record, in the next
+    /// column of the current row, or at the start of a new row. JasperReports does not let
+    /// them grow there: what does not fit in a band's height is cut.
+    fn print_detail_across(&mut self) -> Result<()> {
+        let r = self.report;
+        let cell_h: f32 = r.detail.iter().map(|b| b.height).sum();
+        if self.row.is_none() {
+            if self.page_has_content && self.offset_y + cell_h > self.body_limit() + 1e-3 {
+                self.page_break(Values::Committed)?;
+            }
+            self.row = Some((self.offset_y, 0.0));
+            self.column = 0;
+        }
+        let (top, height) = self.row.unwrap_or((self.offset_y, 0.0));
+        let mut y = top;
+        // In a report, JasperReports does not let a band in a row grow; in a list it does,
+        // and every cell of a row is as tall as the tallest (see `fill_flow`).
+        let (avail, min) = match self.flow {
+            Some(_) => (None, self.row_heights.get(self.row_index).copied().filter(|_| r.detail.len() == 1).unwrap_or(0.0)),
+            None => (Some(0.0), 0.0),
+        };
+        self.in_column = true;
+        for band in &r.detail {
+            let avail = avail.map(|_| band.height);
+            if let Some(l) = self.layout_within(band, Values::Estimated, avail, min)? {
+                let h = l.height;
+                self.emit(l, y);
+                y += h;
+                self.page_has_content = true;
+            }
+        }
+        self.in_column = false;
+        self.row = Some((top, height.max(y - top)));
+        self.column += 1;
+        if self.column >= r.column_count.max(1) {
+            self.end_row();
+        }
+        Ok(())
+    }
+
+    /// Ends the row of columns being filled, if any: what follows goes below it.
+    fn end_row(&mut self) {
+        if let Some((top, height)) = self.row.take() {
+            self.offset_y = top + height;
+            self.column = 0;
+            if self.row_index >= self.row_heights.len() {
+                self.row_heights.push(height);
+            }
+            self.row_index += 1;
+        }
+    }
+
     fn page_break(&mut self, mode: Values) -> Result<()> {
         if self.flow.is_some() {
             return Ok(());
         }
+        self.row = None;
         self.page_footers(false, mode)?;
         self.new_page()?;
         self.page_headers()
@@ -3321,6 +3422,7 @@ impl<'a> Filler<'a> {
         let mut more = !no_data;
         while more {
             if let Some(gi) = self.group_rupture()? {
+                self.end_row();
                 if idx > 0 {
                     self.group_footers(gi, Values::Old)?;
                 }
@@ -3337,8 +3439,12 @@ impl<'a> Filler<'a> {
             self.estimated = Some(self.calculate(&self.committed.clone())?);
             self.returned.clear();
             self.increment_charts(|i| *i == crate::chart::Increment::Record, Values::Estimated)?;
-            for band in &r.detail {
-                self.print_body_band(band, Values::Estimated)?;
+            if r.horizontal {
+                self.print_detail_across()?;
+            } else {
+                for band in &r.detail {
+                    self.print_body_band(band, Values::Estimated)?;
+                }
             }
             self.changed_groups.clear();
             if let Some(est) = self.estimated.take() {
@@ -3352,7 +3458,13 @@ impl<'a> Filler<'a> {
         }
 
         // End of data: closing group footers see the last record.
+        self.end_row();
         if !no_data {
+            self.group_footers(0, Values::Committed)?;
+        } else if r.when_no_data == WhenNoData::AllSectionsNoDetail && !r.groups.is_empty() {
+            // Without rows, every section but the detail prints once: the groups' headers
+            // and footers too, with nothing in their fields.
+            self.group_headers(0)?;
             self.group_footers(0, Values::Committed)?;
         }
         self.finish()
@@ -3487,8 +3599,18 @@ fn fill_flow(
     images: &mut ImageStore,
     env: &EvalEnv,
 ) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
+    // A horizontal list is filled twice: once to learn how tall each row ends, since every
+    // cell of a row is as tall as its tallest, and once to lay the cells out at that height.
+    let mut row_heights = Vec::new();
+    if report.horizontal {
+        let mut first = new_filler(report, Rows::from_slice(records, report), params.clone(), fonts, images, env)?;
+        first.flow = Some(Vec::new());
+        first.run()?;
+        row_heights = std::mem::take(&mut first.row_heights);
+    }
     let mut filler = new_filler(report, Rows::from_slice(records, report), params, fonts, images, env)?;
     filler.flow = Some(Vec::new());
+    filler.row_heights = row_heights;
     filler.run()?;
     let vars = filler.var_index.iter().map(|(name, &i)| (name.clone(), filler.committed[i].value.clone())).collect();
     let marks = filler.flow.take().unwrap_or_default();
@@ -3502,6 +3624,7 @@ fn fill_flow(
             segments.push(Segment { height: first.y, items: Vec::new(), header: false, footer: false });
         }
     }
+    let mut last_y = f32::NAN;
     for mark in &marks {
         let mut seg = Vec::with_capacity(mark.items.len());
         for slot in &mut items[mark.items.clone()] {
@@ -3510,7 +3633,15 @@ fn fill_flow(
                 seg.push(item);
             }
         }
-        segments.push(Segment { height: mark.height, items: seg, header: mark.header, footer: false });
+        // The cells of one row of a horizontal list start at the same height: one segment.
+        match segments.last_mut() {
+            Some(row) if report.horizontal && (mark.y - last_y).abs() < 1e-3 => {
+                row.height = row.height.max(mark.height);
+                row.items.extend(seg);
+            }
+            _ => segments.push(Segment { height: mark.height, items: seg, header: mark.header, footer: false }),
+        }
+        last_y = mark.y;
     }
     if !marks.is_empty() && report.margins.bottom > 0.0 {
         segments.push(Segment { height: report.margins.bottom, items: Vec::new(), header: false, footer: false });
@@ -3627,6 +3758,9 @@ fn new_filler<'a>(
         group_values: vec![None; report.groups.len()],
         stepped,
         groups_read_variables,
+        row: None,
+        row_heights: Vec::new(),
+        row_index: 0,
         defs,
         var_index,
         committed,

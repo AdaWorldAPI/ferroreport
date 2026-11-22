@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="PageOffsets" whenNoDataType="AllSectionsNoDetail" pageWidth="400" pageHeight="300" columnWidth="340" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+	<!-- PDF pages moved for binding: odd pages right and down, even pages left. -->
+	<property name="net.sf.jasperreports.export.pdf.odd.page.offset.x" value="12"/>
+	<property name="net.sf.jasperreports.export.pdf.odd.page.offset.y" value="6"/>
+	<property name="net.sf.jasperreports.export.pdf.even.page.offset.x" value="-12"/>
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<field name="city" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<variable name="CityTotal" class="java.lang.Double" resetType="Group" resetGroup="City" calculation="Sum">
+		<variableExpression><![CDATA[$F{amount}]]></variableExpression>
+	</variable>
+	<!-- With no rows, the group's header and footer still print once (whenNoDataType="AllSectionsNoDetail"). -->
+	<group name="City">
+		<groupExpression><![CDATA[$F{city}]]></groupExpression>
+		<groupHeader>
+			<band height="18">
+				<textField>
+					<reportElement mode="Opaque" x="0" y="2" width="340" height="14" backcolor="#DDDDDD"/>
+					<textFieldExpression><![CDATA["City: " + $F{city}]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupHeader>
+		<groupFooter>
+			<band height="16">
+				<textField>
+					<reportElement x="0" y="1" width="340" height="14"/>
+					<textElement textAlignment="Right"/>
+					<textFieldExpression><![CDATA["Rows: " + $V{City_COUNT} + ", total: " + $V{CityTotal}]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupFooter>
+	</group>
+	<title>
+		<band height="30">
+			<staticText>
+				<reportElement x="0" y="0" width="340" height="20"/>
+				<textElement><font size="14" isBold="true"/></textElement>
+				<text><![CDATA[Sales by city]]></text>
+			</staticText>
+			<line><reportElement x="0" y="24" width="340" height="1"/></line>
+		</band>
+	</title>
+	<detail>
+		<band height="14">
+			<textField><reportElement x="10" y="0" width="200" height="14"/><textFieldExpression><![CDATA[$F{city}]]></textFieldExpression></textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="16">
+			<textField><reportElement x="0" y="2" width="340" height="14"/><textElement textAlignment="Center"/><textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField>
+		</band>
+	</pageFooter>
+	<summary>
+		<band height="20">
+			<staticText><reportElement x="0" y="4" width="340" height="14"/><text><![CDATA[No sales in this period.]]></text></staticText>
+		</band>
+	</summary>
+</jasperReport>

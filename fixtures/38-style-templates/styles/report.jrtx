@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperTemplate xmlns="http://jasperreports.sourceforge.net/jasperreports/template">
+	<!-- Found next to this file. -->
+	<template>base.jrtx</template>
+	<style name="Strong" style="Base" isUnderline="true" forecolor="#AA0000"/>
+	<style name="Serif" fontName="DejaVu Serif" fontSize="11"/>
+	<style name="Flagged" style="Base">
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$F{flag}]]></conditionExpression>
+			<style forecolor="#0000CC" isItalic="true"/>
+		</conditionalStyle>
+	</style>
+</jasperTemplate>

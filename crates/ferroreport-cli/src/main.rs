@@ -2,7 +2,7 @@
 
 use ferroreport::model::{Band, ElementKind, Report};
 use ferroreport::Renderer;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
@@ -185,7 +185,6 @@ fn render(args: &[String]) -> CliResult {
 
     let started = Instant::now();
     let source = std::fs::read_to_string(&template).map_err(|e| format!("{template}: {e}"))?;
-    let report = ferroreport::parse(&source)?;
     let params_json = match &params {
         Some(p) => read_json(p)?,
         None => serde_json::Value::Object(Default::default()),
@@ -202,6 +201,8 @@ fn render(args: &[String]) -> CliResult {
     for dir in &resources {
         renderer = renderer.resource_dir(dir);
     }
+    // Parsed here, where the resource folders are known: style templates are read from them.
+    let report = renderer.parse(&source)?;
     if let Some(n) = now {
         let dt = ferroreport::data::parse_datetime(&n).ok_or("--now expects YYYY-MM-DDTHH:MM:SS")?;
         renderer = renderer.now(dt);
@@ -383,7 +384,8 @@ fn count_elements(band: &Band, counts: &mut std::collections::BTreeMap<String, u
 fn doctor(args: &[String]) -> CliResult {
     let path = args.first().ok_or("missing template path")?;
     let source = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
-    let report: Report = match ferroreport::parse(&source) {
+    let dir = Path::new(path).parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let report: Report = match Renderer::new().resource_dir(dir).parse(&source) {
         Ok(r) => r,
         Err(e) => {
             println!("✗ {path}: cannot be loaded\n  {e}");

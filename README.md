@@ -215,13 +215,13 @@ spreadsheet made from a template looks the way it did with Jasper:
 
 | Area | Supported | Not yet |
 |---|---|---|
-| Templates | JRXML 6.x schema; JRXML 7 element syntax; subdatasets (for tables) | `.jasper` files (by design), scriptlets, style templates, subdataset queries |
-| Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical print order, `isStartNewColumn`, column breaks) | horizontal print order |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG/JPEG from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical), charts, barcodes (barcode4j components: QR code, Code 128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, horizontal lists, UPC-E, EAN-128, PDF417, DataMatrix, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes |
+| Templates | JRXML 6.x schema; JRXML 7 element syntax; subdatasets (for tables); style templates (`<template>`, `.jrtx` files, with the templates they include, found next to the report or in a resource folder) | `.jasper` files (by design), scriptlets, subdataset queries |
+| Bands | title, page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical and horizontal print order, `isStartNewColumn`, column breaks); with no rows and `AllSectionsNoDetail`, group headers and footers print once | |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG, JPEG or GIF from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical), charts, barcodes (barcode4j components: QR code, Code 128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, Interleaved 2 of 5, Codabar), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, horizontal lists, UPC-E, EAN-128, PDF417, DataMatrix, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled and HTML markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks, lists), also across page breaks; rotation (Left, Right, UpsideDown) | RTF markup |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
-| Styles | default style (also what styles without a parent inherit from), parent styles, element overrides, conditional styles (up to 4 per style) | style templates (`<template>`, `.jrtx` files) |
-| Images | scale modes RetainShape, FillFrame, Clip; alignment; `onErrorType` | remote URLs (by design), SVG and other formats |
+| Styles | default style (also what styles without a parent inherit from), parent styles, element overrides, conditional styles (up to 4 per style), styles from style templates (a style defined again replaces the earlier one for what comes after, as in JasperReports) | |
+| Images | PNG, JPEG and GIF (its first frame, with its transparent color); scale modes RetainShape, FillFrame, Clip; alignment; `onErrorType` | remote URLs (by design), SVG and other formats |
 | Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, scatter; titles, legends, axis labels, series colors, range limits, tick formats; datasets by record, group, page or report, with `evaluationTime` | time series, meter, thermometer, Gantt, candlestick, bubble, multi-axis, chart customizers. Charts follow JFreeChart's default look closely but are not pixel-identical |
 | Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), parameters, return values, splitting across pages with reprinted column headers | JDBC connections |
 | Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | embedded SQL queries (data comes from JSON) |
@@ -241,12 +241,12 @@ Run `ferroreport doctor template.jrxml` to get this verdict for a specific templ
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-32 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
+38 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
 (`crates/ferroreport/tests/barcode4j.rs`).
 
 `tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
 XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
-same, and every picture anchored to the same cells. All 34 fixtures pass. Jasper's output for five
+same, and every picture anchored to the same cells. All 40 fixtures pass. Jasper's output for five
 of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 | Fixture | What it exercises | Result |
@@ -286,6 +286,12 @@ of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them withou
 | 33-page-x-of-y | "Page X of Y", a grand total in the title and group totals in group headers: values known only later, added to pages already written | identical |
 | 34-late-values-overlap | Late values with something drawn over them (a stamp over a total, a line across a page count): the page waits for the value | identical |
 | 35-auto-increment-styles | `evaluationTime="Auto"`, `incrementType`, a group expression that reads a variable, `resetType="None"`, `msg()`, styles without a parent | identical |
+| 36-no-rows-groups-offsets | No rows with `AllSectionsNoDetail`: group header and footer print once; PDF page offsets for binding | identical |
+| 37-page-offsets | Odd and even pages moved in opposite directions (`net.sf.jasperreports.export.pdf.odd.page.offset.x` and siblings) | identical |
+| 38-style-templates | Styles from a `.jrtx` that includes another, a style redefined, a conditional style in a template, the report's own style over a template's | identical |
+| 39-horizontal | `printOrder="Horizontal"`: records across a row of columns, group bands on rows of their own, a detail band that does not grow | identical |
+| 40-horizontal-new-page | Horizontal order with `isStartNewColumn` (a new page) and `isReprintHeaderOnEachPage` | identical |
+| 41-horizontal-list | A `jr:list` with `printOrder="Horizontal"`: cards side by side, each row as tall as its tallest card | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -313,20 +319,22 @@ database connection.
 
 | Result | Templates |
 |---|---|
-| The same pages | 14 |
-| Both render it, the pages differ | 54 |
-| ferroreport refuses it or fails on it | 19 |
+| The same pages | 17 |
+| Both render it, the pages differ | 53 |
+| ferroreport refuses it or fails on it | 17 |
 | JasperReports cannot render it from rows and parameters alone (it needs the sample's Java objects, a database connection or other files), so there is nothing to compare | 53 |
 
-So 14 of the 87 that can be compared come out the same; 21 of those 87 name no font for
-some of their text, which JasperReports then draws with whatever the Java runtime has, and 14
-of the 66 that do name their fonts come out the same. [Every template with its result and
+So 17 of the 87 that can be compared come out the same; 20 of those 87 name no font for
+some of their text, which JasperReports writes in PDF's built-in Helvetica and ferroreport in
+DejaVu Sans, so those cannot match, and 17
+of the 67 that do name their fonts come out the same. [Every template with its result and
 the reason](docs/samples.md). Most of the differences are charts (drawn to look like
 JFreeChart's, not pixel for pixel, and nine kinds are not drawn at all), elements that are
-not supported (maps, PDF form fields, RTF markup, horizontal print order) and expressions that
-call the sample's own Java classes, which ferroreport never runs. Rendering these samples is
-also how seven differences in how variables, styles and repeated values are evaluated were found and fixed
-for 0.9.0.
+not supported (maps, PDF form fields, RTF markup, HTML lists) and expressions that call the
+sample's own Java classes, which ferroreport never runs. Rendering these samples is also how
+differences in how variables, styles, repeated values and the height of a band are evaluated
+were found and fixed, and why style templates, GIF images, horizontal print order and PDF
+page offsets are supported.
 
 ## Performance
 

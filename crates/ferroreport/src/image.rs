@@ -91,6 +91,11 @@ impl ImageStore {
         texts
     }
 
+    /// A resource by relative location, when there is one.
+    pub(crate) fn read_resource(&self, location: &str) -> Option<Vec<u8>> {
+        self.read(location).ok()
+    }
+
     /// Reads a resource by relative location: in-memory files first, then the directories.
     fn read(&self, location: &str) -> Result<Vec<u8>> {
         check_relative(location)?;
@@ -135,7 +140,7 @@ impl ImageStore {
         };
         let bytes = self.read(&source)?;
         let text = String::from_utf8(bytes).map_err(|_| Error::Data(format!("subreport `{source}` is not UTF-8")))?;
-        let report = Arc::new(crate::jrxml::parse_report(&text)?);
+        let report = Arc::new(crate::jrxml::parse_report_with(&text, &|l| self.read(l).ok())?);
         self.reports.insert(location.to_string(), report.clone());
         Ok(report)
     }
@@ -178,8 +183,10 @@ impl ImageStore {
             decode_png(bytes, id)?
         } else if bytes.starts_with(&[0xFF, 0xD8]) {
             decode_jpeg(bytes, id)?
+        } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+            decode_gif(bytes, id)?
         } else {
-            return Err(Error::Unsupported("image format (only PNG and JPEG are supported)".into()));
+            return Err(Error::Unsupported("image format (only PNG, JPEG and GIF are supported)".into()));
         };
         Ok(Arc::new(img))
     }
@@ -258,6 +265,181 @@ fn decode_png(bytes: &[u8], id: usize) -> Result<ImageData> {
         alpha = None;
     }
     Ok(ImageData { id, width: info.width, height: info.height, pixels: Pixels::Raw { samples, gray, alpha } })
+}
+
+/// The first picture of a GIF file, as JasperReports takes it (its other frames, for
+/// animations, are not drawn). The transparent color, if there is one, becomes transparent.
+fn decode_gif(bytes: &[u8], id: usize) -> Result<ImageData> {
+    let bad = |what: &str| Error::Data(format!("GIF: {what}"));
+    let byte = |i: usize| bytes.get(i).copied().ok_or_else(|| bad("the file ends too soon"));
+    let word = |i: usize| -> Result<usize> { Ok(byte(i)? as usize | (byte(i + 1)? as usize) << 8) };
+    let table = |at: usize, packed: u8| -> Result<Vec<[u8; 3]>> {
+        let n = 2usize << (packed & 7);
+        let raw = bytes.get(at..at + 3 * n).ok_or_else(|| bad("the color table is cut short"))?;
+        Ok(raw.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect())
+    };
+    let screen_packed = byte(10)?;
+    let mut at = 13;
+    let global = if screen_packed & 0x80 != 0 {
+        let t = table(at, screen_packed)?;
+        at += 3 * t.len();
+        Some(t)
+    } else {
+        None
+    };
+    let mut transparent = None;
+    loop {
+        match byte(at)? {
+            // An extension: a graphic control block may name the transparent color.
+            0x21 => {
+                if byte(at + 1)? == 0xF9 && byte(at + 2)? >= 4 && byte(at + 3)? & 1 != 0 {
+                    transparent = Some(byte(at + 6)?);
+                }
+                at += 2;
+                loop {
+                    let n = byte(at)? as usize;
+                    at += 1 + n;
+                    if n == 0 {
+                        break;
+                    }
+                }
+            }
+            0x2C => break,
+            0x3B => return Err(bad("there is no picture in it")),
+            other => return Err(bad(&format!("unknown block {other:#04x}"))),
+        }
+    }
+    let (width, height, packed) = (word(at + 5)?, word(at + 7)?, byte(at + 9)?);
+    if width == 0 || height == 0 || width as u64 * height as u64 > MAX_PIXELS {
+        return Err(bad(&format!("{width}×{height} pixels is not an image size that is allowed")));
+    }
+    at += 10;
+    let local;
+    let colors = if packed & 0x80 != 0 {
+        local = table(at, packed)?;
+        at += 3 * local.len();
+        &local
+    } else {
+        global.as_ref().ok_or_else(|| bad("there is no color table"))?
+    };
+    let min_size = byte(at)?;
+    if !(1..=11).contains(&min_size) {
+        return Err(bad("the compressed data is not valid"));
+    }
+    at += 1;
+    let mut data = Vec::new();
+    loop {
+        let n = byte(at)? as usize;
+        if n == 0 {
+            break;
+        }
+        data.extend_from_slice(bytes.get(at + 1..at + 1 + n).ok_or_else(|| bad("the compressed data is cut short"))?);
+        at += 1 + n;
+    }
+    let indexes = lzw(&data, min_size, width * height).ok_or_else(|| bad("the compressed data is not valid"))?;
+    // Interlaced rows come in four passes: every 8th from 0, every 8th from 4, every 4th
+    // from 2, every 2nd from 1.
+    let order: Vec<usize> = if packed & 0x40 != 0 {
+        [(0, 8), (4, 8), (2, 4), (1, 2)].iter().flat_map(|&(start, step)| (start..height).step_by(step)).collect()
+    } else {
+        (0..height).collect()
+    };
+    let mut samples = vec![0u8; width * height * 3];
+    let mut alpha = transparent.map(|_| vec![255u8; width * height]);
+    for (source, &row) in order.iter().enumerate() {
+        for x in 0..width {
+            let index = indexes.get(source * width + x).copied().unwrap_or(0);
+            let at = row * width + x;
+            let color = colors.get(index as usize).copied().unwrap_or([0, 0, 0]);
+            samples[at * 3..at * 3 + 3].copy_from_slice(&color);
+            if let (Some(a), Some(t)) = (&mut alpha, transparent) {
+                if index == t {
+                    a[at] = 0;
+                }
+            }
+        }
+    }
+    Ok(ImageData { id, width: width as u32, height: height as u32, pixels: Pixels::Raw { samples, gray: false, alpha } })
+}
+
+/// Decodes GIF's variable-length LZW into at most `limit` color indexes.
+fn lzw(data: &[u8], min_size: u8, limit: usize) -> Option<Vec<u8>> {
+    let clear = 1usize << min_size;
+    let end = clear + 1;
+    // Each code: the code before it (or none) and its last index; its length.
+    let mut prefix: Vec<u16> = Vec::with_capacity(4096);
+    let mut last: Vec<u8> = Vec::with_capacity(4096);
+    let mut length: Vec<u16> = Vec::with_capacity(4096);
+    let reset = |prefix: &mut Vec<u16>, last: &mut Vec<u8>, length: &mut Vec<u16>| {
+        prefix.clear();
+        last.clear();
+        length.clear();
+        for i in 0..clear + 2 {
+            prefix.push(u16::MAX);
+            last.push(i as u8);
+            length.push(1);
+        }
+    };
+    reset(&mut prefix, &mut last, &mut length);
+    let mut out: Vec<u8> = Vec::with_capacity(limit);
+    let (mut size, mut bits, mut held, mut pos) = (min_size as u32 + 1, 0u32, 0u32, 0usize);
+    let mut previous: Option<usize> = None;
+    let first_of = |code: usize, prefix: &[u16], last: &[u8]| {
+        let mut c = code;
+        while prefix[c] != u16::MAX {
+            c = prefix[c] as usize;
+        }
+        last[c]
+    };
+    while out.len() < limit {
+        while bits < size {
+            let Some(&b) = data.get(pos) else { return Some(out) };
+            held |= (b as u32) << bits;
+            bits += 8;
+            pos += 1;
+        }
+        let code = (held & ((1 << size) - 1)) as usize;
+        held >>= size;
+        bits -= size;
+        if code == clear {
+            reset(&mut prefix, &mut last, &mut length);
+            size = min_size as u32 + 1;
+            previous = None;
+            continue;
+        }
+        if code == end {
+            break;
+        }
+        let known = code < prefix.len();
+        if let Some(p) = previous {
+            if !known && code != prefix.len() {
+                return None;
+            }
+            if prefix.len() < 4096 {
+                let first = if known { first_of(code, &prefix, &last) } else { first_of(p, &prefix, &last) };
+                prefix.push(p as u16);
+                last.push(first);
+                length.push(length[p] + 1);
+                if prefix.len() == 1 << size && size < 12 {
+                    size += 1;
+                }
+            }
+        } else if !known {
+            return None;
+        }
+        // Write the code's indexes, last first, into their place.
+        let n = length[code] as usize;
+        let start = out.len();
+        out.resize(start + n, 0);
+        let mut c = code;
+        for i in (0..n).rev() {
+            out[start + i] = last[c];
+            c = if prefix[c] == u16::MAX { c } else { prefix[c] as usize };
+        }
+        previous = Some(code);
+    }
+    out.truncate(limit);
+    Some(out)
 }
 
 fn decode_jpeg(bytes: &[u8], id: usize) -> Result<ImageData> {

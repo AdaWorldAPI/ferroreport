@@ -1,0 +1,112 @@
+[
+{
+"customer": "Grupo Ramos",
+"contacts": [
+{
+"name": "Ana Peña",
+"role": "Compras",
+"note": null
+},
+{
+"name": "Luis Mejía",
+"role": "Contabilidad",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+},
+{
+"name": "Rosa Díaz",
+"role": "Gerencia",
+"note": null
+},
+{
+"name": "Juan Pérez",
+"role": "Almacén",
+"note": null
+},
+{
+"name": "Marta Cruz",
+"role": "Compras",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+},
+{
+"name": "Pedro Gil",
+"role": "Contabilidad",
+"note": null
+},
+{
+"name": "Sofía Ruiz",
+"role": "Gerencia",
+"note": null
+}
+]
+},
+{
+"customer": "Ferretería Ochoa",
+"contacts": [
+{
+"name": "Ana Peña",
+"role": "Compras",
+"note": null
+},
+{
+"name": "Luis Mejía",
+"role": "Contabilidad",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+}
+]
+},
+{
+"customer": "Caribe Motors",
+"contacts": [
+{
+"name": "Ana Peña",
+"role": "Compras",
+"note": null
+},
+{
+"name": "Luis Mejía",
+"role": "Contabilidad",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+},
+{
+"name": "Rosa Díaz",
+"role": "Gerencia",
+"note": null
+},
+{
+"name": "Juan Pérez",
+"role": "Almacén",
+"note": null
+}
+]
+},
+{
+"customer": "Distribuidora Norte",
+"contacts": [
+{
+"name": "Ana Peña",
+"role": "Compras",
+"note": null
+},
+{
+"name": "Luis Mejía",
+"role": "Contabilidad",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+},
+{
+"name": "Rosa Díaz",
+"role": "Gerencia",
+"note": null
+},
+{
+"name": "Juan Pérez",
+"role": "Almacén",
+"note": null
+},
+{
+"name": "Marta Cruz",
+"role": "Compras",
+"note": "Llamar antes de las 10 de la mañana, nunca los viernes por la tarde"
+}
+]
+}
+]

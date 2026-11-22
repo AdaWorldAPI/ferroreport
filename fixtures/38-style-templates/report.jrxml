@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="StyleTemplates" pageWidth="400" pageHeight="260" columnWidth="360" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<!-- Styles from a template, which includes another; the report's own style comes last. -->
+	<template><![CDATA["styles/report.jrtx"]]></template>
+	<style name="Note" style="Serif" isItalic="true" forecolor="#555555"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="flag" class="java.lang.Boolean"/>
+	<title>
+		<band height="70">
+			<staticText><reportElement style="Very Strong" x="0" y="0" width="360" height="18"/><text><![CDATA[Very Strong: bold, grey, from base.jrtx]]></text></staticText>
+			<staticText><reportElement style="Strong" x="0" y="20" width="360" height="16"/><text><![CDATA[Strong: underlined and red, from report.jrtx]]></text></staticText>
+			<staticText><reportElement x="0" y="38" width="360" height="16"/><text><![CDATA[No style: the default style, Base]]></text></staticText>
+			<staticText><reportElement style="Note" x="0" y="54" width="360" height="16"/><text><![CDATA[Note: the report's own, over Serif]]></text></staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="16">
+			<textField><reportElement style="Flagged" x="0" y="0" width="360" height="16"/><textFieldExpression><![CDATA[$F{name} + ($F{flag} ? " (flagged)" : "")]]></textFieldExpression></textField>
+		</band>
+	</detail>
+</jasperReport>

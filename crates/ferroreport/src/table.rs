@@ -233,13 +233,19 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         no_data,
         datasets: Vec::new(),
         uses_data_source: true,
+        horizontal: false,
+        pdf_page_offsets: Default::default(),
         warnings: Vec::new(),
     }
 }
 
-/// The report JasperReports effectively fills for a vertical list: the contents as the detail
-/// band, nothing else.
+/// The report JasperReports effectively fills for a list: the contents as the detail band,
+/// nothing else; a horizontal list fills them across as many columns as fit.
 pub fn list_report(list: &ListElement, width: f32) -> Report {
+    let (columns, column_width) = match list.across {
+        Some(w) => (((width / w).floor() as u32).max(1), w),
+        None => (1, width),
+    };
     let run = &list.run;
     let dataset = run.dataset.clone().unwrap_or(Dataset {
         name: "list".into(),
@@ -256,8 +262,8 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         page_width: width,
         page_height: run.page_height,
         landscape: false,
-        column_width: width,
-        column_count: 1,
+        column_width,
+        column_count: columns,
         column_spacing: 0.0,
         margins: Margins { left: 0.0, right: 0.0, top: 0.0, bottom: 0.0 },
         when_no_data: WhenNoData::NoPages,
@@ -281,6 +287,8 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         no_data: None,
         datasets: Vec::new(),
         uses_data_source: true,
+        horizontal: columns > 1,
+        pdf_page_offsets: Default::default(),
         warnings: Vec::new(),
     }
 }

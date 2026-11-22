@@ -21,10 +21,11 @@ fn fixtures_render_with_expected_page_counts() {
             let p = dir.join(name);
             serde_json::from_str(&if p.exists() { std::fs::read_to_string(p).unwrap() } else { default.to_string() }).unwrap()
         };
-        let report = ferroreport::parse(&template).unwrap();
+        let mut renderer = ferroreport::Renderer::new().resource_dir(&dir);
+        let report = renderer.parse(&template).unwrap();
+        assert!(!report.warnings.iter().any(|w| w.contains("style template")), "{}: {:?}", dir.display(), report.warnings);
         let records = ferroreport::data::records_from_json(&report, &read("data.json", "[]")).unwrap();
         let params = ferroreport::params_from_json(&report, &read("params.json", "{}")).unwrap();
-        let mut renderer = ferroreport::Renderer::new().resource_dir(&dir);
         let doc = renderer.fill(&report, &records, params).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
         let want = read("expected.json", "{}")["pages"].as_u64().unwrap() as usize;
         assert_eq!(doc.pages.len(), want, "{}", dir.display());

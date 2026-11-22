@@ -62,7 +62,7 @@ fn render(
             for (name, data) in resources {
                 r.add_resource(&name, data);
             }
-            let report = ferroreport::parse(&template).map_err(|e| e.to_string())?;
+            let report = r.parse(&template).map_err(|e| e.to_string())?;
             let params = ferroreport::params_from_json(&report, &params).map_err(|e| e.to_string())?;
             // The rows from the start, each time they are asked for: a large workbook reads
             // them twice (`Renderer::render_rows_to`).

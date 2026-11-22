@@ -479,6 +479,12 @@ pub struct Report {
     /// Features found in the template that are not rendered (yet).
     /// Expressions read `$P{REPORT_DATA_SOURCE}` (records then keep their source JSON row).
     pub uses_data_source: bool,
+    /// `printOrder="Horizontal"` with more than one column: records fill a row of columns
+    /// left to right, then the next row.
+    pub horizontal: bool,
+    /// Where PDF pages are moved to, odd pages then even ones (x right, y down, in points):
+    /// `net.sf.jasperreports.export.pdf.odd.page.offset.x` and its siblings, for binding.
+    pub pdf_page_offsets: [[f32; 2]; 2],
     pub warnings: Vec<String>,
 }
 
@@ -591,6 +597,9 @@ pub struct ListElement {
     pub run: DatasetRun,
     /// The contents, as a band as tall as `<listContents height>`.
     pub contents: Band,
+    /// `printOrder="Horizontal"`: the contents side by side, as many to a row as fit, each
+    /// `<listContents width>` wide.
+    pub across: Option<f32>,
 }
 
 /// Where a group's total row or column goes.

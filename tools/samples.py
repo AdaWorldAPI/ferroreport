@@ -310,7 +310,7 @@ def main():
                 # engines do not even draw with the same letters.
                 fonts = [i for i in row["issues"] if "without a font family" in i]
                 others = [i for i in row["issues"] if i not in fonts]
-                row["reason"] = "; ".join((["names no font, so JasperReports draws it with the JVM's own"] if fonts else []) + others[:3]) or (
+                row["reason"] = "; ".join((["names no font: JasperReports writes that text in PDF's Helvetica, ferroreport in DejaVu Sans"] if fonts else []) + others[:3]) or (
                     "a different number of pages" if len(pa) != len(pb) else "")
         results.append(row)
         print(f"{row['result']:13} {rel}  {row.get('reason', '')[:100]}" + (f"  [{row['detail'][:150]}]" if args.only and "detail" in row else ""), flush=True)
@@ -346,8 +346,8 @@ def markdown(s):
         f"| no reference | {s['no_reference']} | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |",
         "",
         f"**{s['same']} of the {s['compared']} templates that can be compared come out the same.** {s['compared'] - s['compared_naming_fonts']} of them",
-        "name no font for some of their text: JasperReports then draws it with whatever fonts the Java runtime has, which no",
-        f"other engine can reproduce (and neither can another machine). Of the {s['compared_naming_fonts']} that name their fonts,",
+        "name no font for some of their text: JasperReports writes that text in PDF's built-in Helvetica (laid out with the Java",
+        f"runtime's SansSerif) and ferroreport in DejaVu Sans, so their pages cannot match. Of the {s['compared_naming_fonts']} that name their fonts,",
         f"{s['same_naming_fonts']} come out the same.",
         "",
         "These samples were written to show every feature of JasperReports, one per sample: charts of every kind, maps, forms,",

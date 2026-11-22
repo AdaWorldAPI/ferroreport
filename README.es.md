@@ -18,10 +18,10 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **vista previa.** Las 32 plantillas comparables de la batería de pruebas salen píxel por
+> Estado: **vista previa.** Las 38 plantillas comparables de la batería de pruebas salen píxel por
 > píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas, imágenes,
 > subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 34 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
+> estilo de JFreeChart. Las 40 también exportan el mismo Excel y CSV que Jasper. Todavía faltan
 > algunas funciones; ver
 > [compatibilidad](README.md#compatibility). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
@@ -32,8 +32,8 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   las páginas salen sin acumularse: un reporte de un millón de filas usa la memoria de uno de
   diez.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 32 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 34 coinciden.
+  píxel: hoy los 38 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 40 coinciden.
 - **PDF, Excel, CSV y HTML.** La misma plantilla da un PDF, un `.xlsx` armado como el de
   JasperReports (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y
   gráficos), un CSV o una página web que se ve como el PDF, para vistas previas.
@@ -108,7 +108,7 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 ## Qué soporta
 
 - Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`).
-- Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG/JPEG,
+- Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG, JPEG y GIF,
   subreportes, y códigos de los componentes barcode4j: QR, Code 128, Code 39 (con ASCII completo),
   EAN-13, EAN-8, UPC-A, Interleaved 2 of 5 y Codabar. Cada barra se verifica contra barcode4j.
 - Estilos con herencia y estilos condicionales, texto justificado, `isRemoveLineWhenBlank`,

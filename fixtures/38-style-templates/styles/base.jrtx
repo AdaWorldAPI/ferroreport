@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperTemplate xmlns="http://jasperreports.sourceforge.net/jasperreports/template">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+	<style name="Strong" style="Base" isBold="true"/>
+	<!-- Keeps the Strong of this file, even though a later file redefines Strong. -->
+	<style name="Very Strong" style="Strong" mode="Opaque" backcolor="#DDDDDD" fontSize="12"/>
+</jasperTemplate>

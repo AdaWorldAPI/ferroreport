@@ -298,7 +298,7 @@ public class FerroreportTest {
                 try {
                     pdf = invoice(remote).render();
                 } catch (FerroreportException e) {
-                    if (attempt > 50 || !e.getMessage().contains("cannot reach")) {
+                    if (attempt > 300 || !e.getMessage().contains("cannot reach")) {
                         throw e;
                     }
                     Thread.sleep(100);

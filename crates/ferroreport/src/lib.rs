@@ -52,7 +52,8 @@ use chrono::NaiveDateTime;
 use fonts::FontSet;
 use std::collections::HashMap;
 
-/// Parses a JRXML template.
+/// Parses a JRXML template. Style templates it uses (`<template>`, `.jrtx` files) are not
+/// read: use [`Renderer::parse`], which finds them where it finds images and subreports.
 pub fn parse(template: &str) -> Result<Report> {
     jrxml::parse_report(template)
 }
@@ -163,12 +164,13 @@ impl Renderer {
         self
     }
 
-    fn pdf_options(&self, title: &str) -> pdf::PdfOptions {
+    fn pdf_options(&self, title: &str, page_offsets: [[f32; 2]; 2]) -> pdf::PdfOptions {
         pdf::PdfOptions {
             title: Some(title.to_string()),
             compress: true,
             tagged: self.tagged,
             lang: Some(self.locale.tag.replace('_', "-")),
+            page_offsets,
         }
     }
 
@@ -268,7 +270,7 @@ impl Renderer {
         let env = self.env(report);
         match format {
             Format::Pdf => {
-                let options = self.pdf_options(&report.name);
+                let options = self.pdf_options(&report.name, report.pdf_page_offsets);
                 let mut sink = pdf::PdfStream::new(out, report.page_width, report.page_height, options)?;
                 let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
                 sink.finish(&self.fonts)?;
@@ -300,7 +302,7 @@ impl Renderer {
 
     /// Exports a filled document to PDF.
     pub fn to_pdf(&self, doc: &PrintDocument) -> Result<Vec<u8>> {
-        pdf::write_pdf(doc, &self.fonts, &self.pdf_options(&doc.name))
+        pdf::write_pdf(doc, &self.fonts, &self.pdf_options(&doc.name, doc.pdf_page_offsets))
     }
 
     /// Exports a filled document to an Excel workbook (XLSX), laid out like JasperReports'
@@ -374,6 +376,13 @@ impl Renderer {
         csv::write_csv(doc, options)
     }
 
+    /// Parses a JRXML template, reading the style templates it uses (`<template>`, `.jrtx`
+    /// files) from the renderer's resources: its resource folders and the files added with
+    /// [`Renderer::add_resource`].
+    pub fn parse(&self, template: &str) -> Result<Report> {
+        jrxml::parse_report_with(template, &|location| self.images.read_resource(location))
+    }
+
     /// Exports a filled document in the given format.
     pub fn export(&self, doc: &PrintDocument, format: Format) -> Result<Vec<u8>> {
         Ok(match format {
@@ -397,7 +406,7 @@ impl Renderer {
         params: &serde_json::Value,
         format: Format,
     ) -> Result<Vec<u8>> {
-        let report = parse(template)?;
+        let report = self.parse(template)?;
         self.render_report_json(&report, rows, params, format)
     }
 
