@@ -1759,12 +1759,12 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 close_mark(&mut out.items, mark);
             }
             ElementKind::Barcode(bc) => {
-                // JasperReports sizes a barcode picture in whole points (barcode4j works in mm).
+                // The size of the barcode's picture in points (barcode4j works in mm).
                 let unit = match bc.symbology {
                     Symbology::Qr { .. } => 1.0,
                     _ => 72.0 / 25.4,
                 };
-                let symbol = m.symbol.as_ref().map(|s| ((s.width * unit + 0.01).floor(), (s.height * unit + 0.01).floor()));
+                let symbol = m.symbol.as_ref().map(|s| (s.width * unit, s.height * unit));
                 let mark = open_mark(&mut out.items, el, Shape::Picture { symbol }, Some(bc.boxed), x, y, w, h);
                 if el.mode == Mode::Opaque {
                     out.items.push(Laid {
@@ -1838,6 +1838,9 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
                     *vertical_quiet_zone,
                 )
             })
+        }
+        Symbology::Pdf417 { spec, text_position } => {
+            crate::barcode::pdf417_symbol(&code, spec, el.height as f64, *text_position, bc.font_size.map(|s| s as f64))
         }
         Symbology::DataMatrix { module_width, shape } => crate::barcode::datamatrix_symbol(&code, *module_width, *shape),
         Symbology::Postnet { module_width, short_bar, gap, add_checksum } => {

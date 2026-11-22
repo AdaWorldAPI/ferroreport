@@ -7,6 +7,7 @@
 pub mod code128;
 pub mod datamatrix;
 pub mod linear;
+pub mod pdf417;
 pub mod postal;
 pub mod qr;
 mod qr_tables;
@@ -264,4 +265,74 @@ pub fn datamatrix_symbol(msg: &str, module_width_pt: Option<f64>, shape: datamat
         }
     }
     Ok(Symbol { width: r4(2.0 * quiet + cols as f64 * mw), height: r4(2.0 * quiet + rows as f64 * mw), rects, texts: Vec::new() })
+}
+
+/// The PDF417 settings of a JasperReports `PDF417` component (sizes in points).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Pdf417Spec {
+    pub module_width: Option<f64>,
+    pub quiet_zone: Option<f64>,
+    pub vertical_quiet_zone: Option<f64>,
+    pub min_columns: Option<usize>,
+    pub max_columns: Option<usize>,
+    pub min_rows: Option<usize>,
+    pub max_rows: Option<usize>,
+    pub ratio: Option<f64>,
+    pub level: Option<u8>,
+}
+
+/// A PDF417 symbol like barcode4j's `PDF417Bean` configured by JasperReports: each row as tall
+/// as the element (`height_pt`) less the room the bean keeps for a human-readable text it never
+/// draws, runs of dark modules as rectangles, in millimetres.
+pub fn pdf417_symbol(
+    msg: &str,
+    spec: &Pdf417Spec,
+    height_pt: f64,
+    position: TextPosition,
+    font_size_pt: Option<f64>,
+) -> Result<Symbol, String> {
+    // barcode4j's default module: one point, as inches.
+    let default_module = 25.4 / 72.0;
+    let mw = spec.module_width.map(pt2mm).unwrap_or(default_module);
+    // The quiet zone is set from the default module when the bean is made.
+    let quiet = spec.quiet_zone.map(pt2mm).unwrap_or(2.0 * default_module);
+    let vquiet = spec.vertical_quiet_zone.map(pt2mm).unwrap_or(quiet);
+    let font = font_size_pt.map(pt2mm).unwrap_or(2.8222);
+    let rh = pt2mm(height_pt) - if position == TextPosition::None { 0.0 } else { font };
+    // Columns default to exactly two, as the bean sets them.
+    let min_cols = spec.min_columns.unwrap_or(2);
+    let max_cols = spec.max_columns.unwrap_or(2);
+    let o = pdf417::Options {
+        min_cols,
+        max_cols,
+        min_rows: spec.min_rows.unwrap_or(3),
+        max_rows: spec.max_rows.unwrap_or(90),
+        ratio: spec.ratio.unwrap_or(3.0),
+        level: spec.level.unwrap_or(0),
+        module_width: mw,
+        row_height: rh,
+    };
+    let (rows, cols) = pdf417::matrix(msg, &o)?;
+    let mut rects = Vec::new();
+    let mut y = vquiet;
+    for row in &rows {
+        let mut x = quiet;
+        let mut i = 0;
+        while i < row.len() {
+            let dark = row[i];
+            let start = i;
+            while i < row.len() && row[i] == dark {
+                i += 1;
+            }
+            let w = (i - start) as f64 * mw;
+            if dark {
+                rects.push([r4(x), r4(y), r4(w), r4(rh.max(0.0))]);
+            }
+            x += w;
+        }
+        y += rh;
+    }
+    let width = (17 * cols + 69) as f64 * mw;
+    let height = rows.len() as f64 * rh;
+    Ok(Symbol { width: r4(width + 2.0 * quiet), height: r4(height + 2.0 * vquiet), rects, texts: Vec::new() })
 }
