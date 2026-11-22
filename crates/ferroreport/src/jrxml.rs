@@ -461,7 +461,8 @@ impl Parser {
             raw_conditionals.retain(|(n, ..)| n != name);
             for cs in s.children_named("conditionalStyle") {
                 let cond = cs.child("conditionExpression").map(|c| c.text.clone()).unwrap_or_default();
-                let inner = cs.child("style").map(StyleProps::from_style_node).unwrap_or_default();
+                // JRXML 6 puts the style in a `<style>` inside; JRXML 7 on the condition itself.
+                let inner = cs.child("style").map(StyleProps::from_style_node).unwrap_or_else(|| StyleProps::from_style_node(cs));
                 raw_conditionals.push((name.to_string(), cond, inner));
             }
             styles.insert(name.to_string(), props);
