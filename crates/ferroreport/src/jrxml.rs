@@ -1289,6 +1289,13 @@ impl Parser {
 
         let element_kind = match kind {
             "staticText" | "textField" => {
+                if props.font_name.is_none() {
+                    let note = "text without a font family is drawn in DejaVu Sans; JasperReports uses the JVM's own SansSerif for it, \
+                                which is not embedded and differs between machines, so name a font to get the same pages everywhere";
+                    if !self.warnings.iter().any(|w| w == note) {
+                        self.warnings.push(note.into());
+                    }
+                }
                 let font = FontSpec {
                     name: props.font_name.clone().unwrap_or_else(|| "SansSerif".into()),
                     size: props.font_size.unwrap_or(10.0),

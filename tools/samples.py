@@ -252,6 +252,7 @@ def main():
         issues = [line.strip()[2:] for line in text.splitlines() if line.strip().startswith("- ")]
         # Rows come from the application in ferroreport: a query in the template is not a missing feature.
         row["issues"] = [i for i in issues if "query is ignored" not in i]
+        row["names_fonts"] = not any("without a font family" in i for i in issues)
 
         params = sample_params(sample)
         rows, note = rows_for(template, db, params)
@@ -305,7 +306,12 @@ def main():
                 row.update(result="same" if same else "differs", pages_jasper=len(pa), pages_ferroreport=len(pb),
                            worst_page=round(max(shares) if shares else 0.0, 4))
             if row["result"] == "differs":
-                row["reason"] = "; ".join(row["issues"][:3]) or ("a different number of pages" if len(pa) != len(pb) else "")
+                # The reason that explains most comes first: without a font named, the two
+                # engines do not even draw with the same letters.
+                fonts = [i for i in row["issues"] if "without a font family" in i]
+                others = [i for i in row["issues"] if i not in fonts]
+                row["reason"] = "; ".join((["names no font, so JasperReports draws it with the JVM's own"] if fonts else []) + others[:3]) or (
+                    "a different number of pages" if len(pa) != len(pb) else "")
         results.append(row)
         print(f"{row['result']:13} {rel}  {row.get('reason', '')[:100]}" + (f"  [{row['detail'][:150]}]" if args.only and "detail" in row else ""), flush=True)
 
@@ -315,8 +321,12 @@ def main():
     print(f"{counts['same']} of the {compared} that JasperReports renders from rows alone come out the same")
     if args.no_write or args.only:
         return
+    # Templates that name the font of every text: the only ones where both engines draw with
+    # the same letters, and what JasperReports itself recommends (font extensions).
+    named = [r for r in results if r["names_fonts"] and r["result"] != "no reference"]
     summary = {"jasperreports": args.tag, "templates": len(results), **{k.replace(" ", "_"): v for k, v in counts.items()},
-               "compared": compared, "threshold": MATCH_THRESHOLD, "results": results}
+               "compared": compared, "compared_naming_fonts": len(named), "same_naming_fonts": sum(r["result"] == "same" for r in named),
+               "threshold": MATCH_THRESHOLD, "results": results}
     (ROOT / "docs" / "samples.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n")
     (ROOT / "docs" / "samples.md").write_text(markdown(summary))
 
@@ -335,7 +345,14 @@ def markdown(s):
         f"| not rendered | {s['not_rendered']} | ferroreport refuses the template or fails on it |",
         f"| no reference | {s['no_reference']} | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |",
         "",
-        f"**{s['same']} of the {s['compared']} templates that can be compared come out the same.**",
+        f"**{s['same']} of the {s['compared']} templates that can be compared come out the same.** {s['compared'] - s['compared_naming_fonts']} of them",
+        "name no font for some of their text: JasperReports then draws it with whatever fonts the Java runtime has, which no",
+        f"other engine can reproduce (and neither can another machine). Of the {s['compared_naming_fonts']} that name their fonts,",
+        f"{s['same_naming_fonts']} come out the same.",
+        "",
+        "These samples were written to show every feature of JasperReports, one per sample: charts of every kind, maps, forms,",
+        "Java scriptlets, database connections inside the report. They are a much harder test than the reports people usually",
+        "write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport doctor your.jrxml` to see where yours stands.",
         "",
         "| Template | Result | Pages | Why |",
         "|---|---|---|---|",

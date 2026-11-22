@@ -1126,7 +1126,12 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 let value = m.text.clone().unwrap_or_default();
                 let reprint = (el.print_in_first_whole_band && le.first_on_page)
                     || el.print_when_group_changes.as_ref().is_some_and(|g| le.changed_groups.contains(g));
-                if !reprint && le.repeated.get(&key) == Some(&value) {
+                // A static text always says the same, so it counts as repeated from the start:
+                // it only prints where a repeated value is printed again. (With
+                // isPrintWhenDetailOverflows that makes the "(continued)" label of a band
+                // that goes on to the next page.)
+                let fixed = matches!(&el.kind, ElementKind::Text(te) if matches!(te.content, TextContent::Static(_)));
+                if !reprint && (fixed || le.repeated.get(&key) == Some(&value)) {
                     m.visible = false;
                     m.blank = true;
                 } else {
@@ -3293,7 +3298,12 @@ impl<'a> Filler<'a> {
                 }
                 let groups: Vec<String> = r.groups[gi..].iter().map(|g| g.name.clone()).collect();
                 self.changed_groups = groups.clone();
-                self.reset_where(|rt| matches!(rt, ResetType::Group(g) if groups.contains(g)))?;
+                // The first row starts every group, and every variable has just started with
+                // the report: starting them again would run their initial values twice (a
+                // group number kept as `$V{N} == null ? 1 : $V{N} + 1` would begin at 2).
+                if idx > 0 {
+                    self.reset_where(|rt| matches!(rt, ResetType::Group(g) if groups.contains(g)))?;
+                }
                 self.group_headers(gi)?;
             }
             self.estimated = Some(self.calculate(&self.committed.clone())?);

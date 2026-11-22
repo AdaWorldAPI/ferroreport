@@ -61,12 +61,16 @@ fn render(
             }
             let report = ferroreport::parse(&template).map_err(|e| e.to_string())?;
             let params = ferroreport::params_from_json(&report, &params).map_err(|e| e.to_string())?;
-            let rows: ferroreport::RowIter = match &data_path {
-                Some(path) => {
-                    let file = std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?;
-                    Box::new(ferroreport::JsonRows::new(&report, file))
-                }
-                None => Box::new(ferroreport::JsonRows::new(&report, data_json.as_bytes())),
+            // The rows from the start, each time they are asked for: a large workbook reads
+            // them twice (`Renderer::render_rows_to`).
+            let mut rows = || -> ferroreport::Result<ferroreport::RowIter> {
+                Ok(match &data_path {
+                    Some(path) => {
+                        let file = std::fs::File::open(path).map_err(|e| ferroreport::Error::Io(format!("{path}: {e}")))?;
+                        Box::new(ferroreport::JsonRows::new(&report, file))
+                    }
+                    None => Box::new(ferroreport::JsonRows::new(&report, data_json.as_bytes())),
+                })
             };
             match output_path {
                 Some(path) => {
@@ -75,7 +79,7 @@ fn render(
                     let part = format!("{path}.part");
                     let file = std::fs::File::create(&part).map_err(|e| format!("{path}: {e}"))?;
                     let out = std::io::BufWriter::with_capacity(1 << 16, file);
-                    match r.render_to(&report, rows, params, format, out) {
+                    match r.render_rows_to(&report, &mut rows, params, format, out) {
                         Ok(stats) => {
                             std::fs::rename(&part, &path).map_err(|e| format!("{path}: {e}"))?;
                             Ok((Vec::new(), stats))
@@ -88,7 +92,7 @@ fn render(
                 }
                 None => {
                     let mut out = Vec::new();
-                    let stats = r.render_to(&report, rows, params, format, &mut out).map_err(|e| e.to_string())?;
+                    let stats = r.render_rows_to(&report, &mut rows, params, format, &mut out).map_err(|e| e.to_string())?;
                     Ok((out, stats))
                 }
             }

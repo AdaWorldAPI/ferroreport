@@ -224,8 +224,9 @@ impl Renderer {
 
     /// Renders a report whose rows arrive one at a time, writing the output as it goes:
     /// PDF and CSV pages leave memory as soon as they are finished, so a report of a
-    /// million rows needs about as much memory as one of a thousand. (Excel workbooks are
-    /// laid out as a whole, so they are built in memory first.)
+    /// million rows needs about as much memory as one of a thousand. (An Excel workbook
+    /// needs its rows twice to be written that way: see [`Renderer::render_rows_to`]. Here
+    /// they can only be read once, so the workbook is built in memory.)
     ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -269,7 +270,7 @@ impl Renderer {
                 let mut count = 0;
                 let rows = rows.inspect(|_| count += 1);
                 let doc = fill::fill_rows(report, Box::new(rows), params, &mut self.fonts, &mut self.images, &env, self.limits)?;
-                let bytes = self.to_xlsx(&doc, &self.xlsx);
+                let bytes = self.to_xlsx(&doc, &self.xlsx)?;
                 out.write_all(&bytes).and_then(|_| out.flush()).map_err(|e| Error::Io(e.to_string()))?;
                 Ok(FillStats { pages: doc.pages.len(), rows: count })
             }
@@ -283,8 +284,68 @@ impl Renderer {
 
     /// Exports a filled document to an Excel workbook (XLSX), laid out like JasperReports'
     /// XLSX exporter.
-    pub fn to_xlsx(&self, doc: &PrintDocument, options: &xlsx::XlsxOptions) -> Vec<u8> {
+    pub fn to_xlsx(&self, doc: &PrintDocument, options: &xlsx::XlsxOptions) -> Result<Vec<u8>> {
         xlsx::write_xlsx(doc, &self.fonts, options)
+    }
+
+    /// Renders a report whose rows can be read again from the start: `rows` gives a new
+    /// iterator over them each time it is called (open the file again, run the query again).
+    ///
+    /// PDF, CSV and HTML read them once, like [`Renderer::render_to`]. An Excel workbook
+    /// needs them twice when it is large: the columns of its sheet come from every page, so
+    /// the report is filled once to find them and once more to write the rows, which are
+    /// compressed and sent on as they are made. A workbook of a million rows then takes
+    /// about the memory of one of a thousand. Small workbooks are still filled once.
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let report = ferroreport::parse(&std::fs::read_to_string("sales.jrxml")?)?;
+    /// let mut rows = || -> ferroreport::Result<ferroreport::RowIter> {
+    ///     let file = std::fs::File::open("sales.json").map_err(|e| ferroreport::Error::Io(e.to_string()))?;
+    ///     Ok(Box::new(ferroreport::JsonRows::new(&report, file)))
+    /// };
+    /// let out = std::io::BufWriter::new(std::fs::File::create("sales.xlsx")?);
+    /// ferroreport::Renderer::new().render_rows_to(&report, &mut rows, Default::default(), ferroreport::Format::Xlsx, out)?;
+    /// # Ok(()) }
+    /// ```
+    pub fn render_rows_to<'a, W: std::io::Write>(
+        &mut self,
+        report: &Report,
+        rows: &mut dyn FnMut() -> Result<RowIter<'a>>,
+        params: HashMap<String, Value>,
+        format: Format,
+        out: W,
+    ) -> Result<FillStats> {
+        if format != Format::Xlsx {
+            return self.render_to(report, rows()?, params, format, out);
+        }
+        // One environment for both passes: `new Date()` must say the same in each.
+        let env = self.env(report);
+        let mut first = xlsx::FirstPass::new();
+        let stats =
+            fill::fill_to(report, rows()?, params.clone(), &mut self.fonts, &mut self.images, &env, self.limits, &mut first)?;
+        let (columns, kept) = first.done();
+        let mut sheet = xlsx::XlsxStream::new(
+            out,
+            columns,
+            &report.name,
+            report.page_width,
+            report.page_height,
+            report.landscape,
+            self.xlsx.clone(),
+        )?;
+        let stats = match kept {
+            // A report that fits in memory is written from the pages of the first pass.
+            Some(pages) => {
+                for page in &pages {
+                    sheet.add(&page.items, &self.fonts)?;
+                }
+                stats
+            }
+            None => fill::fill_to(report, rows()?, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sheet)?,
+        };
+        sheet.finish()?;
+        Ok(stats)
     }
 
     /// Exports a filled document to CSV, laid out like JasperReports' CSV exporter.
@@ -296,7 +357,7 @@ impl Renderer {
     pub fn export(&self, doc: &PrintDocument, format: Format) -> Result<Vec<u8>> {
         Ok(match format {
             Format::Pdf => self.to_pdf(doc)?,
-            Format::Xlsx => self.to_xlsx(doc, &self.xlsx),
+            Format::Xlsx => self.to_xlsx(doc, &self.xlsx)?,
             Format::Csv => self.to_csv(doc, &self.csv).into_bytes(),
             Format::Html => html::write_html(doc, &self.fonts, &self.html)?.into_bytes(),
         })
@@ -331,7 +392,13 @@ impl Renderer {
         let records = data::records_from_json(report, rows)?;
         let params = params_from_json(report, params)?;
         let mut out = Vec::new();
-        self.render_to(report, Box::new(records.into_iter().map(Ok)), params, format, &mut out)?;
+        if format == Format::Xlsx {
+            // A workbook may read the rows twice.
+            let mut rows = || -> Result<RowIter> { Ok(Box::new(records.iter().cloned().map(Ok))) };
+            self.render_rows_to(report, &mut rows, params, format, &mut out)?;
+        } else {
+            self.render_to(report, Box::new(records.into_iter().map(Ok)), params, format, &mut out)?;
+        }
         Ok(out)
     }
 

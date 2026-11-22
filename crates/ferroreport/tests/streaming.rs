@@ -194,3 +194,43 @@ fn html_pages_carry_the_report_as_text_and_escape_it() {
     f.renderer().html_options(options).render_to(&f.report, rows, params, Format::Html, &mut out).unwrap();
     assert!(out.starts_with(b"<svg class=\"page\""));
 }
+
+/// A workbook too large to keep is made in two passes over its rows, and comes out the same
+/// as when its pages are all in memory.
+#[test]
+fn a_large_workbook_is_written_in_two_passes_and_is_the_same() {
+    let large = load("09-large");
+    let few: Vec<serde_json::Value> = serde_json::from_str(&large.data).unwrap();
+    let rows: Vec<serde_json::Value> = (0..40_000).map(|i| few[i % few.len()].clone()).collect();
+    let lines: String = rows.iter().map(|r| format!("{r}\n")).collect();
+    let records = ferroreport::data::records_from_json(&large.report, &serde_json::Value::Array(rows)).unwrap();
+
+    let mut r = large.renderer();
+    let doc = r.fill(&large.report, &records, Default::default()).unwrap();
+    let kept = r.to_xlsx(&doc, &Default::default()).unwrap();
+    drop(doc);
+
+    let asked = Cell::new(0);
+    let mut again = || -> ferroreport::Result<RowIter> {
+        asked.set(asked.get() + 1);
+        Ok(Box::new(JsonRows::new(&large.report, lines.as_bytes())))
+    };
+    let mut streamed = Vec::new();
+    let stats =
+        large.renderer().render_rows_to(&large.report, &mut again, Default::default(), Format::Xlsx, &mut streamed).unwrap();
+    assert_eq!(asked.get(), 2, "a report this size reads its rows twice");
+    assert_eq!(stats.rows, 40_000);
+    assert!(streamed == kept, "the workbook written in two passes differs from the one written from memory");
+
+    // A small one is filled once, and other formats always are.
+    for (format, rows) in [(Format::Xlsx, &lines[..2_000]), (Format::Csv, &lines[..])] {
+        let rows = &rows[..rows.rfind('\n').unwrap() + 1];
+        asked.set(0);
+        let mut again = || -> ferroreport::Result<RowIter> {
+            asked.set(asked.get() + 1);
+            Ok(Box::new(JsonRows::new(&large.report, rows.as_bytes())))
+        };
+        large.renderer().render_rows_to(&large.report, &mut again, Default::default(), format, std::io::sink()).unwrap();
+        assert_eq!(asked.get(), 1, "{format:?}");
+    }
+}

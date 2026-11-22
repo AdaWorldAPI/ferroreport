@@ -9,7 +9,7 @@ What it checks:
 
   same documents     every fixture over HTTP, in the four ways a request can be made (rows in
                      the JSON body or one per line; the answer whole or as it renders), gives
-                     the bytes the command line gives, for PDF and CSV
+                     the bytes the command line gives, for PDF, CSV and Excel
   a million rows     the rows are never all in memory: the server's peak memory is measured
   many clients       50 at once: memory and disk stay bounded, and are given back
   a client leaves    half way through a report: the render stops and nothing is left behind
@@ -157,7 +157,7 @@ def same_documents(binary, server, checks, tmp):
     wrong, count = [], 0
     for fx in sorted(p for p in (ROOT / "fixtures").iterdir() if (p / "report.jrxml").exists()):
         name, head, rows = fixture_request(fx)
-        for fmt in ("pdf", "csv"):
+        for fmt in ("pdf", "csv", "xlsx"):
             out = tmp / f"cli.{fmt}"
             cmd = [str(binary), "render", str(fx / "report.jrxml"), "-o", str(out), "-q", "--now", NOW]
             if (fx / "data.json").exists():

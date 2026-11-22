@@ -285,6 +285,7 @@ of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them withou
 | 32-crosstab-percent | Crosstab with percentages of the grand total (BigDecimal and Integer) and regions ordered by their total sales | identical |
 | 33-page-x-of-y | "Page X of Y", a grand total in the title and group totals in group headers: values known only later, added to pages already written | identical |
 | 34-late-values-overlap | Late values with something drawn over them (a stamp over a total, a line across a page count): the page waits for the value | identical |
+| 35-auto-increment-styles | `evaluationTime="Auto"`, `incrementType`, a group expression that reads a variable, `resetType="None"`, `msg()`, styles without a parent | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -297,7 +298,34 @@ cargo build --release
 JASPER_LIB=/path/to/jars python3 tools/compare.py      # diff images land in target/compare/
 JASPER_LIB=/path/to/jars python3 tools/compare_sheets.py   # XLSX and CSV
 JASPER_LIB=/path/to/jars python3 tools/bench_all.py     # every number in the next section
+JASPER_LIB=/path/to/jars python3 tools/samples.py      # JasperReports' own samples (below)
 ```
+
+### JasperReports' own samples
+
+The fixtures above are reports like the ones people write. `tools/samples.py` runs a harder
+test that nobody chose with ferroreport in mind: the 140 templates of the `demo/samples`
+folder of JasperReports 6.20.6, each rendered by both engines from the same rows and
+parameters and compared the same way. They exist to show every feature of JasperReports, one
+per sample: charts of every kind, maps, PDF forms, Java scriptlets, queries through a live
+database connection.
+
+| Result | Templates |
+|---|---|
+| The same pages | 14 |
+| Both render it, the pages differ | 54 |
+| ferroreport refuses it or fails on it | 19 |
+| JasperReports cannot render it from rows and parameters alone (it needs the sample's Java objects, a database connection or other files), so there is nothing to compare | 53 |
+
+So 14 of the 87 that can be compared come out the same; 21 of those 87 name no font for
+some of their text, which JasperReports then draws with whatever the Java runtime has, and 14
+of the 66 that do name their fonts come out the same. [Every template with its result and
+the reason](docs/samples.md). Most of the differences are charts (drawn to look like
+JFreeChart's, not pixel for pixel, and nine kinds are not drawn at all), elements that are
+not supported (maps, PDF form fields, RTF markup, horizontal print order) and expressions that
+call the sample's own Java classes, which ferroreport never runs. Rendering these samples is
+also how seven differences in how variables, styles and repeated values are evaluated were found and fixed
+for 0.9.0.
 
 ## Performance
 
@@ -339,9 +367,10 @@ finishes it, so its memory does not grow with the report:
 In short: most of JasperReports' time on a small report is starting the JVM and compiling the
 template, so the gap is two orders of magnitude when a process starts per report and 3 to 6×
 when it does not. PDFs are usually smaller too (1.2 MB instead of 4.5 MB for the 20,000 rows;
-about the same size at a million). Excel
-workbooks are laid out as a whole, so they are built in memory (100,000 rows: about 3 s and
-490 MiB).
+about the same size at a million). Excel workbooks are written as they are made too: the
+columns of a sheet come from every page, so a large report is filled twice, once to find them
+and once to write the rows (100,000 rows: about 3 s and 58 MiB; 500,000: 17 s and 92 MiB). A
+report with more rows than a sheet holds (1,048,576) stops with an error that says so.
 
 ## Roadmap
 

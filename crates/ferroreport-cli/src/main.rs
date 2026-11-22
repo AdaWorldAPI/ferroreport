@@ -122,6 +122,15 @@ fn read_json(path: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>
     Ok(serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?)
 }
 
+/// A temporary file that goes away with the value.
+struct RemoveOnDrop(PathBuf);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
 fn render(args: &[String]) -> CliResult {
     let mut template = None;
     let mut data = None;
@@ -204,17 +213,34 @@ fn render(args: &[String]) -> CliResult {
     let parsed = started.elapsed();
     // Rows are read as they are needed and pages are written as they are finished, so the
     // size of the data does not decide how much memory the render takes.
-    let rows: ferroreport::RowIter = match data.as_deref() {
-        Some("-") => Box::new(ferroreport::JsonRows::new(&report, std::io::stdin().lock())),
-        Some(path) => {
-            Box::new(ferroreport::JsonRows::new(&report, std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?))
+    // A large workbook reads its rows twice (see `Renderer::render_rows_to`), so rows from
+    // standard input are put in a file first for that format.
+    let mut kept = None;
+    let data = match data.as_deref() {
+        Some("-") if format == ferroreport::Format::Xlsx => {
+            let path = std::env::temp_dir().join(format!("ferroreport-rows-{}.json", std::process::id()));
+            let keep = RemoveOnDrop(path.clone());
+            let mut file = std::fs::File::create(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            std::io::copy(&mut std::io::stdin().lock(), &mut file).map_err(|e| format!("stdin: {e}"))?;
+            kept = Some(keep);
+            Some(path.to_string_lossy().into_owned())
         }
-        None => Box::new(std::iter::empty()),
+        other => other.map(str::to_string),
+    };
+    let mut rows = || -> ferroreport::Result<ferroreport::RowIter> {
+        Ok(match data.as_deref() {
+            Some("-") => Box::new(ferroreport::JsonRows::new(&report, std::io::stdin().lock())),
+            Some(path) => {
+                let file = std::fs::File::open(path).map_err(|e| ferroreport::Error::Io(format!("{path}: {e}")))?;
+                Box::new(ferroreport::JsonRows::new(&report, file))
+            }
+            None => Box::new(std::iter::empty()),
+        })
     };
     let to_stdout = output.as_os_str() == "-";
     let stats = if to_stdout {
         quiet = true;
-        renderer.render_to(&report, rows, params, format, std::io::BufWriter::new(std::io::stdout().lock()))?
+        renderer.render_rows_to(&report, &mut rows, params, format, std::io::BufWriter::new(std::io::stdout().lock()))?
     } else {
         // Written beside the output and moved into place, so a failed render leaves no
         // half-written file behind.
@@ -222,7 +248,7 @@ fn render(args: &[String]) -> CliResult {
         name.push(".part");
         let part = output.with_file_name(name);
         let file = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", output.display()))?;
-        match renderer.render_to(&report, rows, params, format, std::io::BufWriter::with_capacity(1 << 16, file)) {
+        match renderer.render_rows_to(&report, &mut rows, params, format, std::io::BufWriter::with_capacity(1 << 16, file)) {
             Ok(stats) => {
                 std::fs::rename(&part, &output).map_err(|e| format!("{}: {e}", output.display()))?;
                 stats
@@ -234,6 +260,7 @@ fn render(args: &[String]) -> CliResult {
         }
     };
     let total = started.elapsed();
+    drop(kept);
 
     for w in &report.warnings {
         eprintln!("warning: {w}");

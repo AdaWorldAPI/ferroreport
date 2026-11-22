@@ -183,8 +183,10 @@ y escribe cada página al terminarla, así que su memoria no crece con el report
 En resumen: en un reporte pequeño, casi todo el tiempo de JasperReports se va en arrancar la
 JVM y compilar la plantilla, por eso la diferencia es de dos órdenes de magnitud cuando arranca
 un proceso por reporte y de 3 a 6 veces cuando no. Los PDF además suelen pesar menos (1.2 MB
-en vez de 4.5 MB con 20,000 filas; más o menos lo mismo con un millón). Los libros de Excel se arman completos, así que se construyen en
-memoria (100,000 filas: unos 3 s y 490 MiB).
+en vez de 4.5 MB con 20,000 filas; más o menos lo mismo con un millón). Los libros de Excel también se escriben a medida que se generan: las columnas de la hoja
+salen de todas las páginas, así que un reporte grande se llena dos veces, una para encontrarlas
+y otra para escribir las filas (100,000 filas: unos 3 s y 58 MiB; 500,000: 17 s y 92 MiB). Un
+reporte con más filas de las que caben en una hoja (1,048,576) se detiene con un error que lo dice.
 
 ## Roadmap
 

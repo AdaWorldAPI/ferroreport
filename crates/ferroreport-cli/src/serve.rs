@@ -379,8 +379,13 @@ fn prepare(
 }
 
 impl Job {
-    /// Renders the report with `rows` into `out`.
-    fn run<W: Write>(&self, rows: ferroreport::RowIter, out: W) -> Result<ferroreport::FillStats, (u16, String)> {
+    /// Renders the report into `out`. `rows` gives the rows from the start each time it is
+    /// called: once, or twice for a large workbook.
+    fn run<'a, W: Write>(
+        &self,
+        rows: &mut dyn FnMut() -> ferroreport::Result<ferroreport::RowIter<'a>>,
+        out: W,
+    ) -> Result<ferroreport::FillStats, (u16, String)> {
         let mut r = Renderer::new()
             .locale(&self.locale)
             .limits(self.limits)
@@ -396,7 +401,52 @@ impl Job {
             r.add_resource(name, bytes.clone());
         }
         let params = ferroreport::params_from_json(&self.report, &self.params).map_err(failed)?;
-        r.render_to(&self.report, rows, params, self.format, out).map_err(failed)
+        r.render_rows_to(&self.report, rows, params, self.format, out).map_err(failed)
+    }
+
+    /// Whether the rows may be asked for a second time.
+    fn reads_rows_twice(&self) -> bool {
+        self.format == ferroreport::Format::Xlsx
+    }
+}
+
+/// Reads a spool that several readers take turns with.
+struct Shared(std::rc::Rc<std::cell::RefCell<Spool>>);
+
+impl Read for Shared {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        self.0.borrow_mut().read(out)
+    }
+}
+
+impl OwnedRows {
+    /// The rows from the start, each time the result is called. `again` says whether it
+    /// may be called more than once; when not, records are handed over instead of copied.
+    fn source<'a>(
+        self,
+        report: &'a ferroreport::Report,
+        again: bool,
+    ) -> Box<dyn FnMut() -> ferroreport::Result<ferroreport::RowIter<'a>> + 'a> {
+        match self {
+            OwnedRows::Records(records) if again => {
+                let records = std::rc::Rc::new(records);
+                Box::new(move || {
+                    let records = records.clone();
+                    Ok(Box::new((0..records.len()).map(move |i| Ok(records[i].clone()))))
+                })
+            }
+            OwnedRows::Records(records) => {
+                let mut records = Some(records);
+                Box::new(move || Ok(Box::new(records.take().unwrap_or_default().into_iter().map(Ok))))
+            }
+            OwnedRows::Lines(spool) => {
+                let spool = std::rc::Rc::new(std::cell::RefCell::new(spool));
+                Box::new(move || {
+                    spool.borrow_mut().rewind().map_err(|e| ferroreport::Error::Io(e.to_string()))?;
+                    Ok(Box::new(ferroreport::JsonRows::new(report, Shared(spool.clone())).allow_empty()))
+                })
+            }
+        }
     }
 }
 
@@ -531,24 +581,38 @@ fn typed(format: ferroreport::Format) -> Header {
 
 /// Renders into a spool and answers with the whole document, or with an error and nothing
 /// else. `lines` are the rows still to be read from the request, when they come one per line.
-fn respond_whole(
+fn respond_whole<'a>(
     state: &Arc<State>,
-    job: &Job,
+    job: &'a Job,
     body: &serde_json::Value,
-    lines: Option<&mut dyn Read>,
+    lines: Option<&'a mut dyn Read>,
 ) -> Result<Reply, (u16, String)> {
-    let rows: ferroreport::RowIter = match lines {
-        Some(reader) => Box::new(ferroreport::JsonRows::new(&job.report, reader).allow_empty()),
+    let again = job.reads_rows_twice();
+    let mut rows: Box<dyn FnMut() -> ferroreport::Result<ferroreport::RowIter<'a>> + 'a> = match lines {
+        // Rows that are read twice are put aside first: the request can only be read once.
+        Some(reader) if again => {
+            let mut request = Spool::new(state.spool.clone(), "the request");
+            std::io::copy(reader, &mut request)
+                .map_err(|e| (if e.to_string().contains("--spool") { 507 } else { 400 }, e.to_string()))?;
+            OwnedRows::Lines(request).source(&job.report, true)
+        }
+        Some(reader) => {
+            let mut reader = Some(reader);
+            Box::new(move || match reader.take() {
+                Some(r) => Ok(Box::new(ferroreport::JsonRows::new(&job.report, r).allow_empty()) as ferroreport::RowIter),
+                None => Err(ferroreport::Error::Io("the rows of the request were already read".into())),
+            })
+        }
         None => {
             let empty = serde_json::Value::Array(Vec::new());
             let records =
                 ferroreport::data::records_from_json(&job.report, body.get("data").unwrap_or(&empty)).map_err(failed)?;
-            Box::new(records.into_iter().map(Ok))
+            OwnedRows::Records(records).source(&job.report, again)
         }
     };
     let started = Instant::now();
     let mut spool = Spool::new(state.spool.clone(), "the document");
-    let stats = job.run(rows, &mut spool)?;
+    let stats = job.run(&mut *rows, &mut spool)?;
     spool.rewind().map_err(|e| (500, e.to_string()))?;
     let len = spool.len();
     let m = &state.metrics;
@@ -577,12 +641,9 @@ fn respond_streaming(state: &Arc<State>, job: Job, rows: OwnedRows) -> Result<St
     let spawned = std::thread::Builder::new().name("render".into()).stack_size(32 * 1024 * 1024).spawn(move || {
         let started = Instant::now();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let iter: ferroreport::RowIter = match rows {
-                OwnedRows::Records(records) => Box::new(records.into_iter().map(Ok)),
-                OwnedRows::Lines(spool) => Box::new(ferroreport::JsonRows::new(&job.report, spool).allow_empty()),
-            };
+            let mut rows = rows.source(&job.report, job.reads_rows_twice());
             let tail = Arc::new(std::sync::Mutex::new(Vec::with_capacity(PIECE)));
-            let stats = job.run(iter, ToClient { tx: tx.clone(), state: shared.clone(), tail: tail.clone() })?;
+            let stats = job.run(&mut *rows, ToClient { tx: tx.clone(), state: shared.clone(), tail: tail.clone() })?;
             let last = std::mem::take(&mut *tail.lock().unwrap_or_else(|e| e.into_inner()));
             ToClient::send(&tx, &shared, last).map_err(|e| failed(ferroreport::Error::Io(e.to_string())))?;
             Ok(stats)

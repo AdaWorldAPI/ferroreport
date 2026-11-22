@@ -552,8 +552,11 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       </table>
       <p>What this covers, and what it does not:</p>
       <ul>
-        <li><b>PDF and CSV</b> are written page by page. <b>Excel</b> workbooks are laid out as a whole (columns depend on every page), so
-          they are built in memory: about 490 MiB for 100,000 rows.</li>
+        <li><b>PDF and CSV</b> are written page by page. So are <b>Excel</b> workbooks, in two passes: the columns of a sheet come from
+          every page, so a large report is filled once to find them and once more to write its rows, which are compressed and sent on
+          as they are made (100,000 rows: about 3 s and 58 MiB; 500,000: 17 s and 92 MiB). That needs rows that can be read twice: a
+          file, or rows the command line, the server, Python and Java put aside for you; in Rust, <code>render_rows_to</code>. Small
+          workbooks are still filled once. A report with more rows than a sheet holds (1,048,576) stops with an error that says so.</li>
         <li><b>Values known only later</b>, such as "page 3 of 240", a grand total in the title or a group total in the group header, are
           added to their page when they are known, without holding the page back. If something is drawn over such a value, its page waits
           for it instead, so the result is always the same document.</li>

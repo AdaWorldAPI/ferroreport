@@ -23,22 +23,180 @@ pub struct XlsxOptions {
 
 const NATURE: Nature = Nature { span: true, texts_only: false };
 
-/// The files of the workbook of a filled document.
-fn workbook_parts(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -> Vec<(String, Vec<u8>)> {
-    let pages: Vec<_> = doc.pages.iter().map(|p| grid::nodes(&p.items)).collect();
-    let width = doc.page_width.round() as i32;
-    let height = doc.page_height.round() as i32;
-    let mut xcuts = grid::x_cuts(&pages, width, NATURE);
-    let grids: Vec<_> = pages.iter().map(|nodes| grid::layout(nodes, &mut xcuts, height, NATURE)).collect();
+/// Most rows and columns a sheet holds.
+const MAX_ROWS: usize = 1_048_576;
+const MAX_COLUMNS: usize = 16_384;
 
-    let mut styles = Styles::new();
-    let mut pictures = Pictures { fonts, anchors: String::new(), media: Vec::new(), names: HashMap::new() };
-    let mut rows = String::new();
-    let mut merges = String::new();
-    let mut row_no = 0usize;
-    let names: Vec<String> = (0..xcuts.spans()).map(column_name).collect();
-    for (pages_done, g) in grids.iter().enumerate() {
-        let first = row_no;
+fn io(e: std::io::Error) -> crate::Error {
+    crate::Error::Io(e.to_string())
+}
+
+/// The columns of a workbook: the edges of the elements of every page. They have to be known
+/// before the first row is written, which is why a workbook is made in two passes: every
+/// page goes through here first, then through [`XlsxStream`].
+#[derive(Debug, Clone)]
+pub struct XlsxColumns {
+    cuts: grid::Cuts,
+}
+
+impl Default for XlsxColumns {
+    fn default() -> XlsxColumns {
+        XlsxColumns { cuts: grid::Cuts::columns() }
+    }
+}
+
+impl XlsxColumns {
+    pub fn new() -> XlsxColumns {
+        XlsxColumns::default()
+    }
+
+    /// Takes the edges of one page.
+    pub fn add(&mut self, items: &[PrintItem]) {
+        grid::add_x_cuts(&grid::nodes(items), NATURE, &mut self.cuts);
+    }
+}
+
+impl crate::fill::PageSink for XlsxColumns {
+    fn page(&mut self, page: crate::print::PrintPage, _fonts: &FontSet) -> crate::Result<()> {
+        self.add(&page.items);
+        Ok(())
+    }
+}
+
+/// The first of the two passes of a workbook: finds its columns, and keeps the pages while
+/// the report is small enough to be written from them without a second pass.
+pub(crate) struct FirstPass {
+    columns: XlsxColumns,
+    kept: Option<Vec<crate::print::PrintPage>>,
+    items: usize,
+}
+
+/// Most elements kept from the first pass (about 100 MB of pages).
+const KEEP_ITEMS: usize = 100_000;
+
+impl FirstPass {
+    pub fn new() -> FirstPass {
+        FirstPass { columns: XlsxColumns::new(), kept: Some(Vec::new()), items: 0 }
+    }
+
+    /// The columns, and the pages if they were all kept.
+    pub fn done(self) -> (XlsxColumns, Option<Vec<crate::print::PrintPage>>) {
+        (self.columns, self.kept)
+    }
+}
+
+impl crate::fill::PageSink for FirstPass {
+    fn page(&mut self, page: crate::print::PrintPage, _fonts: &FontSet) -> crate::Result<()> {
+        self.columns.add(&page.items);
+        self.items += page.items.len();
+        if self.items > KEEP_ITEMS {
+            self.kept = None;
+        } else if let Some(kept) = &mut self.kept {
+            kept.push(page);
+        }
+        Ok(())
+    }
+}
+
+/// Writes a workbook to `out` page by page: each page's rows are compressed and sent on as
+/// they are made, so the sheet is never in memory. What is kept until the end is small: the
+/// styles, the merged ranges and the pictures.
+pub struct XlsxStream<W: std::io::Write> {
+    zip: crate::zip::ZipStream<W>,
+    xcuts: grid::Cuts,
+    names: Vec<String>,
+    height: i32,
+    options: XlsxOptions,
+    styles: Styles,
+    pictures: Pictures,
+    merges: String,
+    rows: String,
+    row_no: usize,
+    pages_done: usize,
+    name: String,
+    tail: String,
+}
+
+impl<W: std::io::Write> XlsxStream<W> {
+    /// `columns` must have seen every page that will be written. `name` is the report's,
+    /// for the sheet.
+    pub fn new(
+        out: W,
+        columns: XlsxColumns,
+        name: &str,
+        page_width: f32,
+        page_height: f32,
+        landscape: bool,
+        options: XlsxOptions,
+    ) -> crate::Result<XlsxStream<W>> {
+        let width = page_width.round() as i32;
+        let height = page_height.round() as i32;
+        let mut xcuts = columns.cuts;
+        xcuts.close(width);
+        if xcuts.spans() > MAX_COLUMNS {
+            return Err(crate::Error::Limit(format!(
+                "the report needs {} columns and a sheet holds {MAX_COLUMNS}",
+                xcuts.spans()
+            )));
+        }
+        let mut sheet = String::from(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<worksheet\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<sheetPr>\n<outlinePr summaryBelow=\"0\"/>\n</sheetPr><dimension ref=\"A1\"/><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews>\n<sheetFormatPr defaultRowHeight=\"15\"/>\n<cols>\n",
+        );
+        for i in 0..xcuts.spans() {
+            let w = xcuts.size(i) as f32 / 6.0;
+            let _ = writeln!(sheet, "<col min=\"{0}\" max=\"{0}\" customWidth=\"1\" width=\"{1}\"/>", i + 1, java_float(w));
+        }
+        sheet.push_str("</cols>\n<sheetData>\n");
+        let mut tail =
+            String::from("<pageMargins left=\"0.0\" right=\"0.0\" top=\"0.0\" bottom=\"0.00\" header=\"0.0\" footer=\"0.0\"/>\n");
+        let orientation = if landscape { "landscape" } else { "portrait" };
+        match paper_size(width, height) {
+            Some(n) => {
+                let _ = writeln!(tail, "<pageSetup orientation=\"{orientation}\" paperSize=\"{n}\"/>");
+            }
+            None => {
+                let _ = writeln!(tail, "<pageSetup orientation=\"{orientation}\"/>");
+            }
+        }
+        tail.push_str("<drawing r:id=\"rIdDr1\"/></worksheet>");
+        let mut zip = crate::zip::ZipStream::new(out);
+        zip.add("[Content_Types].xml", CONTENT_TYPES.as_bytes()).map_err(io)?;
+        zip.add("_rels/.rels", ROOT_RELS.as_bytes()).map_err(io)?;
+        zip.begin("xl/worksheets/sheet1.xml").map_err(io)?;
+        zip.write(sheet.as_bytes()).map_err(io)?;
+        Ok(XlsxStream {
+            zip,
+            names: (0..xcuts.spans()).map(column_name).collect(),
+            xcuts,
+            height,
+            options,
+            styles: Styles::new(),
+            pictures: Pictures { anchors: String::new(), media: Vec::new(), names: HashMap::new() },
+            merges: String::new(),
+            rows: String::new(),
+            row_no: 0,
+            pages_done: 0,
+            name: sheet_name(name),
+            tail,
+        })
+    }
+
+    /// Writes the rows of one page.
+    pub fn add(&mut self, items: &[PrintItem], fonts: &FontSet) -> crate::Result<()> {
+        let nodes = grid::nodes(items);
+        let g = grid::layout(&nodes, &mut self.xcuts, self.height, NATURE);
+        if self.row_no + g.cells.len() > MAX_ROWS {
+            return Err(crate::Error::Limit(format!(
+                "the report has more rows than a sheet holds ({MAX_ROWS}): page {} would go past the last one. \
+                 Export it as CSV, or in parts",
+                self.pages_done + 1
+            )));
+        }
+        let (styles, pictures, merges, rows, names, options) =
+            (&mut self.styles, &mut self.pictures, &mut self.merges, &mut self.rows, &self.names, &self.options);
+        rows.clear();
+        let first = self.row_no;
+        let mut row_no = self.row_no;
         for (ri, cells) in g.cells.iter().enumerate() {
             row_no += 1;
             let _ = writeln!(rows, "<row r=\"{row_no}\" customHeight=\"1\" ht=\"{}\">", g.rows.size(ri));
@@ -49,7 +207,7 @@ fn workbook_parts(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -
                     Cell::Empty(style) => (styles.shape_xf(style, style.boxed), String::new()),
                     Cell::Element { node, rows: rs, cols: cs, style } => {
                         if let What::Shape(e, _, drawn) = &node.what {
-                            pictures.add(e, drawn, node.w, node.h, ci, first + ri, *cs, *rs, pages_done);
+                            pictures.add(fonts, e, drawn, node.w, node.h, ci, first + ri, *cs, *rs, self.pages_done);
                         }
                         if *rs > 1 || *cs > 1 {
                             let _ = writeln!(
@@ -65,7 +223,7 @@ fn workbook_parts(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -
                     Cell::Occupied(r0, c0) => {
                         // Written with the style of the element covering it (set earlier in
                         // this row, or in a row above).
-                        let xf = if *r0 == ri { xfs[*c0] } else { g.anchor_xf(*r0, *c0, &mut styles, options) };
+                        let xf = if *r0 == ri { xfs[*c0] } else { g.anchor_xf(*r0, *c0, styles, options) };
                         (xf, String::new())
                     }
                 };
@@ -81,86 +239,75 @@ fn workbook_parts(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -
             }
             rows.push_str("</row>\n");
         }
+        drop(g);
+        self.row_no = row_no;
+        self.pages_done += 1;
+        self.zip.write(self.rows.as_bytes()).map_err(io)
     }
 
-    let mut sheet = String::from(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<worksheet\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<sheetPr>\n<outlinePr summaryBelow=\"0\"/>\n</sheetPr><dimension ref=\"A1\"/><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews>\n<sheetFormatPr defaultRowHeight=\"15\"/>\n<cols>\n",
-    );
-    for i in 0..xcuts.spans() {
-        let w = xcuts.size(i) as f32 / 6.0;
-        let _ = writeln!(sheet, "<col min=\"{0}\" max=\"{0}\" customWidth=\"1\" width=\"{1}\"/>", i + 1, java_float(w));
-    }
-    sheet.push_str("</cols>\n<sheetData>\n");
-    sheet.push_str(&rows);
-    sheet.push_str("</sheetData>\n");
-    if !merges.is_empty() {
-        sheet.push_str("<mergeCells>\n");
-        sheet.push_str(&merges);
-        sheet.push_str("</mergeCells>\n");
-    }
-    sheet.push_str("<pageMargins left=\"0.0\" right=\"0.0\" top=\"0.0\" bottom=\"0.00\" header=\"0.0\" footer=\"0.0\"/>\n");
-    let orientation = if doc.landscape { "landscape" } else { "portrait" };
-    match paper_size(width, height) {
-        Some(n) => {
-            let _ = writeln!(sheet, "<pageSetup orientation=\"{orientation}\" paperSize=\"{n}\"/>");
+    /// Ends the sheet and writes the rest of the workbook.
+    pub fn finish(mut self) -> crate::Result<W> {
+        let mut end = String::from("</sheetData>\n");
+        if !self.merges.is_empty() {
+            end.push_str("<mergeCells>\n");
+            end.push_str(&self.merges);
+            end.push_str("</mergeCells>\n");
         }
-        None => {
-            let _ = writeln!(sheet, "<pageSetup orientation=\"{orientation}\"/>");
+        end.push_str(&self.tail);
+        let zip = &mut self.zip;
+        zip.write(end.as_bytes()).map_err(io)?;
+        zip.end().map_err(io)?;
+        let name = &self.name;
+        zip.add(
+            "docProps/app.xml",
+            format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">\n  <Application>ferroreport {}</Application>\n</Properties>\n",
+                env!("CARGO_PKG_VERSION")
+            )
+            .as_bytes(),
+        )
+        .map_err(io)?;
+        zip.add("docProps/core.xml", CORE.as_bytes()).map_err(io)?;
+        zip.add(
+            "xl/workbook.xml",
+            format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{1}'!$A$1</definedName>\n</definedNames>\n</workbook>\n",
+                escape(name),
+                escape(&name.replace('\'', "''"))
+            )
+            .as_bytes(),
+        )
+        .map_err(io)?;
+        zip.add("xl/_rels/workbook.xml.rels", WORKBOOK_RELS.as_bytes()).map_err(io)?;
+        zip.add("xl/styles.xml", self.styles.xml().as_bytes()).map_err(io)?;
+        zip.add("xl/worksheets/_rels/sheet1.xml.rels", SHEET_RELS.as_bytes()).map_err(io)?;
+        zip.add("xl/drawings/drawing1.xml", self.pictures.drawing().as_bytes()).map_err(io)?;
+        zip.add("xl/drawings/_rels/drawing1.xml.rels", self.pictures.rels().as_bytes()).map_err(io)?;
+        for (name, bytes) in &self.pictures.media {
+            zip.add(&format!("xl/media/{name}"), bytes).map_err(io)?;
         }
+        self.zip.finish().map_err(io)
     }
-    sheet.push_str("<drawing r:id=\"rIdDr1\"/></worksheet>");
-
-    let name = sheet_name(&doc.name);
-    let mut zip = Parts::default();
-    zip.add("[Content_Types].xml", CONTENT_TYPES.as_bytes());
-    zip.add("_rels/.rels", ROOT_RELS.as_bytes());
-    zip.add(
-        "docProps/app.xml",
-        format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">\n  <Application>ferroreport {}</Application>\n</Properties>\n",
-            env!("CARGO_PKG_VERSION")
-        )
-        .as_bytes(),
-    );
-    zip.add("docProps/core.xml", CORE.as_bytes());
-    zip.add(
-        "xl/workbook.xml",
-        format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{1}'!$A$1</definedName>\n</definedNames>\n</workbook>\n",
-            escape(&name),
-            escape(&name.replace('\'', "''"))
-        )
-        .as_bytes(),
-    );
-    zip.add("xl/_rels/workbook.xml.rels", WORKBOOK_RELS.as_bytes());
-    zip.add("xl/styles.xml", styles.xml().as_bytes());
-    zip.add("xl/worksheets/sheet1.xml", sheet.as_bytes());
-    zip.add("xl/worksheets/_rels/sheet1.xml.rels", SHEET_RELS.as_bytes());
-    zip.add("xl/drawings/drawing1.xml", pictures.drawing().as_bytes());
-    zip.add("xl/drawings/_rels/drawing1.xml.rels", pictures.rels().as_bytes());
-    for (name, bytes) in &pictures.media {
-        zip.add(&format!("xl/media/{name}"), bytes);
-    }
-    zip.0
 }
 
-/// The files of a workbook, in the order they are zipped.
-#[derive(Default)]
-struct Parts(Vec<(String, Vec<u8>)>);
-
-impl Parts {
-    fn add(&mut self, name: &str, data: &[u8]) {
-        self.0.push((name.to_string(), data.to_vec()));
+impl<W: std::io::Write> crate::fill::PageSink for XlsxStream<W> {
+    fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> crate::Result<()> {
+        self.add(&page.items, fonts)
     }
 }
 
 /// Exports a filled document to an XLSX workbook.
-pub fn write_xlsx(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -> Vec<u8> {
-    let mut zip = crate::zip::ZipWriter::default();
-    for (name, data) in workbook_parts(doc, fonts, options) {
-        zip.add(&name, &data);
+pub fn write_xlsx(doc: &PrintDocument, fonts: &FontSet, options: &XlsxOptions) -> crate::Result<Vec<u8>> {
+    let mut columns = XlsxColumns::new();
+    for page in &doc.pages {
+        columns.add(&page.items);
     }
-    zip.finish()
+    let mut out =
+        XlsxStream::new(Vec::new(), columns, &doc.name, doc.page_width, doc.page_height, doc.landscape, options.clone())?;
+    for page in &doc.pages {
+        out.add(&page.items, fonts)?;
+    }
+    out.finish()
 }
 
 impl grid::PageGrid<'_> {
@@ -585,18 +732,18 @@ const SHEET_RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"
 
 /// Images placed over the cells they cover (`JRXlsxExporter.exportImage`). Charts and
 /// barcodes are drawn into images first.
-struct Pictures<'f> {
-    fonts: &'f FontSet,
+struct Pictures {
     anchors: String,
     /// Media files: name and bytes, each image once.
     media: Vec<(String, Vec<u8>)>,
     names: HashMap<usize, String>,
 }
 
-impl Pictures<'_> {
+impl Pictures {
     #[allow(clippy::too_many_arguments)]
     fn add(
         &mut self,
+        fonts: &FontSet,
         e: &ElementInfo,
         drawn: &[PrintItem],
         w: i32,
@@ -629,7 +776,7 @@ impl Pictures<'_> {
                     _ => (aw, ah, ScaleImage::FillFrame),
                 };
                 let area = [e.x + left as f32, e.y + top as f32, pw as f32, ph as f32];
-                let Some(png) = crate::raster::render_png(drawn, self.fonts, area, PICTURE_SCALE) else { return };
+                let Some(png) = crate::raster::render_png(drawn, fonts, area, PICTURE_SCALE) else { return };
                 let name = format!("img_0_{page}_{}.png", self.media.len());
                 self.media.push((name.clone(), png));
                 (name, scale, HAlign::Left, VAlign::Top, pw, ph)
@@ -777,7 +924,7 @@ mod tests {
         let records = crate::data::records_from_json(&report, &rows).unwrap();
         let params = crate::params_from_json(&report, &params).unwrap();
         let doc = r.fill(&report, &records, params).unwrap();
-        let parts = workbook_parts(&doc, &r.fonts, &XlsxOptions::default());
+        let parts = crate::zip::tests::read(&write_xlsx(&doc, &r.fonts, &XlsxOptions::default()).unwrap());
         for (part, file) in [("xl/worksheets/sheet1.xml", "sheet1.xml"), ("xl/styles.xml", "styles.xml")] {
             let ours = parts.iter().find(|(n, _)| n == part).map(|(_, d)| String::from_utf8_lossy(d).to_string());
             let theirs = read(&format!("jasper-xlsx/{file}")).unwrap();

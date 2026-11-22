@@ -113,24 +113,38 @@ impl Cuts {
     }
 }
 
-/// The column cuts shared by all pages: page edges and element edges on every page.
-pub(crate) fn x_cuts(pages: &[Vec<Node<'_>>], width: i32, nature: Nature) -> Cuts {
-    fn add(nodes: &[Node<'_>], nature: Nature, cuts: &mut Cuts) {
-        for n in nodes.iter().filter(|n| n.exported(nature)) {
-            cuts.add(n.x);
-            cuts.add(n.x + n.w);
-            if let Some((_, children)) = n.children() {
-                add(children, nature, cuts);
-            }
+/// Adds the edges of the elements of one page to the column cuts.
+pub(crate) fn add_x_cuts(nodes: &[Node<'_>], nature: Nature, cuts: &mut Cuts) {
+    for n in nodes.iter().filter(|n| n.exported(nature)) {
+        cuts.add(n.x);
+        cuts.add(n.x + n.w);
+        if let Some((_, children)) = n.children() {
+            add_x_cuts(children, nature, cuts);
         }
     }
-    let mut cuts = Cuts::with(&[0]);
+}
+
+impl Cuts {
+    /// Column cuts before any page: the left edge.
+    pub fn columns() -> Cuts {
+        Cuts::with(&[0])
+    }
+
+    /// Once every page has added its edges: the right edge of the page, if nothing reaches it.
+    pub fn close(&mut self, width: i32) {
+        if self.offsets.last().is_some_and(|&l| l < width) {
+            self.add(width);
+        }
+    }
+}
+
+/// The column cuts shared by all pages: page edges and element edges on every page.
+pub(crate) fn x_cuts(pages: &[Vec<Node<'_>>], width: i32, nature: Nature) -> Cuts {
+    let mut cuts = Cuts::columns();
     for p in pages {
-        add(p, nature, &mut cuts);
+        add_x_cuts(p, nature, &mut cuts);
     }
-    if cuts.offsets.last().is_some_and(|&l| l < width) {
-        cuts.add(width);
-    }
+    cuts.close(width);
     cuts
 }
 
