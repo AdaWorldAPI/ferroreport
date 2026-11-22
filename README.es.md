@@ -171,6 +171,23 @@ cada vez (también interpreta la plantilla). Mediana por reporte:
 | Ventas agrupadas, 4 páginas | 11.8 ms | 3.6 ms | 3.3× |
 | 20,000 filas, 477 páginas | 1258.7 ms | 206.1 ms | 6.1× |
 
+**Muchos a la vez: un servicio con carga.** La misma JVM en caliente y el mismo ferroreport,
+ahora con varios hilos generando la factura al mismo tiempo durante 8 segundos, en 2 CPU
+(`tools/bench_concurrent.py`, resultados en
+[docs/benchmarks-concurrent.json](docs/benchmarks-concurrent.json)):
+
+| Hilos | Reportes/s, JasperReports | Reportes/s, ferroreport | 95% en menos de, JasperReports | 95% en menos de, ferroreport | Memoria, JasperReports | Memoria, ferroreport |
+|---|---|---|---|---|---|---|
+| 1 | 100 | 442 | 15 ms | 4 ms | 317 MiB | 10 MiB |
+| 2 | 136 | 869 | 25 ms | 3 ms | 382 MiB | 11 MiB |
+| 10 | 151 | 942 | 104 ms | 22 ms | 467 MiB | 18 MiB |
+| 50 | 143 | 893 | 884 ms | 131 ms | 655 MiB | 58 MiB |
+| 100 | 160 | 957 | 1834 ms | 318 ms | 812 MiB | 90 MiB |
+
+Entre cuatro y seis veces más reportes por segundo con cualquier carga, el 95% listo entre
+cuatro y ocho veces antes, con entre la novena y la treintava parte de la memoria. Por HTTP, `ferroreport serve`
+responde una factura en unos 3 ms sobre una conexión que se mantiene abierta.
+
 **Grandes: filas por cientos de miles.** El mismo reporte con más filas, en frío, y
 JasperReports con su memoria por defecto. ferroreport lee las filas a medida que las necesita
 y escribe cada página al terminarla, así que su memoria no crece con el reporte:

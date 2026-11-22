@@ -298,6 +298,7 @@ cargo build --release
 JASPER_LIB=/path/to/jars python3 tools/compare.py      # diff images land in target/compare/
 JASPER_LIB=/path/to/jars python3 tools/compare_sheets.py   # XLSX and CSV
 JASPER_LIB=/path/to/jars python3 tools/bench_all.py     # every number in the next section
+JASPER_LIB=/path/to/jars python3 tools/bench_concurrent.py   # many reports at once
 JASPER_LIB=/path/to/jars python3 tools/samples.py      # JasperReports' own samples (below)
 ```
 
@@ -354,6 +355,24 @@ time per report:
 | Employee list, 2 pages | 6.2 ms | 1.3 ms | 4.7× |
 | Grouped sales, 4 pages | 11.8 ms | 3.6 ms | 3.3× |
 | 20,000 rows, 477 pages | 1258.7 ms | 206.1 ms | 6.1× |
+
+**Many at once: a service under load.** The same warm JVM and the same ferroreport, now with
+several threads rendering the invoice at the same time for 8 seconds, on 2 CPUs
+(`tools/bench_concurrent.py`, raw results in
+[docs/benchmarks-concurrent.json](docs/benchmarks-concurrent.json), which has the grouped sales
+report too):
+
+| Threads | Reports/s, JasperReports | Reports/s, ferroreport | 95% under, JasperReports | 95% under, ferroreport | Memory, JasperReports | Memory, ferroreport |
+|---|---|---|---|---|---|---|
+| 1 | 100 | 442 | 15 ms | 4 ms | 317 MiB | 10 MiB |
+| 2 | 136 | 869 | 25 ms | 3 ms | 382 MiB | 11 MiB |
+| 10 | 151 | 942 | 104 ms | 22 ms | 467 MiB | 18 MiB |
+| 50 | 143 | 893 | 884 ms | 131 ms | 655 MiB | 58 MiB |
+| 100 | 160 | 957 | 1834 ms | 318 ms | 812 MiB | 90 MiB |
+
+Four to six times the reports per second at every load, 95% of them finished four to eight
+times sooner, in a ninth to a thirtieth of the memory. Over HTTP, `ferroreport serve` answers an
+invoice in about 3 ms on a connection that is kept open.
 
 **Large: rows by the hundred thousand.** The same report with more rows, cold, JasperReports
 with its default heap. ferroreport reads the rows as it needs them and writes each page as it
