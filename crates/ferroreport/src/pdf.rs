@@ -138,8 +138,9 @@ enum Draw<'a> {
     /// What follows, up to `End`, is one piece of content of the document (tagged PDFs).
     Begin(Mark),
     End,
-    /// What follows, up to `Close`, is in a table or one of its cells, whose top is given.
-    Open(Role, f32),
+    /// What follows, up to `Close`, is in a table, one of its cells or a list; where it is on
+    /// the page (left, top, width, height).
+    Open(Role, [f32; 4]),
     Close,
 }
 
@@ -154,6 +155,11 @@ enum Role {
     HeaderCell,
     RowHeaderCell,
     DataCell,
+    /// A list, numbered or not; one of its items, the item's bullet or number, and the rest.
+    List(bool),
+    ListItem,
+    ListLabel,
+    ListBody,
     /// The page itself, while its structure is gathered.
     Group,
 }
@@ -184,6 +190,10 @@ impl Role {
             Role::Row => "TR",
             Role::HeaderCell | Role::RowHeaderCell => "TH",
             Role::DataCell => "TD",
+            Role::List(_) => "L",
+            Role::ListItem => "LI",
+            Role::ListLabel => "Lbl",
+            Role::ListBody => "LBody",
             Role::Group => "Div",
         }
     }
@@ -210,7 +220,44 @@ struct Node {
     content: Option<usize>,
     /// Top of a cell on the page: cells at the same height are a row.
     y: f32,
+    /// Left, width and height of a cell, for the columns and rows it spans.
+    x: f32,
+    w: f32,
+    h: f32,
+    /// How many columns and rows of its table a cell spans.
+    span: (u16, u16),
     kids: Vec<Node>,
+}
+
+impl Node {
+    fn new(role: Role, [x, y, w, h]: [f32; 4], kids: Vec<Node>) -> Node {
+        Node { role, alt: None, content: None, y, x, w, h, span: (1, 1), kids }
+    }
+}
+
+/// How many columns and rows each cell of a table spans: the columns are where its cells
+/// start, the rows where its rows start (a header over two columns spans both).
+fn spans(rows: &mut [Node]) {
+    let mut xs: Vec<f32> = Vec::new();
+    let mut ys: Vec<f32> = Vec::new();
+    for row in rows.iter() {
+        if row.y.is_finite() {
+            ys.push(row.y);
+        }
+        xs.extend(row.kids.iter().map(|c| c.x).filter(|x| x.is_finite()));
+    }
+    let distinct = |v: &mut Vec<f32>| {
+        v.sort_by(f32::total_cmp);
+        v.dedup_by(|a, b| (*a - *b).abs() < 0.5);
+    };
+    distinct(&mut xs);
+    distinct(&mut ys);
+    let count = |v: &[f32], from: f32, len: f32| v.iter().filter(|&&p| p > from - 0.5 && p < from + len - 0.5).count();
+    for row in rows.iter_mut() {
+        for cell in row.kids.iter_mut().filter(|c| c.x.is_finite() && c.y.is_finite()) {
+            cell.span = (count(&xs, cell.x, cell.w).clamp(1, 1000) as u16, count(&ys, cell.y, cell.h).clamp(1, 1000) as u16);
+        }
+    }
 }
 
 /// The cells of a table gathered into rows (cells at the same height), in order. Anything
@@ -224,13 +271,14 @@ fn rows(kids: Vec<Node>) -> Vec<Node> {
             out.push(kid);
             continue;
         } else {
-            Node { role: Role::DataCell, alt: None, content: None, y: f32::NAN, kids: vec![kid] }
+            Node::new(Role::DataCell, [f32::NAN; 4], vec![kid])
         };
         match out.last_mut() {
             Some(row) if row.role == Role::Row && (row.y - cell.y).abs() < 0.5 => row.kids.push(cell),
-            _ => out.push(Node { role: Role::Row, alt: None, content: None, y: cell.y, kids: vec![cell] }),
+            _ => out.push(Node::new(Role::Row, [f32::NAN, cell.y, f32::NAN, f32::NAN], vec![cell])),
         }
     }
+    spans(&mut out);
     out
 }
 
@@ -241,7 +289,8 @@ fn adopt(kids: Vec<Node>) -> Vec<Node> {
     let mut cells: Vec<Node> = Vec::new();
     let table = |cells: &mut Vec<Node>, out: &mut Vec<Node>| {
         if !cells.is_empty() {
-            out.push(Node { role: Role::Table, alt: None, content: None, y: cells[0].y, kids: rows(std::mem::take(cells)) });
+            let y = cells[0].y;
+            out.push(Node::new(Role::Table, [f32::NAN, y, f32::NAN, f32::NAN], rows(std::mem::take(cells))));
         }
     };
     for kid in kids {
@@ -268,6 +317,12 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
         match item {
             PrintItem::Group(inner) => flatten(inner, tagging, out),
             PrintItem::Cell(info, _) if info.field.is_some() => out.push(Draw::Field(info)),
+            PrintItem::Cell(info, inner) if tagging && matches!(**inner, PrintItem::Paragraphs(..)) => {
+                if let PrintItem::Paragraphs(kinds, paras) = &**inner {
+                    lists(kinds, paras, info, out);
+                }
+            }
+            PrintItem::Paragraphs(_, inner) => flatten(inner, false, out),
             PrintItem::Cell(info, inner) => {
                 let mark = tagging && !info.text.trim().is_empty();
                 if mark {
@@ -299,7 +354,7 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
                     out.push(Draw::Begin(Mark { role: Role::Figure, alt: Some(alt) }));
                     open.push((i + info.len, true));
                 } else if let Some(tag) = info.tag.filter(|t| !matches!(t, crate::model::Tag::Heading(_))) {
-                    out.push(Draw::Open(Role::of(tag), info.y));
+                    out.push(Draw::Open(Role::of(tag), [info.x, info.y, info.w, info.h]));
                     open.push((i + info.len, false));
                 }
             }
@@ -313,6 +368,69 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
     for (_, picture) in open.into_iter().rev() {
         out.push(if picture { Draw::End } else { Draw::Close });
     }
+}
+
+/// The paragraphs of a text with HTML lists as a tagged PDF has them: lists of items, each
+/// with its bullet or number and its body, nested as deep as the text's lists are.
+fn lists<'a>(kinds: &[crate::print::ParaKind], paras: &'a [PrintItem], info: &crate::print::CellInfo, out: &mut Vec<Draw<'a>>) {
+    let role = match info.tag {
+        Some(crate::model::Tag::Heading(level)) => Role::Heading(level.clamp(1, 6)),
+        _ => Role::Paragraph,
+    };
+    let y = [info.x, info.y, info.w, info.h];
+    let content = |items: &'a [PrintItem], role: Role, out: &mut Vec<Draw<'a>>| {
+        if items.is_empty() {
+            return;
+        }
+        out.push(Draw::Begin(Mark { role, alt: None }));
+        flatten(items, false, out);
+        out.push(Draw::End);
+    };
+    // Each open level has a list, an item and the item's body open.
+    let mut depth = 0u8;
+    let close = |out: &mut Vec<Draw<'a>>, n: usize| out.extend((0..n).map(|_| Draw::Close));
+    for (kind, para) in kinds.iter().zip(paras) {
+        let parts: &'a [PrintItem] = match para {
+            PrintItem::Group(v) => v,
+            other => std::slice::from_ref(other),
+        };
+        if !kind.item {
+            while depth > kind.level {
+                close(out, 3);
+                depth -= 1;
+            }
+            content(parts, if depth > 0 { Role::Paragraph } else { role }, out);
+            continue;
+        }
+        let level = kind.level.max(1);
+        while depth > level {
+            close(out, 3);
+            depth -= 1;
+        }
+        // The item's bullet or number is drawn first.
+        let (label, body) = parts.split_first().map(|(l, b)| (std::slice::from_ref(l), b)).unwrap_or((&[], &[]));
+        let ordered = match label.first() {
+            Some(PrintItem::Text(t)) => t.lines.first().is_some_and(|l| l.text.starts_with(|c: char| c.is_ascii_digit())),
+            _ => false,
+        };
+        if depth == level {
+            close(out, 2);
+        } else {
+            while depth < level {
+                out.push(Draw::Open(Role::List(ordered), y));
+                depth += 1;
+                if depth < level {
+                    out.push(Draw::Open(Role::ListItem, y));
+                    out.push(Draw::Open(Role::ListBody, y));
+                }
+            }
+        }
+        out.push(Draw::Open(Role::ListItem, y));
+        content(label, Role::ListLabel, out);
+        out.push(Draw::Open(Role::ListBody, y));
+        content(body, Role::Paragraph, out);
+    }
+    close(out, 3 * depth as usize);
 }
 
 /// What a document has used of one font face so far.
@@ -601,7 +719,7 @@ impl<W: std::io::Write> PdfStream<W> {
         // The structure of the page as it is drawn: the pieces of content, numbered in
         // order, inside the tables and cells that are open.
         let mut numbered = 0usize;
-        let mut nodes: Vec<Node> = vec![Node { role: Role::Group, alt: None, content: None, y: 0.0, kids: Vec::new() }];
+        let mut nodes: Vec<Node> = vec![Node::new(Role::Group, [0.0; 4], Vec::new())];
         // In a tagged PDF everything drawn is either a piece of content or decoration.
         let (mut inside, mut decoration) = (false, false);
         // How many coordinate systems deep the drawing is, and was when decoration began.
@@ -630,19 +748,17 @@ impl<W: std::io::Write> PdfStream<W> {
                         .pair(Name(b"MCID"), numbered as i32);
                     if let Some(parent) = nodes.last_mut() {
                         parent.kids.push(Node {
-                            role: mark.role,
                             alt: mark.alt.clone(),
                             content: Some(numbered),
-                            y: 0.0,
-                            kids: Vec::new(),
+                            ..Node::new(mark.role, [0.0; 4], Vec::new())
                         });
                     }
                     numbered += 1;
                     inside = true;
                     continue;
                 }
-                Draw::Open(role, y) => {
-                    nodes.push(Node { role: *role, alt: None, content: None, y: *y, kids: Vec::new() });
+                Draw::Open(role, rect) => {
+                    nodes.push(Node::new(*role, *rect, Vec::new()));
                     continue;
                 }
                 Draw::Close => {
@@ -680,7 +796,11 @@ impl<W: std::io::Write> PdfStream<W> {
                 }
             };
             match item {
-                PrintItem::Group(_) | PrintItem::Transform(..) | PrintItem::Cell(..) | PrintItem::Element(_) => {}
+                PrintItem::Group(_)
+                | PrintItem::Paragraphs(..)
+                | PrintItem::Transform(..)
+                | PrintItem::Cell(..)
+                | PrintItem::Element(_) => {}
                 PrintItem::Path { ops, fill, stroke, dash } => {
                     if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
                         continue;
@@ -993,19 +1113,37 @@ impl<W: std::io::Write> PdfStream<W> {
             Role::Row => StructRole::TR,
             Role::HeaderCell | Role::RowHeaderCell => StructRole::TH,
             Role::DataCell => StructRole::TD,
+            Role::List(_) => StructRole::L,
+            Role::ListItem => StructRole::LI,
+            Role::ListLabel => StructRole::Lbl,
+            Role::ListBody => StructRole::LBody,
             _ => StructRole::Div,
         })
         .parent(parent)
         .page(page);
-        // A header cell says what it names: its column or its row.
-        match node.role {
-            Role::HeaderCell => {
-                e.attributes().push().table().scope(TableHeaderScope::Column);
+        if let Role::List(ordered) = node.role {
+            use pdf_writer::types::ListNumbering;
+            e.attributes().push().list().list_numbering(if ordered { ListNumbering::Decimal } else { ListNumbering::Disc });
+        }
+        // A header cell says what it names, its column or its row; a cell over several
+        // columns or rows says how many.
+        let scope = match node.role {
+            Role::HeaderCell => Some(TableHeaderScope::Column),
+            Role::RowHeaderCell => Some(TableHeaderScope::Row),
+            _ => None,
+        };
+        if node.role.is_cell() && (scope.is_some() || node.span != (1, 1)) {
+            let mut attributes = e.attributes();
+            let mut table = attributes.push().table();
+            if let Some(scope) = scope {
+                table.scope(scope);
             }
-            Role::RowHeaderCell => {
-                e.attributes().push().table().scope(TableHeaderScope::Row);
+            if node.span.0 > 1 {
+                table.col_span(node.span.0 as i32);
             }
-            _ => {}
+            if node.span.1 > 1 {
+                table.row_span(node.span.1 as i32);
+            }
         }
         let mut children = e.children();
         for kid in &kids {

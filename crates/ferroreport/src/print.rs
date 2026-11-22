@@ -64,6 +64,14 @@ pub struct CellInfo {
     pub field: Option<Arc<crate::model::FormField>>,
 }
 
+/// What a paragraph of a text with HTML lists is: how deep in lists it is (0: not in one),
+/// and whether it starts a list item (it has the item's bullet or number, drawn first).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParaKind {
+    pub level: u8,
+    pub item: bool,
+}
+
 /// What a non-text element is, for spreadsheet exporters.
 #[derive(Debug, Clone)]
 pub enum Shape {
@@ -125,6 +133,9 @@ pub enum PrintItem {
     },
     /// Several items drawn in order (the runs of a styled text).
     Group(Vec<PrintItem>),
+    /// The paragraphs of a text with HTML lists, one item each, and what each paragraph is:
+    /// drawn like a group; tagged PDFs make lists of them.
+    Paragraphs(Arc<Vec<ParaKind>>, Vec<PrintItem>),
     /// Items drawn in a local coordinate system: a local point `(u, v)` lands on the page at
     /// `(a·u + c·v + e, b·u + d·v + f)` (points, y down). Used for rotated text.
     Transform([f32; 6], Vec<PrintItem>),

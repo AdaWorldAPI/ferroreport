@@ -76,7 +76,7 @@ impl Raster<'_> {
     fn item(&mut self, item: &PrintItem, t: Transform) {
         match item {
             PrintItem::Cell(_, inner) => self.item(inner, t),
-            PrintItem::Group(items) => self.items(items, t),
+            PrintItem::Group(items) | PrintItem::Paragraphs(_, items) => self.items(items, t),
             PrintItem::Transform([a, b, c, d, e, f], items) => {
                 self.items(items, t.pre_concat(Transform::from_row(*a, *b, *c, *d, *e, *f)))
             }

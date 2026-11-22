@@ -281,8 +281,13 @@ fn a_tagged_pdf_has_tables_and_headings() {
     assert_eq!(count(&table, "/Scope /Column"), count(&table, "/S /TH"), "the header cells of a table name columns");
     let crosstab = tagged("30-crosstab");
     assert!(count(&crosstab, "/Scope /Row") >= 1 && count(&crosstab, "/Scope /Column") >= 1, "a crosstab has headers both ways");
+    // A header over several columns or rows says how many.
+    let groups = tagged("28-table-groups");
+    assert!(count(&groups, "/ColSpan 2") >= 1 && count(&groups, "/RowSpan 2") >= 1, "column groups");
+    assert!(count(&crosstab, "/ColSpan ") >= 1 && count(&crosstab, "/RowSpan ") >= 1, "crosstab groups");
+    assert_eq!(count(&table, "/ColSpan 1") + count(&table, "/RowSpan 1"), 0, "a single cell says nothing");
     // Nothing sits in a table outside a row, or in a row outside a cell.
-    for pdf in [&table, &crosstab] {
+    for pdf in [&table, &crosstab, &groups] {
         assert_eq!(count(pdf, "/S /Div"), 0);
     }
 
@@ -301,4 +306,35 @@ fn a_tagged_pdf_has_tables_and_headings() {
         .render_to(&report, Box::new(std::iter::empty()), Default::default(), Format::Pdf, &mut out)
         .unwrap();
     assert_eq!((count(&out, "/S/H1/P "), count(&out, "/S/H2/P "), count(&out, "/S/P/P ")), (1, 1, 1));
+}
+
+/// The lists of an HTML text are lists in a tagged PDF: items with their bullet or number
+/// and their body, a list inside an item's body, and the text around them as paragraphs.
+#[test]
+fn a_tagged_pdf_has_lists() {
+    let count = |pdf: &[u8], what: &str| pdf.windows(what.len()).filter(|w| *w == what.as_bytes()).count();
+    let template = r#"<jasperReport name="Lists" whenNoDataType="AllSectionsNoDetail" pageWidth="400" pageHeight="300" columnWidth="360" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+  <style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+  <title><band height="200">
+    <textField><reportElement x="0" y="0" width="360" height="200"/><textElement markup="html"/>
+      <textFieldExpression><![CDATA["Before<ul><li>One</li><li>Two<ol><li>Two a</li><li>Two b</li></ol></li><li>Three</li></ul>After"]]></textFieldExpression></textField>
+  </band></title>
+</jasperReport>"#;
+    let report = ferroreport::parse(template).unwrap();
+    let render = |tagged: bool| {
+        let mut out = Vec::new();
+        Renderer::new()
+            .tagged(tagged)
+            .render_to(&report, Box::new(std::iter::empty()), Default::default(), Format::Pdf, &mut out)
+            .unwrap();
+        out
+    };
+    let out = render(true);
+    assert_eq!(count(&out, "/S /L\n"), 2, "a list and the list inside it");
+    assert_eq!((count(&out, "/ListNumbering /Disc"), count(&out, "/ListNumbering /Decimal")), (1, 1));
+    assert_eq!((count(&out, "/S /LI"), count(&out, "/S/Lbl/P "), count(&out, "/S /LBody")), (5, 5, 5));
+    // Before, after, and the body of each item.
+    assert_eq!(count(&out, "/S/P/P "), 2 + 5);
+    // The same page as without tags.
+    assert_eq!(pages_of(&out), pages_of(&render(false)));
 }

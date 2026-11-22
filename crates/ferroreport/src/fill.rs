@@ -371,7 +371,7 @@ fn may_touch(item: &PrintItem, b: [f32; 4]) -> bool {
     match item {
         PrintItem::Element(_) => false,
         PrintItem::Cell(info, _) => hit(info.x, info.y, info.w, info.h),
-        PrintItem::Group(items) => items.iter().any(|i| may_touch(i, b)),
+        PrintItem::Group(items) | PrintItem::Paragraphs(_, items) => items.iter().any(|i| may_touch(i, b)),
         PrintItem::Rect { x, y, w, h, fill, stroke, .. } => match (fill, stroke) {
             (Some(_), _) => hit(*x, *y, *w, *h),
             (None, Some(pen)) => {
@@ -497,7 +497,7 @@ fn translate(item: &mut PrintItem, dx: f32, dy: f32) {
             info.y += dy;
             translate(inner, dx, dy);
         }
-        PrintItem::Group(items) => {
+        PrintItem::Group(items) | PrintItem::Paragraphs(_, items) => {
             for i in items {
                 translate(i, dx, dy);
             }

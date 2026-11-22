@@ -163,7 +163,7 @@ impl Pages {
             match item {
                 PrintItem::Element(_) => {}
                 PrintItem::Cell(_, inner) => self.items(std::slice::from_ref(inner), fonts, out)?,
-                PrintItem::Group(inner) => self.items(inner, fonts, out)?,
+                PrintItem::Group(inner) | PrintItem::Paragraphs(_, inner) => self.items(inner, fonts, out)?,
                 PrintItem::Transform([a, b, c, d, e, f], inner) => {
                     let _ =
                         writeln!(out, "<g transform=\"matrix({} {} {} {} {} {})\">", n(*a), n(*b), n(*c), n(*d), n(*e), n(*f));

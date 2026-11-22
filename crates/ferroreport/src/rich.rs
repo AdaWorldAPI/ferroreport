@@ -9,6 +9,7 @@ use crate::fonts::{FaceId, FontSet};
 use crate::model::{Color, FontSpec, HAlign, LineSpacing, TextElement, VAlign};
 use crate::print::{PrintItem, PrintLine, PrintText};
 use crate::text::Measure;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Markup {
@@ -868,7 +869,13 @@ pub fn layout(
     let mut baseline = cy + voff;
     let g = glyphs(&shown, fonts, Measure::Render);
     let mut prev_spacing = 0.0f32;
+    // A text with lists is drawn a paragraph at a time, saying what each paragraph is.
+    let listed = shown.paras.iter().any(|p| p.marker.is_some());
+    let starts: Vec<usize> =
+        std::iter::once(0).chain(shown.text.match_indices('\n').map(|(i, _)| i + 1).filter(|&s| s < shown.text.len())).collect();
+    let mut paragraphs: Vec<Vec<PrintItem>> = vec![Vec::new(); if listed { starts.len() } else { 0 }];
     for (k, l) in lines.iter().enumerate() {
+        let line_from = items.len();
         let m = line_metrics(&shown, fonts, l);
         baseline += if k == 0 { first_leading } else { factor * m.max_size };
         // Justification: extra space per space character (not on a paragraph's last line).
@@ -967,6 +974,24 @@ pub fn layout(
             }));
             px += seg_w;
         }
+        if listed {
+            let p = starts.partition_point(|&s| s <= l.start).saturating_sub(1);
+            paragraphs[p].extend(items.drain(line_from..));
+        }
+    }
+    if listed {
+        let kinds = starts
+            .iter()
+            .map(|&s| {
+                let para = shown.para_at(s);
+                crate::print::ParaKind {
+                    level: para.map(|p| (p.indent / LIST_INDENT).round() as u8).unwrap_or(0),
+                    item: para.is_some_and(|p| p.marker.is_some()),
+                }
+            })
+            .collect();
+        let items = paragraphs.into_iter().map(PrintItem::Group).collect();
+        return (PrintItem::Paragraphs(Arc::new(kinds), items), needed);
     }
     (PrintItem::Group(items), needed)
 }
