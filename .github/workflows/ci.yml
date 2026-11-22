@@ -59,6 +59,8 @@ jobs:
       - run: mvn -B -q -f bindings/java/pom.xml verify
         env:
           FERROREPORT_BIN: ${{ github.workspace }}/target/release/ferroreport
+      # What a Maven Central release builds (sources and javadoc jars), without signing.
+      - run: mvn -B -q -f bindings/java/pom.xml -Prelease -Dgpg.skip -DskipTests package
 
   wasm:
     runs-on: ubuntu-latest

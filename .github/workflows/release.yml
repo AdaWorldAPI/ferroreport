@@ -4,8 +4,9 @@
 #   - npm package `ferroreport` (WebAssembly)
 #   - PyPI package `ferroreport` (wheels for Linux, macOS, Windows)
 #   - crates.io crates `ferroreport` and `ferroreport-cli`
+#   - Maven Central library `io.github.cristianencarnacion:ferroreport`
 # GitHub release and Docker image need no setup. Each registry job runs once its repository
-# variable (PUBLISH_NPM, PUBLISH_PYPI, PUBLISH_CRATES) is "true"; see RELEASING.md.
+# variable (PUBLISH_NPM, PUBLISH_PYPI, PUBLISH_CRATES, PUBLISH_MAVEN) is "true"; see RELEASING.md.
 name: Release
 
 on:
@@ -228,3 +229,33 @@ jobs:
           published() { curl -fsS -A "ferroreport-release-workflow" "https://crates.io/api/v1/crates/$1/$V" >/dev/null 2>&1; }
           published ferroreport || cargo publish --locked -p ferroreport
           published ferroreport-cli || cargo publish --locked -p ferroreport-cli
+
+  maven:
+    if: vars.PUBLISH_MAVEN == 'true'
+    runs-on: ubuntu-latest
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          # Writes the `central` server of the pom to settings.xml, and imports the signing key.
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      # Maven Central keeps every version forever: an existing one is left alone.
+      - name: Publish
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          V=$(mvn -B -q -f bindings/java/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)
+          if curl -fsS -o /dev/null "https://repo1.maven.org/maven2/io/github/cristianencarnacion/ferroreport/$V/ferroreport-$V.pom"; then
+            echo "ferroreport $V is already on Maven Central"
+          else
+            mvn -B -f bindings/java/pom.xml -Prelease -DskipTests deploy
+          fi
