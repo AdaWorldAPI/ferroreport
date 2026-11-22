@@ -595,6 +595,16 @@ fn chart_texts(ch: &crate::chart::ChartElement, scope: &dyn Scope, env: &EvalEnv
             None => None,
         })
     };
+    let pair = |a: &Option<Expr>, b: &Option<Expr>| -> Result<Option<(f64, f64)>> {
+        Ok(match (n(a)?, n(b)?) {
+            (Some(lo), Some(hi)) => Some((lo, hi)),
+            _ => None,
+        })
+    };
+    let (dial, intervals) = match &ch.dial {
+        Some(d) => (pair(&d.low, &d.high)?, d.intervals.iter().map(|i| pair(&i.low, &i.high)).collect::<Result<Vec<_>>>()?),
+        None => (None, Vec::new()),
+    };
     Ok(crate::chart::ChartTexts {
         title: s(&ch.title)?,
         subtitle: s(&ch.subtitle)?,
@@ -602,14 +612,65 @@ fn chart_texts(ch: &crate::chart::ChartElement, scope: &dyn Scope, env: &EvalEnv
         value_label: s(&ch.value_axis_label)?,
         value_min: n(&ch.value_min)?,
         value_max: n(&ch.value_max)?,
+        dial,
+        intervals,
+        axes: ch.axes.iter().map(|(_, a)| chart_texts(a, scope, env)).collect::<Result<Vec<_>>>()?,
     })
+}
+
+/// A chart whose dataset runs on a subdataset: the rows of the run are filled into the
+/// chart's dataset, as JasperReports does, by filling a report made over the subdataset whose
+/// summary is the chart.
+#[allow(clippy::too_many_arguments)]
+fn chart_over_run(
+    ch: &crate::chart::ChartElement,
+    run: &DatasetRun,
+    scope: &dyn Scope,
+    env: &EvalEnv,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) -> Result<Vec<PrintItem>> {
+    let mut inner = ch.clone();
+    inner.dataset.run = None;
+    inner.evaluation_time = EvaluationTime::Now;
+    inner.evaluation_group = None;
+    let report = crate::table::chart_report(inner, run, w, h);
+    let (params, records) = run_inputs(run, &report, scope, env, "chart")?;
+    if images.depth >= MAX_SUBREPORT_DEPTH {
+        return Err(Error::Unsupported(format!("chart: nested more than {MAX_SUBREPORT_DEPTH} levels")));
+    }
+    check_time(images)?;
+    images.runs += 1;
+    let inner_env = EvalEnv { locale: env.locale, groovy: report.language == Language::Groovy, now: env.now };
+    images.depth += 1;
+    let filled = fill_flow(&report, &records, params, fonts, images, &inner_env);
+    images.depth -= 1;
+    let mut out = Vec::new();
+    let mut top = y;
+    for seg in filled?.0 {
+        for item in seg.items {
+            let mut item = item;
+            translate(&mut item, x, top);
+            out.push(item);
+        }
+        top += seg.height;
+    }
+    Ok(out)
 }
 
 /// Charts in a list of elements (frames included).
 fn collect_charts<'a>(elements: &'a [Element], out: &mut Vec<&'a crate::chart::ChartElement>) {
     for el in elements {
         match &el.kind {
-            ElementKind::Chart(c) => out.push(c),
+            ElementKind::Chart(c) => {
+                out.push(c);
+                // The charts of a multiple axis chart collect their own data.
+                out.extend(c.axes.iter().map(|(_, a)| a));
+            }
             ElementKind::Frame { children, .. } => collect_charts(children, out),
             _ => {}
         }
@@ -1666,10 +1727,13 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             ElementKind::Chart(ch) => {
                 let mark = open_mark(&mut out.items, el, Shape::Picture { symbol: None }, Some(ch.boxed), x, y, w, h);
                 if ch.evaluation_time == EvaluationTime::Now {
-                    let texts = chart_texts(ch, le.scope, le.env)?;
-                    let empty = crate::chart::DataState::default();
-                    let data = le.charts.get(&ch.id).unwrap_or(&empty);
-                    let items = crate::chart::render(ch, data, &texts, le.fonts, le.env.locale, x, y, w, h);
+                    let items = match &ch.dataset.run {
+                        Some(run) => chart_over_run(ch, run, le.scope, le.env, le.fonts, le.images, x, y, w, h)?,
+                        None => {
+                            let texts = chart_texts(ch, le.scope, le.env)?;
+                            crate::chart::render(ch, le.charts, &texts, le.fonts, le.env.locale, x, y, w, h)
+                        }
+                    };
                     out.items.push(Laid { item: PrintItem::Group(items), deferred: None });
                 } else {
                     out.items.push(Laid {
@@ -2465,9 +2529,26 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
     if le.images.depth >= MAX_SUBREPORT_DEPTH {
         return Err(Error::Unsupported(format!("{what}: nested more than {MAX_SUBREPORT_DEPTH} levels")));
     }
+    let (params, records) = run_inputs(run, report, le.scope, le.env, what)?;
+    let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
+    count_run(le, what)?;
+    le.images.depth += 1;
+    let filled = fill_flow(report, &records, params, le.fonts, le.images, &env);
+    le.images.depth -= 1;
+    Ok(filled?.0)
+}
+
+/// The parameters and rows of a dataset run, evaluated where the run is.
+fn run_inputs(
+    run: &DatasetRun,
+    report: &Report,
+    scope: &dyn Scope,
+    env: &EvalEnv,
+    what: &str,
+) -> Result<(HashMap<String, Value>, Vec<Record>)> {
     let mut params = HashMap::new();
     if let Some(e) = &run.parameters_map {
-        if let Value::Json(map) = eval(e, le.scope, le.env)? {
+        if let Value::Json(map) = eval(e, scope, env)? {
             if let Some(obj) = map.as_object() {
                 for (k, v) in obj {
                     let class = report.parameters.iter().find(|p| &p.name == k).map(|p| p.class).unwrap_or(JavaType::Object);
@@ -2477,14 +2558,14 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
         }
     }
     for (name, e) in &run.parameters {
-        params.insert(name.clone(), eval(e, le.scope, le.env)?);
+        params.insert(name.clone(), eval(e, scope, env)?);
     }
-    params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
-    if let Ok(bundle) = le.scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
+    params.entry("REPORT_LOCALE".into()).or_insert_with(|| scope.param("REPORT_LOCALE").unwrap_or_default());
+    if let Ok(bundle) = scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
         params.entry(crate::expr::eval::RESOURCE_BUNDLE.into()).or_insert(bundle);
     }
     let rows = match &run.data_source {
-        Some(e) => match eval(e, le.scope, le.env)? {
+        Some(e) => match eval(e, scope, env)? {
             Value::Json(j) => j,
             Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
             other => return Err(Error::eval(format!("{what} data source is a {}, expected a list", other.type_name()))),
@@ -2492,12 +2573,7 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
         None => Arc::new(serde_json::Value::Array(Vec::new())),
     };
     let records = crate::data::records_from_json(report, &rows)?;
-    let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
-    count_run(le, what)?;
-    le.images.depth += 1;
-    let filled = fill_flow(report, &records, params, le.fonts, le.images, &env);
-    le.images.depth -= 1;
-    Ok(filled?.0)
+    Ok((params, records))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2631,8 +2707,9 @@ impl<'a> Filler<'a> {
 
     /// Adds the current values to the datasets of charts whose increment matches.
     fn increment_charts(&mut self, pred: impl Fn(&crate::chart::Increment) -> bool, mode: Values) -> Result<()> {
-        use crate::chart::ChartKind::*;
-        if self.charts.is_empty() {
+        use crate::chart::DataKind;
+        // Datasets take values from rows: with none read, there is nothing to add.
+        if self.charts.is_empty() || self.rows.current().is_none() {
             return Ok(());
         }
         let record = self.rows.record(mode);
@@ -2655,7 +2732,7 @@ impl<'a> Filler<'a> {
         };
         for ch in self.charts.clone() {
             let ds = &ch.dataset;
-            if !pred(&ds.increment) {
+            if !pred(&ds.increment) || ds.run.is_some() {
                 continue;
             }
             if let Some(w) = &ds.increment_when {
@@ -2663,22 +2740,85 @@ impl<'a> Filler<'a> {
                     continue;
                 }
             }
+            let date = |v: Value| match v {
+                Value::Date(d) => Some(d),
+                _ => None,
+            };
             for s in &ds.series {
                 let state = self.chart_data.entry(ch.id).or_default();
-                match ch.kind {
-                    Pie | Pie3D => {
+                match ds.kind {
+                    DataKind::Pie => {
                         if let (k, Some(v)) = (ev(&s.key)?, ev(&s.value)?.as_f64()) {
                             if !k.is_null() {
                                 state.add_pie(k.to_java_string(), v);
                             }
                         }
                     }
-                    XyLine | XyArea | Scatter => {
+                    DataKind::Xy => {
                         if let (Some(x), Some(y)) = (ev(&s.x)?.as_f64(), ev(&s.y)?.as_f64()) {
                             state.add_xy(ev(&s.series)?.to_java_string(), x, y);
                         }
                     }
-                    _ => {
+                    DataKind::TimeSeries => {
+                        if let (Some(t), Some(v)) = (date(ev(&s.period)?), ev(&s.value)?.as_f64()) {
+                            let (a, b) = ds.time_period.bounds(t);
+                            state.add_period(ev(&s.series)?.to_java_string(), a, b, v, true);
+                        }
+                    }
+                    DataKind::TimePeriod => {
+                        if let (Some(a), Some(b), Some(v)) = (date(ev(&s.start)?), date(ev(&s.end)?), ev(&s.value)?.as_f64()) {
+                            state.add_period(
+                                ev(&s.series)?.to_java_string(),
+                                crate::chart::millis(a),
+                                crate::chart::millis(b),
+                                v,
+                                false,
+                            );
+                        }
+                    }
+                    DataKind::Xyz => {
+                        if let (Some(x), Some(y), Some(z)) = (ev(&s.x)?.as_f64(), ev(&s.y)?.as_f64(), ev(&s.z)?.as_f64()) {
+                            state.add_xyz(ev(&s.series)?.to_java_string(), x, y, z);
+                        }
+                    }
+                    DataKind::HighLow => {
+                        if let Some(t) = date(ev(&s.date)?) {
+                            let num = |e: &Option<Expr>| -> Result<f64> { Ok(ev(e)?.as_f64().unwrap_or(f64::NAN)) };
+                            let item = [
+                                crate::chart::millis(t),
+                                num(&s.high)?,
+                                num(&s.low)?,
+                                num(&s.open)?,
+                                num(&s.close)?,
+                                num(&s.volume)?,
+                            ];
+                            state.add_ohlc(ev(&s.series)?.to_java_string(), item);
+                        }
+                    }
+                    DataKind::Value => {
+                        if let Some(v) = ev(&s.value)?.as_f64() {
+                            state.value = Some(v);
+                        }
+                    }
+                    DataKind::Gantt => {
+                        if let (Some(a), Some(b)) = (date(ev(&s.start)?), date(ev(&s.end)?)) {
+                            let task = ev(&s.task)?;
+                            if task.is_null() {
+                                continue;
+                            }
+                            let sub = ev(&s.subtask)?;
+                            let percent = ev(&s.percent)?.as_f64();
+                            state.add_gantt(
+                                ev(&s.series)?.to_java_string(),
+                                task.to_java_string(),
+                                !sub.is_null(),
+                                crate::chart::millis(a),
+                                crate::chart::millis(b),
+                                percent,
+                            );
+                        }
+                    }
+                    DataKind::Category => {
                         let (series, category) = (ev(&s.series)?, ev(&s.category)?);
                         if let Some(v) = ev(&s.value)?.as_f64() {
                             if !category.is_null() {
@@ -3343,12 +3483,25 @@ impl<'a> Filler<'a> {
                         tagged(cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item), d.tag)
                     }
                 }
-                Deferred::Chart(ch) => {
-                    let texts = chart_texts(ch, &ctx, self.env)?;
-                    let empty = crate::chart::DataState::default();
-                    let data = self.chart_data.get(&ch.id).unwrap_or(&empty);
-                    PrintItem::Group(crate::chart::render(ch, data, &texts, self.fonts, self.env.locale, d.x, d.y, d.w, d.h))
-                }
+                Deferred::Chart(ch) => match &ch.dataset.run {
+                    Some(run) => {
+                        PrintItem::Group(chart_over_run(ch, run, &ctx, self.env, self.fonts, self.images, d.x, d.y, d.w, d.h)?)
+                    }
+                    None => {
+                        let texts = chart_texts(ch, &ctx, self.env)?;
+                        PrintItem::Group(crate::chart::render(
+                            ch,
+                            &self.chart_data,
+                            &texts,
+                            self.fonts,
+                            self.env.locale,
+                            d.x,
+                            d.y,
+                            d.w,
+                            d.h,
+                        ))
+                    }
+                },
             };
             if p.page >= self.page_base {
                 self.pages[p.page - self.page_base].items[p.item] = item;

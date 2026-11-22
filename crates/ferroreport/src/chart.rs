@@ -31,6 +31,15 @@ pub enum ChartKind {
     XyLine,
     XyArea,
     Scatter,
+    TimeSeries,
+    XyBar,
+    Bubble,
+    Candlestick,
+    HighLow,
+    Gantt,
+    Meter,
+    Thermometer,
+    MultiAxis,
 }
 
 impl ChartKind {
@@ -48,6 +57,15 @@ impl ChartKind {
             "xyLineChart" => ChartKind::XyLine,
             "xyAreaChart" => ChartKind::XyArea,
             "scatterChart" => ChartKind::Scatter,
+            "timeSeriesChart" => ChartKind::TimeSeries,
+            "xyBarChart" => ChartKind::XyBar,
+            "bubbleChart" => ChartKind::Bubble,
+            "candlestickChart" => ChartKind::Candlestick,
+            "highLowChart" => ChartKind::HighLow,
+            "ganttChart" => ChartKind::Gantt,
+            "meterChart" => ChartKind::Meter,
+            "thermometerChart" => ChartKind::Thermometer,
+            "multiAxisChart" => ChartKind::MultiAxis,
             _ => return None,
         })
     }
@@ -56,7 +74,17 @@ impl ChartKind {
         matches!(self, ChartKind::Pie | ChartKind::Pie3D)
     }
     fn is_xy(self) -> bool {
-        matches!(self, ChartKind::XyLine | ChartKind::XyArea | ChartKind::Scatter)
+        matches!(
+            self,
+            ChartKind::XyLine
+                | ChartKind::XyArea
+                | ChartKind::Scatter
+                | ChartKind::TimeSeries
+                | ChartKind::XyBar
+                | ChartKind::Bubble
+                | ChartKind::Candlestick
+                | ChartKind::HighLow
+        )
     }
     fn is_stacked(self) -> bool {
         matches!(self, ChartKind::StackedBar | ChartKind::StackedBar3D | ChartKind::StackedArea)
@@ -90,6 +118,132 @@ pub struct SeriesDef {
     pub value: Option<Expr>,
     pub x: Option<Expr>,
     pub y: Option<Expr>,
+    pub z: Option<Expr>,
+    /// Time series: the date whose period the value belongs to.
+    pub period: Option<Expr>,
+    /// High-low data: the date and its prices.
+    pub date: Option<Expr>,
+    pub high: Option<Expr>,
+    pub low: Option<Expr>,
+    pub open: Option<Expr>,
+    pub close: Option<Expr>,
+    pub volume: Option<Expr>,
+    /// Gantt data.
+    pub task: Option<Expr>,
+    pub subtask: Option<Expr>,
+    /// Gantt tasks and time periods: when they start and end.
+    pub start: Option<Expr>,
+    pub end: Option<Expr>,
+    pub percent: Option<Expr>,
+}
+
+/// What a chart's dataset holds (the element it is read from: `<pieDataset>`, ...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DataKind {
+    #[default]
+    Category,
+    Pie,
+    Xy,
+    TimeSeries,
+    TimePeriod,
+    Xyz,
+    HighLow,
+    Value,
+    Gantt,
+}
+
+impl DataKind {
+    pub fn from_tag(tag: &str) -> DataKind {
+        match tag.trim_end_matches("Dataset") {
+            "pie" => DataKind::Pie,
+            "xy" => DataKind::Xy,
+            "timeSeries" => DataKind::TimeSeries,
+            "timePeriod" => DataKind::TimePeriod,
+            "xyz" => DataKind::Xyz,
+            "highLow" => DataKind::HighLow,
+            "value" => DataKind::Value,
+            "gantt" => DataKind::Gantt,
+            _ => DataKind::Category,
+        }
+    }
+}
+
+/// The period a time series groups its values by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimePeriod {
+    Year,
+    Quarter,
+    Month,
+    Week,
+    #[default]
+    Day,
+    Hour,
+    Minute,
+    Second,
+    Millisecond,
+}
+
+impl TimePeriod {
+    pub fn parse(v: &str) -> TimePeriod {
+        match v {
+            "Year" => TimePeriod::Year,
+            "Quarter" => TimePeriod::Quarter,
+            "Month" => TimePeriod::Month,
+            "Week" => TimePeriod::Week,
+            "Hour" => TimePeriod::Hour,
+            "Minute" => TimePeriod::Minute,
+            "Second" => TimePeriod::Second,
+            "Milisecond" | "Millisecond" => TimePeriod::Millisecond,
+            _ => TimePeriod::Day,
+        }
+    }
+
+    /// The period around `t`: its first and last millisecond, in milliseconds.
+    pub fn bounds(self, t: chrono::NaiveDateTime) -> (f64, f64) {
+        use chrono::{Datelike, Duration, NaiveDate, Timelike};
+        let day = t.date();
+        let midnight = |d: NaiveDate| d.and_hms_opt(0, 0, 0).unwrap_or(t);
+        let month_start = |y: i32, m: u32| NaiveDate::from_ymd_opt(y, m, 1).unwrap_or(day);
+        let next_month = |y: i32, m: u32| if m == 12 { month_start(y + 1, 1) } else { month_start(y, m + 1) };
+        let (a, b) = match self {
+            TimePeriod::Year => (midnight(month_start(day.year(), 1)), midnight(month_start(day.year() + 1, 1))),
+            TimePeriod::Quarter => {
+                let first = (day.month() - 1) / 3 * 3 + 1;
+                let start = month_start(day.year(), first);
+                let end = if first == 10 { month_start(day.year() + 1, 1) } else { month_start(day.year(), first + 3) };
+                (midnight(start), midnight(end))
+            }
+            TimePeriod::Month => (midnight(month_start(day.year(), day.month())), midnight(next_month(day.year(), day.month()))),
+            TimePeriod::Week => {
+                // Weeks start on Sunday (en_US, JFreeChart's default).
+                let start = day - Duration::days(day.weekday().num_days_from_sunday() as i64);
+                (midnight(start), midnight(start + Duration::days(7)))
+            }
+            TimePeriod::Day => (midnight(day), midnight(day + Duration::days(1))),
+            TimePeriod::Hour => {
+                let s = t.with_minute(0).and_then(|v| v.with_second(0)).and_then(|v| v.with_nanosecond(0)).unwrap_or(t);
+                (s, s + Duration::hours(1))
+            }
+            TimePeriod::Minute => {
+                let s = t.with_second(0).and_then(|v| v.with_nanosecond(0)).unwrap_or(t);
+                (s, s + Duration::minutes(1))
+            }
+            TimePeriod::Second => {
+                let s = t.with_nanosecond(0).unwrap_or(t);
+                (s, s + Duration::seconds(1))
+            }
+            TimePeriod::Millisecond => {
+                let s = t.with_nanosecond(t.nanosecond() / 1_000_000 * 1_000_000).unwrap_or(t);
+                (s, s + Duration::milliseconds(1))
+            }
+        };
+        (millis(a), millis(b) - 1.0)
+    }
+}
+
+/// Milliseconds since 1970 of a date (in the report's time zone, taken as UTC).
+pub fn millis(t: chrono::NaiveDateTime) -> f64 {
+    t.and_utc().timestamp_millis() as f64
 }
 
 #[derive(Debug, Clone)]
@@ -98,6 +252,50 @@ pub struct DatasetDef {
     pub increment: Increment,
     pub increment_when: Option<Expr>,
     pub series: Vec<SeriesDef>,
+    pub kind: DataKind,
+    pub time_period: TimePeriod,
+    /// The rows come from a subdataset run, not from the report.
+    pub run: Option<Box<crate::model::DatasetRun>>,
+}
+
+/// A range of a meter or thermometer (`<meterInterval>`, `<lowRange>`, ...).
+#[derive(Debug, Clone)]
+pub struct Interval {
+    pub label: String,
+    pub color: Option<Color>,
+    pub alpha: f32,
+    pub low: Option<Expr>,
+    pub high: Option<Expr>,
+}
+
+/// Where a thermometer writes its value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueLocation {
+    None,
+    Left,
+    Right,
+    Bulb,
+}
+
+/// The plot of a meter or thermometer chart.
+#[derive(Debug, Clone)]
+pub struct DialPlot {
+    pub low: Option<Expr>,
+    pub high: Option<Expr>,
+    pub intervals: Vec<Interval>,
+    pub units: String,
+    pub tick_interval: f64,
+    pub needle: Color,
+    pub tick_color: Color,
+    pub background: Option<Color>,
+    /// Degrees the dial spans.
+    pub angle: f64,
+    pub value_color: Color,
+    pub value_mask: Option<String>,
+    pub value_font: FontSpec,
+    pub tick_font: FontSpec,
+    pub mercury: Color,
+    pub value_location: ValueLocation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -140,7 +338,23 @@ pub struct ChartElement {
     pub backcolor: Option<Color>,
     pub plot_backcolor: Option<Color>,
     pub value_format: Option<String>,
+    /// Tick label pattern of a date axis (`timeAxisFormat`).
+    pub time_format: Option<String>,
+    /// Tick label pattern of an XY chart's domain axis (`xAxisFormat`).
+    pub x_format: Option<String>,
     pub boxed: BoxStyle,
+    /// Meter and thermometer charts.
+    pub dial: Option<Box<DialPlot>>,
+    /// Candlestick charts: draw the volume behind the candles.
+    pub show_volume: bool,
+    /// Multiple axis charts: the charts drawn together, each on its own value axis (`true`:
+    /// the axis is on the right).
+    pub axes: Vec<(bool, ChartElement)>,
+    /// The color of the value axis' labels and line (multiple axis charts).
+    pub axis_color: Option<Color>,
+    /// Pie charts: how sections and legend items are labeled (`{0} {2}`).
+    pub label_format: Option<String>,
+    pub legend_label_format: Option<String>,
 }
 
 /// Values collected for one chart.
@@ -151,6 +365,33 @@ pub struct DataState {
     pub categories: Vec<String>,
     pub values: HashMap<(usize, usize), f64>,
     pub xy: Vec<(String, Vec<(f64, f64)>)>,
+    /// Time series and time periods: (start, end, value), times in milliseconds.
+    pub periods: Vec<(String, Vec<(f64, f64, f64)>)>,
+    pub xyz: Vec<(String, Vec<(f64, f64, f64)>)>,
+    /// High-low data: date, high, low, open, close, volume.
+    pub ohlc: Vec<(String, Vec<[f64; 6]>)>,
+    /// Gantt data, per series.
+    pub gantt: Vec<(String, Vec<GanttTask>)>,
+    /// Meters and thermometers.
+    pub value: Option<f64>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GanttTask {
+    pub task: String,
+    pub start: f64,
+    pub end: f64,
+    pub percent: Option<f64>,
+    /// (start, end, percent) of each subtask.
+    pub subtasks: Vec<(f64, f64, Option<f64>)>,
+}
+
+fn entry<T>(list: &mut Vec<(String, Vec<T>)>, key: String) -> &mut Vec<T> {
+    let i = list.iter().position(|(k, _)| *k == key).unwrap_or_else(|| {
+        list.push((key, Vec::new()));
+        list.len() - 1
+    });
+    &mut list[i].1
 }
 
 impl DataState {
@@ -176,9 +417,43 @@ impl DataState {
     }
 
     pub fn add_xy(&mut self, series: String, x: f64, y: f64) {
-        match self.xy.iter_mut().find(|(k, _)| *k == series) {
-            Some(entry) => entry.1.push((x, y)),
-            None => self.xy.push((series, vec![(x, y)])),
+        entry(&mut self.xy, series).push((x, y));
+    }
+
+    /// A value for a period: a time series keeps the last one given for each period
+    /// (`replace`), time periods keep them all.
+    pub fn add_period(&mut self, series: String, start: f64, end: f64, value: f64, replace: bool) {
+        let list = entry(&mut self.periods, series);
+        match list.iter_mut().find(|p| replace && p.0 == start) {
+            Some(p) => p.2 = value,
+            None => list.push((start, end, value)),
+        }
+    }
+
+    pub fn add_xyz(&mut self, series: String, x: f64, y: f64, z: f64) {
+        entry(&mut self.xyz, series).push((x, y, z));
+    }
+
+    pub fn add_ohlc(&mut self, series: String, item: [f64; 6]) {
+        entry(&mut self.ohlc, series).push(item);
+    }
+
+    /// A task, or a subtask of `task` when `subtask` is given.
+    pub fn add_gantt(&mut self, series: String, task: String, subtask: bool, start: f64, end: f64, percent: Option<f64>) {
+        let tasks = entry(&mut self.gantt, series);
+        let t = match tasks.iter().position(|t| t.task == task) {
+            Some(i) => &mut tasks[i],
+            None => {
+                tasks.push(GanttTask { task, start, end, percent, subtasks: Vec::new() });
+                tasks.last_mut().unwrap_or_else(|| unreachable!())
+            }
+        };
+        if subtask {
+            t.subtasks.push((start, end, percent));
+            t.start = t.start.min(start);
+            t.end = t.end.max(end);
+        } else {
+            (t.start, t.end, t.percent) = (start, end, percent);
         }
     }
 }
@@ -192,6 +467,11 @@ pub struct ChartTexts {
     pub value_label: Option<String>,
     pub value_min: Option<f64>,
     pub value_max: Option<f64>,
+    /// Meters and thermometers: the data range and the range of each interval.
+    pub dial: Option<(f64, f64)>,
+    pub intervals: Vec<Option<(f64, f64)>>,
+    /// Multiple axis charts: the texts of each chart.
+    pub axes: Vec<ChartTexts>,
 }
 
 /// JFreeChart's default series colors.
@@ -381,7 +661,7 @@ fn tick_label(v: f64, unit: f64, pattern: Option<&str>, locale: &Locale) -> Stri
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     ch: &ChartElement,
-    data: &DataState,
+    all: &HashMap<usize, DataState>,
     texts: &ChartTexts,
     fonts: &mut FontSet,
     locale: &Locale,
@@ -390,6 +670,8 @@ pub fn render(
     w: f32,
     h: f32,
 ) -> Vec<PrintItem> {
+    let empty = DataState::default();
+    let data = all.get(&ch.id).unwrap_or(&empty);
     let mut cv = Canvas { fonts, items: Vec::new() };
     let p = ch.boxed.padding;
     let (x, y, w, h) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), (h - p.top - p.bottom).max(0.0));
@@ -410,22 +692,45 @@ pub fn render(
         }
     }
 
-    // Legend items.
-    let legend: Vec<(String, usize)> = if !ch.show_legend {
+    // Legend items: a label and its color.
+    let names = |ch: &ChartElement, data: &DataState| -> Vec<String> {
+        match ch.dataset.kind {
+            DataKind::Pie => data.pie.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Xy => data.xy.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::TimeSeries | DataKind::TimePeriod => data.periods.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Xyz => data.xyz.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::HighLow => data.ohlc.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Gantt => data.gantt.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Value => Vec::new(),
+            DataKind::Category => data.series.clone(),
+        }
+    };
+    let legend: Vec<(String, Color)> = if !ch.show_legend || matches!(ch.kind, ChartKind::Meter | ChartKind::Thermometer) {
         Vec::new()
-    } else if ch.kind.is_pie() {
-        data.pie.iter().enumerate().map(|(i, (k, _))| (k.clone(), i)).collect()
-    } else if ch.kind.is_xy() {
-        data.xy.iter().enumerate().map(|(i, (k, _))| (k.clone(), i)).collect()
+    } else if ch.kind == ChartKind::MultiAxis {
+        // Every chart's series, each chart going on with the palette where the last stopped.
+        let mut out = Vec::new();
+        for (_, a) in &ch.axes {
+            let d = all.get(&a.id).unwrap_or(&empty);
+            let base = out.len();
+            for (i, n) in names(a, d).into_iter().enumerate() {
+                out.push((n, a.series_colors.get(i).copied().unwrap_or_else(|| rgb(PALETTE[(base + i) % PALETTE.len()]))));
+            }
+        }
+        out
+    } else if let (DataKind::Pie, Some(f)) = (ch.dataset.kind, &ch.legend_label_format) {
+        let total: f64 = data.pie.iter().map(|(_, v)| v.max(0.0)).sum();
+        data.pie.iter().enumerate().map(|(i, (k, v))| (pie_label(f, k, *v, total, locale), color_of(i))).collect()
     } else {
-        data.series.iter().enumerate().map(|(i, k)| (k.clone(), i)).collect()
+        names(ch, data).into_iter().enumerate().map(|(i, k)| (k, color_of(i))).collect()
     };
     let mut bottom = y + h;
     if !legend.is_empty() {
         let lf = ch.legend_font.clone();
         let lh = cv.line_height(&lf);
         let widths: Vec<f32> = legend.iter().map(|(k, _)| cv.width(&lf, k)).collect();
-        let line_chart = matches!(ch.kind, ChartKind::Line | ChartKind::XyLine | ChartKind::Scatter) && ch.show_lines;
+        let line_chart =
+            matches!(ch.kind, ChartKind::Line | ChartKind::XyLine | ChartKind::Scatter | ChartKind::TimeSeries) && ch.show_lines;
         let shape_w = if line_chart { 14.0 } else { 8.0 };
         let item_w = |i: usize| shape_w + 4.6 + widths[i];
         let total: f32 = (0..legend.len()).map(item_w).sum::<f32>() + 6.0 * (legend.len() as f32 - 1.0) + 7.0;
@@ -441,8 +746,8 @@ pub fn render(
         cv.rect(bx, by, box_w, box_h, None, Some(pen(Color::BLACK, 1.0)));
         let mut ix = bx + 3.5;
         let cy = by + box_h / 2.0;
-        for (i, (label, series)) in legend.iter().enumerate() {
-            let color = color_of(*series);
+        for (i, (label, color)) in legend.iter().enumerate() {
+            let (color, series) = (*color, i);
             if ch.kind.is_pie() {
                 let mut ops = Vec::new();
                 arc(&mut ops, (ix + 4.0) as f64, cy as f64, 4.0, 4.0, 0.0, 2.0 * PI, true);
@@ -451,10 +756,10 @@ pub fn render(
             } else if line_chart {
                 cv.line(ix, cy, ix + 14.0, cy, color, 1.0, None);
                 if ch.show_shapes {
-                    shape(&mut cv, *series, ix + 7.0, cy, color);
+                    shape(&mut cv, series, ix + 7.0, cy, color);
                 }
-            } else if ch.kind == ChartKind::Scatter {
-                shape(&mut cv, *series, ix + 4.0, cy, color);
+            } else if matches!(ch.kind, ChartKind::Scatter | ChartKind::Bubble) {
+                shape(&mut cv, if ch.kind == ChartKind::Bubble { 1 } else { series }, ix + 4.0, cy, color);
             } else {
                 cv.rect(ix, cy - 4.0, 8.0, 8.0, Some(color), None);
             }
@@ -472,12 +777,29 @@ pub fn render(
 
     // Plot area (JFreeChart's default plot insets: 4 top/bottom, 8 left/right).
     let (px, py, pw, ph) = (x + 8.0, top + 4.0, (w - 16.0).max(1.0), (bottom - top - 8.0).max(1.0));
-    if ch.kind.is_pie() {
-        pie(&mut cv, ch, data, px, py, pw, ph, &color_of);
-    } else {
-        xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of);
+    match ch.kind {
+        _ if ch.kind.is_pie() => pie(&mut cv, ch, data, locale, px, py, pw, ph, &color_of),
+        ChartKind::Meter => meter(&mut cv, ch, data, texts, locale, px, py, pw, ph),
+        ChartKind::Thermometer => thermometer(&mut cv, ch, data, texts, locale, px, py, pw, ph),
+        ChartKind::Gantt => gantt(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
+        ChartKind::MultiAxis => multi_axis(&mut cv, ch, all, texts, locale, px, py, pw, ph),
+        ChartKind::XyLine | ChartKind::XyArea | ChartKind::Scatter if ch.dataset.kind == DataKind::Xy => {
+            xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of)
+        }
+        _ if ch.kind.is_xy() => xy_plot(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
+        _ => xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
     }
     cv.items
+}
+
+/// A pie section's label from a `labelFormat` such as `{0} {2}`: `{0}` the key, `{1}` the
+/// value, `{2}` its share (JFreeChart's StandardPieSectionLabelGenerator).
+fn pie_label(format: &str, key: &str, value: f64, total: f64, locale: &Locale) -> String {
+    let share = if total > 0.0 { value / total } else { 0.0 };
+    format
+        .replace("{0}", key)
+        .replace("{1}", &fmt_number(value, Some("#,##0.###"), locale))
+        .replace("{2}", &format_value(&Value::Double(share), Some("#,##0%"), locale))
 }
 
 /// The shape JFreeChart's default drawing supplier gives a series (size 6).
@@ -517,6 +839,7 @@ fn pie(
     cv: &mut Canvas,
     ch: &ChartElement,
     data: &DataState,
+    locale: &Locale,
     px: f32,
     py: f32,
     pw: f32,
@@ -537,7 +860,11 @@ fn pie(
     let mut a = -PI / 2.0;
     for (i, (key, v)) in data.pie.iter().enumerate() {
         let sweep = 2.0 * PI * v.max(0.0) / total;
-        slices.push((i, key.clone(), a, a + sweep));
+        let label = match &ch.label_format {
+            Some(f) => pie_label(f, key, *v, total, locale),
+            None => key.clone(),
+        };
+        slices.push((i, label, a, a + sweep));
         a += sweep;
     }
     let wedge = |cx: f64, cy: f64, a0: f64, a1: f64| {
@@ -988,9 +1315,888 @@ fn draw_xy(
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Axes shared by the charts below: numbers or dates, with their ticks and labels.
+
+/// An axis: its range and the ticks it labels.
+struct Scale {
+    lower: f64,
+    upper: f64,
+    ticks: Vec<(f64, String)>,
+}
+
+impl Scale {
+    /// Position of `v` along `length` points from `start` (upwards when `vertical`).
+    fn at(&self, v: f64, start: f32, length: f32, vertical: bool) -> f32 {
+        let t = ((v - self.lower) / (self.upper - self.lower)) as f32;
+        if vertical {
+            start + length - t * length
+        } else {
+            start + t * length
+        }
+    }
+}
+
+/// A number axis over `lo..hi` drawn `length` points long.
+fn number_scale(
+    cv: &mut Canvas,
+    lo: f64,
+    hi: f64,
+    length: f32,
+    vertical: bool,
+    fmt: Option<&str>,
+    locale: &Locale,
+    font: &FontSpec,
+) -> Scale {
+    let lh = cv.line_height(font);
+    let unit = if vertical {
+        choose_unit(lo, hi, length, |_| lh + 4.0)
+    } else {
+        choose_unit(lo, hi, length, |u| widest_tick(cv, lo, hi, u, fmt, locale, font) + 8.0)
+    };
+    let axis = Axis { lower: lo, upper: hi, unit };
+    let ticks = axis.ticks().into_iter().map(|t| (t, tick_label(t, unit, fmt, locale))).collect();
+    Scale { lower: lo, upper: hi, ticks }
+}
+
+/// JFreeChart's standard date tick units: the calendar field, how many of it, the label pattern.
+const DATE_UNITS: &[(DateField, i64, &str)] = &[
+    (DateField::Milli, 1, "HH:mm:ss.SSS"),
+    (DateField::Milli, 5, "HH:mm:ss.SSS"),
+    (DateField::Milli, 10, "HH:mm:ss.SSS"),
+    (DateField::Milli, 25, "HH:mm:ss.SSS"),
+    (DateField::Milli, 50, "HH:mm:ss.SSS"),
+    (DateField::Milli, 100, "HH:mm:ss.SSS"),
+    (DateField::Milli, 250, "HH:mm:ss.SSS"),
+    (DateField::Milli, 500, "HH:mm:ss.SSS"),
+    (DateField::Second, 1, "HH:mm:ss"),
+    (DateField::Second, 5, "HH:mm:ss"),
+    (DateField::Second, 10, "HH:mm:ss"),
+    (DateField::Second, 30, "HH:mm:ss"),
+    (DateField::Minute, 1, "HH:mm"),
+    (DateField::Minute, 2, "HH:mm"),
+    (DateField::Minute, 5, "HH:mm"),
+    (DateField::Minute, 10, "HH:mm"),
+    (DateField::Minute, 15, "HH:mm"),
+    (DateField::Minute, 20, "HH:mm"),
+    (DateField::Minute, 30, "HH:mm"),
+    (DateField::Hour, 1, "HH:mm"),
+    (DateField::Hour, 2, "HH:mm"),
+    (DateField::Hour, 4, "HH:mm"),
+    (DateField::Hour, 6, "HH:mm"),
+    (DateField::Hour, 12, "d-MMM, HH:mm"),
+    (DateField::Day, 1, "d-MMM"),
+    (DateField::Day, 2, "d-MMM"),
+    (DateField::Day, 7, "d-MMM"),
+    (DateField::Day, 15, "d-MMM"),
+    (DateField::Month, 1, "MMM-yyyy"),
+    (DateField::Month, 2, "MMM-yyyy"),
+    (DateField::Month, 3, "MMM-yyyy"),
+    (DateField::Month, 4, "MMM-yyyy"),
+    (DateField::Month, 6, "MMM-yyyy"),
+    (DateField::Year, 1, "yyyy"),
+    (DateField::Year, 2, "yyyy"),
+    (DateField::Year, 5, "yyyy"),
+    (DateField::Year, 10, "yyyy"),
+    (DateField::Year, 25, "yyyy"),
+    (DateField::Year, 50, "yyyy"),
+    (DateField::Year, 100, "yyyy"),
+];
+
+#[derive(Clone, Copy, PartialEq)]
+enum DateField {
+    Milli,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Month,
+    Year,
+}
+
+impl DateField {
+    /// Rough length in milliseconds, to pick a unit.
+    fn millis(self) -> f64 {
+        match self {
+            DateField::Milli => 1.0,
+            DateField::Second => 1e3,
+            DateField::Minute => 6e4,
+            DateField::Hour => 3.6e6,
+            DateField::Day => 8.64e7,
+            DateField::Month => 2.6298e9,
+            DateField::Year => 3.15576e10,
+        }
+    }
+}
+
+fn to_date(ms: f64) -> chrono::NaiveDateTime {
+    chrono::DateTime::from_timestamp_millis(ms.round() as i64).map(|d| d.naive_utc()).unwrap_or_default()
+}
+
+fn date_label(ms: f64, pattern: &str, locale: &Locale) -> String {
+    format_value(&Value::Date(to_date(ms)), Some(pattern), locale)
+}
+
+/// The ticks of a date unit from `lo` to `hi`, aligned the way JFreeChart's DateAxis aligns
+/// them: the field rounded down to a multiple of the count.
+fn date_ticks(lo: f64, hi: f64, field: DateField, count: i64) -> Vec<f64> {
+    use chrono::{Datelike, Duration, NaiveDate, Timelike};
+    let t = to_date(lo);
+    let date = |y: i32, m: u32, d: u32| NaiveDate::from_ymd_opt(y, m, d).and_then(|d| d.and_hms_opt(0, 0, 0));
+    let c = count as u32;
+    let start = match field {
+        DateField::Milli => Some(to_date((lo / count as f64).floor() * count as f64)),
+        DateField::Second => t.with_nanosecond(0).and_then(|v| v.with_second(t.second() / c * c)),
+        DateField::Minute => t.with_nanosecond(0).and_then(|v| v.with_second(0)).and_then(|v| v.with_minute(t.minute() / c * c)),
+        DateField::Hour => t
+            .with_nanosecond(0)
+            .and_then(|v| v.with_second(0))
+            .and_then(|v| v.with_minute(0))
+            .and_then(|v| v.with_hour(t.hour() / c * c)),
+        DateField::Day => date(t.year(), t.month(), 1).map(|d| d + Duration::days((t.day() as i64 / count) * count - 1)),
+        DateField::Month => date(t.year(), (t.month0() / c * c) + 1, 1),
+        DateField::Year => date((t.year() / count as i32) * count as i32, 1, 1),
+    };
+    let Some(mut cur) = start else { return Vec::new() };
+    let mut out = Vec::new();
+    for _ in 0..1000 {
+        let ms = millis(cur);
+        if ms > hi {
+            break;
+        }
+        if ms >= lo {
+            out.push(ms);
+        }
+        cur = match field {
+            DateField::Milli => cur + Duration::milliseconds(count),
+            DateField::Second => cur + Duration::seconds(count),
+            DateField::Minute => cur + Duration::minutes(count),
+            DateField::Hour => cur + Duration::hours(count),
+            DateField::Day => cur + Duration::days(count),
+            DateField::Month => {
+                let m = cur.month0() as i64 + count;
+                match date(cur.year() + (m / 12) as i32, (m % 12) as u32 + 1, 1) {
+                    Some(d) => d,
+                    None => break,
+                }
+            }
+            DateField::Year => match date(cur.year() + count as i32, 1, 1) {
+                Some(d) => d,
+                None => break,
+            },
+        };
+    }
+    out
+}
+
+/// A date axis over `lo..hi` (milliseconds) drawn `length` points long: the smallest of
+/// JFreeChart's standard units whose labels do not overlap.
+fn date_scale(
+    cv: &mut Canvas,
+    lo: f64,
+    hi: f64,
+    length: f32,
+    vertical: bool,
+    fmt: Option<&str>,
+    locale: &Locale,
+    font: &FontSpec,
+) -> Scale {
+    let lh = cv.line_height(font);
+    let range = (hi - lo).max(1.0);
+    let mut chosen = DATE_UNITS[DATE_UNITS.len() - 1];
+    for &(field, count, pattern) in DATE_UNITS {
+        let pattern = fmt.unwrap_or(pattern);
+        let need = if vertical {
+            lh + 4.0
+        } else {
+            cv.width(font, &date_label(lo, pattern, locale)).max(cv.width(font, &date_label(hi, pattern, locale))) + 2.0
+        };
+        if (field.millis() * count as f64 / range) as f32 * length >= need {
+            chosen = (field, count, pattern);
+            break;
+        }
+    }
+    let (field, count, pattern) = chosen;
+    let pattern = fmt.unwrap_or(pattern);
+    let ticks = date_ticks(lo, hi, field, count).into_iter().map(|t| (t, date_label(t, pattern, locale))).collect();
+    Scale { lower: lo, upper: hi, ticks }
+}
+
+/// A date range with JFreeChart's DateAxis margins (5% each side, at least 2 ms wide).
+fn date_range(min: f64, max: f64) -> (f64, f64) {
+    if !min.is_finite() || !max.is_finite() {
+        // JFreeChart's empty DateAxis: the first millisecond of 1970.
+        return (0.0, 1.0);
+    }
+    if max - min < 2.0 {
+        let mid = (min + max) / 2.0;
+        return (mid - 1.0, mid + 1.0);
+    }
+    let m = (max - min) * 0.05;
+    (min - m, max + m)
+}
+
+/// Draws the value axis on the left (or right) of a data area, with grid lines when `grid`.
+#[allow(clippy::too_many_arguments)]
+fn vertical_axis(
+    cv: &mut Canvas,
+    scale: &Scale,
+    font: &FontSpec,
+    color: Color,
+    x: f32,
+    dy: f32,
+    dh: f32,
+    right: bool,
+    grid: Option<(f32, f32)>,
+) {
+    let lh = cv.line_height(font);
+    for (t, label) in &scale.ticks {
+        let p = scale.at(*t, dy, dh, true);
+        if let Some((gx, gw)) = grid {
+            cv.line(gx, p, gx + gw, p, GRID, 0.5, Some([2.0, 2.0]));
+        }
+        if right {
+            cv.line(x, p, x + 2.0, p, color, 0.5, None);
+            cv.text(font, color, label, x + 6.0, p - lh / 2.0, Anchor::Left);
+        } else {
+            cv.line(x - 2.0, p, x, p, color, 0.5, None);
+            cv.text(font, color, label, x - 6.0, p - lh / 2.0, Anchor::Right);
+        }
+    }
+    cv.line(x, dy, x, dy + dh, color, 0.5, None);
+}
+
+fn widest_label(cv: &mut Canvas, scale: &Scale, font: &FontSpec) -> f32 {
+    scale.ticks.iter().map(|(_, l)| cv.width(font, l)).fold(0.0f32, f32::max)
+}
+
+/// `color` seen through `alpha` over `under`.
+fn blend(color: Color, alpha: f32, under: Color) -> Color {
+    let mix = |a: u8, b: u8| (a as f32 * alpha + b as f32 * (1.0 - alpha)).round() as u8;
+    Color { r: mix(color.r, under.r), g: mix(color.g, under.g), b: mix(color.b, under.b) }
+}
+
+// ---------------------------------------------------------------------------------------------
+// XY charts over intervals, dates, bubbles and prices.
+
+#[allow(clippy::too_many_arguments)]
+fn xy_plot(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    locale: &Locale,
+    px: f32,
+    py: f32,
+    pw: f32,
+    ph: f32,
+    color_of: &dyn Fn(usize) -> Color,
+) {
+    let font = ch.font.clone();
+    let lh = cv.line_height(&font);
+    let kind = ch.dataset.kind;
+    let dates = matches!(kind, DataKind::TimeSeries | DataKind::TimePeriod | DataKind::HighLow);
+    let bars = ch.kind == ChartKind::XyBar;
+
+    // The items as (series, x from, x to, y from, y to) in data units.
+    let mut x_lo = f64::INFINITY;
+    let mut x_hi = f64::NEG_INFINITY;
+    let mut y_lo = f64::INFINITY;
+    let mut y_hi = f64::NEG_INFINITY;
+    let mut see = |x0: f64, x1: f64, y0: f64, y1: f64| {
+        if x0.is_finite() && x1.is_finite() {
+            x_lo = x_lo.min(x0);
+            x_hi = x_hi.max(x1);
+        }
+        if y0.is_finite() && y1.is_finite() {
+            y_lo = y_lo.min(y0);
+            y_hi = y_hi.max(y1);
+        }
+    };
+    // Bars over plain XY data are one unit of the smallest step between x values wide.
+    let step = {
+        let mut xs: Vec<f64> = data.xy.iter().flat_map(|(_, p)| p.iter().map(|q| q.0)).collect();
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        xs.dedup();
+        xs.windows(2).map(|w| w[1] - w[0]).fold(f64::INFINITY, f64::min)
+    };
+    let step = if step.is_finite() && step > 0.0 { step } else { 1.0 };
+    for (_, pts) in &data.xy {
+        for &(x, y) in pts {
+            if bars {
+                see(x - step / 2.0, x + step / 2.0, y, y);
+            } else {
+                see(x, x, y, y);
+            }
+        }
+    }
+    for (_, pts) in &data.periods {
+        for &(a, b, v) in pts {
+            if bars {
+                see(a, b, v, v);
+            } else {
+                see(a, a, v, v);
+            }
+        }
+    }
+    for (_, pts) in &data.xyz {
+        for &(x, y, z) in pts {
+            see(x, x, y - z / 2.0, y + z / 2.0);
+        }
+    }
+    for (_, items) in &data.ohlc {
+        for it in items {
+            see(it[0], it[0], it[2].min(it[3]).min(it[4]), it[1].max(it[3]).max(it[4]));
+        }
+    }
+    let include_zero = bars || (ch.kind == ChartKind::Candlestick && ch.show_volume) || ch.kind == ChartKind::Bubble;
+    let (vlo, vhi) = auto_range(y_lo, y_hi, include_zero, (texts.value_min, texts.value_max));
+    let (xlo, xhi) = if dates { date_range(x_lo, x_hi) } else { auto_range(x_lo, x_hi, false, (None, None)) };
+
+    let value_label = texts.value_label.clone().filter(|s| !s.is_empty());
+    let x_label = texts.category_label.clone().filter(|s| !s.is_empty());
+    let label_h = |present: bool| if present { lh + 6.0 } else { 0.0 };
+    let bottom_h = 4.0 + (lh + 4.0) + label_h(x_label.is_some());
+    let dh = (ph - bottom_h).max(1.0);
+    let yscale = number_scale(cv, vlo, vhi, dh, true, ch.value_format.as_deref(), locale, &font);
+    let left_w = label_h(value_label.is_some()) + 4.0 + widest_label(cv, &yscale, &font) + 4.0 + 2.0;
+    let (dx, dy, dw) = (px + left_w, py, (pw - left_w).max(1.0));
+    let xscale = if dates {
+        date_scale(cv, xlo, xhi, dw, false, ch.time_format.as_deref(), locale, &font)
+    } else {
+        number_scale(cv, xlo, xhi, dw, false, ch.x_format.as_deref(), locale, &font)
+    };
+    if let Some(bg) = ch.plot_backcolor {
+        cv.rect(dx, dy, dw, dh, Some(bg), None);
+    }
+    let xpos = |v: f64| xscale.at(v, dx, dw, false);
+    let vpos = |v: f64| yscale.at(v, dy, dh, true);
+    vertical_axis(cv, &yscale, &font, Color::BLACK, dx, dy, dh, false, Some((dx, dw)));
+    for (t, label) in &xscale.ticks {
+        let p = xpos(*t);
+        cv.line(p, dy, p, dy + dh, GRID, 0.5, Some([2.0, 2.0]));
+        cv.line(p, dy + dh, p, dy + dh + 2.0, Color::BLACK, 0.5, None);
+        cv.text(&font, Color::BLACK, label, p, dy + dh + 6.0, Anchor::Center);
+    }
+    cv.line(dx, dy + dh, dx + dw, dy + dh, Color::BLACK, 0.5, None);
+    if let Some(l) = &value_label {
+        rotated_label(cv, &font, l, px + 3.0, dy + dh / 2.0);
+    }
+    if let Some(l) = &x_label {
+        cv.text(&font, Color::BLACK, l, dx + dw / 2.0, dy + dh + 4.0 + lh + 4.0 + 3.0, Anchor::Center);
+    }
+    let base = vpos(0.0f64.max(yscale.lower).min(yscale.upper));
+
+    // JFreeChart's XY plots draw their series last to first.
+    match ch.kind {
+        ChartKind::XyBar => {
+            let series: Vec<Vec<(f64, f64, f64)>> = if kind == DataKind::Xy {
+                data.xy.iter().map(|(_, p)| p.iter().map(|&(x, y)| (x - step / 2.0, x + step / 2.0, y)).collect()).collect()
+            } else {
+                data.periods.iter().map(|(_, p)| p.clone()).collect()
+            };
+            for (s, items) in series.iter().enumerate().rev() {
+                for &(a, b, v) in items {
+                    let (x0, x1) = (xpos(a), xpos(b));
+                    let (y0, y1) = (vpos(v).min(base), vpos(v).max(base));
+                    cv.rect(x0, y0, (x1 - x0).max(0.5), y1 - y0, Some(color_of(s)), None);
+                }
+            }
+        }
+        ChartKind::Bubble => {
+            for (s, (_, pts)) in data.xyz.iter().enumerate().rev() {
+                for &(x, y, z) in pts {
+                    // The bubble's size is measured on the range axis.
+                    let r = (z / (yscale.upper - yscale.lower)) as f32 * dh / 2.0;
+                    let mut ops = Vec::new();
+                    arc(&mut ops, xpos(x) as f64, vpos(y) as f64, r as f64, r as f64, 0.0, 2.0 * PI, true);
+                    ops.push(PathOp::Close);
+                    cv.path(ops, Some(color_of(s)), Some((OUTLINE, 0.5)), None);
+                }
+            }
+        }
+        ChartKind::Candlestick | ChartKind::HighLow => {
+            let candle = ch.kind == ChartKind::Candlestick;
+            // Candles are 4.5/7 of the narrowest gap between two dates wide.
+            let mut xs: Vec<f32> = data.ohlc.iter().flat_map(|(_, i)| i.iter().map(|it| xpos(it[0]))).collect();
+            xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let gap = xs.windows(2).map(|w| w[1] - w[0]).filter(|g| *g > 0.0).fold(dw, f32::min);
+            let width = gap * 4.5 / 7.0;
+            let max_volume =
+                data.ohlc.iter().flat_map(|(_, i)| i.iter().map(|it| it[5])).filter(|v| v.is_finite()).fold(0.0, f64::max);
+            for (s, (_, items)) in data.ohlc.iter().enumerate().rev() {
+                let color = color_of(s);
+                for it in items {
+                    let [t, high, low, open, close, volume] = *it;
+                    let x = xpos(t);
+                    if candle && ch.show_volume && max_volume > 0.0 && volume.is_finite() {
+                        let h = (volume / max_volume) as f32 * dh;
+                        cv.rect(x - width / 2.0, dy + dh - h, width, h, Some(Color { r: 0x80, g: 0x80, b: 0x80 }), None);
+                    }
+                    if high.is_finite() && low.is_finite() {
+                        cv.line(x, vpos(high), x, vpos(low), color, 1.0, None);
+                    }
+                    if candle {
+                        if open.is_finite() && close.is_finite() {
+                            let (top, bottom) = (vpos(open.max(close)), vpos(open.min(close)));
+                            let fill = if close > open { Color { r: 0, g: 0xFF, b: 0 } } else { Color { r: 0xFF, g: 0, b: 0 } };
+                            cv.rect(x - width / 2.0, top, width, (bottom - top).max(0.5), Some(fill), Some(pen(color, 1.0)));
+                        }
+                    } else {
+                        if open.is_finite() {
+                            cv.line(x - 2.0, vpos(open), x, vpos(open), color, 1.0, None);
+                        }
+                        if close.is_finite() {
+                            cv.line(x, vpos(close), x + 2.0, vpos(close), color, 1.0, None);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            // Time series (and plain XY data drawn the same way).
+            let series: Vec<Vec<(f64, f64)>> = if kind == DataKind::Xy {
+                data.xy.iter().map(|(_, p)| p.clone()).collect()
+            } else {
+                data.periods.iter().map(|(_, p)| p.iter().map(|&(a, _, v)| (a, v)).collect()).collect()
+            };
+            for (s, pts) in series.iter().enumerate().rev() {
+                let mut pts = pts.clone();
+                pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                let screen: Vec<(f32, f32)> = pts.iter().map(|&(x, y)| (xpos(x), vpos(y))).collect();
+                if ch.show_lines && screen.len() > 1 {
+                    let mut ops = vec![PathOp::Move(screen[0].0 as f64, screen[0].1 as f64)];
+                    ops.extend(screen[1..].iter().map(|p| PathOp::Line(p.0 as f64, p.1 as f64)));
+                    cv.path(ops, None, Some((color_of(s), 1.0)), None);
+                }
+                if ch.show_shapes {
+                    for p in &screen {
+                        shape(cv, s, p.0, p.1, color_of(s));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Gantt charts: tasks down the left, dates across the top.
+
+#[allow(clippy::too_many_arguments)]
+fn gantt(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    locale: &Locale,
+    px: f32,
+    py: f32,
+    pw: f32,
+    ph: f32,
+    color_of: &dyn Fn(usize) -> Color,
+) {
+    let font = ch.font.clone();
+    let lh = cv.line_height(&font);
+    let mut tasks: Vec<String> = Vec::new();
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for (_, list) in &data.gantt {
+        for t in list {
+            if !tasks.contains(&t.task) {
+                tasks.push(t.task.clone());
+            }
+            lo = lo.min(t.start);
+            hi = hi.max(t.end);
+        }
+    }
+    let (lo, hi) = date_range(lo, hi);
+    let label_h = |present: bool| if present { lh + 6.0 } else { 0.0 };
+    let cat_label = texts.category_label.clone().filter(|s| !s.is_empty());
+    let value_label = texts.value_label.clone().filter(|s| !s.is_empty());
+    let widest = tasks.iter().map(|t| cv.width(&font, t)).fold(0.0f32, f32::max);
+    let left_w = label_h(cat_label.is_some()) + 4.0 + widest + 4.0;
+    let top_h = label_h(value_label.is_some()) + (lh + 4.0) + 2.0;
+    let (dx, dy, dw, dh) = (px + left_w, py + top_h, (pw - left_w).max(1.0), (ph - top_h).max(1.0));
+    let scale = date_scale(cv, lo, hi, dw, false, ch.time_format.as_deref(), locale, &font);
+    if let Some(bg) = ch.plot_backcolor {
+        cv.rect(dx, dy, dw, dh, Some(bg), None);
+    }
+    let xpos = |v: f64| scale.at(v, dx, dw, false);
+    for (t, label) in &scale.ticks {
+        let p = xpos(*t);
+        cv.line(p, dy, p, dy + dh, GRID, 0.5, Some([2.0, 2.0]));
+        cv.line(p, dy - 2.0, p, dy, Color::BLACK, 0.5, None);
+        cv.text(&font, Color::BLACK, label, p, dy - 2.0 - 4.0 - lh + 2.0, Anchor::Center);
+    }
+    cv.line(dx, dy, dx + dw, dy, Color::BLACK, 0.5, None);
+    cv.line(dx, dy, dx, dy + dh, Color::BLACK, 0.5, None);
+    if let Some(l) = &value_label {
+        cv.text(&font, Color::BLACK, l, dx + dw / 2.0, py + 3.0, Anchor::Center);
+    }
+    if let Some(l) = &cat_label {
+        rotated_label(cv, &font, l, px + 3.0, dy + dh / 2.0);
+    }
+    // Category bands as in bar charts: 5% margins, 20% between tasks, 20% between series.
+    let (ncat, nser) = (tasks.len(), data.gantt.len());
+    let cat_margin = if ncat > 1 { 0.2 } else { 0.0 };
+    let cat_w = dh * (1.0 - 0.1 - cat_margin) / ncat.max(1) as f32;
+    let cat_gap = if ncat > 1 { dh * cat_margin / (ncat - 1) as f32 } else { 0.0 };
+    let cat_start = |c: usize| dy + 0.05 * dh + c as f32 * (cat_w + cat_gap);
+    let item_margin = if nser > 1 { 0.2 } else { 0.0 };
+    let bar_h = dh * (1.0 - 0.1 - cat_margin - item_margin) / (ncat * nser).max(1) as f32;
+    let item_gap = if nser > 1 { dh * item_margin / (ncat * (nser - 1)).max(1) as f32 } else { 0.0 };
+    for (c, name) in tasks.iter().enumerate() {
+        cv.text(&font, Color::BLACK, name, dx - 4.0, cat_start(c) + cat_w / 2.0 - lh / 2.0, Anchor::Right);
+    }
+    let green = Color { r: 0, g: 0xFF, b: 0 };
+    let red = Color { r: 0xFF, g: 0, b: 0 };
+    for (s, (_, list)) in data.gantt.iter().enumerate() {
+        for t in list {
+            let Some(c) = tasks.iter().position(|n| *n == t.task) else { continue };
+            let y = cat_start(c) + s as f32 * (bar_h + item_gap);
+            let parts: Vec<(f64, f64, Option<f64>)> =
+                if t.subtasks.is_empty() { vec![(t.start, t.end, t.percent)] } else { t.subtasks.clone() };
+            for (a, b, percent) in parts {
+                let (x0, x1) = (xpos(a), xpos(b));
+                cv.rect(x0, y, (x1 - x0).max(0.5), bar_h, Some(color_of(s)), None);
+                // How far the task is done: a band through the middle, green then red.
+                if let Some(p) = percent {
+                    let p = p.clamp(0.0, 1.0) as f32;
+                    let (by, bh) = (y + bar_h * 0.35, bar_h * 0.3);
+                    let mid = x0 + (x1 - x0) * p;
+                    cv.rect(x0, by, mid - x0, bh, Some(green), None);
+                    cv.rect(mid, by, x1 - mid, bh, Some(red), None);
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Meters and thermometers.
+
+#[allow(clippy::too_many_arguments)]
+fn meter(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    locale: &Locale,
+    px: f32,
+    py: f32,
+    pw: f32,
+    ph: f32,
+) {
+    let Some(dial) = ch.dial.as_deref() else { return };
+    let (lo, hi) = texts.dial.unwrap_or((0.0, 100.0));
+    if hi <= lo {
+        return;
+    }
+    let value_font = dial.value_font.clone();
+    let value_h = cv.line_height(&value_font);
+    let extent = dial.angle.clamp(1.0, 360.0).to_radians();
+    // The dial is a circle: as large as fits above the value text.
+    let r = ((pw / 2.0).min(ph - value_h - 8.0) - 4.0).max(4.0) as f64;
+    let (cx, cy) = ((px + pw / 2.0) as f64, (py + 4.0) as f64 + r);
+    // Angles run clockwise in y-down coordinates: the low end on the left.
+    let start = 1.5 * PI - extent / 2.0;
+    let angle = |v: f64| start + (v.clamp(lo, hi) - lo) / (hi - lo) * extent;
+    let wedge = |a0: f64, a1: f64| {
+        let mut ops = vec![PathOp::Move(cx, cy)];
+        arc(&mut ops, cx, cy, r, r, a0, a1, false);
+        ops.insert(1, PathOp::Line(cx + r * a0.cos(), cy + r * a0.sin()));
+        ops.push(PathOp::Close);
+        ops
+    };
+    let back = dial.background.unwrap_or(Color { r: 0x80, g: 0x80, b: 0x80 });
+    cv.path(wedge(angle(lo), angle(hi)), Some(back), None, None);
+    for (i, interval) in dial.intervals.iter().enumerate() {
+        let Some(Some((a, b))) = texts.intervals.get(i) else { continue };
+        let color = blend(interval.color.unwrap_or(back), interval.alpha, back);
+        cv.path(wedge(angle(*a), angle(*b)), Some(color), None, None);
+    }
+    // Rim and ticks.
+    let mut rim = Vec::new();
+    arc(&mut rim, cx, cy, r, r, angle(lo), angle(hi), true);
+    cv.path(rim, None, Some((dial.tick_color, 1.0)), None);
+    if dial.tick_interval > 0.0 && (hi - lo) / dial.tick_interval <= 500.0 {
+        let mut v = lo;
+        while v <= hi + 1e-9 {
+            let a = angle(v);
+            let (c, s) = (a.cos(), a.sin());
+            cv.line(
+                (cx + (r - 6.0) * c) as f32,
+                (cy + (r - 6.0) * s) as f32,
+                (cx + r * c) as f32,
+                (cy + r * s) as f32,
+                dial.tick_color,
+                1.0,
+                None,
+            );
+            v += dial.tick_interval;
+        }
+    }
+    // Labels at the ends of the range and of each interval.
+    let tick_font = dial.tick_font.clone();
+    let th = cv.line_height(&tick_font);
+    let mut marks = vec![lo, hi];
+    for v in texts.intervals.iter().flatten().flat_map(|(a, b)| [*a, *b]) {
+        if !marks.iter().any(|m| (m - v).abs() < 1e-9) {
+            marks.push(v);
+        }
+    }
+    for v in marks {
+        let a = angle(v);
+        let (x, y) = (cx + (r - 18.0) * a.cos(), cy + (r - 18.0) * a.sin());
+        let label = fmt_number(v, None, locale);
+        let w = cv.width(&tick_font, &label);
+        cv.text(&tick_font, Color::BLACK, &label, (x as f32 - w / 2.0).max(px), y as f32 - th / 2.0, Anchor::Left);
+    }
+    // The needle and the value under the dial.
+    if let Some(v) = data.value {
+        let a = angle(v);
+        let (c, s) = (a.cos(), a.sin());
+        let tip = (cx + (r - 2.0) * c, cy + (r - 2.0) * s);
+        let side = (-s * 3.0, c * 3.0);
+        let ops = vec![
+            PathOp::Move(cx + side.0, cy + side.1),
+            PathOp::Line(tip.0, tip.1),
+            PathOp::Line(cx - side.0, cy - side.1),
+            PathOp::Close,
+        ];
+        cv.path(ops, Some(dial.needle), None, None);
+        let mut hub = Vec::new();
+        arc(&mut hub, cx, cy, 4.0, 4.0, 0.0, 2.0 * PI, true);
+        hub.push(PathOp::Close);
+        cv.path(hub, Some(dial.needle), None, None);
+        let text = format!("{} {}", fmt_number(v, dial.value_mask.as_deref(), locale), dial.units).trim().to_string();
+        cv.text(&value_font, dial.value_color, &text, px + pw / 2.0, (cy + 8.0) as f32, Anchor::Center);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn thermometer(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    locale: &Locale,
+    px: f32,
+    py: f32,
+    pw: f32,
+    ph: f32,
+) {
+    let Some(dial) = ch.dial.as_deref() else { return };
+    let (lo, hi) = texts.dial.unwrap_or((0.0, 100.0));
+    if hi <= lo {
+        return;
+    }
+    // JFreeChart's ThermometerPlot: a bulb 80 across, a column 40 wide, 5 apart from the edge.
+    let bulb_r = (pw / 2.0).min(ph / 4.0).min(40.0);
+    let col_r = bulb_r / 2.0;
+    let cx = px + pw / 2.0;
+    let bulb_cy = py + ph - bulb_r - 2.0;
+    let top = py + 5.0;
+    let col_bottom = bulb_cy - bulb_r * 0.5;
+    let col_h = (col_bottom - (top + col_r)).max(1.0);
+    let scale = number_scale(cv, lo, hi, col_h, true, None, locale, &ch.font);
+    let level = |v: f64| scale.at(v.clamp(lo, hi), top + col_r, col_h, true);
+    let outline = |cv: &mut Canvas, fill: Option<Color>, r_col: f32, r_bulb: f32, to: f32| {
+        let mut ops = Vec::new();
+        arc(&mut ops, cx as f64, to as f64, r_col as f64, r_col as f64, PI, 2.0 * PI, true);
+        let a = ((r_col / r_bulb).asin()) as f64;
+        ops.push(PathOp::Line((cx + r_col) as f64, (bulb_cy as f64) - (r_bulb as f64) * a.cos()));
+        arc(&mut ops, cx as f64, bulb_cy as f64, r_bulb as f64, r_bulb as f64, -PI / 2.0 + a, 1.5 * PI - a, false);
+        ops.push(PathOp::Close);
+        cv.path(ops, fill, Some((Color::BLACK, 1.0)), None);
+    };
+    outline(cv, Some(Color { r: 0xFF, g: 0xFF, b: 0xFF }), col_r, bulb_r, top + col_r);
+    if let Some(v) = data.value {
+        let gap = 5.0f32.min(col_r / 2.0);
+        let mut ops = Vec::new();
+        let (r_col, r_bulb) = (col_r - gap, bulb_r - gap);
+        let to = level(v).min(col_bottom);
+        ops.push(PathOp::Move((cx - r_col) as f64, to as f64));
+        ops.push(PathOp::Line((cx + r_col) as f64, to as f64));
+        let a = ((r_col / r_bulb).asin()) as f64;
+        ops.push(PathOp::Line((cx + r_col) as f64, (bulb_cy as f64) - (r_bulb as f64) * a.cos()));
+        arc(&mut ops, cx as f64, bulb_cy as f64, r_bulb as f64, r_bulb as f64, -PI / 2.0 + a, 1.5 * PI - a, false);
+        ops.push(PathOp::Close);
+        cv.path(ops, Some(dial.mercury), None, None);
+    }
+    // The ranges, as marks beside the column; the axis on the left.
+    for (i, interval) in dial.intervals.iter().enumerate() {
+        let Some(Some((a, b))) = texts.intervals.get(i) else { continue };
+        let x = cx + col_r + 4.0;
+        cv.line(x, level(*a), x, level(*b), interval.color.unwrap_or(Color::BLACK), 2.0, None);
+    }
+    let font = ch.font.clone();
+    let lh = cv.line_height(&font);
+    for (t, label) in &scale.ticks {
+        let y = level(*t);
+        cv.line(cx - col_r - 4.0, y, cx - col_r, y, Color::BLACK, 0.5, None);
+        cv.text(&font, Color::BLACK, label, cx - col_r - 6.0, y - lh / 2.0, Anchor::Right);
+    }
+    if let (Some(v), true) = (data.value, dial.value_location != ValueLocation::None) {
+        let text = fmt_number(v, dial.value_mask.as_deref(), locale);
+        let vf = dial.value_font.clone();
+        let vh = cv.line_height(&vf);
+        let (x, y, anchor) = match dial.value_location {
+            ValueLocation::Left => (cx - col_r - 40.0, level(v) - vh / 2.0, Anchor::Right),
+            ValueLocation::Right => (cx + col_r + 10.0, level(v) - vh / 2.0, Anchor::Left),
+            _ => (cx, bulb_cy - vh / 2.0, Anchor::Center),
+        };
+        cv.text(&vf, dial.value_color, &text, x, y, anchor);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Multiple axis charts: category charts drawn together, each with its own value axis.
+
+#[allow(clippy::too_many_arguments)]
+fn multi_axis(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    all: &HashMap<usize, DataState>,
+    texts: &ChartTexts,
+    locale: &Locale,
+    px: f32,
+    py: f32,
+    pw: f32,
+    ph: f32,
+) {
+    let empty = DataState::default();
+    let font = ch.font.clone();
+    let lh = cv.line_height(&font);
+    // The categories of every chart, in the order they first appear.
+    let mut cats: Vec<String> = Vec::new();
+    for (_, a) in &ch.axes {
+        for c in &all.get(&a.id).unwrap_or(&empty).categories {
+            if !cats.contains(c) {
+                cats.push(c.clone());
+            }
+        }
+    }
+    let bottom_h = 4.0 + (lh + 4.0);
+    let dh = (ph - bottom_h).max(1.0);
+    // Each chart's value range and axis.
+    let mut scales = Vec::new();
+    for (i, (_, a)) in ch.axes.iter().enumerate() {
+        let d = all.get(&a.id).unwrap_or(&empty);
+        let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+        for v in d.values.values() {
+            lo = lo.min(*v);
+            hi = hi.max(*v);
+        }
+        let t = texts.axes.get(i);
+        let (lo, hi) = auto_range(lo, hi, true, (t.and_then(|t| t.value_min), t.and_then(|t| t.value_max)));
+        scales.push(number_scale(cv, lo, hi, dh, true, a.value_format.as_deref(), locale, &font));
+    }
+    let widths: Vec<f32> = ch
+        .axes
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let label = texts.axes.get(i).and_then(|t| t.value_label.as_deref()).is_some_and(|l| !l.is_empty());
+            widest_label(cv, &scales[i], &font) + 10.0 + if label { lh + 6.0 } else { 0.0 }
+        })
+        .collect();
+    let left: f32 = ch.axes.iter().zip(&widths).filter(|((r, _), _)| !*r).map(|(_, w)| w).sum();
+    let right: f32 = ch.axes.iter().zip(&widths).filter(|((r, _), _)| *r).map(|(_, w)| w).sum();
+    let (dx, dy, dw) = (px + left, py, (pw - left - right).max(1.0));
+    if let Some(bg) = ch.plot_backcolor {
+        cv.rect(dx, dy, dw, dh, Some(bg), None);
+    }
+    let (mut at_left, mut at_right) = (dx, dx + dw);
+    let mut palette_base = 0;
+    let mut bases = Vec::new();
+    for (i, (right_side, a)) in ch.axes.iter().enumerate() {
+        let color = a.axis_color.unwrap_or(Color::BLACK);
+        let x = if *right_side { at_right } else { at_left };
+        vertical_axis(cv, &scales[i], &font, color, x, dy, dh, *right_side, if i == 0 { Some((dx, dw)) } else { None });
+        if let Some(l) = texts.axes.get(i).and_then(|t| t.value_label.as_deref()).filter(|l| !l.is_empty()) {
+            let lx = if *right_side { x + widths[i] - lh - 3.0 } else { x - widths[i] + 3.0 };
+            rotated_label(cv, &font, l, lx, dy + dh / 2.0);
+        }
+        if *right_side {
+            at_right += widths[i];
+        } else {
+            at_left -= widths[i];
+        }
+        bases.push(palette_base);
+        palette_base += all.get(&a.id).map(|d| d.series.len()).unwrap_or(0);
+    }
+    cv.line(dx, dy + dh, dx + dw, dy + dh, Color::BLACK, 0.5, None);
+    let ncat = cats.len();
+    let cat_margin = if ncat > 1 { 0.2 } else { 0.0 };
+    let cat_w = dw * (1.0 - 0.1 - cat_margin) / ncat.max(1) as f32;
+    let cat_gap = if ncat > 1 { dw * cat_margin / (ncat - 1) as f32 } else { 0.0 };
+    let cat_start = |c: usize| dx + 0.05 * dw + c as f32 * (cat_w + cat_gap);
+    for (c, name) in cats.iter().enumerate() {
+        cv.text(&font, Color::BLACK, name, cat_start(c) + cat_w / 2.0, dy + dh + 6.0, Anchor::Center);
+    }
+    // The last chart is drawn first.
+    for (i, (_, a)) in ch.axes.iter().enumerate().rev() {
+        let d = all.get(&a.id).unwrap_or(&empty);
+        let scale = &scales[i];
+        let vpos = |v: f64| scale.at(v, dy, dh, true);
+        let color = |s: usize| a.series_colors.get(s).copied().unwrap_or_else(|| rgb(PALETTE[(bases[i] + s) % PALETTE.len()]));
+        let col = |name: &String| cats.iter().position(|c| c == name);
+        let nser = d.series.len();
+        match a.kind {
+            ChartKind::Line | ChartKind::Area | ChartKind::StackedArea | ChartKind::XyLine => {
+                for s in 0..nser {
+                    let pts: Vec<(f32, f32)> = d
+                        .categories
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(k, name)| Some((cat_start(col(name)?) + cat_w / 2.0, vpos(*d.values.get(&(s, k))?))))
+                        .collect();
+                    if a.show_lines && pts.len() > 1 {
+                        let mut ops = vec![PathOp::Move(pts[0].0 as f64, pts[0].1 as f64)];
+                        ops.extend(pts[1..].iter().map(|p| PathOp::Line(p.0 as f64, p.1 as f64)));
+                        cv.path(ops, None, Some((color(s), 1.0)), None);
+                    }
+                    if a.show_shapes {
+                        for p in &pts {
+                            shape(cv, s, p.0, p.1, color(s));
+                        }
+                    }
+                }
+            }
+            _ => {
+                let base = vpos(0.0f64.max(scale.lower).min(scale.upper));
+                let item_margin = if nser > 1 { 0.2 } else { 0.0 };
+                let bar_w = dw * (1.0 - 0.1 - cat_margin - item_margin) / (nser * ncat).max(1) as f32;
+                let item_gap = if nser > 1 { dw * item_margin / (ncat * (nser - 1)).max(1) as f32 } else { 0.0 };
+                for (k, name) in d.categories.iter().enumerate() {
+                    let Some(c) = col(name) else { continue };
+                    for s in 0..nser {
+                        let Some(v) = d.values.get(&(s, k)) else { continue };
+                        bar(cv, false, cat_start(c) + s as f32 * (bar_w + item_gap), bar_w, base, vpos(*v), color(s), false);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn time_periods_and_date_ticks() {
+        let t = chrono::NaiveDate::from_ymd_opt(2017, 5, 17).unwrap().and_hms_opt(13, 45, 0).unwrap();
+        let (a, b) = TimePeriod::Month.bounds(t);
+        assert_eq!(to_date(a), chrono::NaiveDate::from_ymd_opt(2017, 5, 1).unwrap().and_hms_opt(0, 0, 0).unwrap());
+        assert_eq!(b + 1.0, millis(chrono::NaiveDate::from_ymd_opt(2017, 6, 1).unwrap().and_hms_opt(0, 0, 0).unwrap()));
+        // Four-month ticks start in January, May and September, as JFreeChart's do.
+        let lo = millis(chrono::NaiveDate::from_ymd_opt(2016, 11, 3).unwrap().and_hms_opt(0, 0, 0).unwrap());
+        let hi = millis(chrono::NaiveDate::from_ymd_opt(2018, 2, 1).unwrap().and_hms_opt(0, 0, 0).unwrap());
+        let months: Vec<u32> =
+            date_ticks(lo, hi, DateField::Month, 4).into_iter().map(|t| chrono::Datelike::month(&to_date(t))).collect();
+        assert_eq!(months, vec![1, 5, 9, 1]);
+    }
 
     #[test]
     fn tick_units_follow_jfreechart() {

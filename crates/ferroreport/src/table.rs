@@ -292,3 +292,67 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         warnings: Vec::new(),
     }
 }
+
+/// The report JasperReports fills for a chart whose dataset runs on a subdataset: the
+/// subdataset's rows, and the chart (its dataset now filled from them) as the summary.
+pub fn chart_report(chart: crate::chart::ChartElement, run: &DatasetRun, width: f32, height: f32) -> Report {
+    let dataset = run.dataset.clone().unwrap_or_default();
+    let element = Element {
+        key: None,
+        x: 0.0,
+        y: 0.0,
+        width,
+        height,
+        position_type: PositionType::Fix,
+        stretch_type: StretchType::NoStretch,
+        mode: Mode::Transparent,
+        forecolor: Color::BLACK,
+        backcolor: Color { r: 255, g: 255, b: 255 },
+        print_when: None,
+        remove_line_when_blank: false,
+        print_when_detail_overflows: false,
+        print_repeated_values: true,
+        print_in_first_whole_band: false,
+        print_when_group_changes: None,
+        conditional: None,
+        tag: None,
+        kind: ElementKind::Chart(Box::new(chart)),
+    };
+    Report {
+        name: dataset.name,
+        resource_bundle: None,
+        when_resource_missing: WhenResourceMissing::Null,
+        language: run.language,
+        page_width: width,
+        page_height: run.page_height.max(height),
+        landscape: false,
+        column_width: width,
+        column_count: 1,
+        column_spacing: 0.0,
+        margins: Margins { left: 0.0, right: 0.0, top: 0.0, bottom: 0.0 },
+        when_no_data: WhenNoData::AllSectionsNoDetail,
+        title_new_page: false,
+        summary_new_page: false,
+        summary_with_page_header_and_footer: false,
+        float_column_footer: false,
+        parameters: dataset.parameters,
+        fields: dataset.fields,
+        variables: dataset.variables,
+        groups: dataset.groups.into_iter().map(|g| Group { header: Vec::new(), footer: Vec::new(), ..g }).collect(),
+        background: None,
+        title: None,
+        page_header: None,
+        column_header: None,
+        detail: Vec::new(),
+        column_footer: None,
+        page_footer: None,
+        last_page_footer: None,
+        summary: Some(Band { height, split_type: SplitType::Stretch, print_when: None, elements: vec![element] }),
+        no_data: None,
+        datasets: Vec::new(),
+        uses_data_source: true,
+        horizontal: false,
+        pdf_page_offsets: Default::default(),
+        warnings: Vec::new(),
+    }
+}

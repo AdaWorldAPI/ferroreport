@@ -1031,6 +1031,158 @@ impl Parser {
 }
 
 /// The barcode4j/ZXing component inside a `componentElement` (JRXML 6) or a
+/// A JRXML 7 chart (`<element kind="chart" chartType="bar">`, or the `<chart>` of a multiple
+/// axis chart's `<axis>`) in the shape JRXML 6 gives it (`<barChart><chart>...`), which the
+/// chart reader understands.
+fn v7_chart(e: &Node) -> Node {
+    let node = |name: &str, attrs: Vec<(String, String)>, children: Vec<Node>| Node {
+        name: name.to_string(),
+        attrs,
+        children,
+        text: String::new(),
+    };
+    let pick = |n: &Node, map: &[(&str, &str)]| -> Vec<(String, String)> {
+        map.iter().filter_map(|(from, to)| n.attr(from).map(|v| (to.to_string(), v.to_string()))).collect()
+    };
+    let renamed = |n: &Node, name: &str| Node { name: name.to_string(), ..n.clone() };
+    let chart_type = e.attr("chartType").unwrap_or("bar");
+
+    // <chart>: what every chart has.
+    const CHART_ATTRS: &[&str] = &[
+        "kind",
+        "chartType",
+        "showLegend",
+        "evaluationTime",
+        "evaluationGroup",
+        "customizerClass",
+        "theme",
+        "renderType",
+        "titlePosition",
+        "titleColor",
+        "subtitleColor",
+        "legendColor",
+        "legendBackgroundColor",
+        "legendPosition",
+    ];
+    let geometry: Vec<(String, String)> = e.attrs.iter().filter(|(k, _)| !CHART_ATTRS.contains(&k.as_str())).cloned().collect();
+    let element_children: Vec<Node> = e
+        .children
+        .iter()
+        .filter(|c| matches!(c.name.as_str(), "property" | "propertyExpression" | "printWhenExpression"))
+        .cloned()
+        .collect();
+    let mut chart_children = vec![node("reportElement", geometry, element_children)];
+    if let Some(b) = e.child("box") {
+        chart_children.push(b.clone());
+    }
+    let mut title = Vec::new();
+    if let Some(f) = e.child("titleFont") {
+        title.push(renamed(f, "font"));
+    }
+    if let Some(x) = e.child("titleExpression") {
+        title.push(x.clone());
+    }
+    chart_children.push(node("chartTitle", pick(e, &[("titlePosition", "position"), ("titleColor", "color")]), title));
+    let mut subtitle = Vec::new();
+    if let Some(f) = e.child("subtitleFont") {
+        subtitle.push(renamed(f, "font"));
+    }
+    if let Some(x) = e.child("subtitleExpression") {
+        subtitle.push(x.clone());
+    }
+    chart_children.push(node("chartSubtitle", pick(e, &[("subtitleColor", "color")]), subtitle));
+    let legend = e.child("legendFont").map(|f| vec![renamed(f, "font")]).unwrap_or_default();
+    chart_children.push(node(
+        "chartLegend",
+        pick(e, &[("legendColor", "textColor"), ("legendBackgroundColor", "backgroundColor"), ("legendPosition", "position")]),
+        legend,
+    ));
+    let chart = node(
+        "chart",
+        pick(
+            e,
+            &[
+                ("showLegend", "isShowLegend"),
+                ("evaluationTime", "evaluationTime"),
+                ("evaluationGroup", "evaluationGroup"),
+                ("customizerClass", "customizerClass"),
+                ("theme", "theme"),
+                ("renderType", "renderType"),
+            ],
+        ),
+        chart_children,
+    );
+    let mut out = vec![chart];
+
+    // <xxxDataset><dataset .../>series...</xxxDataset>
+    if let Some(d) = e.child("dataset") {
+        let kind = d.attr("kind").unwrap_or("category");
+        let inner_children: Vec<Node> =
+            d.children.iter().filter(|c| matches!(c.name.as_str(), "incrementWhenExpression" | "datasetRun")).cloned().collect();
+        let inner = node(
+            "dataset",
+            d.attrs.iter().filter(|(k, _)| !matches!(k.as_str(), "kind" | "timePeriod")).cloned().collect(),
+            inner_children,
+        );
+        let mut children = vec![inner];
+        children
+            .extend(d.children.iter().filter(|c| !matches!(c.name.as_str(), "incrementWhenExpression" | "datasetRun")).cloned());
+        out.push(node(&format!("{kind}Dataset"), pick(d, &[("timePeriod", "timePeriod")]), children));
+    }
+
+    // <xxxPlot ...><plot .../>...</xxxPlot>
+    if let Some(p) = e.child("plot") {
+        let mut children = Vec::new();
+        let mut plot_children = Vec::new();
+        let mut formats: Vec<(String, Vec<(String, String)>)> = Vec::new();
+        for (k, v) in &p.attrs {
+            // valueAxisTickLabelMask="..." -> <valueAxisFormat><axisFormat tickLabelMask="..."/>
+            if let Some(i) = k.find("Axis").filter(|_| k != "Axis") {
+                let (axis, rest) = (&k[..i], &k[i + 4..]);
+                let attr = match rest {
+                    "TickLabelMask" => "tickLabelMask",
+                    "TickLabelColor" => "tickLabelColor",
+                    "LabelColor" => "labelColor",
+                    "LineColor" => "axisLineColor",
+                    "VerticalTickLabels" => "verticalTickLabels",
+                    "TickLabelRotation" => "tickLabelRotation",
+                    _ => continue,
+                };
+                let name = format!("{axis}AxisFormat");
+                match formats.iter_mut().find(|(n, _)| *n == name) {
+                    Some((_, attrs)) => attrs.push((attr.into(), v.clone())),
+                    None => formats.push((name, vec![(attr.into(), v.clone())])),
+                }
+            }
+        }
+        for (name, attrs) in formats {
+            children.push(node(&name, Vec::new(), vec![node("axisFormat", attrs, Vec::new())]));
+        }
+        for c in &p.children {
+            match c.name.as_str() {
+                "seriesColor" => plot_children.push(Node {
+                    attrs: c
+                        .attrs
+                        .iter()
+                        .map(|(k, v)| (if k == "order" { "seriesOrder".into() } else { k.clone() }, v.clone()))
+                        .collect(),
+                    ..c.clone()
+                }),
+                "axis" => {
+                    let position =
+                        c.attr("position").or_else(|| c.child("position").map(|p| p.text.trim())).unwrap_or("leftOrTop");
+                    let inner = c.child("chart").map(v7_chart).into_iter().collect();
+                    children.push(node("axis", vec![("position".into(), position.to_string())], inner));
+                }
+                _ => children.push(c.clone()),
+            }
+        }
+        children.insert(0, node("plot", p.attrs.clone(), plot_children));
+        out.push(node(&format!("{chart_type}Plot"), p.attrs.clone(), children));
+    }
+    node(&format!("{chart_type}Chart"), Vec::new(), out)
+}
+
 /// `<element kind="component">` (JRXML 7), when this engine can draw it.
 fn barcode_node(n: &Node) -> Option<&Node> {
     const SUPPORTED: &[&str] = &["QRCode", "Code128", "Code39", "Interleaved2Of5", "Codabar", "EAN13", "EAN8", "UPCA"];
@@ -1152,23 +1304,64 @@ impl Parser {
             Some("Report") => Increment::Report,
             _ => Increment::Record,
         };
-        if ds.and_then(|d| d.child("datasetRun")).is_some() {
-            self.warnings.push("chart datasets run on a subdataset (datasetRun) are empty".into());
-        }
+        let run = match ds.and_then(|d| d.child("datasetRun")) {
+            Some(r) => Some(Box::new(self.dataset_run(Some(r), "chart")?)),
+            None => None,
+        };
+        let data_kind = ds_node.map(|d| DataKind::from_tag(&d.name)).unwrap_or(match kind {
+            ChartKind::Pie | ChartKind::Pie3D => DataKind::Pie,
+            ChartKind::XyLine | ChartKind::XyArea | ChartKind::Scatter | ChartKind::XyBar => DataKind::Xy,
+            ChartKind::TimeSeries => DataKind::TimeSeries,
+            ChartKind::Bubble => DataKind::Xyz,
+            ChartKind::Candlestick | ChartKind::HighLow => DataKind::HighLow,
+            ChartKind::Meter | ChartKind::Thermometer => DataKind::Value,
+            ChartKind::Gantt => DataKind::Gantt,
+            _ => DataKind::Category,
+        });
+        let time_period = TimePeriod::parse(ds_node.and_then(|d| d.attr("timePeriod")).unwrap_or("Day"));
         let mut series = Vec::new();
         if let Some(d) = ds_node {
             let read = |p: &mut Parser, s: &Node| -> Result<SeriesDef> {
+                let e = |p: &mut Parser, names: &[&str]| p.child_expr(s, names);
                 Ok(SeriesDef {
-                    series: p.child_expr(s, &["seriesExpression"])?,
-                    key: p.child_expr(s, &["keyExpression"])?,
-                    category: p.child_expr(s, &["categoryExpression"])?,
-                    value: p.child_expr(s, &["valueExpression"])?,
-                    x: p.child_expr(s, &["xValueExpression"])?,
-                    y: p.child_expr(s, &["yValueExpression"])?,
+                    series: e(p, &["seriesExpression"])?,
+                    key: e(p, &["keyExpression"])?,
+                    category: e(p, &["categoryExpression"])?,
+                    value: e(p, &["valueExpression"])?,
+                    x: e(p, &["xValueExpression"])?,
+                    y: e(p, &["yValueExpression"])?,
+                    z: e(p, &["zValueExpression"])?,
+                    period: e(p, &["timePeriodExpression"])?,
+                    date: e(p, &["dateExpression"])?,
+                    high: e(p, &["highExpression"])?,
+                    low: e(p, &["lowExpression"])?,
+                    open: e(p, &["openExpression"])?,
+                    close: e(p, &["closeExpression"])?,
+                    volume: e(p, &["volumeExpression"])?,
+                    task: e(p, &["taskExpression"])?,
+                    subtask: e(p, &["subtaskExpression"])?,
+                    start: e(p, &["startDateExpression"])?,
+                    end: e(p, &["endDateExpression"])?,
+                    percent: e(p, &["percentExpression"])?,
                 })
             };
-            let nested: Vec<&Node> =
-                d.children.iter().filter(|c| matches!(c.name.as_str(), "pieSeries" | "categorySeries" | "xySeries")).collect();
+            let nested: Vec<&Node> = d
+                .children
+                .iter()
+                .filter(|c| {
+                    matches!(
+                        c.name.as_str(),
+                        "pieSeries"
+                            | "categorySeries"
+                            | "xySeries"
+                            | "timeSeries"
+                            | "timePeriodSeries"
+                            | "xyzSeries"
+                            | "ganttSeries"
+                            | "series"
+                    )
+                })
+                .collect();
             if nested.is_empty() {
                 series.push(read(self, d)?);
             } else {
@@ -1196,12 +1389,50 @@ impl Parser {
             .and_then(|f| f.child("axisFormat"))
             .and_then(|f| f.attr("tickLabelMask"))
             .map(str::to_string);
+        let mask = |names: &[&str]| {
+            plot_node
+                .and_then(|p| names.iter().find_map(|n| p.child(n)))
+                .and_then(|f| f.child("axisFormat"))
+                .and_then(|f| f.attr("tickLabelMask"))
+                .map(str::to_string)
+        };
+        let time_format = mask(&["timeAxisFormat"]);
+        let x_format = mask(&["xAxisFormat", "categoryAxisFormat"]);
+        let axis_color = plot_node
+            .and_then(|p| p.child("valueAxisFormat").or_else(|| p.child("rangeAxisFormat")))
+            .and_then(|f| f.child("axisFormat"))
+            .and_then(|f| f.attr("tickLabelColor").or_else(|| f.attr("labelColor")))
+            .and_then(parse_color);
+        let dial = match kind {
+            ChartKind::Meter | ChartKind::Thermometer => match plot_node {
+                Some(pn) => Some(Box::new(self.dial_plot(pn, &font)?)),
+                None => None,
+            },
+            _ => None,
+        };
+        let mut axes = Vec::new();
+        if kind == ChartKind::MultiAxis {
+            for a in plot_node.into_iter().flat_map(|p| p.children_named("axis")) {
+                let right = a.attr("position").or_else(|| a.child("position").map(|p| p.text.trim())) == Some("rightOrBottom");
+                if let Some(inner) = a.children.iter().find(|c| ChartKind::from_tag(&c.name).is_some()) {
+                    axes.push((right, self.chart(inner, &inner.name, font.clone(), boxed)?));
+                }
+            }
+        }
         let label = |p: &mut Parser, names: &[&str]| match plot_node {
             Some(pn) => p.child_expr(pn, names),
             None => Ok(None),
         };
         self.chart_count += 1;
         Ok(ChartElement {
+            dial,
+            axes,
+            axis_color,
+            time_format,
+            x_format,
+            show_volume: flag(plot_node, &["isShowVolume", "showVolume"], true),
+            label_format: plot_node.and_then(|p| p.attr("labelFormat")).map(str::to_string),
+            legend_label_format: plot_node.and_then(|p| p.attr("legendLabelFormat")).map(str::to_string),
             id: self.chart_count,
             kind,
             horizontal: plot.and_then(|p| p.attr("orientation")) == Some("Horizontal"),
@@ -1238,6 +1469,9 @@ impl Parser {
                     None => None,
                 },
                 series,
+                kind: data_kind,
+                time_period,
+                run,
             },
             category_axis_label: label(
                 self,
@@ -1255,6 +1489,65 @@ impl Parser {
             plot_backcolor: color(plot, "backcolor"),
             value_format,
             boxed,
+        })
+    }
+
+    /// The plot of a meter or thermometer (`<meterPlot>`, `<thermometerPlot>`).
+    fn dial_plot(&mut self, pn: &Node, font: &FontSpec) -> Result<crate::chart::DialPlot> {
+        use crate::chart::*;
+        let range = |p: &mut Parser, n: Option<&Node>| -> Result<(Option<Expr>, Option<Expr>)> {
+            match n.and_then(|n| n.child("dataRange")) {
+                Some(r) => Ok((p.child_expr(r, &["lowExpression"])?, p.child_expr(r, &["highExpression"])?)),
+                None => Ok((None, None)),
+            }
+        };
+        let (low, high) = range(self, Some(pn))?;
+        let mut intervals = Vec::new();
+        for i in pn.children.iter().filter(|c| c.name == "meterInterval" || c.name == "interval") {
+            let (l, h) = range(self, Some(i))?;
+            intervals.push(Interval {
+                label: i.attr("label").unwrap_or_default().to_string(),
+                color: i.attr("color").or_else(|| i.attr("backgroundColor")).and_then(parse_color),
+                alpha: i.attr("alpha").and_then(number).unwrap_or(1.0),
+                low: l,
+                high: h,
+            });
+        }
+        // Thermometers: low, medium and high ranges, green, yellow and red.
+        for (name, color) in [("lowRange", 0x00FF00), ("mediumRange", 0xFFFF00), ("highRange", 0xFF0000)] {
+            if let Some(r) = pn.child(name) {
+                let (l, h) = range(self, Some(r))?;
+                let c = Color { r: (color >> 16) as u8, g: (color >> 8) as u8, b: color as u8 };
+                intervals.push(Interval { label: String::new(), color: Some(c), alpha: 1.0, low: l, high: h });
+            }
+        }
+        let display = pn.child("valueDisplay");
+        let plot = pn.child("plot").unwrap_or(pn);
+        Ok(DialPlot {
+            low,
+            high,
+            intervals,
+            units: pn.attr("units").unwrap_or_default().to_string(),
+            tick_interval: pn.attr("tickInterval").and_then(number).unwrap_or(10.0),
+            needle: pn.attr("needleColor").and_then(parse_color).unwrap_or(Color { r: 0x80, g: 0x80, b: 0x80 }),
+            tick_color: pn.attr("tickColor").and_then(parse_color).unwrap_or(Color::BLACK),
+            background: pn.attr("meterColor").or_else(|| plot.attr("backcolor")).and_then(parse_color),
+            angle: pn.attr("meterAngle").or_else(|| pn.attr("angle")).and_then(number).unwrap_or(180.0),
+            value_color: display.and_then(|d| d.attr("color")).and_then(parse_color).unwrap_or(Color::BLACK),
+            value_mask: display.and_then(|d| d.attr("mask")).map(str::to_string),
+            value_font: font_from(display, font),
+            // JFreeChart's meter labels its ticks in a bold 10-point font unless told otherwise.
+            tick_font: match pn.child("tickLabelFont") {
+                Some(t) => font_from(Some(t), font),
+                None => FontSpec { size: 10.0, bold: true, ..font.clone() },
+            },
+            mercury: pn.attr("mercuryColor").and_then(parse_color).unwrap_or(Color { r: 0xFF, g: 0, b: 0 }),
+            value_location: match pn.attr("valueLocation") {
+                Some("none") => ValueLocation::None,
+                Some("left") => ValueLocation::Left,
+                Some("right") => ValueLocation::Right,
+                _ => ValueLocation::Bulb,
+            },
         })
     }
 
@@ -1286,6 +1579,17 @@ impl Parser {
             } else {
                 continue;
             };
+            if kind == "elementGroup" {
+                // JRXML 7 element groups, flattened like JRXML 6 ones.
+                out.extend(self.elements(c)?);
+                continue;
+            }
+            if kind == "chart" {
+                // JRXML 7 charts are read through their JRXML 6 shape.
+                let old = v7_chart(c);
+                out.push(self.element(&old, &old.name.clone())?);
+                continue;
+            }
             out.push(self.element(c, kind)?);
         }
         Ok(out)

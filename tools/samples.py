@@ -126,8 +126,9 @@ def rows_for(template, db, params):
     """(rows, note): the rows of the template's SQL query, or None when it has none."""
     xml = template.read_text(encoding="utf-8", errors="replace")
     # The main query is the one outside any <subDataset>.
-    main = re.sub(r"<subDataset.*?</subDataset>", "", xml, flags=re.S)
-    m = re.search(r"<queryString(?:\s+language=\"(\w+)\")?\s*>\s*<!\[CDATA\[(.*?)\]\]>", main, re.S)
+    # (JRXML 6 <subDataset>, JRXML 7 <dataset name="...">; JRXML 7 calls the query <query>.)
+    main = re.sub(r"<subDataset.*?</subDataset>|<dataset name=.*?</dataset>", "", xml, flags=re.S)
+    m = re.search(r"<(?:queryString|query)(?:\s+language=\"(\w+)\")?\s*>\s*<!\[CDATA\[(.*?)\]\]>", main, re.S)
     if not m or not m.group(2).strip():
         return None, None
     if (m.group(1) or "sql").lower() != "sql":
@@ -237,7 +238,7 @@ def main():
     if not (oracle / "Oracle.class").exists():
         oracle.mkdir(parents=True, exist_ok=True)
         subprocess.run(["javac", "-proc:none", "-nowarn", "-cp", f"{args.lib}/*", "-d", str(oracle), str(ROOT / "tools" / "oracle" / "Oracle.java")], check=True)
-    out_root = Path(args.out)
+    out_root = Path(args.out).resolve()
     results = []
     for template in sorted((demo / "samples").rglob("*.jrxml")):
         rel = template.relative_to(demo / "samples")
@@ -270,7 +271,7 @@ def main():
         jasper_pdf, ours_pdf = out / "jasper.pdf", out / "ferroreport.pdf"
         classes = sample_classes(sample, args.lib, out_root)
         classpath = os.pathsep.join([str(oracle), f"{args.lib}/*", *([str(classes)] if classes else []), str(sample / "src"), str(template.parent), str(sample)])
-        jcode, jtext, jsec = run(["java", "-Djava.awt.headless=true", f"-Duser.home={Path(args.out) / '.java-home'}", "-cp", classpath, "Oracle", str(template),
+        jcode, jtext, jsec = run(["java", "-Djava.awt.headless=true", f"-Duser.home={out_root / '.java-home'}", "-cp", classpath, "Oracle", str(template),
                                   str(data_file) if rows is not None else "-", str(jasper_pdf), str(params_file)], cwd=sample)
         cmd = [args.bin, "render", str(template), "-o", str(ours_pdf), "-q", "-p", str(params_file), "--timeout", "120"]
         for r in resources:

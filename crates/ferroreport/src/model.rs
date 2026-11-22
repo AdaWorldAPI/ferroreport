@@ -572,7 +572,7 @@ pub struct ReturnValue {
 
 /// A `<subDataset>`: the parameters, fields, variables and groups of a data source other than
 /// the report's own (tables iterate over one).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Dataset {
     pub name: String,
     pub parameters: Vec<Parameter>,
