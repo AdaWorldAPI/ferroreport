@@ -749,6 +749,7 @@ fn cell_item(
         valign: te.style.valign,
         rotation: te.style.rotation,
         boxed: te.boxed,
+        field: te.field.as_deref().map(|f| Arc::new(f.clone())),
     };
     PrintItem::Cell(Arc::new(info), Box::new(drawn))
 }
@@ -1555,7 +1556,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                         let (item, _) = text_item(le.fonts, te, el.forecolor, x, y, w, h, &text, true);
                         let value = TextValue { text, number: m.number, pattern: m.pattern.take() };
                         let back = (el.mode == Mode::Opaque).then_some(el.backcolor);
-                        let item = if le.images.skip_cells {
+                        let item = if le.images.skip_cells && te.field.is_none() {
                             item
                         } else {
                             tagged(cell_item(le.fonts, te, el.forecolor, back, x, y, w, h, &value, item), el.tag)
@@ -1823,6 +1824,67 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
             *vertical_quiet_zone,
         ),
         Symbology::Linear(spec) => crate::barcode::linear::symbol(spec, &code, el.height as f64, bc.font_size.map(|s| s as f64)),
+        Symbology::Ean128 { module_width, text_position, quiet_zone, vertical_quiet_zone, checksum } => {
+            crate::barcode::ean128_message(&code, *checksum).and_then(|(data, human)| {
+                crate::barcode::code128_layout(
+                    &data,
+                    Some(&human),
+                    *module_width,
+                    el.height as f64,
+                    *text_position,
+                    bc.font_size.map(|s| s as f64),
+                    *quiet_zone,
+                    *vertical_quiet_zone,
+                )
+            })
+        }
+        Symbology::DataMatrix { module_width, shape } => crate::barcode::datamatrix_symbol(&code, *module_width, *shape),
+        Symbology::Postnet { module_width, short_bar, gap, add_checksum } => {
+            let mm = crate::barcode::pt2mm;
+            let bar = module_width.map(mm).unwrap_or(0.508);
+            crate::barcode::postal::postnet(
+                &code,
+                *add_checksum,
+                bar,
+                gap.map(mm).unwrap_or(bar),
+                short_bar.map(mm).unwrap_or(1.27),
+                el.height as f64,
+            )
+        }
+        Symbology::FourState { usps, module_width, ascender, track, gap, checksum } => {
+            let mm = crate::barcode::pt2mm;
+            let g = if *usps {
+                crate::barcode::postal::FourState {
+                    bar: module_width.map(mm).unwrap_or(0.508),
+                    gap: gap.map(mm).unwrap_or(0.635),
+                    track: track.map(mm).unwrap_or(1.27),
+                    ascender: ascender.map(mm).unwrap_or(1.27),
+                    quiet: 3.175,
+                    vquiet: 0.7112,
+                    fit_height: ascender.is_none() && track.is_none(),
+                }
+            } else {
+                crate::barcode::postal::FourState {
+                    bar: module_width.map(mm).unwrap_or(0.53),
+                    gap: gap.map(mm).unwrap_or(0.53),
+                    track: track.map(mm).unwrap_or(1.25),
+                    ascender: ascender.map(mm).unwrap_or(1.8),
+                    quiet: 2.0,
+                    vquiet: 2.0,
+                    fit_height: ascender.is_none() && track.is_none(),
+                }
+            };
+            if *usps {
+                crate::barcode::postal::usps(&code, &g, el.height as f64)
+            } else {
+                crate::barcode::postal::royal_mail(
+                    &code,
+                    *checksum != crate::barcode::linear::Checksum::Ignore,
+                    &g,
+                    el.height as f64,
+                )
+            }
+        }
     };
     symbol.map(Some).map_err(|e| Error::eval(format!("barcode `{code}`: {e}")))
 }
@@ -1847,7 +1909,7 @@ fn place_symbol(
     // QR codes take the element's color; barcode4j draws black.
     let color = match bc.symbology {
         Symbology::Qr { .. } => el.forecolor,
-        Symbology::Code128 { .. } | Symbology::Linear(_) => Color::BLACK,
+        _ => Color::BLACK,
     };
     // Human-readable text: JasperReports draws the SVG text as glyph outlines, centered on
     // its anchor with fractional advances.
@@ -3477,7 +3539,7 @@ impl<'a> Filler<'a> {
                 Deferred::Text(te) => {
                     let value = text_value_full(&te.content, &ctx, self.env)?;
                     let item = text_item(self.fonts, te, d.forecolor, d.x, d.y, d.w, d.h, &value.text, true).0;
-                    if self.images.skip_cells {
+                    if self.images.skip_cells && te.field.is_none() {
                         item
                     } else {
                         tagged(cell_item(self.fonts, te, d.forecolor, d.back, d.x, d.y, d.w, d.h, &value, item), d.tag)

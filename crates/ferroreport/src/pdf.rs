@@ -131,6 +131,8 @@ fn subset_tag(face: FaceId, glyphs: &BTreeSet<u16>) -> String {
 /// One drawing step: an item, or entering/leaving a transformed coordinate system.
 enum Draw<'a> {
     Item(&'a PrintItem),
+    /// A text element written as a form field.
+    Field(&'a crate::print::CellInfo),
     Push([f32; 6]),
     Pop,
     /// What follows, up to `End`, is one piece of content of the document (tagged PDFs).
@@ -265,6 +267,7 @@ fn flatten<'a>(items: &'a [PrintItem], tagged: bool, out: &mut Vec<Draw<'a>>) {
         let tagging = tagged && !open.iter().any(|&(_, picture)| picture);
         match item {
             PrintItem::Group(inner) => flatten(inner, tagging, out),
+            PrintItem::Cell(info, _) if info.field.is_some() => out.push(Draw::Field(info)),
             PrintItem::Cell(info, inner) => {
                 let mark = tagging && !info.text.trim().is_empty();
                 if mark {
@@ -339,6 +342,33 @@ impl FaceUse {
             self.chars.push((glyph, ch));
         }
         self.codes[i].wrapping_sub(1)
+    }
+}
+
+/// A text element written as a PDF form field.
+struct Widget {
+    rect: Rect,
+    field: std::sync::Arc<crate::model::FormField>,
+    value: String,
+    size: f32,
+    color: Color,
+    back: Option<Color>,
+    border: Option<Color>,
+}
+
+impl Widget {
+    fn of(info: &crate::print::CellInfo, ph: f32, offset: [f32; 2]) -> Widget {
+        let (x, y) = (info.x + offset[0], ph - info.y - info.h - offset[1]);
+        let pen = info.boxed.top;
+        Widget {
+            rect: Rect::new(x, y, x + info.w, y + info.h),
+            field: info.field.clone().unwrap_or_else(|| unreachable!("a field cell")),
+            value: info.text.clone(),
+            size: info.font.size,
+            color: info.color,
+            back: info.back,
+            border: (pen.width > 0.0).then_some(pen.color),
+        }
     }
 }
 
@@ -428,6 +458,9 @@ pub struct PdfStream<W: std::io::Write> {
     images: BTreeMap<usize, (String, Ref)>,
     /// The content streams of each page.
     pages: Vec<Vec<Ref>>,
+    /// The form fields of each page, and those of the page being drawn.
+    fields: Vec<Vec<Widget>>,
+    pending_fields: Vec<Widget>,
     tags: Option<Tags>,
 }
 
@@ -458,6 +491,8 @@ impl<W: std::io::Write> PdfStream<W> {
             page_height,
             faces: BTreeMap::new(),
             standard: Default::default(),
+            fields: Vec::new(),
+            pending_fields: Vec::new(),
             images: BTreeMap::new(),
             pages: Vec::new(),
             tags: None,
@@ -573,6 +608,10 @@ impl<W: std::io::Write> PdfStream<W> {
         let (mut depth, mut decoration_depth) = (0usize, 0usize);
         for draw in flat.iter() {
             let item = match draw {
+                Draw::Field(info) => {
+                    self.pending_fields.push(Widget::of(info, ph, self.options.page_offsets[page % 2]));
+                    continue;
+                }
                 Draw::Item(item) => {
                     if tagged && !inside && !decoration && !matches!(item, PrintItem::Element(_)) {
                         c.begin_marked_content(Name(b"Artifact"));
@@ -869,6 +908,7 @@ impl<W: std::io::Write> PdfStream<W> {
         let (raw, nodes, numbered) = self.draw(items, fonts, self.pages.len())?;
         let id = self.content_stream(&raw)?;
         self.pages.push(vec![id]);
+        self.fields.push(std::mem::take(&mut self.pending_fields));
         if self.tags.is_some() {
             self.tag_page(&nodes, numbered)?;
         }
@@ -988,6 +1028,10 @@ impl<W: std::io::Write> PdfStream<W> {
         if let Some(p) = self.pages.get_mut(page) {
             p.push(id);
         }
+        let late = std::mem::take(&mut self.pending_fields);
+        if let Some(f) = self.fields.get_mut(page) {
+            f.extend(late);
+        }
         Ok(())
     }
 
@@ -997,6 +1041,227 @@ impl<W: std::io::Write> PdfStream<W> {
     }
 
     /// Writes the fonts, the page tree and the trailer, and returns the output.
+    /// Writes the form fields: the annotations of each page and the form they make up.
+    fn write_fields(&mut self) -> Result<(Vec<Vec<Ref>>, Option<Ref>)> {
+        use crate::model::FieldKind;
+        let fields = std::mem::take(&mut self.fields);
+        if fields.iter().all(|f| f.is_empty()) {
+            return Ok((Vec::new(), None));
+        }
+        let helv = self.next_id();
+        let zadb = self.next_id();
+        let mut chunk = Chunk::new();
+        chunk.type1_font(helv).base_font(Name(b"Helvetica")).encoding_predefined(Name(b"WinAnsiEncoding"));
+        chunk.type1_font(zadb).base_font(Name(b"ZapfDingbats"));
+        self.put(helv, &chunk)?;
+        self.put(zadb, &chunk)?;
+        let text_str = |s: &str| -> Vec<u8> {
+            // PDF text strings: Latin-1 as it is, anything else as UTF-16.
+            if s.chars().all(|c| (c as u32) < 256) {
+                s.chars().map(|c| c as u8).collect()
+            } else {
+                let mut out = vec![0xFE, 0xFF];
+                for u in s.encode_utf16() {
+                    out.extend(u.to_be_bytes());
+                }
+                out
+            }
+        };
+        let rgb3 = |c: Color| [c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0];
+        let mut top_level: Vec<Ref> = Vec::new();
+        let mut annots: Vec<Vec<Ref>> = vec![Vec::new(); fields.len()];
+        // Radio buttons with the same name are one field.
+        let mut radios: Vec<(String, Ref, Vec<Ref>, Option<String>)> = Vec::new();
+        let mut unnamed = 0;
+        for (page, list) in fields.iter().enumerate() {
+            for w in list {
+                let id = self.next_id();
+                annots[page].push(id);
+                let f = &w.field;
+                let name = f.name.clone().unwrap_or_else(|| {
+                    unnamed += 1;
+                    format!("field{unnamed}")
+                });
+                let [r, g, b] = rgb3(w.color);
+                let (bw, bh) = (w.rect.x2 - w.rect.x1, w.rect.y2 - w.rect.y1);
+                // The mark of a check box or radio button, drawn when it is on.
+                let mark_stream = |pdf: &mut Self, mark: char| -> Result<(Ref, Ref)> {
+                    let (on, off) = (pdf.next_id(), pdf.next_id());
+                    let size = bw.min(bh) * 0.8;
+                    let ops = format!(
+                        "q BT /ZaDb {size:.2} Tf {r:.3} {g:.3} {b:.3} rg {:.2} {:.2} Td ({mark}) Tj ET Q",
+                        (bw - size * 0.8) / 2.0,
+                        (bh - size * 0.7) / 2.0
+                    );
+                    for (rf, body) in [(on, ops.as_bytes().to_vec()), (off, Vec::new())] {
+                        let mut chunk = Chunk::new();
+                        let mut x = chunk.form_xobject(rf, &body);
+                        x.bbox(Rect::new(0.0, 0.0, bw, bh));
+                        x.resources().fonts().pair(Name(b"ZaDb"), zadb);
+                        x.finish();
+                        pdf.put(rf, &chunk)?;
+                    }
+                    Ok((on, off))
+                };
+                let mut chunk = Chunk::new();
+                let mut d = chunk.indirect(id).dict();
+                d.pair(Name(b"Type"), Name(b"Annot")).pair(Name(b"Subtype"), Name(b"Widget"));
+                d.insert(Name(b"Rect")).primitive(w.rect);
+                d.pair(Name(b"F"), 4);
+                {
+                    let mut mk = d.insert(Name(b"MK")).dict();
+                    if let Some(c) = w.border {
+                        mk.insert(Name(b"BC")).array().items(rgb3(c));
+                    }
+                    if let Some(c) = w.back {
+                        mk.insert(Name(b"BG")).array().items(rgb3(c));
+                    }
+                    if matches!(f.kind, FieldKind::Check | FieldKind::Radio) {
+                        mk.pair(Name(b"CA"), Str(f.check_char.to_string().as_bytes()));
+                    }
+                }
+                {
+                    let mut bs = d.insert(Name(b"BS")).dict();
+                    bs.pair(Name(b"W"), if w.border.is_some() { 1 } else { 0 });
+                    bs.pair(Name(b"S"), Name(f.border.to_string().as_bytes()));
+                }
+                let mut flags = if f.read_only { 1 } else { 0 };
+                match f.kind {
+                    FieldKind::Text | FieldKind::Combo | FieldKind::List => {
+                        let value = f.value.clone().unwrap_or_else(|| w.value.clone());
+                        d.pair(Name(b"T"), Str(&text_str(&name)));
+                        d.pair(Name(b"V"), Str(&text_str(&value)));
+                        let da = format!("/Helv {:.1} Tf {r:.3} {g:.3} {b:.3} rg", w.size);
+                        d.pair(Name(b"DA"), Str(da.as_bytes()));
+                        if f.kind == FieldKind::Text {
+                            d.pair(Name(b"FT"), Name(b"Tx"));
+                            if f.multiline {
+                                flags |= 1 << 12;
+                            }
+                        } else {
+                            d.pair(Name(b"FT"), Name(b"Ch"));
+                            if f.kind == FieldKind::Combo {
+                                flags |= 1 << 17;
+                                if f.editable {
+                                    flags |= 1 << 18;
+                                }
+                            }
+                            let mut opt = d.insert(Name(b"Opt")).array();
+                            for c in &f.choices {
+                                opt.item(Str(&text_str(c)));
+                            }
+                        }
+                        d.pair(Name(b"Ff"), flags);
+                        top_level.push(id);
+                        d.finish();
+                    }
+                    FieldKind::Check => {
+                        drop(d);
+                        let (on, off) = mark_stream(self, f.check_char)?;
+                        let mut chunk = Chunk::new();
+                        let mut d = chunk.indirect(id).dict();
+                        d.pair(Name(b"Type"), Name(b"Annot")).pair(Name(b"Subtype"), Name(b"Widget"));
+                        d.insert(Name(b"Rect")).primitive(w.rect);
+                        d.pair(Name(b"F"), 4);
+                        {
+                            let mut mk = d.insert(Name(b"MK")).dict();
+                            if let Some(c) = w.border {
+                                mk.insert(Name(b"BC")).array().items(rgb3(c));
+                            }
+                            if let Some(c) = w.back {
+                                mk.insert(Name(b"BG")).array().items(rgb3(c));
+                            }
+                            mk.pair(Name(b"CA"), Str(f.check_char.to_string().as_bytes()));
+                        }
+                        d.pair(Name(b"T"), Str(&text_str(&name)));
+                        d.pair(Name(b"FT"), Name(b"Btn"));
+                        d.pair(Name(b"Ff"), flags);
+                        let state: &[u8] = if f.checked { b"Yes" } else { b"Off" };
+                        d.pair(Name(b"V"), Name(state)).pair(Name(b"AS"), Name(state));
+                        let da = format!("/ZaDb 0 Tf {r:.3} {g:.3} {b:.3} rg");
+                        d.pair(Name(b"DA"), Str(da.as_bytes()));
+                        {
+                            let mut ap = d.insert(Name(b"AP")).dict();
+                            let mut n = ap.insert(Name(b"N")).dict();
+                            n.pair(Name(b"Yes"), on).pair(Name(b"Off"), off);
+                        }
+                        d.finish();
+                        top_level.push(id);
+                        self.put(id, &chunk)?;
+                        continue;
+                    }
+                    FieldKind::Radio => {
+                        drop(d);
+                        let (on, off) = mark_stream(self, f.check_char)?;
+                        let group = match radios.iter().position(|(n, ..)| *n == name) {
+                            Some(i) => i,
+                            None => {
+                                let parent = self.next_id();
+                                radios.push((name.clone(), parent, Vec::new(), None));
+                                radios.len() - 1
+                            }
+                        };
+                        let state = format!("choice{}", radios[group].2.len() + 1);
+                        radios[group].2.push(id);
+                        if f.checked {
+                            radios[group].3 = Some(state.clone());
+                        }
+                        let parent = radios[group].1;
+                        let mut chunk = Chunk::new();
+                        let mut d = chunk.indirect(id).dict();
+                        d.pair(Name(b"Type"), Name(b"Annot")).pair(Name(b"Subtype"), Name(b"Widget"));
+                        d.insert(Name(b"Rect")).primitive(w.rect);
+                        d.pair(Name(b"F"), 4).pair(Name(b"Parent"), parent);
+                        {
+                            let mut mk = d.insert(Name(b"MK")).dict();
+                            if let Some(c) = w.border {
+                                mk.insert(Name(b"BC")).array().items(rgb3(c));
+                            }
+                            mk.pair(Name(b"CA"), Str(f.check_char.to_string().as_bytes()));
+                        }
+                        let current: &[u8] = if f.checked { state.as_bytes() } else { b"Off" };
+                        d.pair(Name(b"AS"), Name(current));
+                        {
+                            let mut ap = d.insert(Name(b"AP")).dict();
+                            let mut n = ap.insert(Name(b"N")).dict();
+                            n.pair(Name(state.as_bytes()), on).pair(Name(b"Off"), off);
+                        }
+                        d.finish();
+                        self.put(id, &chunk)?;
+                        continue;
+                    }
+                }
+                self.put(id, &chunk)?;
+            }
+        }
+        for (name, parent, kids, selected) in radios {
+            let mut chunk = Chunk::new();
+            let mut d = chunk.indirect(parent).dict();
+            d.pair(Name(b"FT"), Name(b"Btn")).pair(Name(b"T"), Str(&text_str(&name)));
+            // Radio, and one is always on.
+            d.pair(Name(b"Ff"), (1 << 15) | (1 << 14));
+            d.pair(Name(b"V"), Name(selected.as_deref().unwrap_or("Off").as_bytes()));
+            d.insert(Name(b"Kids")).array().items(kids);
+            d.finish();
+            self.put(parent, &chunk)?;
+            top_level.push(parent);
+        }
+        let form = self.next_id();
+        let mut chunk = Chunk::new();
+        let mut d = chunk.indirect(form).dict();
+        d.insert(Name(b"Fields")).array().items(top_level);
+        d.pair(Name(b"NeedAppearances"), true);
+        d.pair(Name(b"DA"), Str(b"/Helv 0 Tf 0 g"));
+        {
+            let mut dr = d.insert(Name(b"DR")).dict();
+            let mut f = dr.insert(Name(b"Font")).dict();
+            f.pair(Name(b"Helv"), helv).pair(Name(b"ZaDb"), zadb);
+        }
+        d.finish();
+        self.put(form, &chunk)?;
+        Ok((annots, Some(form)))
+    }
+
     pub fn finish(mut self, fonts: &FontSet) -> Result<W> {
         if self.pages.is_empty() {
             self.page(&[], fonts)?;
@@ -1119,6 +1384,7 @@ impl<W: std::io::Write> PdfStream<W> {
         self.put(resources, &chunk)?;
 
         let (catalog_id, tree_id, info_id) = (Ref::new(1), Ref::new(2), Ref::new(3));
+        let (annots, acroform) = self.write_fields()?;
         let mut page_ids = Vec::with_capacity(self.pages.len());
         for (number, contents) in std::mem::take(&mut self.pages).into_iter().enumerate() {
             let tagged = self.tags.as_ref().and_then(|t| t.pages.get(number).copied());
@@ -1142,6 +1408,9 @@ impl<W: std::io::Write> PdfStream<W> {
                 }
             }
             p.pair(Name(b"Resources"), resources);
+            if let Some(list) = annots.get(number).filter(|l| !l.is_empty()) {
+                p.annotations(list.iter().copied());
+            }
             p.finish();
             self.put(page_id, &chunk)?;
         }
@@ -1203,6 +1472,9 @@ impl<W: std::io::Write> PdfStream<W> {
             catalog.metadata(xmp);
             catalog.viewer_preferences().display_doc_title(true);
             catalog.lang(TextStr(self.options.lang.as_deref().unwrap_or("en-US")));
+        }
+        if let Some(form) = acroform {
+            catalog.pair(Name(b"AcroForm"), form);
         }
         catalog.finish();
         self.put(catalog_id, &chunk)?;

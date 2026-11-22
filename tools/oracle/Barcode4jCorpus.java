@@ -13,6 +13,9 @@ import org.krysalis.barcode4j.impl.upcean.*;
 import org.krysalis.barcode4j.impl.int2of5.*;
 import org.krysalis.barcode4j.impl.codabar.*;
 import org.krysalis.barcode4j.impl.code128.*;
+import org.krysalis.barcode4j.impl.datamatrix.*;
+import org.krysalis.barcode4j.impl.postnet.*;
+import org.krysalis.barcode4j.impl.fourstate.*;
 import org.krysalis.barcode4j.output.svg.*;
 import org.krysalis.barcode4j.tools.UnitConv;
 import org.krysalis.barcode4j.*;
@@ -29,6 +32,10 @@ public class Barcode4jCorpus {
       case "i25": b = new Interleaved2Of5Bean(); break;
       case "codabar": b = new CodabarBean(); break;
       case "ean128": b = new EAN128Bean(); break;
+      case "datamatrix": b = new DataMatrixBean(); break;
+      case "postnet": b = new POSTNETBean(); break;
+      case "royalmail": b = new RoyalMailCBCBean(); break;
+      case "usps": b = new USPSIntelligentMailBean(); break;
       default: b = new Code128Bean();
     }
     b.setFontName("Helvetica");
@@ -43,6 +50,9 @@ public class Barcode4jCorpus {
           if (b instanceof Code39Bean) ((Code39Bean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
           if (b instanceof Interleaved2Of5Bean) ((Interleaved2Of5Bean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
           if (b instanceof UPCEANBean) ((UPCEANBean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
+          if (b instanceof EAN128Bean) ((EAN128Bean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
+          if (b instanceof POSTNETBean) ((POSTNETBean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
+          if (b instanceof AbstractFourStateBean) ((AbstractFourStateBean)b).setChecksumMode(ChecksumMode.byName(kv[1]));
           break;
         case "wide":
           if (b instanceof Code39Bean) ((Code39Bean)b).setWideFactor(Double.parseDouble(kv[1]));
@@ -55,6 +65,13 @@ public class Barcode4jCorpus {
           else ((Interleaved2Of5Bean)b).setDisplayChecksum(Boolean.parseBoolean(kv[1])); break;
         case "ext": ((Code39Bean)b).setExtendedCharSetEnabled(Boolean.parseBoolean(kv[1])); break;
         case "gap": ((Code39Bean)b).setIntercharGapWidth(Double.parseDouble(kv[1])); break;
+        case "shape": ((DataMatrixBean)b).setShape(SymbolShapeHint.byName(kv[1])); break;
+        case "short": ((POSTNETBean)b).setShortBarHeight(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
+        case "pchecksum": ((POSTNETBean)b).setChecksumMode(ChecksumMode.byName(kv[1])); break;
+        case "ascender": ((AbstractFourStateBean)b).setAscenderHeight(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
+        case "track": ((AbstractFourStateBean)b).setTrackHeight(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
+        case "fgap": ((AbstractFourStateBean)b).setIntercharGapWidth(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
+        case "echecksum": ((EAN128Bean)b).setChecksumMode(ChecksumMode.byName(kv[1])); break;
         case "vquiet": b.setVerticalQuietZone(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
         case "quiet": b.doQuietZone(true); b.setQuietZone(UnitConv.pt2mm(Double.parseDouble(kv[1]))); break;
       }

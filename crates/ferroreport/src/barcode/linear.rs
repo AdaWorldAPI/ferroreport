@@ -13,6 +13,7 @@ pub enum Kind {
     Ean13,
     Ean8,
     UpcA,
+    UpcE,
 }
 
 impl Kind {
@@ -25,6 +26,7 @@ impl Kind {
             "EAN13" => Kind::Ean13,
             "EAN8" => Kind::Ean8,
             "UPCA" => Kind::UpcA,
+            "UPCE" => Kind::UpcE,
             _ => return None,
         })
     }
@@ -37,6 +39,7 @@ impl Kind {
             Kind::Ean13 => "EAN13",
             Kind::Ean8 => "EAN8",
             Kind::UpcA => "UPCA",
+            Kind::UpcE => "UPCE",
         }
     }
 
@@ -45,7 +48,7 @@ impl Kind {
         match self {
             Kind::Code39 => 0.19f32 as f64,
             Kind::Interleaved2Of5 | Kind::Codabar => 0.21f32 as f64,
-            Kind::Ean13 | Kind::Ean8 | Kind::UpcA => 0.33f32 as f64,
+            Kind::Ean13 | Kind::Ean8 | Kind::UpcA | Kind::UpcE => 0.33f32 as f64,
         }
     }
 
@@ -135,7 +138,7 @@ pub fn symbol(spec: &Spec, msg: &str, height_pt: f64, font_size_pt: Option<f64>)
         Kind::Code39 => code39(spec, msg, &geo),
         Kind::Interleaved2Of5 => interleaved(spec, msg, &geo),
         Kind::Codabar => codabar(spec, msg, &geo),
-        Kind::Ean13 | Kind::Ean8 | Kind::UpcA => upc_ean(spec, msg, &geo),
+        Kind::Ean13 | Kind::Ean8 | Kind::UpcA | Kind::UpcE => upc_ean(spec, msg, &geo),
     }
 }
 
@@ -457,20 +460,40 @@ struct Run {
     long: bool,
 }
 
+/// The UPC-A code (11 digits, without check digit) a UPC-E code (number system and six digits)
+/// stands for.
+fn upce_expand(d: &[u8]) -> Vec<u8> {
+    let (ns, x) = (d[0], &d[1..7]);
+    let mut out = vec![ns];
+    match x[5] {
+        0..=2 => out.extend([x[0], x[1], x[5], 0, 0, 0, 0, x[2], x[3], x[4]]),
+        3 => out.extend([x[0], x[1], x[2], 0, 0, 0, 0, 0, x[3], x[4]]),
+        4 => out.extend([x[0], x[1], x[2], x[3], 0, 0, 0, 0, 0, x[4]]),
+        _ => out.extend([x[0], x[1], x[2], x[3], x[4], 0, 0, 0, 0, x[5]]),
+    }
+    out
+}
+
 fn upc_ean(spec: &Spec, msg: &str, geo: &Geometry) -> Result<Symbol, String> {
     let (name, body_len) = match spec.kind {
         Kind::Ean13 => ("EAN-13", 12),
         Kind::Ean8 => ("EAN-8", 7),
+        Kind::UpcE => ("UPC-E", 7),
         _ => ("UPC-A", 11),
     };
     if msg.contains('+') {
         return Err(format!("{name} supplementals (+2 and +5 add-ons) are not supported yet"));
     }
     let mut d = digits(msg, name)?;
+    // UPC-E's check digit is the one of the UPC-A code it stands for.
+    let check = |d: &[u8]| if spec.kind == Kind::UpcE { mod10(&upce_expand(d)) } else { mod10(d) };
+    if spec.kind == Kind::UpcE && d.len() >= 2 && d[0] > 1 {
+        return Err("UPC-E needs number system 0 or 1".into());
+    }
     match (spec.checksum, d.len()) {
-        (Checksum::Auto | Checksum::Add, n) if n == body_len => d.push(mod10(&d)),
+        (Checksum::Auto | Checksum::Add, n) if n == body_len => d.push(check(&d)),
         (Checksum::Auto | Checksum::Check, n) if n == body_len + 1 => {
-            let expected = mod10(&d[..body_len]);
+            let expected = check(&d[..body_len]);
             if d[body_len] != expected {
                 return Err(format!("Message '{msg}' has a bad checksum. Expected: {expected}"));
             }
@@ -505,6 +528,18 @@ fn upc_ean(spec: &Spec, msg: &str, geo: &Geometry) -> Result<Symbol, String> {
                 None,
                 None,
             )
+        }
+        Kind::UpcE => {
+            // The parity of the six digits tells the number system and the check digit.
+            const PARITY: [&str; 10] =
+                ["GGGLLL", "GGLGLL", "GGLLGL", "GGLLLG", "GLGGLL", "GLLGGL", "GLLLGG", "GLGLGL", "GLGLLG", "GLLGLG"];
+            let p = PARITY[d[7] as usize].as_bytes();
+            let set = |i: usize| match (p[i], d[0]) {
+                (b'G', 0) | (b'L', 1) => 'G',
+                _ => 'L',
+            };
+            let text = d[1..7].iter().map(|x| (b'0' + x) as char).collect::<String>();
+            (vec![guard("101"), group(enc(&d[1..7], &set)), guard("010101")], vec![(3, 42, text)], Some(d[0]), Some(d[7]))
         }
         _ => {
             let text = |r: std::ops::Range<usize>| d[r].iter().map(|x| (b'0' + x) as char).collect::<String>();

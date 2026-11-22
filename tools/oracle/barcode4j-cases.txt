@@ -39,3 +39,29 @@ code128 X1 40 0.9 none - vquiet=3
 i25 1234567 40 - - - checksum=add dispcheck=true
 i25 987654 40 - - - checksum=add dispcheck=true
 i25 13579 40 - top 8 checksum=add
+upce 0123413 50
+upce 01234133 50 0.8 top 6
+upce 1987650 40
+upce 0654321 40 - none
+ean128 0101234567890128 50 1.4 - - checksum=check
+ean128 010123456789012 50
+ean128 0109501101530003 50
+ean128 17260131 40 - top
+datamatrix JasperReports 40 4
+datamatrix 123456 40
+datamatrix HELLO-WORLD-2024 40 2
+datamatrix hello.there,this.is.a.longer.message 40 2
+datamatrix 0123456789012345678901234567890123456789 40 2
+datamatrix ABC 40 3 - - shape=force-rectangle
+postnet 01234 20 - - - short=10 pchecksum=add
+postnet 01234 20
+postnet 555551237 30 - - - pchecksum=add
+royalmail 0123456789 30 - - - ascender=8 track=10
+royalmail 0123456789 30
+royalmail SN34RD1A 25
+usps 00040123456200800001987654321 30
+usps 00040123456200800001987654321 30 - - - ascender=8 track=10
+usps 01234567094987654321 30
+usps 0123456709498765432101234 30
+usps 01234567094987654321012345678 30
+usps 0123456709498765432101234567891 30

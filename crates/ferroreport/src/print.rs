@@ -60,6 +60,8 @@ pub struct CellInfo {
     pub valign: crate::model::VAlign,
     pub rotation: crate::model::Rotation,
     pub boxed: crate::model::BoxStyle,
+    /// The PDF form field the element is written as, instead of its text.
+    pub field: Option<Arc<crate::model::FormField>>,
 }
 
 /// What a non-text element is, for spreadsheet exporters.

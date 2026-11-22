@@ -5,7 +5,10 @@
 //! Every bar, the drawing size and every piece of human-readable text must match exactly.
 
 use ferroreport::barcode::linear::{self, Checksum, Kind, Spec};
-use ferroreport::barcode::{code128_symbol, Symbol, SymbolText, TextPosition};
+use ferroreport::barcode::postal::{self, FourState};
+use ferroreport::barcode::{
+    code128_layout, code128_symbol, datamatrix, datamatrix_symbol, ean128_message, Symbol, SymbolText, TextPosition,
+};
 
 struct Case {
     args: String,
@@ -68,8 +71,47 @@ fn generate(args: &str) -> Result<Symbol, String> {
     let extras: Vec<(&str, &str)> = a.iter().skip(6).map(|kv| kv.split_once('=').unwrap()).collect();
     let extra = |k: &str| extras.iter().find(|(key, _)| *key == k).map(|(_, v)| *v);
     let extra_num = |k: &str| extra(k).map(|v| v.parse::<f64>().unwrap());
-    if a[0] == "code128" {
-        return code128_symbol(a[1], num(3), height, position, font, extra_num("quiet"), extra_num("vquiet"));
+    let mm = |pt: f64| pt / 2.835;
+    match a[0] {
+        "code128" => return code128_symbol(a[1], num(3), height, position, font, extra_num("quiet"), extra_num("vquiet")),
+        "ean128" => {
+            let checksum = extra("checksum").and_then(Checksum::from_name).unwrap_or_default();
+            let (data, human) = ean128_message(a[1], checksum)?;
+            return code128_layout(&data, Some(&human), num(3), height, position, font, extra_num("quiet"), extra_num("vquiet"));
+        }
+        "datamatrix" => {
+            let shape = extra("shape").map(datamatrix::Shape::from_name).unwrap_or_default();
+            return datamatrix_symbol(a[1], num(3), shape);
+        }
+        "postnet" => {
+            let short = extra_num("short").map(mm).unwrap_or(1.27);
+            return postal::postnet(a[1], extra("pchecksum") == Some("add"), 0.508, 0.508, short, height);
+        }
+        "royalmail" => {
+            let g = FourState {
+                bar: num(3).map(mm).unwrap_or(0.53),
+                gap: extra_num("fgap").map(mm).unwrap_or(0.53),
+                track: extra_num("track").map(mm).unwrap_or(1.25),
+                ascender: extra_num("ascender").map(mm).unwrap_or(1.8),
+                quiet: 2.0,
+                vquiet: 2.0,
+                fit_height: true,
+            };
+            return postal::royal_mail(a[1], extra("checksum") != Some("ignore"), &g, height);
+        }
+        "usps" => {
+            let g = FourState {
+                bar: num(3).map(mm).unwrap_or(0.508),
+                gap: extra_num("fgap").map(mm).unwrap_or(0.635),
+                track: extra_num("track").map(mm).unwrap_or(1.27),
+                ascender: extra_num("ascender").map(mm).unwrap_or(1.27),
+                quiet: 3.175,
+                vquiet: 0.7112,
+                fit_height: true,
+            };
+            return postal::usps(a[1], &g, height);
+        }
+        _ => {}
     }
     let kind = match a[0] {
         "code39" => Kind::Code39,
@@ -78,6 +120,7 @@ fn generate(args: &str) -> Result<Symbol, String> {
         "ean13" => Kind::Ean13,
         "ean8" => Kind::Ean8,
         "upca" => Kind::UpcA,
+        "upce" => Kind::UpcE,
         other => panic!("unknown type {other}"),
     };
     let start_stop = extra("startstop") == Some("true");

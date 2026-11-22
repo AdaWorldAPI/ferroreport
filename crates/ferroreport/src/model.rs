@@ -264,6 +264,35 @@ pub struct TextElement {
     pub stretch: bool,
     pub markup: crate::rich::Markup,
     pub truncate: Truncate,
+    /// Written as a PDF form field instead of text (`net.sf.jasperreports.export.pdf.field.*`).
+    pub field: Option<Box<FormField>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    Text,
+    Combo,
+    List,
+    Check,
+    Radio,
+}
+
+/// A PDF form field (JasperReports' `net.sf.jasperreports.export.pdf.field.*` properties).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FormField {
+    pub kind: FieldKind,
+    pub name: Option<String>,
+    /// The value given by property (otherwise the element's text is the value).
+    pub value: Option<String>,
+    pub choices: Vec<String>,
+    pub checked: bool,
+    /// The ZapfDingbats character of a check box's mark.
+    pub check_char: char,
+    pub read_only: bool,
+    pub multiline: bool,
+    pub editable: bool,
+    /// The border style: S (solid), B (beveled), I (inset), U (underline), D (dashed).
+    pub border: char,
 }
 
 /// How a text that does not fit its box is cut (`net.sf.jasperreports.text.truncate.*` and
@@ -534,8 +563,36 @@ pub enum Symbology {
         quiet_zone: Option<f64>,
         vertical_quiet_zone: Option<f64>,
     },
-    /// Code 39, Interleaved 2 of 5, Codabar, EAN-13, EAN-8, UPC-A.
+    /// Code 39, Interleaved 2 of 5, Codabar, EAN-13, EAN-8, UPC-A, UPC-E.
     Linear(crate::barcode::linear::Spec),
+    /// EAN-128 (GS1-128): Code 128 with application identifiers.
+    Ean128 {
+        module_width: Option<f64>,
+        text_position: crate::barcode::TextPosition,
+        quiet_zone: Option<f64>,
+        vertical_quiet_zone: Option<f64>,
+        checksum: crate::barcode::linear::Checksum,
+    },
+    DataMatrix {
+        module_width: Option<f64>,
+        shape: crate::barcode::datamatrix::Shape,
+    },
+    /// POSTNET (heights and widths in points).
+    Postnet {
+        module_width: Option<f64>,
+        short_bar: Option<f64>,
+        gap: Option<f64>,
+        add_checksum: bool,
+    },
+    /// Royal Mail 4-state (`usps: false`) or USPS Intelligent Mail (sizes in points).
+    FourState {
+        usps: bool,
+        module_width: Option<f64>,
+        ascender: Option<f64>,
+        track: Option<f64>,
+        gap: Option<f64>,
+        checksum: crate::barcode::linear::Checksum,
+    },
 }
 
 impl Symbology {
@@ -545,6 +602,11 @@ impl Symbology {
             Symbology::Qr { .. } => "QRCode",
             Symbology::Code128 { .. } => "Code128",
             Symbology::Linear(spec) => spec.kind.component(),
+            Symbology::Ean128 { .. } => "EAN128",
+            Symbology::DataMatrix { .. } => "DataMatrix",
+            Symbology::Postnet { .. } => "POSTNET",
+            Symbology::FourState { usps: true, .. } => "USPSIntelligentMail",
+            Symbology::FourState { .. } => "RoyalMailCustomer",
         }
     }
 }

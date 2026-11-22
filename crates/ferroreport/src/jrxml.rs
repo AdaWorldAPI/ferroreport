@@ -1185,7 +1185,22 @@ fn v7_chart(e: &Node) -> Node {
 
 /// `<element kind="component">` (JRXML 7), when this engine can draw it.
 fn barcode_node(n: &Node) -> Option<&Node> {
-    const SUPPORTED: &[&str] = &["QRCode", "Code128", "Code39", "Interleaved2Of5", "Codabar", "EAN13", "EAN8", "UPCA"];
+    const SUPPORTED: &[&str] = &[
+        "QRCode",
+        "Code128",
+        "Code39",
+        "Interleaved2Of5",
+        "Codabar",
+        "EAN13",
+        "EAN8",
+        "UPCA",
+        "UPCE",
+        "EAN128",
+        "DataMatrix",
+        "POSTNET",
+        "RoyalMailCustomer",
+        "USPSIntelligentMail",
+    ];
     n.children.iter().find(|c| {
         SUPPORTED.contains(&c.name.as_str())
             || (c.name == "component" && c.attr("kind").is_some_and(|k| SUPPORTED.contains(&k.rsplit(':').next().unwrap_or(k))))
@@ -1746,6 +1761,7 @@ impl Parser {
                 let markup = match attr(n, &["markup"]).or_else(|| te_node.and_then(|t| t.attr("markup"))) {
                     Some("styled") => crate::rich::Markup::Styled,
                     Some("html") => crate::rich::Markup::Html,
+                    Some("rtf") => crate::rich::Markup::Rtf,
                     Some(m) if m != "none" && !m.is_empty() => {
                         self.warnings.push(format!("markup=\"{m}\" is rendered as plain text"));
                         crate::rich::Markup::None
@@ -1789,7 +1805,61 @@ impl Parser {
                     suffix: property("net.sf.jasperreports.text.truncate.suffix").filter(|v| !v.is_empty()),
                     keep_full: property("net.sf.jasperreports.print.keep.full.text").is_some_and(|v| parse_bool(&v)),
                 };
-                ElementKind::Text(TextElement { content, style, boxed: props.box_style(forecolor), stretch, markup, truncate })
+                let field = property("net.sf.jasperreports.export.pdf.field.type").and_then(|kind| {
+                    let p = |k: &str| property(&format!("net.sf.jasperreports.export.pdf.field.{k}"));
+                    let kind = match kind.as_str() {
+                        "Text" => FieldKind::Text,
+                        "Combo" => FieldKind::Combo,
+                        "List" => FieldKind::List,
+                        "Check" => FieldKind::Check,
+                        "Radio" => FieldKind::Radio,
+                        _ => return None,
+                    };
+                    let separators = p("choice.separators").unwrap_or_else(|| "|".into());
+                    let choices = p("choices")
+                        .map(|c| {
+                            c.split(|ch: char| separators.contains(ch))
+                                .map(|v| v.trim().to_string())
+                                .filter(|v| !v.is_empty())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let flag = |k: &str| p(k).is_some_and(|v| parse_bool(&v));
+                    Some(Box::new(FormField {
+                        kind,
+                        name: p("name"),
+                        value: p("value"),
+                        choices,
+                        checked: flag("checked"),
+                        check_char: match p("check.type").as_deref() {
+                            Some("Circle") => 'l',
+                            Some("Cross") => '8',
+                            Some("Diamond") => 'u',
+                            Some("Square") => 'n',
+                            Some("Star") => 'H',
+                            _ => '4',
+                        },
+                        read_only: flag("read.only"),
+                        multiline: flag("text.multiline"),
+                        editable: flag("combo.edit"),
+                        border: match p("border.style").as_deref() {
+                            Some("Beveled") => 'B',
+                            Some("Inset") => 'I',
+                            Some("Underline") => 'U',
+                            Some("Dashed") => 'D',
+                            _ => 'S',
+                        },
+                    }))
+                });
+                ElementKind::Text(TextElement {
+                    content,
+                    style,
+                    boxed: props.box_style(forecolor),
+                    stretch,
+                    markup,
+                    truncate,
+                    field,
+                })
             }
             "line" => ElementKind::Line {
                 direction: if n.attr("direction") == Some("BottomUp") { LineDirection::BottomUp } else { LineDirection::TopDown },
@@ -1800,6 +1870,37 @@ impl Parser {
             }
             "ellipse" => ElementKind::Ellipse { pen: props.graphic_pen.resolve(1.0, forecolor) },
             "frame" => ElementKind::Frame { children: self.elements(n)?, boxed: props.box_style(forecolor) },
+            "componentElement" | "component" if component_node(n, "iconLabel").is_some() => {
+                // An icon next to a label, drawn as a frame of two texts: the icon in a square
+                // as tall as the element, at the start or the end, the label in the rest.
+                let c = component_node(n, "iconLabel").unwrap_or(n);
+                let geometry = n.child("reportElement").unwrap_or(n);
+                let size = |a: &str| geometry.attr(a).and_then(number::<f32>).unwrap_or(0.0);
+                let (w, h) = (size("width"), size("height"));
+                let icon_w = h.min(w / 3.0);
+                let at_end = c.attr("iconPosition") == Some("End");
+                let mut children = Vec::new();
+                for (part, x, width) in [
+                    ("label", if at_end { 0.0 } else { icon_w }, w - icon_w),
+                    ("icon", if at_end { w - icon_w } else { 0.0 }, icon_w),
+                ] {
+                    let node = c.child(part).and_then(|p| {
+                        p.children.iter().find(|e| e.name == "textField" || e.name == "staticText" || e.name == "element")
+                    });
+                    if let Some(node) = node {
+                        let kind = node.attr("kind").unwrap_or(node.name.as_str()).to_string();
+                        let mut el = self.element(node, &kind)?;
+                        (el.x, el.y, el.width, el.height) = (x, 0.0, width, h);
+                        if part == "icon" {
+                            if let ElementKind::Text(te) = &mut el.kind {
+                                te.style.halign = HAlign::Center;
+                            }
+                        }
+                        children.push(el);
+                    }
+                }
+                ElementKind::Frame { children, boxed: props.box_style(forecolor) }
+            }
             "image" => {
                 let scale = match attr(n, &["scaleImage"]) {
                     Some("Clip") => ScaleImage::Clip,
@@ -1898,7 +1999,48 @@ impl Parser {
                 let name = c.attr("kind").map(|k| k.rsplit(':').next().unwrap_or(k)).filter(|_| c.name == "component");
                 let name = name.unwrap_or(c.name.as_str());
                 let num = |a: &str| c.attr(a).and_then(number::<f64>);
-                let symbology = if name == "QRCode" {
+                let checksum = |w: &mut Vec<String>| match c.attr("checksumMode") {
+                    Some(m) => crate::barcode::linear::Checksum::from_name(m).unwrap_or_else(|| {
+                        w.push(format!("unknown barcode checksumMode `{m}`, using auto"));
+                        crate::barcode::linear::Checksum::Auto
+                    }),
+                    None => crate::barcode::linear::Checksum::Auto,
+                };
+                let position = match c.attr("textPosition") {
+                    Some("none") => crate::barcode::TextPosition::None,
+                    Some("top") => crate::barcode::TextPosition::Top,
+                    _ => crate::barcode::TextPosition::Bottom,
+                };
+                let symbology = if name == "EAN128" {
+                    Symbology::Ean128 {
+                        module_width: num("moduleWidth"),
+                        text_position: position,
+                        quiet_zone: num("quietZone"),
+                        vertical_quiet_zone: num("verticalQuietZone"),
+                        checksum: checksum(&mut self.warnings),
+                    }
+                } else if name == "DataMatrix" {
+                    Symbology::DataMatrix {
+                        module_width: num("moduleWidth"),
+                        shape: c.attr("shape").map(crate::barcode::datamatrix::Shape::from_name).unwrap_or_default(),
+                    }
+                } else if name == "POSTNET" {
+                    Symbology::Postnet {
+                        module_width: num("moduleWidth"),
+                        short_bar: num("shortBarHeight"),
+                        gap: num("intercharGapWidth"),
+                        add_checksum: c.attr("checksumMode") == Some("add"),
+                    }
+                } else if name == "RoyalMailCustomer" || name == "USPSIntelligentMail" {
+                    Symbology::FourState {
+                        usps: name == "USPSIntelligentMail",
+                        module_width: num("moduleWidth"),
+                        ascender: num("ascenderHeight"),
+                        track: num("trackHeight"),
+                        gap: num("intercharGapWidth"),
+                        checksum: checksum(&mut self.warnings),
+                    }
+                } else if name == "QRCode" {
                     let level = c.attr("errorCorrectionLevel").and_then(crate::barcode::qr::Ecl::from_name);
                     Symbology::Qr {
                         level: level.unwrap_or(crate::barcode::qr::Ecl::L),

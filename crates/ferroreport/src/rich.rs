@@ -15,6 +15,7 @@ pub enum Markup {
     None,
     Styled,
     Html,
+    Rtf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -63,11 +64,34 @@ pub struct Run {
 pub struct StyledText {
     pub text: String,
     pub runs: Vec<Run>,
+    /// Paragraphs of HTML lists: where they start, how far they are indented, and the bullet
+    /// or number drawn before their first line.
+    pub paras: Vec<Para>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Para {
+    pub start: usize,
+    pub indent: f32,
+    pub marker: Option<String>,
+}
+
+/// How far each level of an HTML list is indented, and where its marker ends (JasperReports).
+const LIST_INDENT: f32 = 50.0;
+const MARKER_GAP: f32 = 10.0;
 
 impl StyledText {
     pub fn plain(text: &str, style: &RunStyle) -> StyledText {
-        StyledText { text: text.to_string(), runs: vec![Run { start: 0, end: text.len(), style: style.clone() }] }
+        StyledText {
+            text: text.to_string(),
+            runs: vec![Run { start: 0, end: text.len(), style: style.clone() }],
+            paras: Vec::new(),
+        }
+    }
+
+    /// The list paragraph starting at `start`, if any.
+    fn para_at(&self, start: usize) -> Option<&Para> {
+        self.paras.iter().find(|p| p.start == start)
     }
 
     fn style_at(&self, byte: usize) -> &RunStyle {
@@ -92,7 +116,8 @@ impl StyledText {
         if runs.is_empty() {
             runs.push(Run { start: 0, end: 0, style: self.style_at(from).clone() });
         }
-        StyledText { text, runs }
+        let paras = self.paras.iter().filter(|p| p.start >= from).map(|p| Para { start: p.start - from, ..p.clone() }).collect();
+        StyledText { text, runs, paras }
     }
 
     /// Writes the text back as `markup="styled"` source, for a text continued on another page.
@@ -306,6 +331,9 @@ fn truthy(v: &str) -> bool {
 /// Parses styled or HTML markup. Like JasperReports, styled text that is not well formed is
 /// shown as it is, tags included.
 pub fn parse(src: &str, base: &RunStyle, markup: Markup) -> StyledText {
+    if markup == Markup::Rtf {
+        return crate::rtf::parse(src, base);
+    }
     match parse_markup(src, base, markup) {
         Some(st) => st,
         None => StyledText::plain(src, base),
@@ -331,6 +359,9 @@ fn parse_markup(src: &str, base: &RunStyle, markup: Markup) -> Option<StyledText
     };
     let mut rest = src;
     let mut last_space = true;
+    // Open HTML lists: ordered, and the number of their next item.
+    let mut lists: Vec<(bool, u32)> = Vec::new();
+    let mut paras: Vec<Para> = Vec::new();
     while !rest.is_empty() {
         let (chunk, tag) = match rest.find('<') {
             Some(0) => {
@@ -383,15 +414,23 @@ fn parse_markup(src: &str, base: &RunStyle, markup: Markup) -> Option<StyledText
         let line_break = |text: &mut String, runs: &mut Vec<Run>, style: &RunStyle| {
             push_text(text, runs, "\n", style);
         };
+        let indent = LIST_INDENT * lists.len() as f32;
         match (t.name.as_str(), t.closing) {
             ("br", _) => {
                 line_break(&mut text, &mut runs, &style);
+                if html && !lists.is_empty() {
+                    // A line break inside a list item keeps its indent.
+                    paras.push(Para { start: text.len(), indent, marker: None });
+                }
                 last_space = true;
                 continue;
             }
             ("p" | "div" | "li" | "ul" | "ol", true) if html => {
                 if !text.ends_with('\n') && !text.is_empty() {
                     line_break(&mut text, &mut runs, &style);
+                }
+                if matches!(t.name.as_str(), "ul" | "ol") {
+                    lists.pop();
                 }
                 last_space = true;
             }
@@ -418,11 +457,31 @@ fn parse_markup(src: &str, base: &RunStyle, markup: Markup) -> Option<StyledText
             "s" | "strike" | "del" => style.font.strike = true,
             "sup" => style.script = Script::Super,
             "sub" => style.script = Script::Sub,
+            "ul" | "ol" if html => {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    line_break(&mut text, &mut runs, &style);
+                }
+                lists.push((t.name == "ol", 1));
+                last_space = true;
+            }
             "li" => {
                 if !text.is_empty() && !text.ends_with('\n') {
                     line_break(&mut text, &mut runs, &style);
                 }
-                push_text(&mut text, &mut runs, "\u{2022} ", &style);
+                if html {
+                    // The item's number or bullet hangs to the left of its indented text.
+                    let marker = match lists.last_mut() {
+                        Some((true, n)) => {
+                            *n += 1;
+                            format!("{}.", *n - 1)
+                        }
+                        _ => "\u{2022}".to_string(),
+                    };
+                    let level = lists.len().max(1) as f32;
+                    paras.push(Para { start: text.len(), indent: LIST_INDENT * level, marker: Some(marker) });
+                } else {
+                    push_text(&mut text, &mut runs, "\u{2022} ", &style);
+                }
                 last_space = true;
             }
             "p" | "div" if html && !text.is_empty() && !text.ends_with('\n') => {
@@ -473,7 +532,8 @@ fn parse_markup(src: &str, base: &RunStyle, markup: Markup) -> Option<StyledText
     if runs.is_empty() {
         runs.push(Run { start: 0, end: text.len(), style: base.clone() });
     }
-    Some(StyledText { text, runs })
+    paras.retain(|p| p.start < text.len());
+    Some(StyledText { text, runs, paras })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -536,6 +596,8 @@ pub struct RLine {
     pub end: usize,
     pub next: usize,
     pub width: f32,
+    /// Left indent of the line's paragraph (HTML lists).
+    pub indent: f32,
 }
 
 fn break_units(text: &str, from: usize, to: usize, mode: Measure) -> Vec<usize> {
@@ -590,12 +652,14 @@ pub fn break_rich(st: &StyledText, fonts: &mut FontSet, max_width: f32, mode: Me
     let mut para_start = 0;
     loop {
         let para_end = text[para_start..].find('\n').map(|i| para_start + i).unwrap_or(text.len());
+        let indent = st.para_at(para_start).map(|p| p.indent).unwrap_or(0.0);
+        let max_width = (max_width - indent).max(0.0);
         let fits = |a: usize, b: usize| g.width(a, trim_end(text, a, b)) <= max_width + 1e-3;
         let mut line_start = para_start;
         let mut pos = para_start;
         let push = |lines: &mut Vec<RLine>, a: usize, b: usize| {
             let e = trim_end(text, a, b);
-            lines.push(RLine { start: a, end: e, next: b, width: render_w(a, e) });
+            lines.push(RLine { start: a, end: e, next: b, width: render_w(a, e), indent });
         };
         for unit_end in break_units(text, para_start, para_end, mode) {
             if fits(line_start, unit_end) {
@@ -833,12 +897,31 @@ pub fn layout(
             prev_spacing = word_spacing;
         }
         let line_width = l.width + word_spacing * spaces as f32;
+        let (cx, cw) = (cx + l.indent, cw - l.indent);
         let mut px = match te.style.halign {
             HAlign::Center => cx + (cw - l.width) / 2.0,
             HAlign::Right => cx + cw - l.width,
             _ => cx,
         };
         let _ = line_width;
+        // A list item's bullet or number, right-aligned a little before its text.
+        if let Some(marker) = shown.para_at(l.start).and_then(|p| p.marker.as_ref()) {
+            let st_ = shown.style_at(l.start).clone();
+            let id = resolve(fonts, &st_);
+            let size = st_.draw_size();
+            let w = fonts.face(id).text_width(marker, size);
+            let mx = cx - MARKER_GAP - w;
+            items.push(PrintItem::Text(PrintText {
+                face: id,
+                size,
+                color: st_.color,
+                underline: false,
+                strike: false,
+                lines: vec![PrintLine { text: marker.clone(), x: mx, baseline, width: w, word_spacing: 0.0 }],
+                standard: fonts.standard(&st_.font, marker),
+                halign: HAlign::Left,
+            }));
+        }
         // One drawn segment per run on this line.
         for r in &shown.runs {
             let (a, b) = (r.start.max(l.start), r.end.min(l.end));
