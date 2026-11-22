@@ -140,6 +140,16 @@ fn parse_color(v: &str) -> Option<Color> {
         let n = u32::from_str_radix(&hex[hex.len().saturating_sub(6)..], 16).ok()?;
         return Some(Color { r: (n >> 16) as u8, g: (n >> 8) as u8, b: n as u8 });
     }
+    // JRXML 7 writes a color with transparency as rgba(r, g, b, alpha): drawn here over white.
+    if let Some(inner) = v.strip_prefix("rgba(").or_else(|| v.strip_prefix("rgb(")).and_then(|r| r.strip_suffix(')')) {
+        let parts: Vec<f32> = inner.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let alpha = parts.get(3).copied().unwrap_or(1.0).clamp(0.0, 1.0);
+        let over_white = |c: f32| (c.clamp(0.0, 255.0) * alpha + 255.0 * (1.0 - alpha)).round() as u8;
+        return Some(Color { r: over_white(parts[0]), g: over_white(parts[1]), b: over_white(parts[2]) });
+    }
     let (r, g, b) = match v.to_ascii_lowercase().as_str() {
         "black" => (0, 0, 0),
         "white" => (255, 255, 255),
