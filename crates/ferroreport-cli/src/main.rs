@@ -10,7 +10,8 @@ mod serve;
 mod spool;
 
 const USAGE: &str = "\
-ferroreport — report engine: PDF, Excel, CSV and HTML from JasperReports JRXML templates, no JVM required
+ferroreport — report engine: PDF, Excel, Word, CSV and HTML from JasperReports JRXML templates
+or .ferro templates, no JVM required
 
 USAGE:
     ferroreport render <template.jrxml|template.ferro> [OPTIONS]

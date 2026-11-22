@@ -25,6 +25,7 @@
       <a href="#first">Your first PDF</a>
       <a href="#install">Install</a>
       <a href="#inputs">Template, data, parameters</a>
+      <a href="#ferro">Templates in .ferro</a>
       <b>Ways to call it</b>
       <a href="#cli">Command line</a>
       <a href="#http">HTTP API (any language)</a>
@@ -37,6 +38,7 @@
       <a href="#tables">Tables</a>
       <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
+      <a href="#word">Word</a>
       <a href="#html">HTML previews</a>
       <a href="#tagged">Accessible PDFs</a>
       <a href="#large">Large reports and limits</a>
@@ -50,8 +52,8 @@
 
     <article class="doc">
       <h1>Documentation</h1>
-      <p>ferroreport takes a JasperReports template (<code>.jrxml</code>), your rows as JSON and your parameters, and returns a PDF,
-        an Excel workbook or a CSV file. Every way of calling it, from the command line to Python, uses the same engine and produces the same bytes.</p>
+      <p>ferroreport takes a template (JasperReports' <code>.jrxml</code>, or its own <a href="#ferro"><code>.ferro</code></a>), your rows
+        as JSON and your parameters, and returns a PDF, an Excel workbook, a Word document, a CSV file or an HTML preview. Every way of calling it, from the command line to Python, uses the same engine and produces the same bytes.</p>
 
       <h2 id="first">Your first PDF</h2>
       <p>You need three files: the template you designed in Jaspersoft Studio, the rows, and the parameters.</p>
@@ -90,8 +92,9 @@ curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
 
       <h2 id="inputs">Template, data, parameters</h2>
       <h3>Template</h3>
-      <p>The JRXML source, exactly as Jaspersoft Studio saves it (JRXML 6 and the JRXML 7 element syntax). Compiled <code>.jasper</code> files are
-        never loaded: if a template names <code>lines.jasper</code>, ferroreport reads <code>lines.jrxml</code> instead.</p>
+      <p>The JRXML source, exactly as Jaspersoft Studio saves it (JRXML 6, and JRXML 7 as JasperReports 7 writes it), or a
+        <a href="#ferro"><code>.ferro</code> template</a>: every function that takes a template takes either. Compiled <code>.jasper</code> files are
+        never loaded: if a template names <code>lines.jasper</code>, ferroreport reads <code>lines.jrxml</code> (or <code>lines.ferro</code>) instead.</p>
 
       <h3>Data</h3>
       <p>A JSON array with one object per row, or one JSON object per line (JSON Lines). Keys match the <code>&lt;field name="..."&gt;</code> entries; a field named
@@ -113,17 +116,77 @@ curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
       <p>A JSON object with one key per <code>&lt;parameter&gt;</code>, converted with the same rules. Parameters you leave out take
         their <code>defaultValueExpression</code>.</p>
 
+      <h2 id="ferro">Templates in .ferro</h2>
+      <p><code>.ferro</code> is ferroreport's own template format: the same reports as JRXML, written as an indented outline instead of
+        XML. It is about half the size, a person can write it without a designer, and its reports are accessible by default.</p>
+<pre>// Employees, with their salaries and the total.
+report "Employees" lang=en
+  style Base default fontName="DejaVu Sans" fontSize=10
+  field name String
+  field salary Double
+  variable total Double calculation=Sum : $F{salary}
+
+  title 40
+    h1 0,0 555x30 fontSize=18 : Employees
+  columnHeader 20
+    staticText 0,0 300x20 bold : Name
+    staticText 300,0 255x20 bold hTextAlign=Right : Salary
+  detail 20
+    textField 0,0 300x20 : $F{name}
+    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salary}
+    image 0,0 20x20 alt="Photo of the employee" : $F{photo}
+  summary 20
+    textField 300,0 255x20 bold hTextAlign=Right : $V{total}</pre>
+      <table>
+        <tr><th>Part of a line</th><th>Meaning</th></tr>
+        <tr><td>The first word</td><td>What the line is: <code>report</code>, <code>style</code>, <code>field</code>, a band
+          (<code>title</code>, <code>detail</code>, <code>pageFooter</code>...), an element (<code>staticText</code>,
+          <code>textField</code>, <code>image</code>, <code>line</code>, <code>rectangle</code>, <code>frame</code>,
+          <code>subreport</code>, <code>chart</code>, <code>crosstab</code>, <code>component</code>...), or any other JRXML 7 element
+          by its name (<code>box</code>, <code>pen</code>, <code>property</code>...)</td></tr>
+        <tr><td>Indentation</td><td>A line indented under another is inside it</td></tr>
+        <tr><td><code>x,y</code> and <code>widthxheight</code></td><td>An element's position and size, in points</td></tr>
+        <tr><td>A number after a band</td><td>Its height. <code>detail 20</code> is a detail section with one band 20 points tall (the same for
+          <code>groupHeader</code> and <code>groupFooter</code>)</td></tr>
+        <tr><td>Words after <code>field</code>, <code>parameter</code>, <code>variable</code></td><td>The name and the class:
+          <code>field amount BigDecimal</code>. <code>String</code>, <code>Integer</code>, <code>Long</code>, <code>Double</code>,
+          <code>BigDecimal</code>, <code>Boolean</code>, <code>Date</code>, <code>Timestamp</code>, <code>List</code>... need no package.
+          <code>style</code>, <code>group</code> and <code>property</code> take their name the same way</td></tr>
+        <tr><td><code>name=value</code></td><td>An attribute, with its JRXML 7 name. Quote the value when it has spaces:
+          <code>pattern="MMMM d, yyyy"</code>. A name alone means <code>true</code>: <code>bold</code></td></tr>
+        <tr><td><code>: text</code></td><td>The text or expression of the line: a static text's text, a text field's or image's expression,
+          a variable's or group's expression, a parameter's default value, a field's description</td></tr>
+        <tr><td>A line ending in <code> :</code></td><td>The text is on the lines below, one level further in, as written (for long
+          expressions and texts of several lines). <code>:= "..."</code> gives it as a JSON string</td></tr>
+        <tr><td><code>report</code> options</td><td><code>page=A4</code> (or <code>A3</code>, <code>A5</code>, <code>Letter</code>,
+          <code>Legal</code>, <code>612x792</code>), <code>landscape</code>, <code>margins=20</code> (or <code>20,30</code>, or four
+          numbers), <code>lang=es-DO</code>, <code>tagged=false</code>. Without them a report is A4, portrait, with 20-point margins</td></tr>
+        <tr><td><code>// ...</code></td><td>A comment</td></tr>
+      </table>
+      <p><b>Accessible by default.</b> A <code>.ferro</code> report gives a <a href="#tagged">tagged PDF</a>, the kind screen readers
+        follow, unless it says <code>tagged=false</code>, in the language of <code>lang=</code> (or of the locale). <code>h1</code> to
+        <code>h6</code> are headings (a static text tagged as one), <code>alt="..."</code> describes an image, and <code>tag=th</code>
+        (or <code>td</code>, <code>table</code>, <code>h2</code>...) says what any element is.</p>
+      <p>Everything JRXML 7 can say, <code>.ferro</code> can say, so converting between them loses nothing:</p>
+<pre>ferroreport convert invoice.jrxml -o invoice.ferro      # JRXML 6 or 7 -&gt; .ferro
+ferroreport convert invoice.ferro -o invoice.jrxml      # .ferro -&gt; JRXML 7, for Jaspersoft Studio 7
+ferroreport convert old.jrxml --to jrxml -o new.jrxml   # JRXML 6 -&gt; JRXML 7</pre>
+      <p>From code: <code>convert(template, "ferro")</code> in JavaScript, <code>ferroreport.convert(template, to="ferro")</code> in
+        Python, <code>ferroreport::template::from_jrxml</code>, <code>to_jrxml</code> and <code>ferroreport::convert::jrxml_to_v7</code>
+        in Rust. Every fixture renders to the same pixels from its JRXML, its JRXML 7 and its <code>.ferro</code>.</p>
+
       <h2 id="cli">Command line</h2>
-<pre>ferroreport render &lt;template.jrxml&gt; [options]
-ferroreport doctor &lt;template.jrxml&gt;
+<pre>ferroreport render &lt;template.jrxml|template.ferro&gt; [options]
+ferroreport doctor &lt;template&gt;
+ferroreport convert &lt;template&gt; [-o &lt;output&gt;] [--to ferro|jrxml]
 ferroreport serve [options]</pre>
       <h3>render</h3>
       <table>
         <tr><th>Option</th><th>Meaning</th></tr>
         <tr><td><code>-d, --data &lt;file.json&gt;</code></td><td>Rows: a JSON array of objects, or one object per line. <code>-</code> reads them from standard input. Omit for reports without data. The file is read as the report needs it, so it can be larger than memory</td></tr>
         <tr><td><code>-p, --params &lt;file.json&gt;</code></td><td>Parameter values</td></tr>
-        <tr><td><code>-o, --output &lt;file&gt;</code></td><td>Output file (default: the template name with <code>.pdf</code>). The extension picks the format: <code>.pdf</code>, <code>.xlsx</code> or <code>.csv</code>. <code>-</code> writes to standard output</td></tr>
-        <tr><td><code>-f, --format &lt;pdf|xlsx|csv&gt;</code></td><td>Output format, when the file name does not say it (for example with <code>-o -</code>)</td></tr>
+        <tr><td><code>-o, --output &lt;file&gt;</code></td><td>Output file (default: the template name with <code>.pdf</code>). The extension picks the format: <code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.csv</code> or <code>.html</code>. <code>-</code> writes to standard output</td></tr>
+        <tr><td><code>-f, --format &lt;pdf|xlsx|docx|csv|html&gt;</code></td><td>Output format, when the file name does not say it (for example with <code>-o -</code>)</td></tr>
         <tr><td><code>--xlsx-numbers</code></td><td>In Excel, writes numbers as numbers with their format pattern instead of as the formatted text. See <a href="#excel">Excel and CSV</a></td></tr>
         <tr><td><code>--csv-safe</code></td><td>In CSV, puts an apostrophe before values a spreadsheet would run as a formula. Use it when the data comes from other people</td></tr>
         <tr><td><code>--tagged</code></td><td>In PDF, says what the content is, for screen readers. See <a href="#tagged">Accessible PDFs</a></td></tr>
@@ -148,8 +211,14 @@ ferroreport render invoice.jrxml -d rows.json \
       <h3>doctor</h3>
       <p>Lists what a template uses and whether ferroreport can render it. Run it on a template before you rely on it. See
         <a href="#check">Check a template</a>.</p>
+      <h3>convert</h3>
+      <p>Rewrites a template: JRXML (6 or 7) as <a href="#ferro"><code>.ferro</code></a>, <code>.ferro</code> as JRXML 7, or JRXML 6 as
+        JRXML 7, the way JasperReports 7 writes its own samples. The output's extension, or <code>--to ferro</code> /
+        <code>--to jrxml</code>, picks the format; without either, a JRXML becomes <code>.ferro</code> and a <code>.ferro</code> becomes
+        JRXML. Without <code>-o</code> the result goes to standard output. Style templates (<code>.jrtx</code>) convert too.</p>
       <h3>serve</h3>
-      <p>Starts the <a href="#http">HTTP API</a>.</p>
+      <p>Starts the <a href="#http">HTTP API</a>. <code>POST /render/invoice</code> renders <code>invoice.jrxml</code> from the
+        templates directory, or <code>invoice.ferro</code> when there is no JRXML.</p>
       <table>
         <tr><th>Option</th><th>Environment variable</th><th>Meaning</th></tr>
         <tr><td><code>--host &lt;addr&gt;</code></td><td><code>FERROREPORT_HOST</code></td><td>Address to listen on. Default <code>127.0.0.1</code>; the Docker image uses <code>0.0.0.0</code></td></tr>
@@ -181,7 +250,7 @@ ferroreport render invoice.jrxml -d rows.json \
         <tr><td><code>POST /render/&lt;name&gt;</code></td><td>Renders <code>&lt;name&gt;.jrxml</code> from the templates directory (subfolders allowed: <code>/render/sales/invoice</code>)</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /render</code></td><td>Renders the template sent in the request</td><td><code>application/pdf</code>, or the Excel or CSV file with <code>format</code></td></tr>
         <tr><td><code>POST /inspect</code></td><td>Reports a template's parameters, fields and unsupported features</td><td>JSON</td></tr>
-        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.10.0"}</code></td></tr>
+        <tr><td><code>GET /health</code></td><td>For load balancers. Answers without the token</td><td><code>{"status": "ok", "version": "0.11.0"}</code></td></tr>
         <tr><td><code>GET /metrics</code></td><td>Counters for Prometheus: renders, errors, renders stopped by a limit, renders stopped because the client left, documents sent as they rendered, time spent, pages, rows, bytes sent, template cache hits and misses, renders in flight, disk in use for documents</td><td>Prometheus text</td></tr>
       </table>
       <p>The request body is JSON:</p>
@@ -276,7 +345,7 @@ psql -At -c "select row_to_json(s) from sales s" | { echo '{"params": {"YEAR": 2
 
       <h2 id="js">JavaScript</h2>
       <p>For Node.js 18+, Deno, Bun and browsers. The engine is WebAssembly: no native build step, no JVM.</p>
-<pre>import { render, inspect, version } from "ferroreport";
+<pre>import { render, inspect, convert, version } from "ferroreport";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const pdf = render(
@@ -300,10 +369,11 @@ writeFileSync("invoice.xlsx", render(template, rows, params, { format: "xlsx" })
         <tr><th>Function</th><th>Returns</th></tr>
         <tr><td><code>render(template, data?, params?, options?)</code></td><td><code>Uint8Array</code> with the PDF (or the Excel workbook or CSV text with <code>options.format</code>). Throws an <code>Error</code> with the reason if the template cannot be rendered</td></tr>
         <tr><td><code>inspect(template)</code></td><td><code>{ name, parameters, fields, warnings }</code>. <code>warnings</code> lists what the engine does not support in that template</td></tr>
+        <tr><td><code>convert(template, to)</code></td><td>The template rewritten: <code>to</code> is <code>"ferro"</code> or <code>"jrxml"</code> (JRXML 7). See <a href="#ferro">Templates in .ferro</a></td></tr>
         <tr><td><code>version()</code></td><td>The engine version</td></tr>
       </table>
       <p><code>options</code> holds <code>locale</code>, <code>now</code>, <code>resources</code> (as above) and <code>format</code>:
-        <code>"pdf"</code> (default), <code>"xlsx"</code> or <code>"csv"</code> (UTF-8 bytes). Also <code>maxPages</code> (stop a
+        <code>"pdf"</code> (default), <code>"xlsx"</code>, <code>"docx"</code>, <code>"html"</code> or <code>"csv"</code> (UTF-8 bytes). Also <code>maxPages</code> (stop a
         report that grows past that many pages), <code>csvSafe</code> (guard CSV against spreadsheet formulas in the data) and
         <code>xlsxNumbers</code> (numbers as numbers in Excel).</p>
       <p>In a browser, or with a bundler that picks the web build, load the engine once before the first render:</p>
@@ -340,9 +410,10 @@ stats = ferroreport.render_to_file("sales.jrxml", "sales.pdf", data_file="sales.
 print(stats)                               # {"pages": 23810, "rows": 1000000}</pre>
       <table>
         <tr><th>Function</th><th>Does</th></tr>
-        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers, tagged)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, CSV with <code>format="csv"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect</td></tr>
-        <tr><td><code>render_to_file(template, output, data=None, params=None, *, data_file, ...)</code></td><td>Same arguments; writes the file to <code>output</code> as it is made and returns <code>{"pages", "rows"}</code>. Without <code>format</code>, the extension (<code>.pdf</code>, <code>.xlsx</code>, <code>.csv</code>) decides. <code>data_file</code> is a file of rows (a JSON array or one object per line) read as the report needs it, instead of <code>data</code></td></tr>
+        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers, tagged)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, Word with <code>format="docx"</code>, CSV with <code>format="csv"</code>, HTML with <code>format="html"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect</td></tr>
+        <tr><td><code>render_to_file(template, output, data=None, params=None, *, data_file, ...)</code></td><td>Same arguments; writes the file to <code>output</code> as it is made and returns <code>{"pages", "rows"}</code>. Without <code>format</code>, the extension (<code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.csv</code>, <code>.html</code>) decides. <code>data_file</code> is a file of rows (a JSON array or one object per line) read as the report needs it, instead of <code>data</code></td></tr>
         <tr><td><code>inspect(template)</code></td><td>Returns a dict with <code>name</code>, <code>parameters</code>, <code>fields</code> and <code>warnings</code></td></tr>
+        <tr><td><code>convert(template, to="ferro")</code></td><td>Returns the template rewritten, as <code>.ferro</code> or (<code>to="jrxml"</code>) JRXML 7. See <a href="#ferro">Templates in .ferro</a></td></tr>
         <tr><td><code>FerroreportError</code></td><td>Raised when a template cannot be parsed, filled or exported</td></tr>
       </table>
       <p>Python values are converted for you: <code>datetime</code> and <code>date</code> become dates, <code>Decimal</code> keeps its exact
@@ -371,7 +442,7 @@ def invoice_pdf(pk: int):
 &lt;dependency&gt;
   &lt;groupId&gt;com.github.cristianEncarnacion&lt;/groupId&gt;
   &lt;artifactId&gt;ferroreport&lt;/artifactId&gt;
-  &lt;version&gt;v0.10.0&lt;/version&gt;
+  &lt;version&gt;v0.11.0&lt;/version&gt;
 &lt;/dependency&gt;</pre>
 <pre>Ferroreport reports = Ferroreport.local();
 
@@ -536,8 +607,16 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         that opens the CSV. When the data comes from other people, turn on the guard (<code>--csv-safe</code>, <code>csv_safe=True</code>,
         <code>csvSafe: true</code>): those values get an apostrophe in front, which spreadsheets show as text. Numbers such as
         <code>-12.50</code> are left alone. It is off by default so the CSV stays exactly what JasperReports writes.</p>
-      <p>Not available yet: other exporters (Word, HTML, ODS, the old XLS format) and the <code>net.sf.jasperreports.export.*</code> properties
-        other than number detection.</p>
+      <p>Not available yet: ODS, the old XLS format and the <code>net.sf.jasperreports.export.*</code> properties other than number
+        detection.</p>
+
+      <h2 id="word">Word</h2>
+      <p>Ask for <code>docx</code> (<code>-o report.docx</code>, <code>format="docx"</code>, <code>Format::Docx</code>,
+        <code>Format.DOCX</code>) and you get a Word document laid out like JasperReports' DOCX exporter: each page is a table cut at the
+        edges of its elements, and each element sits in the cells it covers. Texts keep their fonts, sizes, colors, styled runs,
+        alignment, padding, borders and backgrounds; images, charts and barcodes are pictures; lines and rectangles become cell borders
+        and backgrounds. A page break separates the pages, so the document has as many pages as the PDF. Like Jasper's, the document is
+        made for reading and light editing, not for reflowing: rounded rectangles and ellipses come out as plain boxes.</p>
 
       <h2 id="tagged">Accessible PDFs</h2>
       <p>A PDF is a picture of pages unless it also says what is on them. With tagging on, the document carries that description
@@ -554,6 +633,8 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td>Java</td><td><code>.tagged(true)</code></td></tr>
         <tr><td>JavaScript</td><td><code>{ tagged: true }</code></td></tr>
         <tr><td>Rust</td><td><code>Renderer::new().tagged(true)</code></td></tr>
+        <tr><td>The template</td><td><code>&lt;property name="net.sf.jasperreports.export.pdf.tagged" value="true"/&gt;</code> (and
+          <code>...pdf.tag.language</code> for its language); <code>.ferro</code> templates are tagged unless they say <code>tagged=false</code></td></tr>
       </table>
       <p>Two things are yours to say in the template, the way JasperReports has them:</p>
       <table>
@@ -562,11 +643,9 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td>Headings</td><td><code>&lt;property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/&gt;</code> inside the text's <code>&lt;reportElement&gt;</code>, with <code>h1</code> to <code>h6</code></td></tr>
         <tr><td>A table drawn by hand with frames</td><td>The same property on the frames: <code>table</code> on the outer one, <code>th</code> (or <code>columnheader</code>, <code>rowheader</code>) and <code>td</code> on its cells. Cells at the same height are a row. <code>jr:table</code> and crosstabs need nothing</td></tr>
       </table>
-      <p>What this is and is not yet: the structure is read correctly by PDF tools (Poppler's <code>pdfinfo -struct-text</code> prints
-        it), every tagged test report has the same pixels as the untagged one, and every table in them has its cells in rows and
-        its rows in the table. The
-        files do not claim PDF/UA conformance: that needs a validator's verdict, which this project will publish when it has one. A
-        tagged PDF is larger (an entry per text) and a value known only later, such as "page 3 of 240", makes its page wait instead
+      <p>Tagged PDFs say they follow PDF/UA-1, the accessibility standard, and every test report is checked against it on each change
+        with veraPDF, the validator the PDF Association maintains: all of them pass. Each tagged test report also has the same pixels as
+        the untagged one. A tagged PDF is larger (an entry per text) and a value known only later, such as "page 3 of 240", makes its page wait instead
         of being added afterwards.</p>
 
       <h2 id="html">HTML previews</h2>
@@ -665,8 +744,9 @@ invoice.jrxml: report `invoice`
         templates your users upload.</p>
 
       <h2 id="support">What is supported</h2>
-      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, every JasperReports chart type, barcodes (QR, DataMatrix, Code 128, EAN-128, Code 39, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail, USPS Intelligent Mail), PDF form fields, icon labels, styled, HTML and RTF text,
-        rotation, multi-column layouts in either print order, conditional styles and style templates, exported to PDF, Excel, CSV or HTML. The
+      <p>Bands and page breaks, groups and variables, frames, images, subreports, tables (<code>jr:table</code>), lists (<code>jr:list</code>), crosstabs, every JasperReports chart type, barcodes (QR, DataMatrix, PDF417, Code 128, EAN-128, Code 39, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail, USPS Intelligent Mail), PDF form fields, icon labels, styled, HTML and RTF text,
+        rotation, multi-column layouts in either print order, conditional styles and style templates, PNG, JPEG, GIF and SVG images, from JRXML 6, JRXML 7 or
+        <code>.ferro</code> templates, exported to PDF (tagged, PDF/UA-1), Excel, Word, CSV or HTML. The
         <a href="https://github.com/cristianEncarnacion/ferroreport#compatibility">compatibility table</a> in the repository lists every
         feature and what is not there yet, and <code>ferroreport doctor</code> gives the answer for your own template.</p>
     </article>

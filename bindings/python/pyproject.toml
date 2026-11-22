@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ferroreport"
-description = "Report engine: PDF, Excel and CSV in milliseconds and constant memory. Reads JasperReports JRXML templates with pixel-identical output, no JVM, safe with untrusted templates."
+description = "Report engine: PDF, Excel, Word and CSV in milliseconds and constant memory. Reads JasperReports JRXML templates with pixel-identical output, no JVM, safe with untrusted templates."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 requires-python = ">=3.9"

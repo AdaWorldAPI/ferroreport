@@ -1,6 +1,6 @@
 [package]
 name = "ferroreport"
-description = "Report engine: PDF, Excel and CSV in milliseconds, in constant memory. Reads JasperReports JRXML templates, pixel-identical, no JVM"
+description = "Report engine: PDF, Excel, Word and CSV in milliseconds, in constant memory. Reads JasperReports JRXML templates, pixel-identical, no JVM"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

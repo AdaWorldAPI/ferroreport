@@ -1,6 +1,7 @@
 //! # ferroreport
 //!
-//! Renders JasperReports JRXML templates to PDF, Excel (XLSX) and CSV without a JVM.
+//! Renders JasperReports JRXML templates (and templates in its own format, see [`template`]) to
+//! PDF, Excel (XLSX), Word (DOCX), CSV and HTML without a JVM.
 //!
 //! ```no_run
 //! let template = std::fs::read_to_string("invoice.jrxml")?;

@@ -5,12 +5,12 @@ the same rows and parameters and compared page by page. Made by `tools/samples.p
 
 | Result | Templates | Meaning |
 |---|---|---|
-| same | 29 | every page is the same picture |
-| differs | 42 | both engines render it, the pictures differ |
+| same | 30 | every page is the same picture |
+| differs | 41 | both engines render it, the pictures differ |
 | not rendered | 16 | ferroreport refuses the template or fails on it |
 | no reference | 53 | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |
 
-**29 of the 87 templates that can be compared come out the same.** JasperReports runs with the
+**30 of the 87 templates that can be compared come out the same.** JasperReports runs with the
 Java runtime's logical fonts (SansSerif, Serif, Monospaced) on DejaVu, as on a stock Linux server (`tools/oracle/fonts.conf`):
 text that names no font is laid out with them and written in PDF's built-in Helvetica, Times or Courier, by both engines.
 
@@ -27,7 +27,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `antupdate/reports/com/bar/BarReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeBarClass.isToPrint() |
 | `antupdate/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
 | `barbecue/reports/BarbecueReport.jrxml` | differs | 1/1 | worst page differs in 89.3% of its ink: <barbecue> elements are not supported yet and are skipped |
-| `barcode4j/reports/Barcode4JReport.jrxml` | differs | 1/1 | worst page differs in 6.5% of its ink: <PDF417> elements are not supported yet and are skipped |
+| `barcode4j/reports/Barcode4JReport.jrxml` | same | 1/1 |  |
 | `batchexport/reports/Report1.jrxml` | same | 2/2 |  |
 | `batchexport/reports/Report2.jrxml` | same | 2/2 |  |
 | `batchexport/reports/Report3.jrxml` | same | 2/2 |  |
@@ -99,7 +99,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `hyperlink/reports/HyperlinkReport.jrxml` | same | 3/3 |  |
 | `i18n/reports/I18nReport.jrxml` | not rendered |  | error evaluating expression: unsupported method String.getDisplayName() |
 | `iconlabel/reports/IconLabelReport.jrxml` | differs | 2/2 | worst page differs in 34.3% of its ink |
-| `images/reports/ImagesReport.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `images/reports/ImagesReport.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG, GIF and SVG are supported) |
 | `jasper/reports/FirstJasper.jrxml` | same | 9/9 |  |
 | `java1.5/reports/Java5Report.jrxml` | not rendered |  | error evaluating expression: unsupported static field Greeting.bye |
 | `javascript/reports/JavaScriptReport.jrxml` | differs | 1/1 | worst page differs in 3.4% of its ink |

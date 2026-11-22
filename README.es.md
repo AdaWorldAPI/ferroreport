@@ -1,7 +1,8 @@
 # ferroreport
 
 **Reportes en milisegundos, desde cualquier lenguaje.** ferroreport es un motor de reportes:
-le das una plantilla y tus datos y escribe el PDF, el Excel, el CSV o una vista previa web. Una factura tarda
+le das una plantilla y tus datos y escribe el PDF, el Excel, el Word, el CSV o una vista previa
+web. Una factura tarda
 **2 ms**; **un millón de filas** tardan 12 segundos y usan **11 MB de memoria**, porque las
 filas se leen a medida que hacen falta y cada página se escribe apenas se termina. Es un solo
 binario pequeño, sin nada que instalar, y las plantillas **no pueden ejecutar código** en tu
@@ -9,7 +10,8 @@ servidor.
 
 Lee las plantillas de JasperReports (`.jrxml`) que ya tienes y saca el mismo resultado,
 **píxel por píxel**: puedes diseñar en Jaspersoft Studio y cambiar de motor sin tocar un
-reporte. Frente al propio JasperReports es unas **250 veces más rápido arrancando en frío** y
+reporte. O escribe las plantillas en [su propio formato](#plantillas-jrxml-o-ferro), de la
+mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperReports es unas **250 veces más rápido arrancando en frío** y
 **de 3 a 6 veces más rápido que una JVM ya caliente** ([los números](#rendimiento)).
 
 <p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Carrera: JasperReports genera 1 factura en 3.01 s; ferroreport genera 301 en el mismo tiempo" width="760"></a></p>
@@ -18,15 +20,16 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **beta, versión 0.10.** Las 40 plantillas comparables de la batería de pruebas salen
+> Estado: **beta, versión 0.11.** Las 42 plantillas comparables de la batería de pruebas salen
 > píxel por píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas,
-> imágenes, subreportes, tablas, listas, crosstabs, códigos QR y de barras, texto con formato y
-> varias columnas; los gráficos siguen de cerca el estilo de JFreeChart. Las 42 también exportan
-> el mismo Excel y CSV que Jasper, y las muestras del propio JasperReports se comparan contra
-> 6.20.6 y 7.1.1. `ferroreport doctor` te dice si todo lo de tu plantilla está soportado; lo que
-> aún falta está en [compatibilidad](README.md#compatibility). Hasta la 1.0 la API todavía puede
-> cambiar, y cada cambio va en las notas de la versión. No está afiliado a Jaspersoft ni a Cloud
-> Software Group.
+> imágenes (también SVG), subreportes, tablas, listas, crosstabs, códigos QR, PDF417 y de barras,
+> texto con formato y varias columnas; los gráficos siguen de cerca el estilo de JFreeChart. Las
+> 44 también exportan el mismo Excel y CSV que Jasper, cada PDF etiquetado pasa las pruebas
+> PDF/UA-1 de veraPDF, y las muestras del propio JasperReports se comparan contra 6.20.6 y 7.1.1.
+> `ferroreport doctor` te dice si todo lo de tu plantilla está soportado; lo que aún falta está
+> en [compatibilidad](README.md#compatibility). Hasta la 1.0 la API todavía puede cambiar, y
+> cada cambio va en las notas de la versión. No está afiliado a Jaspersoft ni a Cloud Software
+> Group.
 
 ## Por qué
 
@@ -35,11 +38,15 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
   las páginas salen sin acumularse: un reporte de un millón de filas usa la memoria de uno de
   diez.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 40 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 42 coinciden.
-- **PDF, Excel, CSV y HTML.** La misma plantilla da un PDF, un `.xlsx` armado como el de
-  JasperReports (celdas combinadas, fuentes, rellenos, bordes, alturas de fila, imágenes y
-  gráficos), un CSV o una página web que se ve como el PDF, para vistas previas.
+  píxel: hoy los 42 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 44 coinciden.
+- **PDF, Excel, Word, CSV y HTML.** La misma plantilla da un PDF (etiquetado para lectores de
+  pantalla si quieres, PDF/UA-1), un `.xlsx` armado como el de JasperReports (celdas combinadas,
+  fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos), un `.docx` armado como el
+  Word que exporta Jasper, un CSV o una página web que se ve como el PDF, para vistas previas.
+- **JRXML, o un formato propio.** Las plantillas de Jaspersoft Studio funcionan tal cual (JRXML
+  6 y 7). Las nuevas se pueden escribir en `.ferro`, un esquema que una persona lee y escribe a
+  mano, y `ferroreport convert` pasa de uno a otro, y de JRXML 6 a 7.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -64,15 +71,15 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 
 - **JavaScript/TypeScript:** `npm install ferroreport` y
   `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF; con
-  `{ format: "xlsx" }` o `"csv"`, el Excel o el CSV.
+  `{ format: "xlsx" }`, `"docx"` o `"csv"`, el Excel, el Word o el CSV.
 - **Python:** `pip install ferroreport` y
   `ferroreport.render("factura.jrxml", filas, parametros, locale="es_DO")` (agrega
-  `format="xlsx"` o `"csv"`, o usa `render_to_file(..., "factura.xlsx", ...)`).
+  `format="xlsx"`, `"docx"` o `"csv"`, o usa `render_to_file(..., "factura.xlsx", ...)`).
 - **Cualquier lenguaje por HTTP:**
   `docker run -p 8080:8080 -v "$PWD/plantillas:/templates" -e FERROREPORT_TEMPLATES=/templates -e FERROREPORT_TOKEN=cambiame ghcr.io/cristianencarnacion/ferroreport`
   y luego `POST /render/factura` con `Authorization: Bearer cambiame` y
-  `{"data": [...], "params": {...}}` te devuelve el PDF (agrega `"format": "xlsx"`, `"csv"` o
-  `"html"` para Excel, CSV o una vista previa web). Para reportes con más filas de las que
+  `{"data": [...], "params": {...}}` te devuelve el PDF (agrega `"format": "xlsx"`, `"docx"`, `"csv"` o
+  `"html"` para Excel, Word, CSV o una vista previa web). Para reportes con más filas de las que
   quieres en memoria, envíalas una por línea (`Content-Type: application/x-ndjson`: la
   petición en la primera línea y una fila en cada línea siguiente) y el servidor las lee a
   medida que el reporte las necesita: un millón de filas con el servidor en unos 45 MB. La
@@ -92,8 +99,9 @@ reporte. Frente al propio JasperReports es unas **250 veces más rápido arranca
 cargo install --path crates/ferroreport-cli
 
 ferroreport render factura.jrxml --data filas.json --params parametros.json -o factura.pdf --locale es_DO
-ferroreport render factura.jrxml --data filas.json -o factura.xlsx   # Excel (o .csv)
+ferroreport render factura.jrxml --data filas.json -o factura.xlsx   # Excel (o .docx, .csv, .html)
 ferroreport doctor factura.jrxml     # qué soporta (y qué no) esta plantilla
+ferroreport convert factura.jrxml -o factura.ferro   # la misma plantilla en el formato de ferroreport
 ```
 
 `filas.json` es un arreglo JSON de objetos, o un objeto JSON por línea, cuyas claves coinciden
@@ -104,16 +112,82 @@ ISO-8601 a `java.util.Date`, arreglos anidados a `java.util.List`, base64 a `byt
 
 Las imágenes y subreportes se buscan junto a la plantilla (agrega más carpetas con
 `--resources CARPETA`). Un subreporte que apunta a `lineas.jasper` se renderiza desde
-`lineas.jrxml`: nunca se cargan archivos `.jasper` compilados. Los arreglos JSON anidados
+`lineas.jrxml` (o `lineas.ferro`): nunca se cargan archivos `.jasper` compilados. Los arreglos JSON anidados
 alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 `((JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("lineas")`.
+
+## Plantillas: JRXML o .ferro
+
+ferroreport lee JRXML como lo escriben JasperReports 6 y 7, y un formato propio, `.ferro`: los
+mismos reportes, escritos como un esquema con sangría en vez de XML. Ocupa más o menos la mitad
+que el JRXML, se puede escribir sin diseñador, y sus reportes son accesibles por defecto.
+
+```text
+report "Empleados" lang=es
+  style Base default fontName="DejaVu Sans" fontSize=10
+  field nombre String
+  field salario Double
+  variable total Double calculation=Sum : $F{salario}
+
+  title 40
+    h1 0,0 555x30 fontSize=18 : Empleados
+  columnHeader 20
+    staticText 0,0 300x20 bold : Nombre
+    staticText 300,0 255x20 bold hTextAlign=Right : Salario
+  detail 20
+    textField 0,0 300x20 : $F{nombre}
+    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salario}
+  summary 20
+    textField 300,0 255x20 bold hTextAlign=Right : $V{total}
+```
+
+Cada línea es una parte del reporte: qué es (en un elemento, su tipo), luego su posición y
+tamaño (`x,y` y `anchoxalto`), sus atributos (`nombre=valor`, entre comillas si el valor tiene
+espacios; un nombre solo quiere decir `true`), y después de ` : ` su texto o expresión. Las
+líneas con más sangría debajo van dentro de ella. La altura de una banda va después de su
+nombre, y `detail 20` es una banda de detalle de 20 puntos. Los campos, parámetros y variables
+llevan su nombre y su clase (`String`, `BigDecimal`, `Date`... sin paquete). Un reporte es A4
+con márgenes de 20 puntos salvo que diga `page=Letter` (o `A3`, `A5`, `Legal`, `612x792`),
+`landscape` o `margins=30`. Un texto de varias líneas va debajo de una línea que termina en
+` :`, un nivel más adentro. Las líneas que empiezan con `//` son comentarios. Todo lo que dice
+un JRXML 7 se puede decir en `.ferro`: lo que no tiene forma corta conserva su nombre de JRXML
+(`box`, `pen lineWidth=0.5`, `component`...).
+
+**Accesible por defecto.** Un reporte `.ferro` da un PDF etiquetado que los lectores de pantalla
+pueden recorrer (salvo que diga `tagged=false`), en el idioma de `lang=`. `h1` a `h6` son
+títulos, `alt="..."` describe una imagen y `tag=th` (o cualquier otra etiqueta) dice qué es un
+elemento.
+
+`ferroreport convert` pasa de un formato al otro, y de JRXML 6 a JRXML 7:
+
+```bash
+ferroreport convert factura.jrxml -o factura.ferro     # JRXML 6 o 7 -> .ferro
+ferroreport convert factura.ferro -o factura.jrxml     # .ferro -> JRXML 7 (lo abre Jaspersoft Studio 7)
+ferroreport convert viejo.jrxml --to jrxml -o nuevo.jrxml  # JRXML 6 -> JRXML 7
+```
+
+Todas las formas de renderizar leen `.ferro` igual que JRXML: el CLI (`ferroreport render
+factura.ferro`), los paquetes (con el texto o el archivo de la plantilla), el servidor
+(`POST /render/factura` encuentra `factura.ferro` si no hay `factura.jrxml`), los subreportes y
+las plantillas de estilos. Los paquetes de Python y JavaScript también tienen
+`convert(plantilla, to)`.
+
+Cómo se verifican las conversiones: JasperReports trae sus muestras escritas en JRXML 6 (6.20) y
+en JRXML 7 (7.1.1, convertidas con las herramientas del propio JasperReports).
+`tools/convert_check.py` convierte las 123 muestras que están en las dos y compara el resultado
+con el JRXML 7 de JasperReports: 89 salen iguales, y las otras 34 son muestras que se editaron
+entre una versión y otra (un texto, un margen, una propiedad nueva), salvo una que usa un
+componente propio de la muestra. Las 171 muestras de JRXML 7 van a `.ferro` y vuelven sin
+cambios (dos con sus propiedades en otro orden). Cada fixture sale con los mismos píxeles desde
+su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures convertidos.
 
 ## Qué soporta
 
 - Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`), y un
   título que no cabe en una página y sigue en las siguientes, como en JasperReports.
-- Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG, JPEG y GIF,
-  subreportes, icon labels, y códigos de los componentes barcode4j: QR, DataMatrix, Code 128,
+- Texto estático y dinámico, líneas, rectángulos, elipses, frames, imágenes PNG, JPEG, GIF y SVG
+  (en el PDF, el SVG se dibuja como vectores), subreportes, icon labels, y códigos de los
+  componentes barcode4j: QR, DataMatrix, PDF417, Code 128,
   EAN-128, Code 39 (con ASCII completo), EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5,
   Codabar, POSTNET, Royal Mail y USPS Intelligent Mail. Cada barra se verifica contra barcode4j.
 - Campos de formulario PDF (`net.sf.jasperreports.export.pdf.field.*`): texto, listas
@@ -149,11 +223,15 @@ alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
   orden por totales (`orderByExpression`), totales con `$V{medida_grupo_ALL}`,
   parámetros, datos del reporte o de un subdataset. Si no caben a lo ancho se parten en bloques de
   columnas, y si no caben a lo alto siguen en la página siguiente con las cabeceras repetidas.
-- PDF etiquetado para lectores de pantalla (`--tagged`): párrafos y títulos, imágenes con su
-  descripción, tablas y crosstabs con celdas de encabezado y las columnas y filas que abarca
-  cada celda, y listas HTML como listas.
-- Aún no: comparadores propios en crosstabs, PDF417, códigos Barbecue, personalizadores de
-  gráficos, conexiones JDBC.
+- Exportación a Word (DOCX) como la de JasperReports: una tabla por página, cada elemento en las
+  celdas que cubre, con sus fuentes, colores, bordes e imágenes.
+- PDF etiquetado para lectores de pantalla (`--tagged`, la propiedad
+  `net.sf.jasperreports.export.pdf.tagged` de la plantilla, o por defecto en `.ferro`), que pasa
+  las pruebas PDF/UA-1 de veraPDF: párrafos y títulos, imágenes con su descripción, tablas y
+  crosstabs con celdas de encabezado y las columnas y filas que abarca cada celda, y listas HTML
+  como listas.
+- Aún no: comparadores propios en crosstabs, códigos Barbecue, personalizadores de gráficos,
+  conexiones JDBC.
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento
@@ -228,6 +306,11 @@ reporte con más filas de las que caben en una hoja (1,048,576) se detiene con u
 - **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
   vista previa en vivo para VS Code.
 - **Fase 4:** listo: exportación a Excel (XLSX) y CSV, todos los tipos de gráfico de JasperReports.
+- **Listo en 0.11:** un formato de plantilla propio (`.ferro`), corto, legible y accesible por
+  defecto; `ferroreport convert` entre ese formato y JRXML, y de JRXML 6 a 7; salida a Word
+  (DOCX); códigos PDF417; imágenes SVG; PDF etiquetado verificado con veraPDF (PDF/UA-1); JRXML 7
+  leído tal como lo escribe JasperReports 7; el flujo de publicación listo para subir la librería
+  de Java a Maven Central.
 - **Listo en 0.10:** los nueve tipos de gráfico que faltaban, markup RTF, listas HTML, DataMatrix,
   EAN-128, UPC-E y códigos postales, campos de formulario PDF, icon labels, Helvetica para el
   texto sin fuente, listas y celdas combinadas en PDF etiquetado, títulos de varias páginas;
@@ -235,11 +318,9 @@ reporte con más filas de las que caben en una hoja (1,048,576) se detiene con u
 - **Listo en 0.8:** salida HTML para vistas previas, librería de Java que lee un `ResultSet`
   fila por fila, filas desde cualquier base de datos por tubería o iterador, y un servidor que
   se niega a quedar abierto a la red y puede limitar a cada cliente.
-- **Siguiente:** un formato de plantilla propio, corto y legible como Markdown, que se compila al
-  mismo motor y es accesible por defecto; `ferroreport convert` entre ese formato y JRXML (y de
-  JRXML 6 a 7); la librería de Java en Maven Central (hoy la construye JitPack), Excel escrito
-  por partes, salida a Word, PDF417 y un diseñador visual (mientras tanto, Jaspersoft Studio
-  sirve para diseñar las plantillas).
+- **Siguiente:** la librería de Java en Maven Central (hoy la construye JitPack; la publicación
+  solo espera la cuenta), códigos Barbecue y un diseñador visual (mientras tanto, Jaspersoft
+  Studio sirve para diseñar las plantillas, y `.ferro` se escribe a mano).
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).
