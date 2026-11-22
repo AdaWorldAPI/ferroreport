@@ -2695,6 +2695,10 @@ struct Filler<'a> {
     /// once per group: a count with `incrementType="Group"` counts groups.
     stepped: Vec<Option<VarState>>,
     groups_read_variables: bool,
+    /// A band split across columns is being continued: its record has been counted.
+    split_carry: bool,
+    /// The values group headers are printed again with on a new page.
+    reprint_mode: Values,
     /// With `printOrder="Horizontal"`: the row of columns being filled (its top, its height).
     row: Option<(f32, f32)>,
     /// The height of each row filled so far, or, given beforehand, the height each row of a
@@ -2894,6 +2898,18 @@ impl<'a> Filler<'a> {
         Ok(())
     }
 
+    /// A record already counted where its band began: the variables that just started again
+    /// keep their new values instead of taking it in once more.
+    fn carry_estimate(&mut self, pred: impl Fn(&ResetType) -> bool) {
+        if let Some(est) = self.estimated.as_mut() {
+            for (i, def) in self.defs.iter().enumerate() {
+                if pred(&def.reset) {
+                    est[i] = self.committed[i].clone();
+                }
+            }
+        }
+    }
+
     fn reset_where(&mut self, pred: impl Fn(&ResetType) -> bool) -> Result<()> {
         for ch in &self.charts {
             if pred(&ch.dataset.reset) {
@@ -2913,7 +2929,7 @@ impl<'a> Filler<'a> {
                 // That is why it can be printed in a group header, which comes before the
                 // row is added to anything.
                 if let Some(e) = &self.defs[i].expression {
-                    let value = self.eval_with(e, &vars, self.rows.current())?;
+                    let value = self.eval_with(e, &vars, self.rows.record(self.reprint_mode))?;
                     vars[i].value = self.defs[i].class.coerce(value);
                 }
             } else if pred(&self.defs[i].reset) {
@@ -3188,7 +3204,9 @@ impl<'a> Filler<'a> {
         self.footers_done = false;
         if self.page_number > 1 {
             self.reset_where(|r| matches!(r, ResetType::Page | ResetType::Column))?;
-            if self.estimated.is_some() {
+            if self.split_carry {
+                self.carry_estimate(|r| matches!(r, ResetType::Page | ResetType::Column));
+            } else if self.estimated.is_some() {
                 // Re-estimate the record being moved to this page with page variables reset.
                 self.estimated = Some(self.calculate(&self.committed.clone())?);
                 for (i, calculation, value) in self.returned.clone() {
@@ -3243,7 +3261,7 @@ impl<'a> Filler<'a> {
             for gi in 0..limit {
                 if self.report.groups[gi].reprint_header_on_each_page && self.group_values[gi].is_some() {
                     for b in &self.report.groups[gi].header {
-                        self.print_band_at_offset(b, Values::Committed)?;
+                        self.print_band_at_offset(b, self.reprint_mode)?;
                     }
                 }
             }
@@ -3329,7 +3347,9 @@ impl<'a> Filler<'a> {
         self.offset_y = self.column_top;
         self.page_has_content = false;
         self.reset_where(|r| matches!(r, ResetType::Column))?;
-        if self.estimated.is_some() {
+        if self.split_carry {
+            self.carry_estimate(|r| matches!(r, ResetType::Column));
+        } else if self.estimated.is_some() {
             self.estimated = Some(self.calculate(&self.committed.clone())?);
             for (i, calculation, value) in self.returned.clone() {
                 self.apply_return(i, calculation, value);
@@ -3396,8 +3416,17 @@ impl<'a> Filler<'a> {
         }
         self.row = None;
         self.page_footers(false, mode)?;
-        self.new_page()?;
-        self.page_headers()
+        // Group headers printed again on the new page show the groups being ended when the
+        // break came in their footers.
+        self.reprint_mode = if mode == Values::Old { Values::Old } else { Values::Committed };
+        let started = self.new_page();
+        if let Err(e) = started {
+            self.reprint_mode = Values::Committed;
+            return Err(e);
+        }
+        let printed = self.page_headers();
+        self.reprint_mode = Values::Committed;
+        printed
     }
 
     /// Prints a body band. When it does not fit, it either moves to the next page or, like
@@ -3464,7 +3493,12 @@ impl<'a> Filler<'a> {
             self.offset_y = self.body_limit();
             self.page_has_content = true;
             self.in_column = false;
-            self.column_break(footer_mode)?;
+            // Part of the band is on this page: its record counts in this page's footers,
+            // and not again in the next page's or column's.
+            self.split_carry = true;
+            let moved = self.column_break(mode);
+            self.split_carry = false;
+            moved?;
             self.in_column = true;
             if rest.is_empty() {
                 return Ok(());
@@ -4054,6 +4088,8 @@ fn new_filler<'a>(
         group_values: vec![None; report.groups.len()],
         stepped,
         groups_read_variables,
+        split_carry: false,
+        reprint_mode: Values::Committed,
         row: None,
         row_heights: Vec::new(),
         row_index: 0,

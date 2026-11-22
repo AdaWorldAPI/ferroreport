@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="split" pageWidth="420" pageHeight="420" columnWidth="380" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<field name="grp" class="java.lang.String"/>
+	<field name="id" class="java.lang.Integer"/>
+	<field name="note" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<variable name="Letter" class="java.lang.String" resetType="None">
+		<variableExpression><![CDATA[$F{grp}.substring($F{grp}.length() - 1)]]></variableExpression>
+	</variable>
+	<variable name="PageSum" class="java.lang.Double" resetType="Page" calculation="Sum">
+		<variableExpression><![CDATA[$F{amount}]]></variableExpression>
+	</variable>
+	<variable name="GroupSum" class="java.lang.Double" resetType="Group" resetGroup="grp" calculation="Sum">
+		<variableExpression><![CDATA[$F{amount}]]></variableExpression>
+	</variable>
+	<group name="grp" isReprintHeaderOnEachPage="true">
+		<groupExpression><![CDATA[$F{grp}]]></groupExpression>
+		<groupHeader>
+			<band height="16">
+				<textField>
+					<reportElement mode="Opaque" x="0" y="0" width="380" height="14" backcolor="#E0E0E0"/>
+					<textFieldExpression><![CDATA["Group " + $V{Letter} + " (" + $F{grp} + ")"]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupHeader>
+		<groupFooter>
+			<band height="30">
+				<textField pattern="#,##0.00">
+					<reportElement x="200" y="2" width="180" height="12"/>
+					<textElement textAlignment="Right"/>
+					<textFieldExpression><![CDATA[$V{GroupSum}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement x="0" y="2" width="200" height="12"/>
+					<textFieldExpression><![CDATA["Rows: " + $V{grp_COUNT}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement x="0" y="15" width="200" height="12"/>
+					<textFieldExpression><![CDATA["Last letter " + $V{Letter}]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupFooter>
+	</group>
+	<detail>
+		<band height="14">
+			<textField>
+				<reportElement x="0" y="0" width="40" height="12"/>
+				<textFieldExpression><![CDATA[$F{id}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight">
+				<reportElement x="45" y="0" width="260" height="12"/>
+				<textFieldExpression><![CDATA[$F{note}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="310" y="0" width="70" height="12"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="16">
+			<textField>
+				<reportElement x="0" y="2" width="200" height="12"/>
+				<textFieldExpression><![CDATA["Rows on page: " + $V{PAGE_COUNT}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="200" y="2" width="180" height="12"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$V{PageSum}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>

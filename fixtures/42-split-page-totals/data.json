@@ -1,0 +1,362 @@
+[
+{
+"grp": "Group A",
+"id": 1000,
+"note": "romeo oscar oscar quebec golf foxtrot quebec papa foxtrot delta oscar juliet echo charlie romeo bravo mike oscar foxtrot alpha quebec charlie bravo bravo golf hotel alpha oscar kilo oscar golf quebec hotel juliet papa alpha charlie oscar india november romeo charlie india kilo hotel quebec juliet alpha",
+"amount": 36.04
+},
+{
+"grp": "Group A",
+"id": 1001,
+"note": "mike delta juliet mike charlie alpha",
+"amount": 423.81
+},
+{
+"grp": "Group A",
+"id": 1002,
+"note": "golf golf bravo papa mike mike",
+"amount": 210.48
+},
+{
+"grp": "Group A",
+"id": 1003,
+"note": "golf india kilo charlie juliet kilo alpha november delta echo hotel delta alpha bravo oscar papa foxtrot romeo golf oscar quebec golf echo november mike delta mike november golf alpha india juliet alpha golf foxtrot mike delta bravo echo golf oscar india alpha kilo juliet mike charlie charlie charlie golf hotel alpha lima lima oscar echo papa echo mike foxtrot echo juliet hotel hotel golf foxtrot romeo golf mike papa charlie november",
+"amount": 24.65
+},
+{
+"grp": "Group A",
+"id": 1004,
+"note": "bravo quebec india hotel mike india",
+"amount": 210.99
+},
+{
+"grp": "Group A",
+"id": 1005,
+"note": "papa juliet quebec foxtrot charlie echo hotel papa romeo charlie india golf golf alpha charlie india november oscar hotel bravo bravo foxtrot juliet lima quebec echo charlie lima echo oscar kilo quebec echo bravo alpha papa lima juliet bravo alpha charlie papa charlie juliet kilo echo charlie charlie oscar romeo lima bravo echo kilo lima charlie papa charlie november alpha papa alpha mike mike alpha charlie charlie charlie delta india november kilo",
+"amount": 194.83
+},
+{
+"grp": "Group A",
+"id": 1006,
+"note": "oscar oscar oscar romeo charlie quebec quebec alpha juliet charlie papa alpha hotel delta papa papa india alpha lima juliet echo golf quebec foxtrot kilo oscar papa hotel kilo mike india golf november golf golf mike hotel kilo golf echo echo papa lima bravo charlie india foxtrot delta oscar papa india golf november mike quebec papa kilo oscar kilo charlie bravo india bravo india lima juliet alpha echo mike oscar golf alpha",
+"amount": 384.84
+},
+{
+"grp": "Group A",
+"id": 1007,
+"note": "hotel echo bravo delta oscar delta romeo lima charlie golf golf papa india foxtrot alpha papa romeo bravo foxtrot hotel india lima romeo quebec",
+"amount": 250.71
+},
+{
+"grp": "Group A",
+"id": 1008,
+"note": "mike hotel charlie november mike echo oscar oscar golf alpha mike romeo",
+"amount": 284.84
+},
+{
+"grp": "Group A",
+"id": 1009,
+"note": "kilo oscar kilo golf delta delta golf hotel mike charlie juliet romeo kilo india alpha lima quebec charlie bravo oscar kilo romeo november india papa alpha golf charlie november bravo foxtrot romeo kilo echo papa echo quebec quebec oscar papa charlie hotel oscar quebec romeo juliet romeo foxtrot quebec quebec romeo india juliet mike golf juliet echo romeo quebec india papa golf november romeo delta quebec alpha mike alpha romeo bravo quebec",
+"amount": 458.76
+},
+{
+"grp": "Group A",
+"id": 1010,
+"note": "delta papa charlie foxtrot charlie romeo oscar november mike india hotel papa papa echo kilo november papa quebec kilo delta golf november alpha india echo alpha bravo golf echo hotel alpha juliet kilo lima hotel papa delta papa delta quebec india golf quebec november alpha mike november quebec foxtrot romeo golf romeo golf quebec golf romeo echo hotel lima foxtrot kilo kilo golf golf golf delta echo hotel echo charlie india mike",
+"amount": 49.41
+},
+{
+"grp": "Group A",
+"id": 1011,
+"note": "romeo echo golf mike alpha delta golf lima lima delta quebec kilo quebec golf charlie papa delta alpha bravo romeo quebec papa echo golf foxtrot delta golf foxtrot foxtrot juliet delta bravo echo oscar charlie delta kilo mike oscar november quebec lima november golf lima alpha bravo golf",
+"amount": 91.45
+},
+{
+"grp": "Group B",
+"id": 1012,
+"note": "lima lima mike golf foxtrot delta quebec alpha kilo charlie mike golf quebec kilo india india delta foxtrot mike echo kilo romeo lima november foxtrot mike golf foxtrot charlie kilo juliet papa delta alpha lima bravo hotel india juliet kilo golf mike foxtrot romeo charlie mike quebec papa",
+"amount": 321.49
+},
+{
+"grp": "Group B",
+"id": 1013,
+"note": "mike alpha delta delta hotel india",
+"amount": 222.38
+},
+{
+"grp": "Group B",
+"id": 1014,
+"note": "bravo golf mike alpha delta india india india kilo romeo romeo quebec november quebec delta oscar charlie romeo bravo mike foxtrot mike papa foxtrot papa romeo bravo november papa november juliet quebec mike juliet lima quebec juliet papa india romeo juliet juliet alpha alpha hotel bravo foxtrot november mike bravo kilo mike bravo kilo charlie hotel november papa india hotel bravo quebec delta oscar echo hotel delta bravo november oscar delta golf",
+"amount": 430.7
+},
+{
+"grp": "Group B",
+"id": 1015,
+"note": "quebec echo delta lima oscar echo november oscar india november lima quebec echo juliet echo hotel papa delta quebec juliet quebec lima india india",
+"amount": 305.29
+},
+{
+"grp": "Group B",
+"id": 1016,
+"note": "golf india hotel golf hotel quebec golf bravo bravo alpha india india november alpha bravo delta hotel romeo india charlie charlie foxtrot romeo hotel lima papa papa lima golf kilo kilo papa echo charlie delta oscar golf oscar november india mike echo lima echo kilo juliet romeo foxtrot november lima delta oscar kilo charlie romeo charlie november papa oscar juliet alpha charlie juliet golf charlie juliet papa kilo juliet echo hotel lima",
+"amount": 328.97
+},
+{
+"grp": "Group B",
+"id": 1017,
+"note": "lima delta kilo oscar india oscar quebec juliet oscar kilo hotel mike quebec hotel charlie lima lima alpha lima mike mike golf lima mike",
+"amount": 270.74
+},
+{
+"grp": "Group B",
+"id": 1018,
+"note": "foxtrot foxtrot charlie oscar juliet alpha hotel quebec bravo romeo foxtrot juliet alpha november charlie romeo juliet romeo charlie kilo charlie india delta kilo charlie alpha echo delta november hotel hotel papa quebec kilo oscar mike lima kilo kilo echo papa papa romeo charlie bravo november lima alpha mike charlie oscar romeo alpha quebec lima alpha delta november november echo hotel foxtrot mike foxtrot kilo golf mike november quebec juliet india bravo",
+"amount": 236.25
+},
+{
+"grp": "Group B",
+"id": 1019,
+"note": "juliet echo foxtrot bravo oscar alpha",
+"amount": 292.45
+},
+{
+"grp": "Group B",
+"id": 1020,
+"note": "kilo delta golf foxtrot lima golf",
+"amount": 294.59
+},
+{
+"grp": "Group B",
+"id": 1021,
+"note": "papa quebec hotel oscar foxtrot india mike foxtrot juliet romeo romeo papa india papa mike kilo romeo charlie papa hotel mike bravo golf echo mike quebec quebec india bravo hotel alpha papa lima oscar hotel november foxtrot november foxtrot kilo echo india quebec echo india quebec romeo bravo echo foxtrot alpha golf echo echo charlie lima india quebec delta papa oscar charlie romeo quebec juliet alpha golf november golf charlie oscar golf",
+"amount": 19.57
+},
+{
+"grp": "Group B",
+"id": 1022,
+"note": "quebec papa foxtrot juliet kilo juliet mike charlie romeo juliet oscar charlie lima charlie echo delta mike oscar delta oscar alpha mike papa hotel juliet delta oscar alpha golf echo juliet mike romeo juliet kilo mike romeo charlie india golf golf mike delta kilo juliet india papa kilo",
+"amount": 223.98
+},
+{
+"grp": "Group B",
+"id": 1023,
+"note": "charlie delta echo delta echo foxtrot foxtrot golf mike bravo oscar charlie delta hotel bravo foxtrot delta november november charlie kilo november quebec echo golf echo mike papa kilo november alpha mike kilo hotel quebec alpha india kilo golf kilo juliet oscar delta romeo mike golf quebec kilo",
+"amount": 394.49
+},
+{
+"grp": "Group C",
+"id": 1024,
+"note": "foxtrot india romeo juliet romeo hotel",
+"amount": 176.93
+},
+{
+"grp": "Group C",
+"id": 1025,
+"note": "quebec echo golf quebec golf alpha golf charlie echo hotel papa november kilo kilo charlie lima india oscar delta oscar echo hotel romeo romeo romeo charlie romeo india foxtrot kilo echo delta alpha juliet lima hotel lima foxtrot foxtrot romeo charlie oscar bravo mike foxtrot echo juliet mike alpha foxtrot golf november oscar bravo echo quebec mike delta mike foxtrot kilo quebec echo india hotel kilo bravo bravo echo mike papa delta",
+"amount": 235.48
+},
+{
+"grp": "Group C",
+"id": 1026,
+"note": "november juliet papa oscar november november delta delta quebec kilo quebec quebec november november alpha kilo bravo juliet november mike kilo juliet charlie hotel delta oscar hotel quebec mike bravo papa delta quebec hotel romeo juliet mike hotel charlie lima romeo november foxtrot hotel november delta charlie delta",
+"amount": 260.3
+},
+{
+"grp": "Group C",
+"id": 1027,
+"note": "delta romeo oscar alpha juliet hotel juliet alpha kilo foxtrot charlie oscar",
+"amount": 447.67
+},
+{
+"grp": "Group C",
+"id": 1028,
+"note": "mike echo lima hotel bravo juliet alpha oscar kilo juliet kilo papa echo papa golf golf juliet bravo golf kilo lima papa alpha foxtrot romeo golf romeo hotel golf bravo delta juliet kilo india november echo kilo oscar november charlie foxtrot hotel juliet delta golf india foxtrot hotel quebec juliet india lima quebec delta quebec hotel juliet foxtrot hotel india echo charlie oscar charlie oscar quebec charlie quebec bravo alpha juliet romeo",
+"amount": 126.2
+},
+{
+"grp": "Group C",
+"id": 1029,
+"note": "charlie foxtrot juliet golf hotel foxtrot india romeo alpha foxtrot echo bravo oscar mike alpha papa bravo foxtrot charlie romeo lima kilo papa bravo quebec juliet quebec quebec romeo foxtrot foxtrot delta november hotel oscar romeo india hotel india papa romeo hotel papa india bravo golf bravo oscar foxtrot kilo echo alpha papa november quebec oscar india alpha charlie delta foxtrot romeo hotel echo bravo juliet november bravo kilo quebec india papa",
+"amount": 45.15
+},
+{
+"grp": "Group C",
+"id": 1030,
+"note": "foxtrot mike india hotel foxtrot papa oscar bravo kilo november oscar lima golf bravo echo papa echo echo oscar quebec bravo alpha hotel november quebec echo charlie mike romeo juliet papa november charlie bravo hotel juliet india delta romeo hotel november oscar charlie hotel lima juliet kilo golf bravo foxtrot mike bravo kilo foxtrot oscar mike golf mike mike bravo golf november lima hotel foxtrot romeo foxtrot papa golf mike golf oscar",
+"amount": 380.04
+},
+{
+"grp": "Group C",
+"id": 1031,
+"note": "oscar papa foxtrot papa golf romeo mike november charlie bravo india lima india alpha quebec foxtrot india quebec mike golf india delta lima bravo echo lima echo hotel delta alpha kilo mike oscar charlie mike kilo india quebec bravo juliet mike hotel papa bravo golf echo quebec echo",
+"amount": 16.86
+},
+{
+"grp": "Group C",
+"id": 1032,
+"note": "november november papa romeo echo quebec romeo india kilo oscar mike echo golf india romeo oscar mike echo mike quebec lima hotel delta juliet",
+"amount": 185.86
+},
+{
+"grp": "Group C",
+"id": 1033,
+"note": "golf echo bravo alpha papa alpha juliet charlie golf romeo lima delta lima hotel india charlie november delta mike papa bravo papa mike kilo juliet papa india hotel foxtrot mike golf papa foxtrot lima hotel quebec charlie kilo november echo papa india romeo juliet alpha mike delta lima charlie mike india bravo mike papa juliet papa kilo india charlie alpha bravo lima kilo lima juliet india foxtrot papa mike kilo lima alpha",
+"amount": 288.51
+},
+{
+"grp": "Group C",
+"id": 1034,
+"note": "charlie bravo romeo november november charlie india charlie oscar oscar mike mike",
+"amount": 20.03
+},
+{
+"grp": "Group C",
+"id": 1035,
+"note": "quebec india juliet papa lima papa alpha echo golf india hotel india",
+"amount": 340.41
+},
+{
+"grp": "Group D",
+"id": 1036,
+"note": "quebec alpha romeo mike alpha hotel romeo papa romeo charlie romeo kilo",
+"amount": 132.77
+},
+{
+"grp": "Group D",
+"id": 1037,
+"note": "alpha kilo golf mike foxtrot golf",
+"amount": 412.37
+},
+{
+"grp": "Group D",
+"id": 1038,
+"note": "kilo papa juliet lima november juliet lima romeo papa hotel hotel lima",
+"amount": 163.17
+},
+{
+"grp": "Group D",
+"id": 1039,
+"note": "quebec echo charlie charlie delta juliet delta oscar quebec papa bravo foxtrot",
+"amount": 311.17
+},
+{
+"grp": "Group D",
+"id": 1040,
+"note": "papa bravo lima india mike quebec mike india india lima kilo foxtrot kilo golf echo november echo india foxtrot echo golf mike juliet hotel foxtrot alpha papa echo india india november india mike mike echo bravo foxtrot delta bravo golf juliet lima romeo delta mike kilo alpha romeo",
+"amount": 427.92
+},
+{
+"grp": "Group D",
+"id": 1041,
+"note": "lima charlie juliet oscar juliet hotel mike november echo mike golf romeo",
+"amount": 142.06
+},
+{
+"grp": "Group D",
+"id": 1042,
+"note": "oscar foxtrot delta romeo india papa november delta echo kilo alpha india",
+"amount": 283.39
+},
+{
+"grp": "Group D",
+"id": 1043,
+"note": "india mike india kilo hotel charlie papa golf lima romeo india romeo",
+"amount": 26.56
+},
+{
+"grp": "Group D",
+"id": 1044,
+"note": "alpha juliet charlie alpha foxtrot kilo",
+"amount": 242.24
+},
+{
+"grp": "Group D",
+"id": 1045,
+"note": "november papa bravo november lima romeo mike romeo bravo golf romeo india",
+"amount": 139.28
+},
+{
+"grp": "Group D",
+"id": 1046,
+"note": "hotel oscar bravo foxtrot alpha foxtrot romeo delta charlie india lima alpha romeo juliet charlie quebec oscar alpha golf charlie lima alpha quebec india",
+"amount": 405.25
+},
+{
+"grp": "Group D",
+"id": 1047,
+"note": "mike juliet romeo delta papa mike november india alpha alpha echo hotel kilo mike lima quebec india lima oscar lima juliet india charlie kilo delta india kilo golf foxtrot golf bravo echo romeo juliet golf foxtrot lima delta echo echo lima lima foxtrot november alpha alpha mike quebec",
+"amount": 27.05
+},
+{
+"grp": "Group E",
+"id": 1048,
+"note": "kilo romeo golf alpha foxtrot kilo",
+"amount": 34.19
+},
+{
+"grp": "Group E",
+"id": 1049,
+"note": "delta kilo november papa hotel papa november foxtrot india charlie mike kilo foxtrot lima quebec alpha echo mike bravo golf lima oscar november quebec delta delta oscar november oscar november mike quebec hotel mike romeo bravo quebec bravo quebec oscar oscar juliet bravo bravo kilo echo romeo oscar kilo india kilo golf papa romeo mike bravo echo papa delta hotel foxtrot echo delta delta quebec india india charlie foxtrot bravo kilo india",
+"amount": 259.31
+},
+{
+"grp": "Group E",
+"id": 1050,
+"note": "oscar golf romeo alpha november golf papa india hotel charlie delta romeo oscar papa hotel charlie papa bravo romeo charlie echo lima foxtrot delta",
+"amount": 167.54
+},
+{
+"grp": "Group E",
+"id": 1051,
+"note": "hotel juliet delta november foxtrot mike alpha oscar papa charlie charlie golf romeo kilo golf romeo november mike alpha kilo kilo india golf golf",
+"amount": 91.16
+},
+{
+"grp": "Group E",
+"id": 1052,
+"note": "foxtrot oscar bravo echo india delta india lima lima juliet golf alpha",
+"amount": 497.42
+},
+{
+"grp": "Group E",
+"id": 1053,
+"note": "lima juliet november golf echo charlie india november lima november india oscar",
+"amount": 67.75
+},
+{
+"grp": "Group E",
+"id": 1054,
+"note": "delta lima quebec november hotel papa",
+"amount": 290.06
+},
+{
+"grp": "Group E",
+"id": 1055,
+"note": "delta juliet charlie oscar hotel papa mike golf november hotel oscar charlie lima november kilo juliet oscar india juliet alpha hotel alpha november lima",
+"amount": 66.95
+},
+{
+"grp": "Group E",
+"id": 1056,
+"note": "mike november india kilo delta delta romeo delta oscar golf charlie lima alpha lima alpha lima alpha echo papa charlie lima foxtrot oscar quebec",
+"amount": 158.7
+},
+{
+"grp": "Group E",
+"id": 1057,
+"note": "bravo hotel alpha mike november hotel romeo delta bravo charlie oscar mike golf quebec golf papa lima echo quebec mike delta charlie alpha foxtrot india papa delta november oscar echo alpha lima lima alpha delta lima november romeo romeo romeo delta delta juliet quebec delta charlie hotel echo charlie quebec quebec juliet juliet lima hotel hotel november oscar bravo golf oscar foxtrot romeo delta oscar echo delta quebec echo echo quebec foxtrot",
+"amount": 203.81
+},
+{
+"grp": "Group E",
+"id": 1058,
+"note": "delta november alpha hotel echo delta mike foxtrot juliet quebec alpha mike delta papa juliet romeo bravo mike november juliet charlie golf india romeo delta november kilo papa golf romeo echo quebec delta mike juliet india india hotel lima charlie november papa mike lima november kilo oscar delta bravo juliet quebec bravo foxtrot quebec mike romeo kilo mike hotel delta lima bravo kilo lima papa hotel quebec quebec papa alpha lima november",
+"amount": 297.05
+},
+{
+"grp": "Group E",
+"id": 1059,
+"note": "alpha lima hotel lima lima juliet",
+"amount": 105.69
+}
+]
