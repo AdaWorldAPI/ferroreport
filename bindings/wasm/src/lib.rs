@@ -34,9 +34,12 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
 ///   format?: "pdf" | "xlsx" | "docx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
 ///   tagged?: boolean, pdfa?: "2b" | "2u" | "2a" | "3b" | "3u" | "3a",
-///   attachments?: { name: string, data: Uint8Array | string, mime?: string }[] }`
+///   attachments?: { name: string, data: Uint8Array | string, mime?: string }[],
+///   password?: string, ownerPassword?: string, permissions?: string | string[] }`
 ///   (`tagged` writes a tagged PDF, for screen readers; `pdfa` a PDF/A document, for archiving;
-///   `attachments` are files carried inside the PDF, which PDF/A-3 allows).
+///   `attachments` are files carried inside the PDF, which PDF/A-3 allows; `password`,
+///   `ownerPassword` and `permissions` — "print", "copy", "modify", "annotate", "fill",
+///   "accessibility", "assemble", "all" — encrypt the PDF with AES-256).
 ///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
 ///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
 ///   numbers in Excel instead of formatted text.
@@ -57,6 +60,22 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
         let pdfa = ferroreport::pdf::PdfA::parse(&p)
             .ok_or_else(|| JsError::new(&format!("pdfa \"{p}\": say 2b, 2u, 2a, 3b, 3u or 3a")))?;
         r = r.pdfa(Some(pdfa));
+    }
+    let (password, owner) = (get(&options, "password").as_string(), get(&options, "ownerPassword").as_string());
+    let permissions = get(&options, "permissions");
+    let permissions = if js_sys::Array::is_array(&permissions) {
+        Some(js_sys::Array::from(&permissions).iter().filter_map(|p| p.as_string()).collect::<Vec<_>>().join(","))
+    } else {
+        permissions.as_string()
+    };
+    if password.is_some() || owner.is_some() || permissions.is_some() {
+        let permissions = ferroreport::crypt::Permissions::parse(permissions.as_deref().unwrap_or(""))
+            .map_err(|e| JsError::new(&e.to_string()))?;
+        r = r.encrypt(Some(ferroreport::crypt::Encryption {
+            user_password: password.unwrap_or_default(),
+            owner_password: owner,
+            permissions,
+        }));
     }
     let files = get(&options, "attachments");
     if js_sys::Array::is_array(&files) {

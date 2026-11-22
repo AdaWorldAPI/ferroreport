@@ -294,6 +294,7 @@ struct Job {
     csv_safe: bool,
     tagged: bool,
     pdfa: Option<ferroreport::pdf::PdfA>,
+    encryption: Option<ferroreport::crypt::Encryption>,
     xlsx_numbers: bool,
     limits: ferroreport::Limits,
     params: serde_json::Value,
@@ -402,6 +403,26 @@ fn prepare(
             }
             None => None,
         },
+        encryption: {
+            let text = |k: &str| body.get(k).and_then(|v| v.as_str()).map(str::to_string);
+            let permissions = match body.get("permissions") {
+                Some(serde_json::Value::Array(list)) => {
+                    Some(list.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(","))
+                }
+                other => other.and_then(|v| v.as_str()).map(str::to_string),
+            };
+            let (password, owner) = (text("password"), text("ownerPassword"));
+            if password.is_some() || owner.is_some() || permissions.is_some() {
+                Some(ferroreport::crypt::Encryption {
+                    user_password: password.unwrap_or_default(),
+                    owner_password: owner,
+                    permissions: ferroreport::crypt::Permissions::parse(permissions.as_deref().unwrap_or(""))
+                        .map_err(|e| bad(e.to_string()))?,
+                })
+            } else {
+                None
+            }
+        },
         xlsx_numbers: flag("xlsxNumbers"),
         limits: cfg.limits,
         params: body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default())),
@@ -422,6 +443,7 @@ impl Job {
             .limits(self.limits)
             .tagged(self.tagged)
             .pdfa(self.pdfa)
+            .encrypt(self.encryption.clone())
             .csv_options(ferroreport::csv::CsvOptions { guard_formulas: self.csv_safe, ..Default::default() })
             .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: self.xlsx_numbers });
         for d in &self.dirs {

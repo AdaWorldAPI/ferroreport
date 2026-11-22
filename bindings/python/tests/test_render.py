@@ -157,3 +157,16 @@ def test_pdfa_with_an_attachment(tmp_path):
     assert b"/EmbeddedFiles" in pdf and b"(notes.txt)" in pdf
     with pytest.raises(ferroreport.FerroreportError):
         ferroreport.render(fx / "report.jrxml", data, params, pdfa="9z")
+
+
+def test_encrypted_pdf():
+    fx = FIXTURES / "02-invoice"
+    import json
+
+    data = json.loads((fx / "data.json").read_text())
+    params = json.loads((fx / "params.json").read_text())
+    pdf = ferroreport.render(fx / "report.jrxml", data, params, password="año", owner_password="o", permissions=["print", "copy"])
+    assert b"/Filter/Standard/V 5/R 6" in pdf
+    assert b"(invoice)" not in pdf
+    with pytest.raises(ferroreport.FerroreportError):
+        ferroreport.render(fx / "report.jrxml", data, params, permissions="fly")

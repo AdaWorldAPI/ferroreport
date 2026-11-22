@@ -51,6 +51,38 @@ fn fixtures_read_the_same_in_every_format() {
 }
 
 #[test]
+fn encrypted_pdfs_hide_their_text() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/02-invoice");
+    let template = std::fs::read_to_string(dir.join("report.jrxml")).unwrap();
+    let rows: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("data.json")).unwrap()).unwrap();
+    let params: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("params.json")).unwrap()).unwrap();
+    let plain = ferroreport::Renderer::new().render_json(&template, &rows, &params).unwrap();
+    assert!(String::from_utf8_lossy(&plain).contains("(invoice)"));
+    // As JasperReports asks for it, in the template's properties.
+    let with_properties = template.replacen(
+        "<style ",
+        r#"<property name="net.sf.jasperreports.export.pdf.encrypted" value="true"/>
+<property name="net.sf.jasperreports.export.pdf.user.password" value="secret"/>
+<property name="net.sf.jasperreports.export.pdf.permissions.allowed" value="PRINTING|COPY"/>
+<property name="net.sf.jasperreports.export.pdf.permissions.denied" value="COPY"/>
+<style "#,
+        1,
+    );
+    let pdf = ferroreport::Renderer::new().render_json(&with_properties, &rows, &params).unwrap();
+    let text = String::from_utf8_lossy(&pdf);
+    assert!(text.contains("/Filter/Standard/V 5/R 6"), "AES-256");
+    assert!(text.contains("/P -1852>>"), "printing only: {}", &text[text.find("/P ").unwrap()..][..12]);
+    assert!(text.contains("/Encrypt "));
+    assert!(!text.contains("(invoice)"), "the title is encrypted");
+    // PDF/A refuses encryption.
+    let refused = ferroreport::Renderer::new()
+        .pdfa(ferroreport::pdf::PdfA::parse("2b"))
+        .encrypt(Some(ferroreport::crypt::Encryption { user_password: "x".into(), ..Default::default() }))
+        .render_json(&template, &rows, &params);
+    assert!(refused.is_err());
+}
+
+#[test]
 fn pdfa_documents_say_what_they_conform_to() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/02-invoice");
     let template = std::fs::read_to_string(dir.join("report.jrxml")).unwrap();

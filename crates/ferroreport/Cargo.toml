@@ -27,9 +27,16 @@ tiny-skia = { version = "0.11", default-features = false, features = ["std", "si
 # SVG images: parsed (text turned into paths with the bundled fonts) and drawn.
 resvg = { version = "0.45", default-features = false, features = ["text"] }
 base64 = "0.22"
+# PDF encryption (AES-256, the standard security handler of PDF 2.0).
+aes = "0.8"
+sha2 = "0.10"
+getrandom = "0.2"
 
 # A faster deflate for PDF streams where it builds everywhere we ship native code. WebAssembly
 # keeps miniz_oxide, which is already there for reading PNGs.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 

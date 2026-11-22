@@ -656,6 +656,20 @@ impl Parser {
                             })
                         })
                         .transpose()?,
+                    encryption: if property("encrypted").is_some_and(|v| v.trim().eq_ignore_ascii_case("true")) {
+                        let permissions = |name: &str| {
+                            property(name).map(crate::crypt::Permissions::parse).transpose().map(|p| p.unwrap_or_default().0)
+                        };
+                        let allowed = permissions("permissions.allowed")?;
+                        let denied = permissions("permissions.denied")?;
+                        Some(crate::crypt::Encryption {
+                            user_password: property("user.password").unwrap_or("").to_string(),
+                            owner_password: property("owner.password").map(str::to_string),
+                            permissions: crate::crypt::Permissions(allowed & !denied),
+                        })
+                    } else {
+                        None
+                    },
                 }
             },
             warnings: Vec::new(),

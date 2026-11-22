@@ -44,6 +44,14 @@ RENDER OPTIONS:
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
         --max-row <MB>          Stop at a row of data larger than this (default: 256)
+        --user-password <pw>    Encrypt the PDF (AES-256); this password opens it (an empty one opens
+                                it without asking). Also FERROREPORT_PDF_USER_PASSWORD, which
+                                keeps it out of the list of processes
+        --owner-password <pw>   Lifts the permissions (also FERROREPORT_PDF_OWNER_PASSWORD;
+                                without one, nobody can lift them)
+        --permissions <list>    What readers allow without the owner password: print, copy,
+                                modify, annotate, fill, accessibility, assemble, all (comma
+                                separated; default none). Encrypts the PDF too
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
@@ -487,6 +495,9 @@ fn render(args: &[String]) -> CliResult {
     let mut tagged = false;
     let mut pdfa = None;
     let mut max_row = ferroreport::data::MAX_ROW_BYTES;
+    let mut user_password = std::env::var("FERROREPORT_PDF_USER_PASSWORD").ok();
+    let mut owner_password = std::env::var("FERROREPORT_PDF_OWNER_PASSWORD").ok();
+    let mut permissions: Option<String> = None;
     let mut attachments = Vec::new();
     let mut limits = ferroreport::Limits::default();
     let mut it = args.iter();
@@ -504,6 +515,9 @@ fn render(args: &[String]) -> CliResult {
                     Some(ferroreport::pdf::PdfA::parse(&v).ok_or_else(|| format!("--pdfa {v}: say 2b, 2u, 2a, 3b, 3u or 3a"))?);
             }
             "--attach" => attachments.push(value(a)?),
+            "--user-password" => user_password = Some(value(a)?),
+            "--owner-password" => owner_password = Some(value(a)?),
+            "--permissions" => permissions = Some(value(a)?),
             "--max-row" => {
                 let mb: f64 = value(a)?.parse().map_err(|_| "--max-row expects megabytes")?;
                 max_row = (mb.max(0.001) * 1048576.0) as usize;
@@ -550,6 +564,14 @@ fn render(args: &[String]) -> CliResult {
         .tagged(tagged)
         .pdfa(pdfa)
         .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
+    if user_password.is_some() || owner_password.is_some() || permissions.is_some() {
+        let permissions = ferroreport::crypt::Permissions::parse(permissions.as_deref().unwrap_or(""))?;
+        renderer = renderer.encrypt(Some(ferroreport::crypt::Encryption {
+            user_password: user_password.unwrap_or_default(),
+            owner_password,
+            permissions,
+        }));
+    }
     for spec in &attachments {
         // file[:mime type]
         let (path, mime) = match spec.rsplit_once(':').filter(|(_, m)| m.contains('/')) {

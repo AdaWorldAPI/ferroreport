@@ -583,6 +583,9 @@ pub struct PdfSettings {
     pub language: Option<String>,
     /// `net.sf.jasperreports.export.pdfa.conformance` (`pdfa2b`...): write PDF/A.
     pub pdfa: Option<crate::pdf::PdfA>,
+    /// `encrypted`, `user.password`, `owner.password`, `permissions.allowed` and
+    /// `permissions.denied`: encrypt the PDF.
+    pub encryption: Option<crate::crypt::Encryption>,
 }
 
 impl Report {

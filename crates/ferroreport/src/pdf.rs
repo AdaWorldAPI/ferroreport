@@ -34,6 +34,8 @@ pub struct PdfOptions {
     pub pdfa: Option<PdfA>,
     /// Files carried inside the document (PDF/A-3 allows them; an e-invoice's XML, say).
     pub attachments: Vec<Attachment>,
+    /// Encrypt the document: a password to open it, permissions an owner password lifts.
+    pub encryption: Option<crate::crypt::Encryption>,
 }
 
 /// A PDF/A conformance: part 2 or 3, level A (tagged), B (basic) or U (text extractable).
@@ -674,6 +676,8 @@ pub struct PdfStream<W: std::io::Write> {
     /// In a tagged PDF, the parent tree key of each link annotation and its structure element.
     link_parents: Vec<(i32, Ref)>,
     tags: Option<Tags>,
+    /// Encrypts every object as it is written.
+    crypt: Option<crate::crypt::Crypt>,
 }
 
 /// Named destinations: name and object.
@@ -730,6 +734,7 @@ impl<W: std::io::Write> PdfStream<W> {
             images: BTreeMap::new(),
             pages: Vec::new(),
             tags: None,
+            crypt: None,
         };
         if let Some(a) = pdf.options.pdfa {
             // Level A is about the structure: the document is tagged.
@@ -741,6 +746,17 @@ impl<W: std::io::Write> PdfStream<W> {
                     "PDF/A-2 allows only PDF/A documents as attachments: ask for PDF/A-3 (3b) to attach other files".into(),
                 ));
             }
+        }
+        if let Some(e) = &pdf.options.encryption {
+            if pdf.options.pdfa.is_some() {
+                return Err(Error::Unsupported("PDF/A does not allow encryption: ask for one or the other".into()));
+            }
+            let mut e = e.clone();
+            // Screen readers may read a tagged document (PDF/UA asks for it).
+            if pdf.options.tagged {
+                e.permissions.0 |= crate::crypt::Permissions::SCREENREADERS;
+            }
+            pdf.crypt = Some(crate::crypt::Crypt::new(&e)?);
         }
         if pdf.options.tagged {
             let (root, document) = (pdf.next_id(), pdf.next_id());
@@ -757,6 +773,12 @@ impl<W: std::io::Write> PdfStream<W> {
     /// Writes a chunk holding the single object `id`.
     fn put(&mut self, id: Ref, chunk: &Chunk) -> Result<()> {
         self.offsets[id.get() as usize - 1] = self.pos;
+        if let Some(crypt) = &mut self.crypt {
+            let bytes = crypt.object(chunk.as_bytes());
+            self.out.write_all(&bytes).map_err(io)?;
+            self.pos += bytes.len() as u64;
+            return Ok(());
+        }
         self.out.write_all(chunk.as_bytes()).map_err(io)?;
         self.pos += chunk.len() as u64;
         Ok(())
@@ -2202,6 +2224,21 @@ impl<W: std::io::Write> PdfStream<W> {
         info.finish();
         self.put(info_id, &chunk)?;
 
+        // The encryption dictionary: itself not encrypted.
+        let encrypt = match self.crypt.take() {
+            Some(crypt) => {
+                let id = self.next_id();
+                let mut object = format!("{} 0 obj\n", id.get()).into_bytes();
+                object.extend(crypt.dictionary());
+                object.extend_from_slice(b"\nendobj\n");
+                self.offsets[id.get() as usize - 1] = self.pos;
+                self.out.write_all(&object).map_err(io)?;
+                self.pos += object.len() as u64;
+                format!("  /Encrypt {} 0 R\n", id.get())
+            }
+            None => String::new(),
+        };
+
         // Cross-reference table and trailer.
         let mut end = Vec::with_capacity(self.offsets.len() * 20 + 128);
         end.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f\r\n", self.offsets.len() + 1).as_bytes());
@@ -2210,7 +2247,7 @@ impl<W: std::io::Write> PdfStream<W> {
         }
         end.extend_from_slice(
             format!(
-                "trailer\n<<\n  /Size {}\n  /Root 1 0 R\n  /Info 3 0 R\n  /ID [<{id}> <{id}>]\n>>\nstartxref\n{}\n%%EOF",
+                "trailer\n<<\n  /Size {}\n  /Root 1 0 R\n  /Info 3 0 R\n  /ID [<{id}> <{id}>]\n{encrypt}>>\nstartxref\n{}\n%%EOF",
                 self.offsets.len() + 1,
                 self.pos,
                 id = self.file_id()

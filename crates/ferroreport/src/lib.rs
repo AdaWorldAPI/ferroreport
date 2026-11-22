@@ -19,6 +19,7 @@ pub mod barcode;
 pub mod chart;
 pub mod convert;
 pub mod crosstab;
+pub mod crypt;
 pub mod csv;
 pub mod data;
 pub mod docx;
@@ -127,6 +128,7 @@ pub struct Renderer {
     tagged: bool,
     pdfa: Option<pdf::PdfA>,
     attachments: Vec<pdf::Attachment>,
+    encryption: Option<crypt::Encryption>,
 }
 
 impl Default for Renderer {
@@ -147,6 +149,7 @@ impl Renderer {
             tagged: false,
             pdfa: None,
             attachments: Vec::new(),
+            encryption: None,
             csv: Default::default(),
             html: Default::default(),
         }
@@ -196,8 +199,17 @@ impl Renderer {
         self
     }
 
+    /// Encrypts the PDFs written (AES-256): a password to open them, and permissions (printing,
+    /// copying…) that an owner password lifts. Overrides the template's
+    /// `net.sf.jasperreports.export.pdf.encrypted` and its siblings.
+    pub fn encrypt(mut self, encryption: Option<crypt::Encryption>) -> Renderer {
+        self.encryption = encryption;
+        self
+    }
+
     fn pdf_options(&self, title: &str, settings: &model::PdfSettings) -> pdf::PdfOptions {
         pdf::PdfOptions {
+            encryption: self.encryption.clone().or_else(|| settings.encryption.clone()),
             pdfa: self.pdfa.or(settings.pdfa),
             attachments: self.attachments.clone(),
             title: Some(title.to_string()),

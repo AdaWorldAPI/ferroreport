@@ -17,7 +17,8 @@ fn err(e: impl std::fmt::Display) -> PyErr {
 #[pyfunction]
 #[pyo3(signature = (template, data_json, params_json, locale, resource_dirs, resources, now=None, format=None,
                     max_pages=None, timeout=None, csv_safe=false, xlsx_numbers=false, data_path=None, output_path=None,
-                    tagged=false, pdfa=None, attachments=Vec::new()))]
+                    tagged=false, pdfa=None, attachments=Vec::new(), password=None, owner_password=None,
+                    permissions=None))]
 #[allow(clippy::too_many_arguments)]
 fn render(
     py: Python<'_>,
@@ -38,12 +39,24 @@ fn render(
     tagged: bool,
     pdfa: Option<String>,
     attachments: Vec<(String, Vec<u8>, String)>,
+    password: Option<String>,
+    owner_password: Option<String>,
+    permissions: Option<String>,
 ) -> PyResult<(Py<PyBytes>, usize, usize)> {
     let pdfa = match pdfa {
         Some(p) => {
             Some(ferroreport::pdf::PdfA::parse(&p).ok_or_else(|| err(format!("pdfa=\"{p}\": say 2b, 2u, 2a, 3b, 3u or 3a")))?)
         }
         None => None,
+    };
+    let encryption = if password.is_some() || owner_password.is_some() || permissions.is_some() {
+        Some(ferroreport::crypt::Encryption {
+            user_password: password.unwrap_or_default(),
+            owner_password,
+            permissions: ferroreport::crypt::Permissions::parse(permissions.as_deref().unwrap_or("")).map_err(err)?,
+        })
+    } else {
+        None
     };
     let format = match format {
         Some(f) => {
@@ -62,6 +75,7 @@ fn render(
                 .xlsx_options(ferroreport::xlsx::XlsxOptions { detect_cell_type: xlsx_numbers })
                 .tagged(tagged)
                 .pdfa(pdfa)
+                .encrypt(encryption)
                 .csv_options(ferroreport::csv::CsvOptions { guard_formulas: csv_safe, ..Default::default() });
             for (name, data, mime) in attachments {
                 r = r.attach(ferroreport::pdf::Attachment {

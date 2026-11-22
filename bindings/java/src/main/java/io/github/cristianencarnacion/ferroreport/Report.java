@@ -50,6 +50,9 @@ public final class Report {
     private boolean csvSafe;
     private boolean tagged;
     private String pdfa;
+    private String password;
+    private String ownerPassword;
+    private String permissions;
     private final java.util.List<Path> attachments = new java.util.ArrayList<>();
     private boolean xlsxNumbers;
 
@@ -136,6 +139,27 @@ public final class Report {
      */
     public Report pdfa(String conformance) {
         this.pdfa = conformance;
+        return this;
+    }
+
+    /**
+     * Encrypts the PDF (AES-256): {@code password} opens it ({@code ""} opens it without asking),
+     * {@code ownerPassword} lifts the permissions. The passwords reach the engine through its
+     * environment, not its command line.
+     */
+    public Report password(String password, String ownerPassword) {
+        this.password = password == null ? "" : password;
+        this.ownerPassword = ownerPassword;
+        return this;
+    }
+
+    /**
+     * What readers allow in an encrypted PDF without the owner password: {@code "print"}, {@code "copy"},
+     * {@code "modify"}, {@code "annotate"}, {@code "fill"}, {@code "accessibility"}, {@code "assemble"}
+     * or {@code "all"}. Encrypts the PDF.
+     */
+    public Report permissions(String... permissions) {
+        this.permissions = String.join(",", permissions);
         return this;
     }
 
@@ -264,6 +288,10 @@ public final class Report {
                 cmd.add("--pdfa");
                 cmd.add(pdfa);
             }
+            if (permissions != null) {
+                cmd.add("--permissions");
+                cmd.add(permissions);
+            }
             for (Path file : attachments) {
                 cmd.add("--attach");
                 cmd.add(file.toString());
@@ -274,7 +302,16 @@ public final class Report {
             if (xlsxNumbers) {
                 cmd.add("--xlsx-numbers");
             }
-            Process process = new ProcessBuilder(cmd).start();
+            ProcessBuilder builder = new ProcessBuilder(cmd);
+            builder.environment().remove("FERROREPORT_PDF_USER_PASSWORD");
+            builder.environment().remove("FERROREPORT_PDF_OWNER_PASSWORD");
+            if (password != null) {
+                builder.environment().put("FERROREPORT_PDF_USER_PASSWORD", password);
+            }
+            if (ownerPassword != null) {
+                builder.environment().put("FERROREPORT_PDF_OWNER_PASSWORD", ownerPassword);
+            }
+            Process process = builder.start();
             AtomicReference<Throwable> rowsFailure = new AtomicReference<>();
             Thread feeder = new Thread(() -> feed(process, rowsFailure), "ferroreport-rows");
             ByteArrayOutputStream errors = new ByteArrayOutputStream();
@@ -381,6 +418,18 @@ public final class Report {
             if (pdfa != null) {
                 head.append(",\"pdfa\":");
                 Json.string(pdfa, head);
+            }
+            if (password != null) {
+                head.append(",\"password\":");
+                Json.string(password, head);
+            }
+            if (ownerPassword != null) {
+                head.append(",\"ownerPassword\":");
+                Json.string(ownerPassword, head);
+            }
+            if (permissions != null) {
+                head.append(",\"permissions\":");
+                Json.string(permissions, head);
             }
             if (csvSafe) {
                 head.append(",\"csvSafe\":true");

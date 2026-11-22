@@ -64,6 +64,12 @@ def _load_template(template: Union[PathLike, str]) -> "tuple[str, Optional[str]]
 _MIME = {".xml": "text/xml", ".json": "application/json", ".csv": "text/csv", ".txt": "text/plain", ".pdf": "application/pdf"}
 
 
+def _permissions(p: Any) -> Optional[str]:
+    if p is None or isinstance(p, str):
+        return p
+    return ",".join(p)
+
+
 def _attachments(files: Optional[Iterable[Any]]) -> "list[tuple[str, bytes, str]]":
     """(name, bytes, mime type) for each attachment, given as such a tuple or as a path."""
     out = []
@@ -147,6 +153,9 @@ def render(
     pdfa: Optional[str] = None,
     attachments: Optional[Iterable[Any]] = None,
     xlsx_numbers: bool = False,
+    password: Optional[str] = None,
+    owner_password: Optional[str] = None,
+    permissions: Optional[Union[str, Iterable[str]]] = None,
 ) -> bytes:
     """Renders a template and returns the file's bytes: PDF by default, or an Excel workbook
     (format="xlsx") or CSV text encoded as UTF-8 (format="csv"), laid out like JasperReports'
@@ -175,6 +184,10 @@ def render(
     attachments: files carried inside the PDF (PDF/A-3 allows them), as (name, bytes, mime
         type) tuples or paths, such as the XML of an electronic invoice.
     xlsx_numbers: in Excel, write numbers as numbers instead of formatted text.
+    password, owner_password, permissions: encrypt the PDF (AES-256). `password` opens it
+        ("" opens it without asking); `permissions` ("print", "copy", "modify", "annotate",
+        "fill", "accessibility", "assemble" or "all", as a list or separated by commas) is
+        what readers allow without `owner_password`.
     """
     source, dirs, mem = _prepare(template, resources, resource_dirs)
     spooled = _Spooled(data) if _is_stream(data) else None
@@ -196,6 +209,9 @@ def render(
             tagged=tagged,
             pdfa=pdfa,
             attachments=_attachments(attachments),
+            password=password,
+            owner_password=owner_password,
+            permissions=_permissions(permissions),
         )[0]
     except ValueError as e:
         raise FerroreportError(str(e)) from None
@@ -223,6 +239,9 @@ def render_to_file(
     pdfa: Optional[str] = None,
     attachments: Optional[Iterable[Any]] = None,
     xlsx_numbers: bool = False,
+    password: Optional[str] = None,
+    owner_password: Optional[str] = None,
+    permissions: Optional[Union[str, Iterable[str]]] = None,
 ) -> dict:
     """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
     disk as soon as they are finished, so memory stays flat however long the report is. The
@@ -262,6 +281,9 @@ def render_to_file(
             tagged=tagged,
             pdfa=pdfa,
             attachments=_attachments(attachments),
+            password=password,
+            owner_password=owner_password,
+            permissions=_permissions(permissions),
         )
     except ValueError as e:
         raise FerroreportError(str(e)) from None
