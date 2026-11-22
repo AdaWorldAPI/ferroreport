@@ -804,11 +804,12 @@ fn printed_text(
     let cut = if fit < lines.len() { cut_text(text, &lines, fit, face, size, cw, &te.truncate) } else { None };
     let text = match lines.get(fit) {
         _ if cut.is_some() => cut.unwrap_or_default(),
-        // Jasper keeps the spaces the last line ends with.
+        // Jasper keeps the spaces the last line ends with, and the line break too when the
+        // rest of the text goes on to the next page.
         Some(next) => {
             let normalized = crate::text::normalize(text);
             let head = &normalized[..next.start];
-            head.strip_suffix('\n').unwrap_or(head).to_string()
+            if te.stretch { head } else { head.strip_suffix('\n').unwrap_or(head) }.to_string()
         }
         None => text.to_string(),
     };

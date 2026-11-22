@@ -31,7 +31,7 @@ import java.util.Objects;
  */
 public final class Ferroreport {
     /** The version of this library, and of the engine it downloads when none is installed. */
-    public static final String VERSION = "0.9.0";
+    public static final String VERSION = "0.10.0";
 
     final Path binary;
     final URI server;

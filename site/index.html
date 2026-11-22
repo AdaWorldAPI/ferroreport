@@ -417,7 +417,7 @@ ferroreport doctor invoice.jrxml   # what this template uses, and whether it is 
 curl -X POST localhost:8080/render/invoice -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \\
   -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf`,
   java: `// pom.xml: repository https://jitpack.io, then
-// com.github.cristianEncarnacion:ferroreport:v0.9.0
+// com.github.cristianEncarnacion:ferroreport:v0.10.0
 
 Ferroreport reports = Ferroreport.local();
 byte[] pdf = reports.template(Path.of("invoice.jrxml")).rows(lines).param("CUSTOMER", "Distribuidora Caribe").render();
