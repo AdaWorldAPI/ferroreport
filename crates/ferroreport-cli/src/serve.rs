@@ -944,6 +944,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
                         }
                         match outcome {
                             Outcome::Reply(reply) => {
+                                drain(&mut req);
                                 let _ = req.respond(reply);
                             }
                             Outcome::Stream(streamed) => {
@@ -959,6 +960,14 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn std::error::Error>> {
         let _ = w.join();
     }
     Ok(())
+}
+
+/// Reads what the client is still sending of a request answered before its end (a wrong
+/// template, a row that fails): a connection closed with data left unread is reset, and the
+/// client can lose the answer with it. Up to a limit, past which the answer goes as it is.
+fn drain(req: &mut Request) {
+    const LIMIT: u64 = 256 * 1024 * 1024;
+    let _ = std::io::copy(&mut req.as_reader().take(LIMIT), &mut std::io::sink());
 }
 
 #[cfg(test)]
