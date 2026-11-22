@@ -5,12 +5,12 @@ the same rows and parameters and compared page by page. Made by `tools/samples.p
 
 | Result | Templates | Meaning |
 |---|---|---|
-| same | 44 | every page is the same picture |
-| differs | 41 | both engines render it, the pictures differ |
+| same | 45 | every page is the same picture |
+| differs | 40 | both engines render it, the pictures differ |
 | not rendered | 16 | ferroreport refuses the template or fails on it |
 | no reference | 70 | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |
 
-**44 of the 101 templates that can be compared come out the same.** JasperReports runs with the
+**45 of the 101 templates that can be compared come out the same.** JasperReports runs with the
 Java runtime's logical fonts (SansSerif, Serif, Monospaced) on DejaVu, as on a stock Linux server (`tools/oracle/fonts.conf`):
 text that names no font is laid out with them and written in PDF's built-in Helvetica, Times or Courier, by both engines.
 
@@ -26,7 +26,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `antcompile/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
 | `antupdate/reports/com/bar/BarReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeBarClass.isToPrint() |
 | `antupdate/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
-| `barbecue/reports/BarbecueReport.jrxml` | differs | 1/1 | worst page differs in 89.3% of its ink: <component> elements are not supported yet and are skipped |
+| `barbecue/reports/BarbecueReport.jrxml` | same | 1/1 |  |
 | `barcode4j/reports/Barcode4JReport.jrxml` | same | 1/1 |  |
 | `batchexport/reports/Report1.jrxml` | same | 2/2 |  |
 | `batchexport/reports/Report2.jrxml` | same | 2/2 |  |

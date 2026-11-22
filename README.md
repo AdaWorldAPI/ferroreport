@@ -20,11 +20,12 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) Â·
 [Leer en espaÃ±ol](README.es.md)
 
-> Status: **beta, version 0.11.** All 42 comparable test templates render pixel for pixel like
+> Status: **beta, version 0.12.** All 44 comparable test templates render pixel for pixel like
 > JasperReports 6.20, including band splitting, images (SVG too), subreports, tables, lists,
-> crosstabs, QR, PDF417 and other barcodes, styled text and multi-column layouts; charts follow
-> JFreeChart's look closely. All 44 also export the same Excel and CSV files as Jasper, every
-> tagged PDF passes veraPDF's PDF/UA-1 checks, and JasperReports' own samples are checked
+> crosstabs, QR, PDF417, Barbecue and other barcodes, links, styled text and multi-column
+> layouts; charts follow JFreeChart's look closely. All 46 also export the same Excel and CSV
+> files as Jasper, all 47 pass veraPDF's PDF/UA-1, PDF/A-2a and PDF/A-3b checks, and
+> JasperReports' own samples are checked
 > against 6.20.6 and 7.1.1. `ferroreport doctor` tells you whether everything in your template is supported; what
 > is not yet is listed under [compatibility](#compatibility). Until 1.0 the API can still
 > change, and every change is in the release notes. Not affiliated with Jaspersoft or Cloud
@@ -40,7 +41,13 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
 - **PDF, Excel, Word, CSV and HTML.** The same template gives a PDF (tagged for screen readers
   if you want, PDF/UA-1), an `.xlsx` workbook laid out like JasperReports' (merged cells, fonts,
   fills, borders, row heights, images, charts), a `.docx` laid out like Jasper's Word export, a
-  CSV, or a web page that looks like the PDF, for previews in a browser.
+  CSV, or a web page that looks like the PDF, for previews in a browser. Links, anchors and
+  bookmarks work in all of them.
+- **PDFs to archive, send and protect.** PDF/A-2 and PDF/A-3 (levels a, b and u), checked with
+  veraPDF on every push; files carried inside the PDF, such as the XML of an electronic
+  invoice; AES-256 encryption with a password and permissions (print, copy, modify...). All of
+  it in the open-source engine, from template properties JasperReports already uses or from
+  one option.
 - **Safe with untrusted templates.** JasperReports compiles template expressions to Java and
   loads serialized `.jasper` files, which is how recent remote-code-execution bugs happened
   (CVE-2025-10492, CVE-2026-6009). ferroreport never deserializes objects and interprets
@@ -51,7 +58,11 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
   never a crash ([SECURITY.md](SECURITY.md)).
 - **JRXML, or a format of its own.** Templates from Jaspersoft Studio work as they are (JRXML 6
   and 7). New ones can be written in `.ferro`, an outline a person can read and write by hand,
-  and `ferroreport convert` turns one into the other, and JRXML 6 into 7.
+  with no coordinates if you like: parts stack and sit in rows, and what repeats is defined
+  once. `ferroreport convert` turns one format into the other, and JRXML 6 into 7.
+- **Move a whole project at once.** `ferroreport migrate reports/` checks every template of a
+  folder (does it load, what does it use, what is not supported yet, does it render), writes
+  the result as Markdown or JSON and, if you ask, the converted templates.
 - **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers), Python
   and Java, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (C#,
   PHP, Go, Ruby...).
@@ -132,6 +143,7 @@ cargo install --path crates/ferroreport-cli
 ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
 ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .docx, .csv, .html)
 ferroreport doctor invoice.jrxml     # what in this template is (not yet) supported
+ferroreport migrate reports/ --report migration.md   # the same for a whole folder
 ferroreport convert invoice.jrxml -o invoice.ferro   # the same template in ferroreport's format
 ```
 
@@ -176,6 +188,34 @@ println!("{} pages from {} rows", stats.pages, stats.rows);
 
 `rows` is any iterator of records, so they can come from a database cursor or a queue just as
 well; and `fill_to` hands each finished page to a `PageSink` of your own.
+
+### PDF/A, attachments, encryption and links
+
+```bash
+ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --pdfa 3b --attach invoice.xml
+ferroreport render payslip.jrxml -d rows.json -o payslip.pdf --user-password 0423 --permissions print
+```
+
+- `--pdfa 2b` (or `2u`, `2a`, `3b`, `3u`, `3a`) writes PDF/A: every font inside the document, an
+  sRGB output intent, the conformance in the metadata; level a also tags it. A text in a PDF
+  standard font is an error, as in JasperReports. The template's
+  `net.sf.jasperreports.export.pdfa.conformance` property asks for the same.
+- `--attach file[:mime/type]` carries a file inside the PDF (PDF/A-3 allows any file; PDF/A-2
+  refuses them).
+- `--user-password` encrypts the PDF with AES-256 (PDF 2.0's security handler) and asks for that
+  password to open it; `--owner-password` lifts the permissions; `--permissions` lists what
+  readers allow without it (`print`, `copy`, `modify`, `annotate`, `fill`, `accessibility`,
+  `assemble`, `all`). Passwords can come from `FERROREPORT_PDF_USER_PASSWORD` and
+  `FERROREPORT_PDF_OWNER_PASSWORD` instead, which keeps them out of the list of processes. The
+  template's `net.sf.jasperreports.export.pdf.encrypted`, `user.password`, `owner.password`,
+  `permissions.allowed` and `permissions.denied` do the same. A tagged PDF always lets screen
+  readers in; PDF/A and encryption do not go together.
+- Hyperlinks (`hyperlinkType` Reference, LocalAnchor, LocalPage, RemoteAnchor, RemotePage, with
+  their tooltips), anchors and bookmarks (`bookmarkLevel`, which becomes the PDF outline) work
+  in PDF, Excel, Word and HTML, as in JasperReports.
+
+The packages and the server take the same options: `pdfa`, `attachments`, `password`,
+`owner_password` / `ownerPassword` and `permissions`.
 
 ### Rows from a database
 
@@ -259,6 +299,37 @@ several lines goes under a line that ends in ` :`, one level further in. Lines t
 `//` are comments. Everything JRXML 7 can say, `.ferro` can say: what has no shorthand keeps
 its JRXML name (`box`, `pen lineWidth=0.5`, `component`...).
 
+**Without coordinates.** Positions and sizes can be left out. Parts without `x,y` go one under
+the other, as wide as the band, and the band grows to hold them; `row` puts parts side by side,
+each with a width in points (`100`), a share (`40%`) or a fraction of what is left (`2fr`,
+`1fr`); `stack` puts parts one under another inside a row; `gap=` sets the space between them
+(4 points unless you say). A part placed this way moves down when the one above it grows, and a
+text field grows with its text, so nothing overlaps.
+
+**Definitions.** What repeats is written once: `def money value` followed by its parts, then
+`use money 1fr value=$F{salary}` wherever it goes; `{{value}}` stands for what `use` passes, and
+other attributes on `use` go to the parts.
+
+```text
+report "Employees" lang=en
+  field name String
+  field salary Double
+
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+
+  title gap=6
+    h1 height=30 fontSize=18 : Employees
+  detail
+    row height=16
+      textField 3fr : $F{name}
+      use money 1fr value=$F{salary}
+```
+
+`ferroreport convert` writes the result as JRXML with every coordinate worked out, so Jaspersoft
+Studio and JasperReports open it as any other report ([the whole example](examples/employees.ferro),
+which JasperReports 7.1.1 renders pixel for pixel like ferroreport).
+
 **Accessible by default.** A `.ferro` report produces a tagged PDF that screen readers can
 follow (unless it says `tagged=false`), in the language of `lang=`. `h1` to `h6` are headings,
 `alt="..."` describes an image, and `tag=th` (or any other tag) says what an element is.
@@ -291,7 +362,7 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 as JasperReports 7 writes it; `.ferro` (ferroreport's own format), with `ferroreport convert` between them; subdatasets (for tables); style templates (`<template>`, `.jrtx` files, with the templates they include, found next to the report or in a resource folder) | `.jasper` files (by design), scriptlets, subdataset queries |
 | Bands | title (going on over several pages when it does not fit one, as in JasperReports), page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical and horizontal print order, `isStartNewColumn`, column breaks); with no rows and `AllSectionsNoDetail`, group headers and footers print once | |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG, JPEG or GIF from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical and horizontal), icon label, charts, barcodes (barcode4j components: QR code, DataMatrix, PDF417, Code 128, EAN-128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail and USPS Intelligent Mail), PDF form fields (`net.sf.jasperreports.export.pdf.field.*`: text, combo and list boxes, check boxes, radio buttons), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, UPC/EAN add-ons, rotated barcodes, Barbecue barcodes, maps and other custom components |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG, JPEG or GIF from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical and horizontal), icon label, charts, barcodes (barcode4j components: QR code, DataMatrix, PDF417, Code 128, EAN-128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail and USPS Intelligent Mail; Barbecue components: Code 128, EAN-128, SSCC-18, Code 39, 2 of 5, Codabar, EAN-13, UPC-A, rotated), hyperlinks, anchors and bookmarks, PDF form fields (`net.sf.jasperreports.export.pdf.field.*`: text, combo and list boxes, check boxes, radio buttons), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, UPC/EAN add-ons, rotated barcode4j barcodes, the Barbecue types PDF417, PostNet, USPS, SCC-14, GTIN, shipment number and random-weight UPC-A, maps and other custom components |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled, HTML and RTF markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks; HTML lists, bulleted and numbered, nested), also across page breaks; rotation (Left, Right, UpsideDown); cutting a text that does not fit at a character and with a suffix (`net.sf.jasperreports.text.truncate.*`) | |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style (also what styles without a parent inherit from), parent styles, element overrides, conditional styles (up to 4 per style), styles from style templates (a style defined again replaces the earlier one for what comes after, as in JasperReports) | |
@@ -302,29 +373,37 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules, string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale) | arbitrary Java classes (scriptlets, static methods of your own) |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font`; text in a font no one provides is written like JasperReports writes it, in the PDF standard font of its `pdfFontName` (Helvetica by default) | font extension jars |
-| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields and the tagged PDF ones |
+| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), digital signatures, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
 
 QR codes are encoded exactly like ZXing (same version, mask and modules) and are drawn the way
 JasperReports draws them, which makes them a good fit for printed electronic invoices (for
 example the Dominican e-CF stamp).
 
-Run `ferroreport doctor template.jrxml` to get this verdict for a specific template.
+Run `ferroreport doctor template.jrxml` to get this verdict for a specific template, or
+`ferroreport migrate folder/` for every template of a project. Over the 171 JRXML 7 samples of
+JasperReports 7.1.1: 149 load with everything they use supported (74 of them once you pass the
+rows their SQL query gave), 18 use something not supported yet and 4 do not load (Groovy
+closures, a scriptlet and `DATERANGE`).
 
 ## How output is verified
 
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-42 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
-(`crates/ferroreport/tests/barcode4j.rs`).
+44 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
+(`crates/ferroreport/tests/barcode4j.rs`) and against Barbecue (`crates/ferroreport/tests/data/barbecue.txt`: 57
+barcodes as Barbecue draws them for JasperReports).
 
 `tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
 XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
-same, and every picture anchored to the same cells. All 44 fixtures pass. Jasper's output for five
+same, and every picture anchored to the same cells. All 46 fixtures pass. Jasper's output for five
 of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 `tools/pdfua.sh` renders every fixture as a tagged PDF and checks it against PDF/UA-1 with
-veraPDF, the validator the PDF Association maintains; it runs on every push, and all 45 pass.
+veraPDF, the validator the PDF Association maintains, and `tools/pdfa.sh` renders them again as
+PDF/A-2a and as PDF/A-3b with a file attached and checks those; they run on every push, and all
+47 pass all three. Encrypted PDFs are checked by opening them with qpdf and pikepdf: every
+fixture decrypts to the same pages and text as without encryption.
 Word documents follow JasperReports' DOCX exporter; every fixture's `.docx` opens in LibreOffice
 with as many pages as its PDF.
 
@@ -375,6 +454,8 @@ with as many pages as its PDF.
 | 43-title-overflow | A title taller than its page, going on over the next pages without page headers or footers | identical |
 | 44-pdf417 | PDF417 barcodes: error-correction levels, column and row limits, width-to-height ratio | identical |
 | 45-svg-images | SVG images: scale modes, sizes without units and in millimeters, gradients | identical |
+| 46-links | Links to web addresses, anchors, pages and an anchor in another file (with a tooltip), named anchors, bookmarks at two levels | identical |
+| 47-barbecue | Barbecue barcodes: Code 128 (automatic and C), Code 39 with check character, EAN-13, UPC-A, 2 of 5 interleaved and standard, Codabar, EAN-128, SSCC-18, rotated left, right and upside down, one per row | identical |
 
 Â¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
 include it.
@@ -403,16 +484,16 @@ checked.
 
 | Result | 6.20.6 | 7.1.1 |
 |---|---|---|
-| The same pages | 30 | 44 |
-| Both render it, the pages differ | 41 | 41 |
+| The same pages | 31 | 45 |
+| Both render it, the pages differ | 40 | 40 |
 | ferroreport refuses it or fails on it | 16 | 16 |
 | JasperReports cannot render it from rows and parameters alone (it needs the sample's Java objects, a database connection or other files), so there is nothing to compare | 53 | 70 |
 
-So 30 of the 87 6.20.6 samples that can be compared come out the same, and 44 of the 101 7.1.1
+So 31 of the 87 6.20.6 samples that can be compared come out the same, and 45 of the 101 7.1.1
 ones. [Every 6.20.6 template with its result and the reason](docs/samples.md), and [every
 7.1.1 one](docs/samples-7.1.1.md). Most of the differences are charts (26 and 24 of them):
 they are drawn to look like JFreeChart's, not pixel for pixel. The rest are elements that are
-not supported (maps, Barbecue barcodes, custom components), PDF form
+not supported (maps, custom components), PDF form
 fields, whose look is close but not the same, and expressions that call the sample's own Java
 classes, which ferroreport never runs. Rendering these samples is also how differences in how
 variables, styles, repeated values, page totals and the height of a band are evaluated were
@@ -483,6 +564,27 @@ columns of a sheet come from every page, so a large report is filled twice, once
 and once to write the rows (100,000 rows: about 3 s and 58 MiB; 500,000: 17 s and 92 MiB). A
 report with more rows than a sheet holds (1,048,576) stops with an error that says so.
 
+## How it compares
+
+ferroreport is a report engine: rows in, documents out, many of them, the same every time. That
+is a different job from a typesetter or a word processor, so the honest answer to "which one?"
+depends on what you make.
+
+| What you make | The best fit today | ferroreport there |
+|---|---|---|
+| Documents written by hand: papers, books, letters, math | **Typst** (or LaTeX) | Not its job. Typst sets text better (paragraph layout, hyphenation, math), has a real programming language, a package ecosystem and a company and community behind it |
+| JasperReports templates you already have, without a JVM | **ferroreport** | The same pages, pixel for pixel on every fixture; 3 to 6Ã— faster than a warm JVM, about 250Ã— from a cold start, a tenth of the memory or less |
+| Data reports: groups, running totals, "page X of Y", crosstabs, charts, a million rows | **ferroreport** or JasperReports | Bands, groups, variables and late values are what the format is made of; rows stream in and pages stream out (a million rows in 11 MB). In Typst you would program that yourself, and the document is laid out in memory |
+| One template to PDF, Excel, Word, CSV and HTML | **ferroreport**, JasperReports, Carbone | Typst writes PDF, PNG and SVG (HTML is experimental), not spreadsheets or Word |
+| Templates that business users design in Word or LibreOffice | **Carbone** | Templates come from Jaspersoft Studio or are written as text; there is no designer of its own yet |
+| A visual designer, viewers, a report server, dashboards | **Telerik, DevExpress, Stimulsoft**, Jaspersoft Studio and Server | None of these yet |
+| Pages you already have in HTML and CSS | **Chromium** (Gotenberg, Puppeteer), WeasyPrint | A browser per render is heavy, and it knows nothing of page totals or bands |
+| PDFs for archives and regulators, in open source | **ferroreport**, Typst | PDF/UA-1 and PDF/A-2/3 checked with veraPDF on every push, attachments (PDF/A-3 e-invoices), AES-256 encryption; Typst writes PDF/A and PDF/UA-1 too. JasperReports 7 moved its latest PDF tagging out of the free edition |
+| Templates uploaded by your own customers | **ferroreport**, Typst | Expressions come from a fixed list and nothing is deserialized; JasperReports compiles templates to Java |
+
+What would make ferroreport the first choice in more of these rows is on the roadmap below: a
+designer of its own, more of JasperReports' components, and time in production.
+
 ## Roadmap
 
 - **Phase 2 (in progress):** done: band splitting, images, subreports, conditional styles,
@@ -492,6 +594,10 @@ report with more rows than a sheet holds (1,048,576) stops with an error that sa
 - **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
   live preview.
 - **Phase 4:** done: Excel (XLSX) and CSV export, every JasperReports chart type.
+- **Done in 0.12:** links, anchors and bookmarks in every format; PDF/A-2 and PDF/A-3 with
+  attachments; AES-256 PDF encryption with passwords and permissions; Barbecue barcodes;
+  `.ferro` without coordinates (rows, stacks, gaps) and with definitions; `ferroreport migrate`
+  for whole projects; a limit on the size of one row of data.
 - **Done in 0.11:** a template format of its own (`.ferro`), short, readable and accessible by
   default; `ferroreport convert` between it and JRXML, and from JRXML 6 to 7; Word (DOCX)
   output; PDF417 barcodes; SVG images; tagged PDFs checked against PDF/UA-1 with veraPDF; JRXML 7
@@ -504,9 +610,10 @@ report with more rows than a sheet holds (1,048,576) stops with an error that sa
 - **Done in 0.8:** HTML output for previews, a Java library that streams a `ResultSet`, rows
   from any database through a pipe or an iterator, a server that refuses to run open to the
   network and can limit each client.
-- **Next:** the Java library on Maven Central (today it is built by JitPack; publishing waits
-  only for the account), Barbecue barcodes, a visual template designer (Jaspersoft Studio works
-  with ferroreport's templates meanwhile, and `.ferro` can be written by hand).
+- **Next:** the Java library on Maven Central and the Python package on PyPI (publishing waits
+  only for the accounts), a visual template designer (Jaspersoft Studio works with
+  ferroreport's templates meanwhile, and `.ferro` can be written by hand), digital signatures,
+  maps and the remaining Barbecue types.
 
 ## Contributing
 
