@@ -39,6 +39,27 @@
 //! - The page is `page=A4` (A3, A5, Letter, Legal, or `595x842`), `landscape`, `margins=20`.
 //!   Without them a report is A4 with 20-point margins.
 //!
+//! Positions are optional. Parts without one are placed one under another, as wide as their
+//! band or frame; a `row` puts its parts side by side, each as wide as it says (`120` points,
+//! `40%`, or a fraction of what is left: `2fr`); `gap=` spaces them. A part placed this way
+//! floats down when what is above it grows, and a text field grows with its text, so the band
+//! flows like a document. A band without a height is as tall as what is in it.
+//!
+//! ```text
+//!   def money value
+//!     textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+//!   detail gap=2
+//!     row height=16
+//!       textField 3fr : $F{name}
+//!       use money 1fr value=$F{salary}
+//!     textField height=12 italic : $F{notes}
+//! ```
+//!
+//! `def name param...` makes a part (or several) to use again: `use name param=value` puts a
+//! copy where it is, with `{{param}}` replaced; other words on the `use` line go to the first
+//! part it makes. All of this happens when the template is read, so the result is ordinary
+//! JRXML that JasperReports renders the same way.
+//!
 //! What makes it accessible by default: reports written in it produce tagged PDFs (for screen
 //! readers) unless the report says `tagged=false`, in the language of `lang=` (or the
 //! renderer's locale). `h1` to `h6` are headings (a static text tagged as one), `tag=th`
@@ -71,6 +92,7 @@ pub fn is_template(source: &str) -> bool {
 /// Compiles a template in this format to JRXML (as JasperReports 7 writes it).
 pub fn to_jrxml(source: &str) -> Result<String> {
     let items = parse_lines(source)?;
+    let items = expand_definitions(items)?;
     let mut roots = items.into_iter();
     let root = roots.next().ok_or_else(|| err(0, "the template is empty"))?;
     if let Some(extra) = roots.next() {
@@ -491,7 +513,344 @@ fn report(root: &Item) -> Result<Node> {
     }
     out.children.splice(0..0, props);
     order_report(&mut out);
+    lay_out_report(&mut out)?;
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Definitions: `def name param...` and `use name param=value...`
+
+/// How deep definitions may use one another, and how many parts they may make in all: a
+/// template cannot grow without end.
+const MAX_USE_DEPTH: usize = 16;
+const MAX_EXPANDED: usize = 100_000;
+
+/// Takes the `def` blocks out of the outline and puts a copy of one wherever a `use` names it,
+/// with `{{param}}` replaced by the value the `use` gives.
+fn expand_definitions(items: Vec<Item>) -> Result<Vec<Item>> {
+    fn collect(items: Vec<Item>, defs: &mut Vec<Item>) -> Vec<Item> {
+        let mut out = Vec::with_capacity(items.len());
+        for mut item in items {
+            if item.head == "def" {
+                defs.push(item);
+            } else {
+                item.kids = collect(std::mem::take(&mut item.kids), defs);
+                out.push(item);
+            }
+        }
+        out
+    }
+    let mut defs = Vec::new();
+    let items = collect(items, &mut defs);
+    let mut count = 0usize;
+    expand(items, &defs, 0, &mut count)
+}
+
+fn expand(items: Vec<Item>, defs: &[Item], depth: usize, count: &mut usize) -> Result<Vec<Item>> {
+    let mut out = Vec::with_capacity(items.len());
+    for mut item in items {
+        *count += 1;
+        if *count > MAX_EXPANDED {
+            return Err(err(item.line, &format!("the template makes more than {MAX_EXPANDED} parts with its definitions")));
+        }
+        if item.head != "use" {
+            item.kids = expand(std::mem::take(&mut item.kids), defs, depth, count)?;
+            out.push(item);
+            continue;
+        }
+        if depth >= MAX_USE_DEPTH {
+            return Err(err(item.line, &format!("definitions use one another more than {MAX_USE_DEPTH} deep")));
+        }
+        let Some(Token::Word(name)) = item.tokens.first().cloned() else {
+            return Err(err(item.line, "`use` needs the name of a definition: use money value=$F{amount}"));
+        };
+        let def = defs
+            .iter()
+            .find(|d| matches!(d.tokens.first(), Some(Token::Word(n)) if *n == name))
+            .ok_or_else(|| err(item.line, &format!("no definition called `{name}` (write it with `def {name}`)")))?;
+        let params: Vec<String> =
+            def.tokens.iter().skip(1).filter_map(|t| if let Token::Word(w) = t { Some(w.clone()) } else { None }).collect();
+        // The values given for the parameters, and the rest: attributes for what the
+        // definition makes.
+        let mut values: Vec<(String, String)> = Vec::new();
+        let mut extra: Vec<Token> = Vec::new();
+        for t in item.tokens.iter().skip(1) {
+            match t {
+                Token::Pair(k, v) if params.contains(k) => values.push((k.clone(), v.clone())),
+                other => extra.push(other.clone()),
+            }
+        }
+        if let Some(text) = &item.text {
+            // `use money : $F{amount}` gives the first parameter.
+            if let Some(first) = params.first().filter(|p| !values.iter().any(|(k, _)| k == *p)) {
+                values.push((first.clone(), text.clone()));
+            }
+        }
+        for p in &params {
+            if !values.iter().any(|(k, _)| k == p) {
+                return Err(err(item.line, &format!("`use {name}` needs {p}=...")));
+            }
+        }
+        let mut made = def.kids.clone();
+        for m in &mut made {
+            substitute(m, &values);
+        }
+        if let Some(first) = made.first_mut() {
+            first.tokens.extend(extra);
+        }
+        // What the copy makes may use other definitions.
+        out.extend(expand(made, defs, depth + 1, count)?);
+    }
+    Ok(out)
+}
+
+/// `{{name}}` replaced by its value everywhere in an outline node.
+fn substitute(item: &mut Item, values: &[(String, String)]) {
+    let fill = |s: &str| -> String {
+        let mut s = s.to_string();
+        for (k, v) in values {
+            s = s.replace(&format!("{{{{{k}}}}}"), v);
+        }
+        s
+    };
+    item.head = fill(&item.head);
+    for t in &mut item.tokens {
+        *t = match t {
+            Token::Word(w) => Token::Word(fill(w)),
+            Token::Pair(k, v) => Token::Pair(fill(k), fill(v)),
+        };
+    }
+    if let Some(text) = &item.text {
+        item.text = Some(fill(text));
+    }
+    for k in &mut item.kids {
+        substitute(k, values);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Automatic layout: parts without a position are placed one under another, `row` puts parts
+// side by side, and widths may be fractions (`2fr`) or shares (`40%`) of what is there.
+
+/// Bands as wide as the page between its margins (the others are as wide as a column).
+const PAGE_WIDE: &[&str] = &["title", "pageHeader", "pageFooter", "lastPageFooter", "summary", "noData", "background"];
+
+fn num_attr(n: &Node, k: &str) -> Option<f32> {
+    n.attr(k).and_then(|v| v.trim().parse::<f32>().ok())
+}
+
+fn set_attr(n: &mut Node, k: &str, v: f32) {
+    let v = fmt(v);
+    match n.attrs.iter_mut().find(|(a, _)| a == k) {
+        Some((_, old)) => *old = v,
+        None => n.attrs.push((k.to_string(), v)),
+    }
+}
+
+/// Places the parts of every band that has parts without a position.
+fn lay_out_report(report: &mut Node) -> Result<()> {
+    let page = num_attr(report, "pageWidth").unwrap_or(595.0);
+    let printable = page - num_attr(report, "leftMargin").unwrap_or(20.0) - num_attr(report, "rightMargin").unwrap_or(20.0);
+    let column = num_attr(report, "columnWidth").unwrap_or(printable);
+    // The bands of a detail section or a group, whose parts are as wide as a column.
+    fn walk(n: &mut Node, width: f32) -> Result<()> {
+        for c in &mut n.children {
+            match c.name.as_str() {
+                "band" => lay_out_band(c, width)?,
+                "groupHeader" | "groupFooter" => walk(c, width)?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+    // Two passes: page-wide bands with the printable width, the rest with the column's.
+    for c in &mut report.children {
+        match c.name.as_str() {
+            name if PAGE_WIDE.contains(&name) => lay_out_band(c, printable)?,
+            "detail" | "group" | "columnHeader" | "columnFooter" => {
+                if c.name == "columnHeader" || c.name == "columnFooter" {
+                    lay_out_band(c, column)?;
+                } else {
+                    walk(c, column)?;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Whether a part needs placing: it has no position, or a width that is a share.
+fn needs_layout(n: &Node) -> bool {
+    matches!(n.name.as_str(), "row" | "stack")
+        || (n.name == "element"
+            && n.attr("kind") != Some("elementGroup")
+            && (n.attr("x").is_none() || n.attr("y").is_none() || n.attr("width").is_some_and(|w| w.parse::<f32>().is_err())))
+}
+
+fn lay_out_band(band: &mut Node, width: f32) -> Result<()> {
+    let gap = num_attr(band, "gap").unwrap_or(0.0);
+    band.attrs.retain(|(k, _)| k != "gap");
+    if !band.children.iter().any(needs_layout) {
+        return Ok(());
+    }
+    let kids = std::mem::take(&mut band.children);
+    let (kids, used) = stack(kids, 0.0, 0.0, width, gap)?;
+    band.children = kids;
+    if band.attr("height").is_none() {
+        set_attr(band, "height", used);
+    }
+    Ok(())
+}
+
+/// The width a part asks for out of `width`: points, a share (`40%`) or `None` for fractions.
+fn fixed_width(spec: &str, width: f32) -> Option<f32> {
+    if let Some(p) = spec.strip_suffix('%') {
+        return p.trim().parse::<f32>().ok().map(|p| (width * p / 100.0).floor());
+    }
+    if spec.ends_with("fr") {
+        return None;
+    }
+    spec.trim().parse().ok()
+}
+
+fn fraction(spec: &str) -> f32 {
+    spec.strip_suffix("fr").and_then(|f| f.trim().parse().ok()).unwrap_or(1.0)
+}
+
+/// Lays `kids` one under another from `top`, `left`, `width` wide; returns them (rows and
+/// stacks dissolved into their parts) and where the last one ends.
+fn stack(kids: Vec<Node>, left: f32, top: f32, width: f32, gap: f32) -> Result<(Vec<Node>, f32)> {
+    let mut out = Vec::with_capacity(kids.len());
+    let mut y = top;
+    let mut placed_any = false;
+    for mut kid in kids {
+        match kid.name.as_str() {
+            "row" => {
+                let row_gap = num_attr(&kid, "gap").unwrap_or(4.0);
+                let height = num_attr(&kid, "height");
+                let parts = std::mem::take(&mut kid.children);
+                let (parts, h) = row(parts, left, y, width, row_gap, height, placed_any)?;
+                out.extend(parts);
+                y += h + gap;
+                placed_any = true;
+            }
+            "stack" => {
+                let inner_gap = num_attr(&kid, "gap").unwrap_or(gap);
+                let w = kid.attr("width").and_then(|s| fixed_width(s, width)).unwrap_or(width);
+                let parts = std::mem::take(&mut kid.children);
+                let (parts, end) = stack(parts, left, y, w, inner_gap)?;
+                out.extend(parts);
+                y = end + gap;
+                placed_any = true;
+            }
+            "element" if needs_layout(&kid) => {
+                let w = kid.attr("width").map(|s| fixed_width(s, width).unwrap_or(width)).unwrap_or(width);
+                let x = num_attr(&kid, "x").unwrap_or(0.0) + left;
+                let h = num_attr(&kid, "height").unwrap_or(20.0);
+                set_attr(&mut kid, "x", x);
+                let ky = num_attr(&kid, "y").map(|v| v + top).unwrap_or(y);
+                set_attr(&mut kid, "y", ky);
+                set_attr(&mut kid, "width", w);
+                set_attr(&mut kid, "height", h);
+                flow(&mut kid, placed_any);
+                lay_out_frame(&mut kid)?;
+                y = num_attr(&kid, "y").unwrap_or(y) + h + gap;
+                placed_any = true;
+                out.push(kid);
+            }
+            _ => {
+                if kid.name == "element" {
+                    let end = num_attr(&kid, "y").unwrap_or(0.0) + num_attr(&kid, "height").unwrap_or(0.0);
+                    y = y.max(end + gap);
+                    lay_out_frame(&mut kid)?;
+                }
+                out.push(kid);
+            }
+        }
+    }
+    Ok((out, (y - gap).max(top)))
+}
+
+/// Lays `parts` side by side at `top`; returns them and the row's height.
+fn row(
+    parts: Vec<Node>,
+    left: f32,
+    top: f32,
+    width: f32,
+    gap: f32,
+    height: Option<f32>,
+    below: bool,
+) -> Result<(Vec<Node>, f32)> {
+    let specs: Vec<String> = parts.iter().map(|p| p.attr("width").unwrap_or("1fr").to_string()).collect();
+    let gaps = gap * parts.len().saturating_sub(1) as f32;
+    let fixed: f32 = specs.iter().filter_map(|s| fixed_width(s, width)).sum();
+    let fractions: f32 = specs.iter().filter(|s| fixed_width(s, width).is_none()).map(|s| fraction(s)).sum();
+    let free = (width - fixed - gaps).max(0.0);
+    // As tall as it says, or as its tallest part, or 20 points.
+    let tallest =
+        parts.iter().filter_map(|p| num_attr(p, "height")).fold(None, |m: Option<f32>, h| Some(m.map_or(h, |m| m.max(h))));
+    let h = height.or(tallest).unwrap_or(20.0);
+    let mut x = left;
+    let mut out = Vec::with_capacity(parts.len());
+    let n = parts.len();
+    for (i, (mut p, spec)) in parts.into_iter().zip(specs).enumerate() {
+        let mut w = fixed_width(&spec, width).unwrap_or_else(|| (free * fraction(&spec) / fractions.max(1e-6)).floor());
+        // The last part takes what rounding left, so the row is as wide as its container.
+        if i + 1 == n && fixed_width(&spec, width).is_none() {
+            w = (left + width - x).max(0.0);
+        }
+        if p.name == "element" {
+            set_attr(&mut p, "x", x);
+            set_attr(&mut p, "y", top);
+            set_attr(&mut p, "width", w);
+            if p.attr("height").is_none() {
+                set_attr(&mut p, "height", h);
+            }
+            flow(&mut p, below);
+            lay_out_frame(&mut p)?;
+            out.push(p);
+        } else if p.name == "stack" {
+            let inner_gap = num_attr(&p, "gap").unwrap_or(0.0);
+            let kids = std::mem::take(&mut p.children);
+            let (kids, _) = stack(kids, x, top, w, inner_gap)?;
+            out.extend(kids);
+        } else {
+            out.push(p);
+        }
+        x += w + gap;
+    }
+    Ok((out, h))
+}
+
+/// A placed part goes down when what is above it grows (Float), and a text field grows with
+/// its text, unless they say otherwise: the band flows.
+fn flow(n: &mut Node, below: bool) {
+    if below && n.attr("positionType").is_none() {
+        n.attrs.push(("positionType".into(), "Float".into()));
+    }
+    if n.attr("kind") == Some("textField") && n.attr("textAdjust").is_none() {
+        n.attrs.push(("textAdjust".into(), "StretchHeight".into()));
+    }
+}
+
+/// The parts of a frame, laid out inside it.
+fn lay_out_frame(n: &mut Node) -> Result<()> {
+    if n.attr("kind") != Some("frame") || !n.children.iter().any(needs_layout) {
+        return Ok(());
+    }
+    let width = num_attr(n, "width").unwrap_or(0.0);
+    let gap = num_attr(n, "gap").unwrap_or(0.0);
+    n.attrs.retain(|(k, _)| k != "gap");
+    let (els, others): (Vec<Node>, Vec<Node>) =
+        std::mem::take(&mut n.children).into_iter().partition(|c| matches!(c.name.as_str(), "element" | "row" | "stack"));
+    let (els, used) = stack(els, 0.0, 0.0, width, gap)?;
+    n.children = others;
+    n.children.extend(els);
+    if num_attr(n, "height").map_or(true, |h| h < used) {
+        set_attr(n, "height", used);
+    }
+    Ok(())
 }
 
 fn fmt(v: f32) -> String {
@@ -603,7 +962,11 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
                     let (wd, ht) = geometry(w, 'x').expect("checked");
                     out.attrs.push(("width".into(), wd));
                     out.attrs.push(("height".into(), ht));
-                } else if (BANDS.contains(&name.as_str()) || SECTIONS.contains(&name.as_str())) && w.parse::<f32>().is_ok() {
+                } else if (is_element || name == "stack") && (is_share(w) || w.parse::<f32>().is_ok()) {
+                    out.attrs.push(("width".into(), w.clone()));
+                } else if (BANDS.contains(&name.as_str()) || SECTIONS.contains(&name.as_str()) || name == "row")
+                    && w.parse::<f32>().is_ok()
+                {
                     out.attrs.push(("height".into(), w.clone()));
                 } else {
                     out.attrs.push((w.clone(), "true".into()));
@@ -631,10 +994,16 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
     }
 
     // `detail 20`: a section with one band.
-    if SECTIONS.contains(&name.as_str()) {
-        if let Some(i) = out.attrs.iter().position(|(k, _)| k == "height") {
+    // (A table column's groupHeader and groupFooter hold cells, not bands.)
+    if SECTIONS.contains(&name.as_str()) && matches!(parent, "jasperReport" | "group") {
+        let height = out.attrs.iter().position(|(k, _)| k == "height");
+        // `detail 20`, or a detail whose parts are laid out for it.
+        let loose = height.is_none() && !kids.is_empty() && kids.iter().all(|k| !matches!(k.name.as_str(), "band" | "part"));
+        if height.is_some() || loose {
             let mut band = Node { name: "band".into(), ..Default::default() };
-            band.attrs.push(out.attrs.remove(i));
+            if let Some(i) = height {
+                band.attrs.push(out.attrs.remove(i));
+            }
             band.attrs.append(&mut out.attrs);
             band.children = kids;
             kids = vec![band];
@@ -668,6 +1037,12 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
 /// (a multiple axis chart's `<chart>`, a book part's `<component>`).
 fn clashes(head: &str, parent: &str) -> bool {
     (head == "chart" && parent == "axis") || (head == "component" && parent == "part")
+}
+
+/// `2fr` or `40%`: a width that is a share of what is there.
+fn is_share(w: &str) -> bool {
+    let n = w.strip_suffix("fr").or_else(|| w.strip_suffix('%'));
+    n.is_some_and(|n| n.is_empty() || n.parse::<f32>().is_ok())
 }
 
 /// `"12,30"` -> ("12", "30") for `,`; `"100x20"` -> ("100", "20") for `x`.
@@ -869,17 +1244,13 @@ impl Writer {
         if is_element {
             let take =
                 |attrs: &mut Vec<(String, String)>, k: &str| attrs.iter().position(|(n, _)| n == k).map(|i| attrs.remove(i).1);
-            let (x, y) = (take(&mut attrs, "x"), take(&mut attrs, "y"));
-            if x.is_some() || y.is_some() {
+            // Always said, even when 0 (JRXML 7 leaves zeros out): a part without a position
+            // would be laid out by the reader.
+            if kind != Some("elementGroup") {
+                let (x, y) = (take(&mut attrs, "x"), take(&mut attrs, "y"));
                 words.push(format!("{},{}", x.unwrap_or_else(|| "0".into()), y.unwrap_or_else(|| "0".into())));
-            }
-            let (w, h) = (take(&mut attrs, "width"), take(&mut attrs, "height"));
-            match (w, h) {
-                (Some(w), Some(h)) => words.push(format!("{w}x{h}")),
-                (w, h) => {
-                    attrs.extend(w.map(|w| ("width".to_string(), w)));
-                    attrs.extend(h.map(|h| ("height".to_string(), h)));
-                }
+                let (w, h) = (take(&mut attrs, "width"), take(&mut attrs, "height"));
+                words.push(format!("{}x{}", w.unwrap_or_else(|| "0".into()), h.unwrap_or_else(|| "0".into())));
             }
         }
         let band_like = BANDS.contains(&n.name.as_str());
@@ -1088,6 +1459,42 @@ report "Employees" lang=en
             let crate::model::ElementKind::Text(t) = &report.title.as_ref().unwrap().elements[0].kind else { panic!() };
             assert!(format!("{:?}", t.content).contains(&format!("{text:?}")), "{text:?} {:?}", t.content);
         }
+    }
+
+    #[test]
+    fn lays_out_parts_without_coordinates() {
+        let src = r##"
+report r margins=20
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+  title gap=4
+    h1 height=30 : Title
+    textField height=14 : "subtitle"
+  detail
+    row height=16 gap=5
+      textField 2fr : $F{a}
+      textField 100 : $F{b}
+      use money 1fr value=$F{c}
+"##;
+        let x = to_jrxml(src).unwrap();
+        // Title: stacked, the second part floats under the first.
+        assert!(x.contains(r#"<title height="48">"#), "{x}");
+        assert!(x.contains(r#"x="0" y="34" width="555" positionType="Float" textAdjust="StretchHeight""#), "{x}");
+        // A row: 555 wide, two gaps of 5 and 100 points fixed leave 445: 296 and the rest.
+        assert!(x.contains(r#"<band height="16">"#), "{x}");
+        assert!(x.contains(r#"width="296" x="0" y="0" height="16""#), "{x}");
+        assert!(x.contains(r#"width="100" x="301" y="0" height="16""#), "{x}");
+        assert!(x.contains(r##"pattern="#,##0.00" hTextAlign="Right" width="149" x="406" y="0""##), "{x}");
+        assert!(x.contains("<expression><![CDATA[$F{c}]]></expression>"), "{x}");
+        // The result is a report like any other.
+        let report = crate::jrxml::parse_report(&x).unwrap();
+        assert_eq!(report.detail.len(), 1);
+        assert_eq!(report.detail[0].elements.len(), 3);
+        // Definitions say what they miss.
+        let e = to_jrxml("report r\n  detail\n    use nothing\n").unwrap_err();
+        assert!(e.to_string().contains("no definition called `nothing`"), "{e}");
+        let e = to_jrxml("report r\n  def loop\n    use loop\n  detail\n    use loop\n").unwrap_err();
+        assert!(e.to_string().contains("deep"), "{e}");
     }
 
     #[test]
