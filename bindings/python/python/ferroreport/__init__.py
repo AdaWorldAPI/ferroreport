@@ -17,7 +17,7 @@ from typing import Any, Iterable, Mapping, Optional, Union
 
 from . import _ferroreport
 
-__all__ = ["render", "render_to_file", "inspect", "FerroreportError", "__version__"]
+__all__ = ["render", "render_to_file", "inspect", "convert", "FerroreportError", "__version__"]
 __version__ = _ferroreport.__version__
 
 PathLike = Union[str, "os.PathLike[str]"]
@@ -53,7 +53,8 @@ def _to_json(value: Any) -> str:
 def _load_template(template: Union[PathLike, str]) -> "tuple[str, Optional[str]]":
     """Returns (source, directory of the template file or None)."""
     text = os.fspath(template) if not isinstance(template, str) else template
-    if "<jasperReport" in text:
+    # A template's text (JRXML, or a .ferro template: several lines) rather than a file name.
+    if "<jasperReport" in text or "\n" in text:
         return text, None
     with open(text, "r", encoding="utf-8") as f:
         source = f.read()
@@ -244,5 +245,16 @@ def inspect(template: Union[PathLike, str]) -> dict:
     source, _ = _load_template(template)
     try:
         return _ferroreport.inspect(source)
+    except ValueError as e:
+        raise FerroreportError(str(e)) from None
+
+
+def convert(template: Union[PathLike, str], to: str = "ferro") -> str:
+    """Rewrites a template (a file or its text) and returns the result: `to="ferro"` gives
+    ferroreport's own format, `to="jrxml"` gives JRXML as JasperReports 7 writes it. Both are
+    rendered the same."""
+    source, _ = _load_template(template)
+    try:
+        return _ferroreport.convert(source, to)
     except ValueError as e:
         raise FerroreportError(str(e)) from None

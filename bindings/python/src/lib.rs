@@ -118,10 +118,29 @@ fn inspect(py: Python<'_>, template: String) -> PyResult<Py<PyAny>> {
     Ok(out.into_any().unbind())
 }
 
+/// Rewrites a template: `to` is "ferro" (ferroreport's own format) or "jrxml" (JRXML 7).
+#[pyfunction]
+fn convert(template: String, to: String) -> PyResult<String> {
+    convert_template(&template, &to).map_err(err)
+}
+
+fn convert_template(template: &str, to: &str) -> Result<String, String> {
+    use ferroreport::{convert, template as own};
+    let r = match (own::is_template(template), to) {
+        (true, "jrxml") => own::to_jrxml(template),
+        (true, "ferro") => own::to_jrxml(template).and_then(|x| own::from_jrxml(&x)),
+        (false, "jrxml") => convert::jrxml_to_v7(template),
+        (false, "ferro") => own::from_jrxml(template),
+        (_, other) => return Err(format!("to={other:?}: use \"ferro\" or \"jrxml\"")),
+    };
+    r.map_err(|e| e.to_string())
+}
+
 #[pymodule]
 fn _ferroreport(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render, m)?)?;
     m.add_function(wrap_pyfunction!(inspect, m)?)?;
+    m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

@@ -3168,7 +3168,7 @@ impl<'a> Filler<'a> {
             page_width: self.report.page_width,
             page_height: self.report.page_height,
             landscape: self.report.landscape,
-            pdf_page_offsets: self.report.pdf_page_offsets,
+            pdf: self.report.pdf.clone(),
             pages: self.pages,
         }
     }

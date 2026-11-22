@@ -23,6 +23,14 @@ pub fn parse_report(source: &str) -> Result<Report> {
 
 /// Parses JRXML source into a [`Report`], reading the style templates it uses with `load`.
 pub fn parse_report_with(source: &str, load: Loader) -> Result<Report> {
+    // ferroreport's own format (`.ferro`) is compiled to JRXML first.
+    let compiled;
+    let source = if crate::template::is_template(source) {
+        compiled = crate::template::to_jrxml(source)?;
+        compiled.as_str()
+    } else {
+        source
+    };
     let root = xml::parse(source)?;
     if root.name != "jasperReport" {
         return Err(Error::template(format!("root element is <{}>, expected <jasperReport>", root.name)));
@@ -88,7 +96,15 @@ fn style_template(
         warnings.push(format!("style template `{location}` was not found next to the report or in its resource folders"));
         return;
     };
-    let parsed = std::str::from_utf8(&bytes).map_err(|e| e.to_string()).and_then(|t| xml::parse(t).map_err(|e| e.to_string()));
+    let parsed = std::str::from_utf8(&bytes).map_err(|e| e.to_string()).and_then(|t| {
+        // A style template may be in ferroreport's own format too (`styles` at the top).
+        let compiled = if crate::template::is_template(t) {
+            crate::template::to_jrxml(t).map_err(|e| e.to_string())?
+        } else {
+            t.to_string()
+        };
+        xml::parse(&compiled).map_err(|e| e.to_string())
+    });
     let root = match parsed {
         Ok(root) if root.name == "jasperTemplate" => root,
         Ok(root) => return warnings.push(format!("style template `{location}`: <{}> is not a <jasperTemplate>", root.name)),
@@ -612,18 +628,21 @@ impl Parser {
             uses_data_source: false,
             horizontal: attr(root, &["printOrder"]) == Some("Horizontal")
                 && attr(root, &["columnCount"]).and_then(number::<u32>).unwrap_or(1) > 1,
-            pdf_page_offsets: {
-                let offset = |name: &str| {
+            pdf: {
+                let property = |name: &str| {
                     root.children_named("property")
                         .find(|p| p.attr("name") == Some(&*format!("net.sf.jasperreports.export.pdf.{name}")))
                         .and_then(|p| p.attr("value"))
-                        .and_then(number::<f32>)
-                        .unwrap_or(0.0)
                 };
-                [
-                    [offset("odd.page.offset.x"), offset("odd.page.offset.y")],
-                    [offset("even.page.offset.x"), offset("even.page.offset.y")],
-                ]
+                let offset = |name: &str| property(name).and_then(number::<f32>).unwrap_or(0.0);
+                PdfSettings {
+                    page_offsets: [
+                        [offset("odd.page.offset.x"), offset("odd.page.offset.y")],
+                        [offset("even.page.offset.x"), offset("even.page.offset.y")],
+                    ],
+                    tagged: property("tagged").is_some_and(|v| v.trim().eq_ignore_ascii_case("true")),
+                    language: property("tag.language").map(|v| v.trim().replace('_', "-")).filter(|v| !v.is_empty()),
+                }
             },
             warnings: Vec::new(),
         };
@@ -749,7 +768,7 @@ impl Parser {
                 Some("End") => TotalPosition::End,
                 _ => TotalPosition::None,
             };
-            let header_position = match g.attr("headerPosition") {
+            let header_position = match g.attr("headerPosition").or_else(|| g.attr("position")) {
                 Some("Middle" | "Center") => HeaderPosition::Middle,
                 Some("Bottom" | "Right") => HeaderPosition::End,
                 Some("Stretch") => HeaderPosition::Stretch,
@@ -821,7 +840,7 @@ impl Parser {
                 class: JavaType::from_class_name(m.attr("class").unwrap_or("java.lang.Object")),
                 calculation,
                 expr: self.child_expr(m, &["measureExpression", "expression"])?,
-                percentage: m.attr("percentageOf") == Some("GrandTotal"),
+                percentage: m.attr("percentageOf").or_else(|| m.attr("percentageType")) == Some("GrandTotal"),
             });
         }
         let mut cells = Vec::new();
@@ -840,7 +859,9 @@ impl Parser {
             });
         }
         let special = |name: &str, alt: &str| {
-            n.child(name).or_else(|| n.child(alt)).and_then(|h| h.child("cellContents").or_else(|| h.child("contents")))
+            // JRXML 6 wraps the contents in <cellContents>; JasperReports 7 writes them in the
+            // <headerCell> or <whenNoDataCell> itself.
+            n.child(name).or_else(|| n.child(alt)).map(|h| h.child("cellContents").or_else(|| h.child("contents")).unwrap_or(h))
         };
         let header_cell = match special("crosstabHeaderCell", "headerCell") {
             Some(c) => self.cell_contents(c)?,
@@ -1147,6 +1168,11 @@ fn v7_chart(e: &Node) -> Node {
         let mut plot_children = Vec::new();
         let mut formats: Vec<(String, Vec<(String, String)>)> = Vec::new();
         for (k, v) in &p.attrs {
+            // JasperReports 7 writes the x and y axes in lower case (xaxisTickLabelMask).
+            let k = &match k.strip_prefix("xaxis").or_else(|| k.strip_prefix("yaxis")) {
+                Some(rest) => format!("{}Axis{rest}", &k[..1]),
+                None => k.clone(),
+            };
             // valueAxisTickLabelMask="..." -> <valueAxisFormat><axisFormat tickLabelMask="..."/>
             if let Some(i) = k.find("Axis").filter(|_| k != "Axis") {
                 let (axis, rest) = (&k[..i], &k[i + 4..]);
@@ -1355,9 +1381,9 @@ impl Parser {
                     key: e(p, &["keyExpression"])?,
                     category: e(p, &["categoryExpression"])?,
                     value: e(p, &["valueExpression"])?,
-                    x: e(p, &["xValueExpression"])?,
-                    y: e(p, &["yValueExpression"])?,
-                    z: e(p, &["zValueExpression"])?,
+                    x: e(p, &["xValueExpression", "xvalueExpression"])?,
+                    y: e(p, &["yValueExpression", "yvalueExpression"])?,
+                    z: e(p, &["zValueExpression", "zvalueExpression"])?,
                     period: e(p, &["timePeriodExpression"])?,
                     date: e(p, &["dateExpression"])?,
                     high: e(p, &["highExpression"])?,
@@ -1502,9 +1528,9 @@ impl Parser {
             },
             category_axis_label: label(
                 self,
-                &["categoryAxisLabelExpression", "xAxisLabelExpression", "timeAxisLabelExpression"],
+                &["categoryAxisLabelExpression", "xAxisLabelExpression", "xaxisLabelExpression", "timeAxisLabelExpression"],
             )?,
-            value_axis_label: label(self, &["valueAxisLabelExpression", "yAxisLabelExpression"])?,
+            value_axis_label: label(self, &["valueAxisLabelExpression", "yAxisLabelExpression", "yaxisLabelExpression"])?,
             value_min: label(self, &["rangeAxisMinValueExpression"])?,
             value_max: label(self, &["rangeAxisMaxValueExpression"])?,
             series_colors: series_colors.into_iter().map(|(_, c)| c).collect(),
@@ -1717,10 +1743,11 @@ impl Parser {
                 _ => PositionType::Fix,
             },
             stretch_type: match re.attr("stretchType") {
-                Some("RelativeToBandHeight") => StretchType::RelativeToBandHeight,
-                Some("RelativeToTallestObject") => StretchType::RelativeToTallestObject,
-                Some("ContainerHeight") => StretchType::ContainerHeight,
-                Some("ContainerBottom") => StretchType::ContainerBottom,
+                // JasperReports 6.10 renamed RelativeToBandHeight and RelativeToTallestObject
+                // (ContainerHeight, ElementGroupHeight); both names mean the same.
+                Some("RelativeToBandHeight" | "ContainerHeight") => StretchType::ContainerHeight,
+                Some("RelativeToTallestObject" | "ElementGroupHeight") => StretchType::RelativeToTallestObject,
+                Some("ContainerBottom" | "ElementGroupBottom") => StretchType::ContainerBottom,
                 _ => StretchType::NoStretch,
             },
             mode: parts.mode,

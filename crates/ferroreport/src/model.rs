@@ -527,10 +527,21 @@ pub struct Report {
     /// `printOrder="Horizontal"` with more than one column: records fill a row of columns
     /// left to right, then the next row.
     pub horizontal: bool,
-    /// Where PDF pages are moved to, odd pages then even ones (x right, y down, in points):
-    /// `net.sf.jasperreports.export.pdf.odd.page.offset.x` and its siblings, for binding.
-    pub pdf_page_offsets: [[f32; 2]; 2],
+    /// What the template asks of PDF output (its `net.sf.jasperreports.export.pdf.*` properties).
+    pub pdf: PdfSettings,
     pub warnings: Vec<String>,
+}
+
+/// What a template asks of PDF output, with its `net.sf.jasperreports.export.pdf.*` properties.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PdfSettings {
+    /// Where pages are moved to, odd pages then even ones (x right, y down, in points):
+    /// `odd.page.offset.x` and its siblings, for binding.
+    pub page_offsets: [[f32; 2]; 2],
+    /// `tagged`: write a tagged PDF (for screen readers) even when the renderer is not asked to.
+    pub tagged: bool,
+    /// `tag.language`: the language of the text (`es-DO`), instead of the renderer's locale.
+    pub language: Option<String>,
 }
 
 impl Report {

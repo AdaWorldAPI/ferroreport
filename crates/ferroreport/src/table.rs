@@ -234,7 +234,7 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         datasets: Vec::new(),
         uses_data_source: true,
         horizontal: false,
-        pdf_page_offsets: Default::default(),
+        pdf: Default::default(),
         warnings: Vec::new(),
     }
 }
@@ -288,7 +288,7 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         datasets: Vec::new(),
         uses_data_source: true,
         horizontal: columns > 1,
-        pdf_page_offsets: Default::default(),
+        pdf: Default::default(),
         warnings: Vec::new(),
     }
 }
@@ -352,7 +352,7 @@ pub fn chart_report(chart: crate::chart::ChartElement, run: &DatasetRun, width: 
         datasets: Vec::new(),
         uses_data_source: true,
         horizontal: false,
-        pdf_page_offsets: Default::default(),
+        pdf: Default::default(),
         warnings: Vec::new(),
     }
 }

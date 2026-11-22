@@ -16,6 +16,17 @@ const pdf = ferroreport.render(template, data, {}, {
 assert.ok(pdf instanceof Uint8Array);
 assert.equal(Buffer.from(pdf.subarray(0, 5)).toString(), "%PDF-");
 
+// ferroreport's own format: converted, and rendered the same.
+const ferro = ferroreport.convert(template, "ferro");
+assert.ok(ferro.startsWith("report orders"), ferro.slice(0, 80));
+assert.ok(ferroreport.convert(ferro, "jrxml").includes('<element kind="subreport"'));
+const fromFerro = ferroreport.render(ferro, data, {}, {
+  resources: { "lines.jrxml": readFileSync(new URL("lines.jrxml", fx)) },
+  now: "2026-01-01T00:00:00",
+  format: "csv",
+});
+assert.ok(Buffer.from(fromFerro).toString().length > 0);
+
 const info = ferroreport.inspect(template);
 assert.equal(info.name, "orders");
 assert.deepEqual(info.fields, ["order", "customer", "lines"]);

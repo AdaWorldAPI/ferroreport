@@ -13,9 +13,10 @@ const USAGE: &str = "\
 ferroreport — report engine: PDF, Excel, CSV and HTML from JasperReports JRXML templates, no JVM required
 
 USAGE:
-    ferroreport render <template.jrxml> [OPTIONS]
-    ferroreport doctor <template.jrxml>
+    ferroreport render <template.jrxml|template.ferro> [OPTIONS]
+    ferroreport doctor <template.jrxml|template.ferro>
     ferroreport serve [OPTIONS]
+    ferroreport convert <template> [-o <output>] [--to ferro|jrxml]
 
 RENDER OPTIONS:
     -d, --data <file.json>      Rows: a JSON array of objects, or one JSON object per line
@@ -46,6 +47,12 @@ RENDER OPTIONS:
 
 DOCTOR:
     Lists the features of a template and whether ferroreport can render them.
+
+CONVERT:
+    Rewrites a template: JRXML (JasperReports 6 or 7) as a .ferro template, ferroreport's own
+    format, or a .ferro template or a JRXML 6 one as JRXML 7. The output's extension (or --to)
+    picks the format; without either, a JRXML becomes .ferro and a .ferro becomes JRXML.
+    Templates are rendered the same in either format.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
 add format xlsx, docx, csv or html to the request for Excel, Word, CSV or a web preview):
@@ -93,6 +100,7 @@ fn run() -> ExitCode {
         Some("render") => render(&args[1..]),
         Some("doctor") => doctor(&args[1..]),
         Some("serve") => serve(&args[1..]),
+        Some("convert") => convert(&args[1..]),
         Some("-V") | Some("--version") => {
             println!("ferroreport {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -131,6 +139,51 @@ impl Drop for RemoveOnDrop {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
     }
+}
+
+fn convert(args: &[String]) -> CliResult {
+    let mut input = None;
+    let mut output = None;
+    let mut to = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "-o" | "--output" => output = it.next().cloned(),
+            "-t" | "--to" => to = it.next().cloned(),
+            s if s.starts_with('-') && s != "-" => return Err(format!("unknown option {s}").into()),
+            s => input = Some(s.to_string()),
+        }
+    }
+    let input = input.ok_or("convert needs a template: ferroreport convert <template> [-o <output>] [--to ferro|jrxml]")?;
+    let source = if input == "-" {
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut s).map_err(|e| format!("stdin: {e}"))?;
+        s
+    } else {
+        std::fs::read_to_string(&input).map_err(|e| format!("{input}: {e}"))?
+    };
+    let from_template = ferroreport::template::is_template(&source);
+    // What to write: --to, else the output's extension, else the other format.
+    let extension =
+        output.as_deref().and_then(|o| Path::new(o).extension()).and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
+    let to = match (to.as_deref(), extension.as_deref()) {
+        (Some("ferro"), _) | (None, Some("ferro")) => "ferro",
+        (Some("jrxml" | "jrtx"), _) | (None, Some("jrxml" | "jrtx" | "xml")) => "jrxml",
+        (Some(other), _) => return Err(format!("--to {other}: say ferro or jrxml").into()),
+        (None, _) if from_template => "jrxml",
+        (None, _) => "ferro",
+    };
+    let converted = match (from_template, to) {
+        (true, "jrxml") => ferroreport::template::to_jrxml(&source)?,
+        (true, _) => ferroreport::template::from_jrxml(&ferroreport::template::to_jrxml(&source)?)?,
+        (false, "jrxml") => ferroreport::convert::jrxml_to_v7(&source)?,
+        (false, _) => ferroreport::template::from_jrxml(&source)?,
+    };
+    match output.as_deref() {
+        None | Some("-") => print!("{converted}"),
+        Some(path) => std::fs::write(path, converted).map_err(|e| format!("{path}: {e}"))?,
+    }
+    Ok(())
 }
 
 fn render(args: &[String]) -> CliResult {

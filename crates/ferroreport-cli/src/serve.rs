@@ -334,7 +334,11 @@ fn prepare(
             let root = cfg.templates.as_ref().ok_or((404, "no --templates directory configured".to_string()))?;
             let mut rel = safe_name(n).ok_or((400, format!("invalid template name `{n}`")))?;
             if rel.extension().is_none() {
+                // `invoice` is invoice.jrxml, or invoice.ferro when there is no JRXML.
                 rel.set_extension("jrxml");
+                if !root.join(&rel).exists() && root.join(rel.with_extension("ferro")).exists() {
+                    rel.set_extension("ferro");
+                }
             }
             let path = root.join(&rel);
             // A symbolic link in the templates directory may not point outside it.

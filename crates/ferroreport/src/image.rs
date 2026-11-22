@@ -128,7 +128,7 @@ impl ImageStore {
     }
 
     /// Loads a subreport template. A compiled `.jasper` location is resolved to the `.jrxml`
-    /// source next to it: compiled templates are never deserialized.
+    /// source next to it (or a `.ferro` one): compiled templates are never deserialized.
     pub fn load_report(&mut self, location: &str) -> Result<Arc<crate::model::Report>> {
         if let Some(r) = self.reports.get(location) {
             return Ok(r.clone());
@@ -136,11 +136,22 @@ impl ImageStore {
         if location.contains("://") {
             return Err(Error::Unsupported(format!("subreport `{location}`: remote templates are not fetched")));
         }
-        let source = match location.strip_suffix(".jasper") {
-            Some(stem) => format!("{stem}.jrxml"),
-            None => location.to_string(),
+        let (source, bytes) = match location.strip_suffix(".jasper") {
+            Some(stem) => {
+                let jrxml = format!("{stem}.jrxml");
+                match self.read(&jrxml) {
+                    Ok(b) => (jrxml, b),
+                    Err(e) => {
+                        let ferro = format!("{stem}.ferro");
+                        match self.read(&ferro) {
+                            Ok(b) => (ferro, b),
+                            Err(_) => return Err(e),
+                        }
+                    }
+                }
+            }
+            None => (location.to_string(), self.read(location)?),
         };
-        let bytes = self.read(&source)?;
         let text = String::from_utf8(bytes).map_err(|_| Error::Data(format!("subreport `{source}` is not UTF-8")))?;
         let report = Arc::new(crate::jrxml::parse_report_with(&text, &|l| self.read(l).ok())?);
         self.reports.insert(location.to_string(), report.clone());
@@ -211,7 +222,8 @@ fn decode_svg(bytes: &[u8], id: usize) -> Result<ImageData> {
 /// A picture inside an SVG (PNG, JPEG or GIF), with an identifier no store hands out.
 pub(crate) fn decode_embedded(bytes: &[u8]) -> Result<Arc<ImageData>> {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    static NEXT: AtomicUsize = AtomicUsize::new(1 << 40);
+    // Half the range up: far from the ones a store counts from 0, on 32-bit targets too.
+    static NEXT: AtomicUsize = AtomicUsize::new(usize::MAX / 2 + 1);
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
     let img = if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
         decode_png(bytes, id)?

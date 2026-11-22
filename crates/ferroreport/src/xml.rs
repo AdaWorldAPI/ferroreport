@@ -60,6 +60,16 @@ fn predefined_entity(name: &str) -> Option<&'static str> {
 const MAX_DEPTH: usize = 100;
 
 pub fn parse(source: &str) -> Result<Node> {
+    parse_with(source, false)
+}
+
+/// Like [`parse`], but element and attribute names keep their namespace prefixes
+/// (`jr:table`, `xmlns:jr`), for tools that rewrite a template rather than read it.
+pub fn parse_raw(source: &str) -> Result<Node> {
+    parse_with(source, true)
+}
+
+fn parse_with(source: &str, raw: bool) -> Result<Node> {
     let mut reader = Reader::from_str(source);
     reader.config_mut().trim_text(false);
     let mut stack: Vec<Node> = Vec::new();
@@ -73,10 +83,10 @@ pub fn parse(source: &str) -> Result<Node> {
                 if stack.len() >= MAX_DEPTH {
                     return Err(Error::Xml(format!("elements nested more than {MAX_DEPTH} levels deep")));
                 }
-                stack.push(open(&e, pos)?);
+                stack.push(open(&e, pos, raw)?);
             }
             Ok(Event::Empty(e)) => {
-                let node = open(&e, pos)?;
+                let node = open(&e, pos, raw)?;
                 attach(&mut stack, &mut root, node);
             }
             Ok(Event::End(_)) => {
@@ -119,11 +129,12 @@ pub fn parse(source: &str) -> Result<Node> {
     root.ok_or_else(|| Error::Xml("empty document".into()))
 }
 
-fn open(e: &quick_xml::events::BytesStart<'_>, pos: u64) -> Result<Node> {
-    let mut node = Node { name: local(e.name().as_ref()), ..Default::default() };
+fn open(e: &quick_xml::events::BytesStart<'_>, pos: u64, raw: bool) -> Result<Node> {
+    let name = |n: &str| if raw { n.to_string() } else { local(n) };
+    let mut node = Node { name: name(e.name().as_ref()), ..Default::default() };
     for a in e.attributes() {
         let a = a.map_err(|x| Error::Xml(format!("{x} (byte {pos})")))?;
-        let key = local(a.key.as_ref());
+        let key = name(a.key.as_ref());
         #[allow(deprecated)]
         let value = a.unescape_value().map_err(|x| Error::Xml(format!("{x} (byte {pos})")))?;
         node.attrs.push((key, value.into_owned()));

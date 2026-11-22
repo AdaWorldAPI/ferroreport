@@ -16,6 +16,7 @@
 
 pub mod barcode;
 pub mod chart;
+pub mod convert;
 pub mod crosstab;
 pub mod csv;
 pub mod data;
@@ -38,6 +39,7 @@ pub mod rtf;
 pub mod standard;
 pub mod svg;
 pub mod table;
+pub mod template;
 pub mod text;
 pub mod value;
 pub mod xlsx;
@@ -173,13 +175,13 @@ impl Renderer {
         self
     }
 
-    fn pdf_options(&self, title: &str, page_offsets: [[f32; 2]; 2]) -> pdf::PdfOptions {
+    fn pdf_options(&self, title: &str, settings: &model::PdfSettings) -> pdf::PdfOptions {
         pdf::PdfOptions {
             title: Some(title.to_string()),
             compress: true,
-            tagged: self.tagged,
-            lang: Some(self.locale.tag.replace('_', "-")),
-            page_offsets,
+            tagged: self.tagged || settings.tagged,
+            lang: Some(settings.language.clone().unwrap_or_else(|| self.locale.tag.replace('_', "-"))),
+            page_offsets: settings.page_offsets,
         }
     }
 
@@ -279,7 +281,7 @@ impl Renderer {
         let env = self.env(report);
         match format {
             Format::Pdf => {
-                let options = self.pdf_options(&report.name, report.pdf_page_offsets);
+                let options = self.pdf_options(&report.name, &report.pdf);
                 let mut sink = pdf::PdfStream::new(out, report.page_width, report.page_height, options)?;
                 let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
                 sink.finish(&self.fonts)?;
@@ -317,7 +319,7 @@ impl Renderer {
 
     /// Exports a filled document to PDF.
     pub fn to_pdf(&self, doc: &PrintDocument) -> Result<Vec<u8>> {
-        pdf::write_pdf(doc, &self.fonts, &self.pdf_options(&doc.name, doc.pdf_page_offsets))
+        pdf::write_pdf(doc, &self.fonts, &self.pdf_options(&doc.name, &doc.pdf))
     }
 
     /// Exports a filled document to an Excel workbook (XLSX), laid out like JasperReports'

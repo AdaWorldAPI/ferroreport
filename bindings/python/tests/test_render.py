@@ -70,7 +70,9 @@ def test_excel_and_csv(tmp_path):
     ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "invoice.csv", rows, params)
     assert (tmp_path / "invoice.csv").read_text().startswith(",Ferro")
     with pytest.raises(ferroreport.FerroreportError):
-        ferroreport.render(fx / "report.jrxml", rows, params, format="docx")
+        ferroreport.render(fx / "report.jrxml", rows, params, format="odt")
+    docx = ferroreport.render(fx / "report.jrxml", rows, params, format="docx")
+    assert "word/document.xml" in zipfile.ZipFile(__import__("io").BytesIO(docx)).namelist()
 
 
 def test_streams_a_data_file_to_a_file(tmp_path):
@@ -121,3 +123,22 @@ def test_rows_from_a_generator_and_html(tmp_path):
     html = ferroreport.render(fx / "report.jrxml", list(rows())[:50], format="html").decode()
     assert html.startswith("<!DOCTYPE html>") and "Employee 50</text>" in html
     assert ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "list.html", list(rows())[:50])["pages"] == 2
+
+
+def test_own_template_format(tmp_path):
+    fx = FIXTURES / "02-invoice"
+    import json
+
+    data = json.loads((fx / "data.json").read_text())
+    params = json.loads((fx / "params.json").read_text())
+    ferro = ferroreport.convert(fx / "report.jrxml")
+    assert ferro.startswith("report invoice")
+    path = tmp_path / "invoice.ferro"
+    path.write_text(ferro)
+    # From the file and from its text, the same rows as the JRXML.
+    want = ferroreport.render(fx / "report.jrxml", data, params, format="csv")
+    assert ferroreport.render(path, data, params, format="csv") == want
+    assert ferroreport.render(ferro, data, params, format="csv") == want
+    assert '<element kind="textField"' in ferroreport.convert(ferro, to="jrxml")
+    with pytest.raises(ferroreport.FerroreportError):
+        ferroreport.convert(ferro, to="docx")

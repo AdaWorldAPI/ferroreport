@@ -5,12 +5,12 @@ the same rows and parameters and compared page by page. Made by `tools/samples.p
 
 | Result | Templates | Meaning |
 |---|---|---|
-| same | 41 | every page is the same picture |
-| differs | 40 | both engines render it, the pictures differ |
-| not rendered | 20 | ferroreport refuses the template or fails on it |
+| same | 44 | every page is the same picture |
+| differs | 41 | both engines render it, the pictures differ |
+| not rendered | 16 | ferroreport refuses the template or fails on it |
 | no reference | 70 | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |
 
-**41 of the 101 templates that can be compared come out the same.** JasperReports runs with the
+**44 of the 101 templates that can be compared come out the same.** JasperReports runs with the
 Java runtime's logical fonts (SansSerif, Serif, Monospaced) on DejaVu, as on a stock Linux server (`tools/oracle/fonts.conf`):
 text that names no font is laid out with them and written in PDF's built-in Helvetica, Times or Courier, by both engines.
 
@@ -20,14 +20,14 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 
 | Template | Result | Pages | Why |
 |---|---|---|---|
-| `accessible/reports/AccessibleReport.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `accessible/reports/AccessibleReport.jrxml` | differs | 2/2 | worst page differs in 12.3% of its ink |
 | `alterdesign/reports/AlterDesignReport.jrxml` | same | 1/1 |  |
 | `antcompile/reports/com/bar/BarReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeBarClass.isToPrint() |
 | `antcompile/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
 | `antupdate/reports/com/bar/BarReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeBarClass.isToPrint() |
 | `antupdate/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
 | `barbecue/reports/BarbecueReport.jrxml` | differs | 1/1 | worst page differs in 89.3% of its ink: <component> elements are not supported yet and are skipped |
-| `barcode4j/reports/Barcode4JReport.jrxml` | differs | 1/1 | worst page differs in 6.5% of its ink: <component> elements are not supported yet and are skipped |
+| `barcode4j/reports/Barcode4JReport.jrxml` | same | 1/1 |  |
 | `batchexport/reports/Report1.jrxml` | same | 2/2 |  |
 | `batchexport/reports/Report2.jrxml` | same | 2/2 |  |
 | `batchexport/reports/Report3.jrxml` | same | 2/2 |  |
@@ -39,7 +39,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `charts/reports/AreaChartReport.jrxml` | differs | 13/13 | worst page differs in 4.8% of its ink |
 | `charts/reports/Bar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 9.1% of its ink |
 | `charts/reports/BarChartReport.jrxml` | differs | 13/13 | worst page differs in 9.7% of its ink: chart customizers (customizerClass) are ignored |
-| `charts/reports/BubbleChartReport.jrxml` | differs | 19/19 | worst page differs in 22.4% of its ink |
+| `charts/reports/BubbleChartReport.jrxml` | differs | 19/19 | worst page differs in 21.4% of its ink |
 | `charts/reports/CandlestickChartReport.jrxml` | differs | 18/18 | worst page differs in 7.7% of its ink |
 | `charts/reports/GanttChartReport.jrxml` | differs | 1/1 | worst page differs in 11.1% of its ink |
 | `charts/reports/HighLowChartReport.jrxml` | differs | 18/18 | worst page differs in 13.3% of its ink |
@@ -48,18 +48,18 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `charts/reports/MultipleAxisChartReport.jrxml` | differs | 24/24 | worst page differs in 19.1% of its ink |
 | `charts/reports/Pie3DChartReport.jrxml` | differs | 13/13 | worst page differs in 11.1% of its ink |
 | `charts/reports/PieChartReport.jrxml` | differs | 13/13 | worst page differs in 9.3% of its ink |
-| `charts/reports/ScatterChartReport.jrxml` | differs | 19/19 | worst page differs in 16.9% of its ink |
+| `charts/reports/ScatterChartReport.jrxml` | differs | 19/19 | worst page differs in 19.3% of its ink |
 | `charts/reports/StackedAreaChartReport.jrxml` | differs | 13/13 | worst page differs in 19.3% of its ink |
 | `charts/reports/StackedBar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 8.0% of its ink |
 | `charts/reports/StackedBarChartReport.jrxml` | differs | 13/13 | worst page differs in 4.3% of its ink |
 | `charts/reports/SubDatasetChartReport.jrxml` | differs | 7/7 | worst page differs in 32.9% of its ink |
 | `charts/reports/ThermometerChartReport.jrxml` | differs | 16/16 | worst page differs in 9.0% of its ink |
 | `charts/reports/TimeSeriesChartReport.jrxml` | differs | 19/19 | worst page differs in 19.8% of its ink |
-| `charts/reports/XYAreaChartReport.jrxml` | differs | 19/19 | worst page differs in 43.0% of its ink |
-| `charts/reports/XYBarChartReport.jrxml` | differs | 19/19 | worst page differs in 35.0% of its ink |
+| `charts/reports/XYAreaChartReport.jrxml` | differs | 19/19 | worst page differs in 20.0% of its ink |
+| `charts/reports/XYBarChartReport.jrxml` | differs | 19/19 | worst page differs in 14.0% of its ink |
 | `charts/reports/XYBarChartTimePeriodReport.jrxml` | differs | 19/19 | worst page differs in 15.0% of its ink |
 | `charts/reports/XYBarChartTimeSeriesReport.jrxml` | differs | 19/19 | worst page differs in 18.6% of its ink |
-| `charts/reports/XYLineChartReport.jrxml` | differs | 19/19 | worst page differs in 11.7% of its ink |
+| `charts/reports/XYLineChartReport.jrxml` | differs | 19/19 | worst page differs in 15.4% of its ink |
 | `chartthemes/reports/AllChartsReport.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `crosstabs/reports/LateOrdersReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: error evaluating expression: NullPointerException: cannot call toString() on null |
 | `crosstabs/reports/OrdersReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab |
@@ -98,7 +98,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `hyperlink/reports/HyperlinkReport.jrxml` | same | 3/3 |  |
 | `i18n/reports/I18nReport.jrxml` | not rendered |  | error evaluating expression: unsupported method String.getDisplayName() |
 | `iconlabel/reports/IconLabelReport.jrxml` | differs | 2/2 | worst page differs in 49.1% of its ink |
-| `images/reports/ImagesReport.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport: unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `images/reports/ImagesReport.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport: unsupported feature: image format (only PNG, JPEG, GIF and SVG are supported) |
 | `images/reports/scale/ClipNarrowShortImagesReport.jrxml` | same | 1/1 |  |
 | `images/reports/scale/ClipNarrowTallImagesReport.jrxml` | same | 1/1 |  |
 | `images/reports/scale/ClipWideShortImagesReport.jrxml` | same | 1/1 |  |
@@ -119,7 +119,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `images/reports/scale/RetainShapeNarrowTallImagesReport.jrxml` | same | 1/1 |  |
 | `images/reports/scale/RetainShapeWideShortImagesReport.jrxml` | same | 1/1 |  |
 | `images/reports/scale/RetainShapeWideTallImagesReport.jrxml` | same | 1/1 |  |
-| `jasper/reports/FirstJasper.jrxml` | differs | 9/9 | worst page differs in 1.5% of its ink |
+| `jasper/reports/FirstJasper.jrxml` | same | 9/9 |  |
 | `java1.5/reports/Java5Report.jrxml` | not rendered |  | error evaluating expression: unsupported static field Greeting.bye |
 | `javascript/reports/JavaScriptReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
 | `jfreechart/reports/JFreeChartReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
@@ -150,13 +150,13 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `osgi/reports/ImagesReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport: invalid data: `dukesign.jpg` not found in the resource directories |
 | `osgi/reports/JavaScriptReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `paragraphs/reports/ParagraphsReport.jrxml` | differs | 1/1 | worst page differs in 84.5% of its ink |
-| `pdfa/reports/PdfA1Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport: unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `pdfa/reports/PdfA1Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `pdfa/reports/PdfA2Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `pdfa/reports/PdfA3Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
-| `pdfa/reports/TabularPdfA1Report.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG and GIF are supported) |
-| `pdfa/reports/TaggedPdfA1Report.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `pdfa/reports/TabularPdfA1Report.jrxml` | differs | 1/1 | worst page differs in 1.6% of its ink |
+| `pdfa/reports/TaggedPdfA1Report.jrxml` | differs | 2/2 | worst page differs in 13.0% of its ink |
 | `pdfencrypt/reports/PdfEncryptReport.jrxml` | same | 1/1 |  |
-| `query/reports/QueryReport.jrxml` | differs | 1/1 | worst page differs in 10.7% of its ink |
+| `query/reports/QueryReport.jrxml` | same | 1/1 |  |
 | `rotation/reports/RotationReport.jrxml` | differs | 1/1 | worst page differs in 1.3% of its ink |
 | `scriptlet/reports/ScriptletReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: error evaluating expression: NullPointerException: cannot call hello() on null |
 | `shapes/reports/ShapesReport.jrxml` | same | 1/1 |  |
@@ -164,7 +164,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `springboot/reports/AllChartsReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `springboot/reports/ExcelXlsDataAdapterReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `springboot/reports/ExcelXlsQeDataAdapterReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
-| `springboot/reports/ImagesReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport: unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `springboot/reports/ImagesReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport: unsupported feature: image format (only PNG, JPEG, GIF and SVG are supported) |
 | `springboot/reports/StretchReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `stretch/reports/StretchReport.jrxml` | differs | 21/14 | worst page differs in 100.0% of its ink: a different number of pages |
 | `styledtext/reports/StyledTextReport.jrxml` | differs | 1/1 | worst page differs in 2.8% of its ink |
@@ -175,7 +175,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `tableofcontents/reports/TableOfContentsReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
 | `tableofcontents/reports/TablePart.jrxml` | not rendered |  | error evaluating expression: variable `MASTER_CURRENT_PAGE` is not declared |
 | `tableofcontents/reports/TocPart.jrxml` | same | 1/1 |  |
-| `tabular/reports/TabularReport.jrxml` | not rendered |  | unsupported feature: image format (only PNG, JPEG and GIF are supported) |
+| `tabular/reports/TabularReport.jrxml` | differs | 2/2 | worst page differs in 0.7% of its ink |
 | `templates/reports/StylesReport.jrxml` | same | 1/1 |  |
 | `text/reports/TextReport.jrxml` | same | 2/2 |  |
 | `unicode/reports/NumberFormatReport.jrxml` | differs | 1/1 | worst page differs in 25.8% of its ink |

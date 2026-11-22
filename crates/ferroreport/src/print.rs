@@ -201,8 +201,8 @@ pub struct PrintDocument {
     pub page_height: f32,
     /// The report's orientation is landscape.
     pub landscape: bool,
-    /// Where PDF pages are moved to, odd pages then even ones (see [`crate::Report`]).
-    pub pdf_page_offsets: [[f32; 2]; 2],
+    /// What the template asks of PDF output (see [`crate::Report`]).
+    pub pdf: crate::model::PdfSettings,
     pub pages: Vec<PrintPage>,
 }
 

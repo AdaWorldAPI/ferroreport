@@ -100,6 +100,21 @@ pub fn inspect(template: &str) -> Result<JsValue, JsError> {
     serde::Serialize::serialize(&out, &ser).map_err(|e| JsError::new(&e.to_string()))
 }
 
+/// Rewrites a template: `to` is "ferro" (ferroreport's own format) or "jrxml" (JRXML as
+/// JasperReports 7 writes it). Both are rendered the same.
+#[wasm_bindgen]
+pub fn convert(template: &str, to: &str) -> Result<String, JsError> {
+    use ferroreport::{convert, template as own};
+    let r = match (own::is_template(template), to) {
+        (true, "jrxml") => own::to_jrxml(template),
+        (true, "ferro") => own::to_jrxml(template).and_then(|x| own::from_jrxml(&x)),
+        (false, "jrxml") => convert::jrxml_to_v7(template),
+        (false, "ferro") => own::from_jrxml(template),
+        (_, other) => return Err(JsError::new(&format!("to={other:?}: use \"ferro\" or \"jrxml\""))),
+    };
+    r.map_err(js_err)
+}
+
 /// Version of the engine.
 #[wasm_bindgen]
 pub fn version() -> String {
