@@ -1,0 +1,27 @@
+{
+  "name": "ferroreport",
+  "displayName": "ferroreport templates (.ferro)",
+  "description": "Syntax highlighting, folding and snippets for ferroreport's .ferro report templates.",
+  "version": "1.0.0",
+  "publisher": "cristianencarnacion",
+  "license": "MIT OR Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/cristianEncarnacion/ferroreport" },
+  "homepage": "https://cristianencarnacion.github.io/ferroreport/docs.html#ferro",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages", "Snippets"],
+  "keywords": ["ferroreport", "jasperreports", "jrxml", "report", "pdf"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ferro",
+        "aliases": ["ferroreport template", "ferro"],
+        "extensions": [".ferro"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      { "language": "ferro", "scopeName": "source.ferro", "path": "./syntaxes/ferro.tmLanguage.json" }
+    ],
+    "snippets": [{ "language": "ferro", "path": "./snippets/ferro.json" }]
+  }
+}

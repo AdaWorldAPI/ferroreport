@@ -1,0 +1,15 @@
+{
+  "comments": { "lineComment": "//" },
+  "brackets": [["{", "}"], ["(", ")"], ["[", "]"]],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "(", "close": ")" },
+    { "open": "[", "close": "]" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] }
+  ],
+  "folding": { "offSide": true },
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(report|styles|style|title|pageHeader|columnHeader|detail|columnFooter|pageFooter|lastPageFooter|summary|noData|background|group|groupHeader|groupFooter|frame|row|stack|def|if|each|dataset|component|list|contents|table)\\b.*$",
+    "decreaseIndentPattern": "^\\s*$"
+  }
+}

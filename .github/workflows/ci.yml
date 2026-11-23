@@ -24,6 +24,14 @@ jobs:
       - run: cargo clippy --workspace --all-targets --exclude ferroreport-python -- -D warnings
       - run: cargo test
 
+  # The oldest Rust the library promises to build with (rust-version in Cargo.toml).
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.80
+      - run: cargo check --locked -p ferroreport --lib
+
   # Known vulnerabilities, licenses and sources of every dependency (deny.toml).
   dependencies:
     runs-on: ubuntu-latest

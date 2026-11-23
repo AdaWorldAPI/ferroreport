@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// A value flowing through fields, parameters, variables and expressions.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub enum Value {
     #[default]
     Null,
@@ -51,6 +52,7 @@ pub struct DateRange {
 
 /// Java classes a field, parameter or variable can be declared with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum JavaType {
     String,
     Integer,

@@ -70,6 +70,7 @@ pub fn parse(template: &str) -> Result<Report> {
 
 /// An output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum Format {
     #[default]
     Pdf,

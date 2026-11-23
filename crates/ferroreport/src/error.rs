@@ -7,6 +7,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Everything that can go wrong while parsing, filling or exporting a report.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The template is not well-formed XML.
     #[error("invalid XML: {0}")]

@@ -19,6 +19,7 @@ pub(crate) const BYTE_RANGE_PLACEHOLDER: &str = "/ByteRange [0 0000000000 000000
 
 /// How a [`Signer`] signs: always over SHA-256.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SignatureAlgorithm {
     /// RSA, PKCS#1 v1.5 padding.
     RsaSha256,

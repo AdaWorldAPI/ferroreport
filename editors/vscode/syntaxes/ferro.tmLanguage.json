@@ -1,0 +1,180 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ferroreport template",
+  "scopeName": "source.ferro",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#line"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.ferro",
+      "match": "^\\s*//.*$"
+    },
+    "line": {
+      "begin": "^(\\s*)([A-Za-z][\\w]*)",
+      "beginCaptures": {
+        "2": {
+          "patterns": [
+            {
+              "include": "#head"
+            }
+          ]
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#text"
+        },
+        {
+          "include": "#attribute"
+        },
+        {
+          "include": "#geometry"
+        },
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#placeholder"
+        },
+        {
+          "match": "\\b(true|false)\\b",
+          "name": "constant.language.ferro"
+        },
+        {
+          "match": "\\S+",
+          "name": "variable.other.word.ferro"
+        }
+      ]
+    },
+    "head": {
+      "patterns": [
+        {
+          "match": "\\b(report|styles|import|def|use|if|each)\\b",
+          "name": "keyword.control.ferro"
+        },
+        {
+          "match": "\\b(title|pageHeader|columnHeader|detail|columnFooter|pageFooter|lastPageFooter|summary|noData|background|group|groupHeader|groupFooter|band|row|stack)\\b",
+          "name": "entity.name.section.ferro"
+        },
+        {
+          "match": "\\b(field|parameter|variable|dataset|sortField|style|template|property|query)\\b",
+          "name": "storage.type.ferro"
+        },
+        {
+          "match": "\\b(h[1-6]|staticText|textField|image|line|rectangle|ellipse|frame|subreport|break|chart|component|crosstab|genericElement)\\b",
+          "name": "entity.name.tag.ferro"
+        },
+        {
+          "match": ".+",
+          "name": "entity.name.tag.other.ferro"
+        }
+      ]
+    },
+    "attribute": {
+      "match": "\\b([A-Za-z][\\w.]*)(=)(\"[^\"]*\"|\\S+)",
+      "captures": {
+        "1": {
+          "name": "entity.other.attribute-name.ferro"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.ferro"
+        },
+        "3": {
+          "patterns": [
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#placeholder"
+            },
+            {
+              "match": ".+",
+              "name": "string.unquoted.ferro"
+            }
+          ]
+        }
+      }
+    },
+    "geometry": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(\\.\\d+)?(,\\d+(\\.\\d+)?|x\\d+(\\.\\d+)?)\\b",
+          "name": "constant.numeric.geometry.ferro"
+        },
+        {
+          "match": "\\b\\d+(\\.\\d+)?(fr|%)?(?=\\s|$)",
+          "name": "constant.numeric.ferro"
+        }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.ferro",
+      "match": "\"([^\"\\\\]|\\\\.)*\""
+    },
+    "placeholder": {
+      "name": "variable.parameter.placeholder.ferro",
+      "match": "\\{\\{\\w+\\}\\}"
+    },
+    "text": {
+      "begin": "\\s(:)(?=\\s|$)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.separator.text.ferro"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "match": "\\$([FPVR])(!?)\\{[^}]*\\}",
+          "name": "variable.other.reference.ferro"
+        },
+        {
+          "match": "\\{\\{\\w+\\}\\}",
+          "name": "variable.parameter.placeholder.ferro"
+        },
+        {
+          "match": "\"([^\"\\\\]|\\\\.)*\"",
+          "name": "string.quoted.double.ferro"
+        },
+        {
+          "match": "'([^'\\\\]|\\\\.)*'",
+          "name": "string.quoted.single.ferro"
+        },
+        {
+          "match": "\\b\\d+(\\.\\d+)?[LlDdFfG]?\\b",
+          "name": "constant.numeric.ferro"
+        },
+        {
+          "match": "\\b(new|null|true|false|it|in|as)\\b",
+          "name": "keyword.other.ferro"
+        },
+        {
+          "match": "\\b[A-Z][A-Z_]+(?=\\()",
+          "name": "support.function.ferro"
+        },
+        {
+          "match": "\\b[a-z]\\w*(?=\\s*[({])",
+          "name": "entity.name.function.ferro"
+        },
+        {
+          "match": "==|!=|<=|>=|&&|\\|\\||\\?:|\\*\\*|<=>|->|[-+*/%<>!?:]",
+          "name": "keyword.operator.ferro"
+        }
+      ]
+    }
+  }
+}

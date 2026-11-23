@@ -1,5 +1,5 @@
 # Publishes a release when a tag like v0.1.0 is pushed:
-#   - CLI binaries (Linux, macOS, Windows) on the GitHub release
+#   - CLI binaries (Linux, macOS, Windows) and the VS Code extension on the GitHub release
 #   - Docker image on ghcr.io/cristianencarnacion/ferroreport
 #   - npm package `ferroreport` (WebAssembly)
 #   - PyPI package `ferroreport` (wheels for Linux, macOS, Windows)
@@ -56,8 +56,19 @@ jobs:
           name: bin-${{ matrix.name }}
           path: dist/*
 
+  # The VS Code extension for .ferro templates, attached to the release.
+  vscode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: cd editors/vscode && npx -y @vscode/vsce package -o ../../ferroreport-vscode.vsix
+      - uses: actions/upload-artifact@v5
+        with:
+          name: bin-vscode
+          path: ferroreport-vscode.vsix
+
   github-release:
-    needs: binaries
+    needs: [binaries, vscode]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -74,6 +85,7 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.zip
+            dist/*.vsix
             dist/SHA256SUMS
 
   docker:

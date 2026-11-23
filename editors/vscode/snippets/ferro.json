@@ -1,0 +1,47 @@
+{
+  "Report": {
+    "prefix": "report",
+    "body": [
+      "report \"${1:Title}\" lang=${2:en}",
+      "  style Base default fontName=\"DejaVu Sans\" fontSize=10",
+      "  field ${3:name} ${4:String}",
+      "",
+      "  title gap=6",
+      "    h1 height=26 fontSize=16 : ${1:Title}",
+      "  detail",
+      "    textField : \\$F{${3:name}}",
+      "$0"
+    ],
+    "description": "A new report"
+  },
+  "Row": {
+    "prefix": "row",
+    "body": ["row height=${1:16}", "  textField ${2:1fr} : $3", "  textField ${4:1fr} : $0"],
+    "description": "Parts side by side"
+  },
+  "If": {
+    "prefix": "if",
+    "body": ["if : ${1:\\$F{field} != null}", "  $0"],
+    "description": "Parts printed only when the condition holds"
+  },
+  "Each": {
+    "prefix": "each",
+    "body": ["each : \\$F{${1:lines}}", "  field ${2:name} ${3:String}", "  textField : \\$F{${2:name}}$0"],
+    "description": "Parts repeated for every row of a nested list"
+  },
+  "Definition": {
+    "prefix": "def",
+    "body": ["def ${1:money} ${2:value}", "  textField pattern=#,##0.00 hTextAlign=Right : {{${2:value}}}$0"],
+    "description": "A definition to use again"
+  },
+  "Use": {
+    "prefix": "use",
+    "body": ["use ${1:money} ${2:1fr} ${3:value}=${4:\\$F{amount}}$0"],
+    "description": "Use a definition"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": ["import \"${1:parts.ferro}\"$0"],
+    "description": "Bring in another file's definitions and styles"
+  }
+}
