@@ -36,7 +36,9 @@ pub fn write_csv(doc: &PrintDocument, options: &CsvOptions) -> String {
 
 /// Appends the CSV rows of one page.
 pub fn page_csv(items: &[PrintItem], page_width: f32, page_height: f32, options: &CsvOptions, out: &mut String) {
-    let nodes = grid::nodes(items);
+    let mut nodes = grid::nodes(items);
+    // A text with nothing in it takes no place in the CSV grid, as in JasperReports.
+    nodes.retain(|n| !matches!(&n.what, What::Text(t) if t.text.is_empty()));
     let width = page_width.round() as i32;
     let height = page_height.round() as i32;
     // Each page has its own columns: those where one of its texts starts.

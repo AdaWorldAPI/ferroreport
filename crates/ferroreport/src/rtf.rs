@@ -16,8 +16,9 @@ struct State {
 
 /// Reads `src` as RTF; text that is not RTF comes back as it is.
 pub fn parse(src: &str, base: &RunStyle) -> StyledText {
+    // Like JasperReports (Swing's RTF reader), text that is not RTF reads as nothing.
     if !src.trim_start().starts_with("{\\rtf") {
-        return StyledText::plain(src, base);
+        return StyledText::plain("", base);
     }
     let chars: Vec<char> = src.chars().collect();
     let mut fonts: Vec<(i32, String)> = Vec::new();
