@@ -518,6 +518,8 @@ pub(crate) fn escape(s: &str) -> String {
             '\'' => out.push_str("&apos;"),
             '\n' | '\t' | '\r' => out.push(c),
             c if (c as u32) < 0x20 => {}
+            // JasperReports writes the C1 control characters as question marks.
+            '\u{80}'..='\u{9f}' => out.push('?'),
             c => out.push(c),
         }
     }

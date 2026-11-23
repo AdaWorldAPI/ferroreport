@@ -404,9 +404,11 @@ pub fn call(name: &str, args: Vec<Value>, env: &EvalEnv) -> Result<Value> {
             let (Some(n), Some(radix)) = (whole(name, &a(0))?, whole(name, &a(1))?) else { return Ok(Value::Null) };
             let mut digits = radix_string(n as i32 as i64, if (2..=36).contains(&radix) { radix as u32 } else { 10 });
             if let Some(min) = if args.len() > 2 { whole(name, &a(2))? } else { None } {
-                while (digits.chars().count() as i64) < min {
-                    digits.insert(0, '0');
+                if min > 1 << 20 {
+                    return Err(fail(name, "the minimum length is over a million characters"));
                 }
+                let missing = (min.max(0) as usize).saturating_sub(digits.len());
+                digits.insert_str(0, &"0".repeat(missing));
             }
             Ok(Value::str(digits))
         }
@@ -799,7 +801,10 @@ fn round(name: &str, v: &Value, scale: i64) -> Result<Decimal> {
         // A negative scale rounds to tens, hundreds...; the result is kept with no decimals
         // (JasperReports prints it as 1.2E+3).
         let factor = Decimal::from_i128_with_scale(10i128.pow(scale.unsigned_abs().min(27) as u32), 0);
-        return Ok((d / factor).round_dp_with_strategy(0, mode) * factor);
+        let overflow = || fail(name, "ArithmeticException: the result has more than 28 digits");
+        return (d.checked_div(factor).ok_or_else(overflow)?.round_dp_with_strategy(0, mode))
+            .checked_mul(factor)
+            .ok_or_else(overflow);
     }
     let scale = scale.min(28) as u32;
     let mut r = d.round_dp_with_strategy(scale, mode);

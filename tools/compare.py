@@ -59,9 +59,9 @@ def diff_page(a: np.ndarray, b: np.ndarray, out: Path) -> float:
     return float(share)
 
 
-def run(cmd: list, cwd=None) -> tuple:
+def run(cmd: list, cwd=None, env=None) -> tuple:
     t0 = time.perf_counter()
-    p = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    p = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
     return p, time.perf_counter() - t0
 
 
@@ -93,7 +93,13 @@ def main() -> int:
             cmd.append(str(params))
         # Run Jasper from the fixture directory so relative resource paths resolve there.
         # A fixture filled from a database needs a JDBC driver for the reference run.
-        pj, tj = run(cmd, cwd=fx) if not (fx / "data.sql").exists() else (None, 0.0)
+        # Groovy templates need JasperReports on Java 17 (ORACLE_JAVA_GROOVY): its Groovy 4.0.8
+        # cannot compile on Java 21. The rest run on the default Java, whose dates (Java 21)
+        # are the ones ferroreport follows.
+        env = dict(os.environ)
+        if os.environ.get("ORACLE_JAVA_GROOVY") and 'language="groovy"' in (fx / "report.jrxml").read_text(errors="replace"):
+            env["ORACLE_JAVA"] = os.environ["ORACLE_JAVA_GROOVY"]
+        pj, tj = run(cmd, cwd=fx, env=env) if not (fx / "data.sql").exists() else (None, 0.0)
         cmd = [args.bin, "render", str(fx / "report.jrxml"), "-o", str(ours_pdf), "-q", "--now", "2026-01-15T10:30:00"]
         if data.exists():
             cmd += ["-d", str(data)]

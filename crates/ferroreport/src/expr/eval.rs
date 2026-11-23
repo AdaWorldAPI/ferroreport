@@ -327,15 +327,16 @@ fn arithmetic(op: BinOp, l: &Value, r: &Value, env: &EvalEnv) -> Result<Value> {
         // either language rely on it, so it is always accepted.
         Rank::Decimal => {
             let (a, b) = (l.as_decimal().unwrap_or_default(), r.as_decimal().unwrap_or_default());
+            let overflow = || Error::eval("ArithmeticException: the result has more than 28 digits");
             Value::Decimal(match op {
-                BinOp::Add => a + b,
-                BinOp::Sub => a - b,
-                BinOp::Mul => a * b,
+                BinOp::Add => a.checked_add(b).ok_or_else(overflow)?,
+                BinOp::Sub => a.checked_sub(b).ok_or_else(overflow)?,
+                BinOp::Mul => a.checked_mul(b).ok_or_else(overflow)?,
                 BinOp::Div => {
                     if b.is_zero() {
                         return Err(div0());
                     }
-                    groovy_divide(a, b)
+                    groovy_divide(a, b).ok_or_else(overflow)?
                 }
                 BinOp::Rem => a.checked_rem(b).ok_or_else(div0)?,
                 _ => unreachable!(),
@@ -347,20 +348,19 @@ fn arithmetic(op: BinOp, l: &Value, r: &Value, env: &EvalEnv) -> Result<Value> {
 /// Groovy's BigDecimal division: an exact quotient keeps the scale BigDecimal.divide prefers
 /// (1234.50 / 3 is 411.50, 6 / 2 is 3); one that does not end is rounded half up to 10
 /// decimals.
-fn groovy_divide(a: Decimal, b: Decimal) -> Decimal {
-    if let Some(q) = a.checked_div(b) {
-        if q.checked_mul(b) == Some(a) {
-            let q = q.normalize();
-            let preferred = a.scale() as i64 - b.scale() as i64;
-            let scale = (q.scale() as i64).max(preferred).clamp(0, 28) as u32;
-            let mut r = q;
-            r.rescale(scale);
-            return r;
-        }
+fn groovy_divide(a: Decimal, b: Decimal) -> Option<Decimal> {
+    let q = a.checked_div(b)?;
+    if q.checked_mul(b) == Some(a) {
+        let q = q.normalize();
+        let preferred = a.scale() as i64 - b.scale() as i64;
+        let scale = (q.scale() as i64).max(preferred).clamp(0, 28) as u32;
+        let mut r = q;
+        r.rescale(scale);
+        return Some(r);
     }
-    let mut r = (a / b).round_dp_with_strategy(10, RoundingStrategy::MidpointAwayFromZero);
+    let mut r = q.round_dp_with_strategy(10, RoundingStrategy::MidpointAwayFromZero);
     r.rescale(10);
-    r
+    Some(r)
 }
 
 pub(crate) fn binary(op: BinOp, l: Value, r: Value, env: &EvalEnv) -> Result<Value> {
@@ -540,6 +540,7 @@ fn string_method(s: &str, name: &str, args: &[Value]) -> Result<Value> {
 }
 
 fn number_method(v: &Value, name: &str, args: &[Value], env: &EvalEnv) -> Result<Value> {
+    let overflow = || Error::eval("ArithmeticException: the result has more than 28 digits");
     let d = || v.as_decimal().ok_or_else(|| Error::eval("not a decimal"));
     let darg = |i: usize| -> Result<Decimal> {
         arg(args, i, name)?.as_decimal().ok_or_else(|| Error::eval(format!("{name}: argument must be numeric")))
@@ -549,9 +550,9 @@ fn number_method(v: &Value, name: &str, args: &[Value], env: &EvalEnv) -> Result
         "longValue" => Value::Long(v.as_i64().unwrap_or(0)),
         "doubleValue" => Value::Double(v.as_f64().unwrap_or(0.0)),
         "floatValue" => Value::Float(v.as_f64().unwrap_or(0.0) as f32),
-        "add" => Value::Decimal(d()? + darg(0)?),
-        "subtract" => Value::Decimal(d()? - darg(0)?),
-        "multiply" => Value::Decimal(d()? * darg(0)?),
+        "add" => Value::Decimal(d()?.checked_add(darg(0)?).ok_or_else(overflow)?),
+        "subtract" => Value::Decimal(d()?.checked_sub(darg(0)?).ok_or_else(overflow)?),
+        "multiply" => Value::Decimal(d()?.checked_mul(darg(0)?).ok_or_else(overflow)?),
         "negate" => Value::Decimal(-d()?),
         "abs" => Value::Decimal(d()?.abs()),
         "signum" => {
@@ -572,17 +573,18 @@ fn number_method(v: &Value, name: &str, args: &[Value], env: &EvalEnv) -> Result
             if b.is_zero() {
                 return Err(Error::eval("ArithmeticException: division by zero"));
             }
+            let q = a.checked_div(b).ok_or_else(overflow)?;
             match args.len() {
-                1 => Value::Decimal((a / b).normalize()),
-                2 => Value::Decimal((a / b).round_dp_with_strategy(a.scale(), rounding(&args[1]))),
+                1 => Value::Decimal(q.normalize()),
+                2 => Value::Decimal(q.round_dp_with_strategy(a.scale(), rounding(&args[1]))),
                 _ => {
-                    let scale = int_arg(args, 1, name)? as u32;
-                    Value::Decimal((a / b).round_dp_with_strategy(scale, rounding(&args[2])))
+                    let scale = (int_arg(args, 1, name)?).clamp(0, 28) as u32;
+                    Value::Decimal(q.round_dp_with_strategy(scale, rounding(&args[2])))
                 }
             }
         }
         "setScale" => {
-            let scale = int_arg(args, 0, name)? as u32;
+            let scale = int_arg(args, 0, name)?.clamp(0, 28) as u32;
             let strategy = args.get(1).map(rounding).unwrap_or(RoundingStrategy::ToZero);
             let mut r = d()?.round_dp_with_strategy(scale, strategy);
             r.rescale(scale);

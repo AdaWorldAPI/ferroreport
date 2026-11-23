@@ -1,0 +1,8 @@
+homepage: "https://github.com/cristianEncarnacion/ferroreport"
+language: rust
+primary_contact: "cencarnacioninf13@gmail.com"
+main_repo: "https://github.com/cristianEncarnacion/ferroreport"
+sanitizers:
+  - address
+fuzzing_engines:
+  - libfuzzer

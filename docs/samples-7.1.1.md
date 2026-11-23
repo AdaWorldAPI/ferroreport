@@ -5,12 +5,12 @@ the same rows and parameters and compared page by page. Made by `tools/samples.p
 
 | Result | Templates | Meaning |
 |---|---|---|
-| same | 45 | every page is the same picture |
-| differs | 40 | both engines render it, the pictures differ |
-| not rendered | 16 | ferroreport refuses the template or fails on it |
+| same | 47 | every page is the same picture |
+| differs | 39 | both engines render it, the pictures differ |
+| not rendered | 15 | ferroreport refuses the template or fails on it |
 | no reference | 70 | JasperReports cannot render it from rows alone (it needs the sample's Java classes, a database connection inside the report, or other files), so there is nothing to compare with |
 
-**45 of the 101 templates that can be compared come out the same.** JasperReports runs with the
+**47 of the 101 templates that can be compared come out the same.** JasperReports runs with the
 Java runtime's logical fonts (SansSerif, Serif, Monospaced) on DejaVu, as on a stock Linux server (`tools/oracle/fonts.conf`):
 text that names no font is laid out with them and written in PDF's built-in Helvetica, Times or Courier, by both engines.
 
@@ -68,7 +68,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `csvdatasource/reports/CsvDataSourceReport.jrxml` | no reference |  | JasperReports draws nothing for it without the sample's own program; ferroreport renders it |
 | `csvdatasource/reports/CsvQueryExecuterReport.jrxml` | no reference |  | JasperReports draws nothing for it without the sample's own program; ferroreport renders it |
 | `datasource/reports/DataSourceReport.jrxml` | same | 1/1 |  |
-| `daterange/reports/DateRangeReport.jrxml` | not rendered |  | cannot parse expression `DATERANGE("1996-09-01")`: unknown identifier `DATERANGE` |
+| `daterange/reports/DateRangeReport.jrxml` | same | 1/1 |  |
 | `ejbql/reports/JRMDbCastSubreport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `ejbql/reports/JRMDbReport.jrxml` | no reference |  | its rows come from a ejbql query; ferroreport renders it |
 | `ejbql/reports/JRMDbVariaSubreport.jrxml` | no reference |  | its rows come from a ejbql query; ferroreport renders it |
@@ -85,7 +85,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `forms/reports/FormsReport.jrxml` | differs | 1/1 | worst page differs in 33.5% of its ink |
 | `functions/reports/FunctionsReport.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `genericelement/reports/GenericElementReport.jrxml` | same | 1/1 |  |
-| `groovy/reports/GroovyReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: cannot parse expression `[5, 6, 7, 8, 9].findAll{it % 2 == 1}`: unexpected character `[` |
+| `groovy/reports/GroovyReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
 | `hibernate/reports/AddressesReport.jrxml` | no reference |  | its rows come from a hql query; ferroreport renders it |
 | `hibernate/reports/DocumentsReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `hibernate/reports/HibernateQueryReport.jrxml` | no reference |  | its rows come from a hql query; ferroreport renders it |
@@ -129,7 +129,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `landscape/reports/LandscapeReport.jrxml` | same | 1/1 |  |
 | `list/reports/HorizontalListReport.jrxml` | same | 2/2 |  |
 | `list/reports/ListReport.jrxml` | same | 1/1 |  |
-| `markup/reports/MarkupReport.jrxml` | differs | 1/1 | worst page differs in 0.2% of its ink |
+| `markup/reports/MarkupReport.jrxml` | same | 1/1 |  |
 | `maven/src/main/reports/com/bar/BarReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeBarClass.isToPrint() |
 | `maven/src/main/reports/com/foo/FooReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method SomeFooClass.isToPrint() |
 | `maven/src/test/reports/com/bar/BarTestReport.jrxml` | not rendered |  | error evaluating expression: unsupported static method BarTestClass.isToPrint() |
@@ -146,10 +146,10 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `nopagebreak/reports/NoPageBreakReport.jrxml` | not rendered |  | error evaluating expression: unsupported constructor new ArrayList() |
 | `osgi/reports/ExcelXlsDataAdapterReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `osgi/reports/ExcelXlsQeDataAdapterReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
-| `osgi/reports/GroovyReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport: cannot parse expression `[5, 6, 7, 8, 9].findAll{it % 2 == 1}`: unexpected character `[` |
+| `osgi/reports/GroovyReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
 | `osgi/reports/ImagesReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport: invalid data: `dukesign.jpg` not found in the resource directories |
 | `osgi/reports/JavaScriptReport.jrxml` | no reference |  | runs SQL through a live database connection inside the report; ferroreport renders it |
-| `paragraphs/reports/ParagraphsReport.jrxml` | differs | 1/1 | worst page differs in 84.5% of its ink |
+| `paragraphs/reports/ParagraphsReport.jrxml` | differs | 1/1 | worst page differs in 84.4% of its ink |
 | `pdfa/reports/PdfA1Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `pdfa/reports/PdfA2Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `pdfa/reports/PdfA3Report.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
@@ -169,7 +169,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `stretch/reports/StretchReport.jrxml` | differs | 21/14 | worst page differs in 100.0% of its ink: a different number of pages |
 | `styledtext/reports/StyledTextReport.jrxml` | differs | 1/1 | worst page differs in 2.8% of its ink |
 | `subreport/reports/AddressReport.jrxml` | no reference |  | JasperReports draws nothing for it without the sample's own program; ferroreport renders it |
-| `subreport/reports/MasterReport.jrxml` | differs | 1/1 | worst page differs in 58.9% of its ink: subreports with a connectionExpression get no rows (only data sources are supported) |
+| `subreport/reports/MasterReport.jrxml` | differs | 1/1 | worst page differs in 58.9% of its ink |
 | `subreport/reports/ProductReport.jrxml` | same | 1/1 |  |
 | `table/reports/TableReport.jrxml` | differs | 2/2 | worst page differs in 3.6% of its ink |
 | `tableofcontents/reports/TableOfContentsReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
@@ -181,7 +181,7 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `unicode/reports/NumberFormatReport.jrxml` | differs | 1/1 | worst page differs in 25.8% of its ink |
 | `unicode/reports/UnicodeReport.jrxml` | differs | 2/2 | worst page differs in 95.7% of its ink |
 | `virtualizer/reports/VirtualizerReport.jrxml` | same | 27/27 |  |
-| `webapp/src/main/webapp/reports/WebappReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: cannot parse expression `((scriptlets.WebappScriptlet)$P{REPORT_SCRIPTLET}).hello()`: expected RParen, found Param("REPORT_SCRIPTLET") |
+| `webapp/src/main/webapp/reports/WebappReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport: error evaluating expression: unsupported constructor new File() |
 | `xchart/reports/XChartReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
 | `xchartcomponent/reports/XYChart.jrxml` | no reference |  | JasperReports fails on it without the sample's own program; ferroreport renders it |
 | `xlsfeatures/reports/ExcelNames.jrxml` | differs | 1/1 | worst page differs in 8.0% of its ink |

@@ -54,7 +54,9 @@ fn add_values(a: &Value, b: &Value, class: JavaType) -> Value {
         }
         JavaType::Long | JavaType::BigInteger => Value::Long(a.as_i64().unwrap_or(0).wrapping_add(b.as_i64().unwrap_or(0))),
         JavaType::Float => Value::Float(a.as_f64().unwrap_or(0.0) as f32 + b.as_f64().unwrap_or(0.0) as f32),
-        JavaType::BigDecimal => Value::Decimal(a.as_decimal().unwrap_or_default() + b.as_decimal().unwrap_or_default()),
+        JavaType::BigDecimal => {
+            Value::Decimal(a.as_decimal().unwrap_or_default().saturating_add(b.as_decimal().unwrap_or_default()))
+        }
         _ => Value::Double(a.as_f64().unwrap_or(0.0) + b.as_f64().unwrap_or(0.0)),
     }
 }
@@ -2296,7 +2298,7 @@ fn percentage(value: &Value, total: &Value, class: JavaType) -> Value {
     match class {
         JavaType::BigDecimal => {
             let (Some(v), Some(t)) = (value.as_decimal(), total.as_decimal()) else { return class.zero() };
-            let scaled = v * rust_decimal::Decimal::from(100);
+            let scaled = v.saturating_mul(rust_decimal::Decimal::from(100));
             let q = scaled.checked_div(t).unwrap_or_default();
             Value::Decimal(q.round_dp_with_strategy(scaled.scale(), rust_decimal::RoundingStrategy::MidpointAwayFromZero))
         }

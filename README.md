@@ -435,7 +435,8 @@ barcodes as Barbecue draws them for JasperReports).
 
 `tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
 XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
-same, and every picture anchored to the same cells. All 46 fixtures pass. Jasper's output for five
+same, and every picture anchored to the same cells. All 47 fixtures it can compare pass (48-sql
+needs a JDBC driver for the reference). Jasper's output for five
 of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 `tools/pdfua.sh` renders every fixture as a tagged PDF and checks it against PDF/UA-1 with
@@ -498,8 +499,9 @@ with as many pages as its PDF.
 | 48-sql | The report's SQL query with `$P{}`, `$P!{}` and `$X{IN}`, and a subreport that runs its own query per row on `$P{REPORT_CONNECTION}` | identical² |
 | 49-functions | 265 expressions of JasperReports' function library (`IF`, `SUM`, `DATEFORMAT`, `WORKDAY`, `DATERANGE`...) | identical |
 
-¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21: set `ORACLE_JAVA` to a Java 17
-runtime and `tools/compare.py` includes it. The Groovy subset is also checked expression by
+¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21: set `ORACLE_JAVA_GROOVY` to a
+Java 17 runtime and `tools/compare.py` uses it for Groovy templates (the others stay on Java 21,
+whose date formats, with a narrow space before AM/PM, are the ones ferroreport follows). The Groovy subset is also checked expression by
 expression against JasperReports on Java 17 (`crates/ferroreport/tests/groovy.rs`, 128 cases).
 
 ² Filled from SQLite with the template's own query; the reference run would need a JDBC driver,
@@ -530,13 +532,13 @@ checked.
 
 | Result | 6.20.6 | 7.1.1 |
 |---|---|---|
-| The same pages | 31 | 45 |
-| Both render it, the pages differ | 40 | 40 |
-| ferroreport refuses it or fails on it | 16 | 16 |
-| JasperReports cannot render it from rows and parameters alone (it needs the sample's Java objects, a database connection or other files), so there is nothing to compare | 53 | 70 |
+| The same pages | 34 | 47 |
+| Both render it, the pages differ | 39 | 39 |
+| ferroreport refuses it or fails on it | 15 | 15 |
+| JasperReports cannot render it from rows and parameters alone (it needs the sample's Java objects, a database connection or other files), so there is nothing to compare | 52 | 70 |
 
-So 31 of the 87 6.20.6 samples that can be compared come out the same, and 45 of the 101 7.1.1
-ones. [Every 6.20.6 template with its result and the reason](docs/samples.md), and [every
+So 34 of the 88 6.20.6 samples that can be compared come out the same, and 47 of the 101 7.1.1
+ones (JasperReports 6.20.6 runs on Java 17 there, where its Groovy works). [Every 6.20.6 template with its result and the reason](docs/samples.md), and [every
 7.1.1 one](docs/samples-7.1.1.md). Most of the differences are charts (26 and 24 of them):
 they are drawn to look like JFreeChart's, not pixel for pixel. The rest are elements that are
 not supported (maps, custom components), PDF form

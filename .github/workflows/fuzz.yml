@@ -1,0 +1,34 @@
+name: Fuzz
+
+# Each fuzz target runs for a few minutes once a week (and by hand): a template, an expression,
+# rows or a query that makes the engine panic or hang fails the run, and the input that did it
+# is uploaded.
+on:
+  schedule:
+    - cron: "41 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [template, expression, rows, query]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - name: Seed corpus
+        run: |
+          mkdir -p fuzz/corpus/${{ matrix.target }}
+          case ${{ matrix.target }} in
+            template) cp fixtures/*/*.jrxml examples/*.ferro fuzz/corpus/template/ ;;
+            rows) for f in fixtures/*/data.json; do cp "$f" "fuzz/corpus/rows/$(basename $(dirname $f))"; done ;;
+          esac
+      - run: cargo fuzz run -O ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=600 -timeout=20 -rss_limit_mb=3072
+      - if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz/artifacts

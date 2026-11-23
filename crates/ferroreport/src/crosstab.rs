@@ -50,8 +50,8 @@ pub(crate) fn leaves(
 /// groups with an `orderByExpression`, by `key(path prefix)`; ties keep the natural order.
 pub(crate) fn sorted_paths(paths: &[Vec<Value>], descending: &[bool], order_by: &HashMap<String, Value>) -> Vec<Vec<Value>> {
     let n = descending.len();
-    let mut sorted: Vec<Vec<Value>> = paths.to_vec();
-    sorted.sort_by(|a, b| {
+    // Bucket values come from the data and may mix types: a sort that cannot panic.
+    let mut sorted = crate::expr::groovy::merge_sort(paths.to_vec(), &mut |a: &Vec<Value>, b: &Vec<Value>| {
         for i in 0..n {
             let by = (order_by.get(&key(&a[..=i])), order_by.get(&key(&b[..=i])));
             if let (Some(x), Some(y)) = by {
@@ -89,14 +89,29 @@ pub(crate) fn prefixes(sorted: &[Vec<Value>], len: usize) -> Vec<Vec<Value>> {
     out
 }
 
-/// Nulls first, then natural order (Java's `compareTo`); mixed types by their text.
+/// Nulls first, then natural order (Java's `compareTo`); mixed types by kind.
 fn compare(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering::*;
     match (a.is_null(), b.is_null()) {
         (true, true) => Equal,
         (true, false) => Less,
         (false, true) => Greater,
-        _ => a.compare(b).unwrap_or_else(|| a.to_java_string().cmp(&b.to_java_string())),
+        // Numbers, then texts, dates and the rest, each in its own order.
+        _ => {
+            let rank = |v: &Value| match v {
+                v if v.is_numeric() => 0,
+                Value::Str(_) => 1,
+                Value::Date(_) => 2,
+                Value::Bool(_) => 3,
+                _ => 4,
+            };
+            rank(a).cmp(&rank(b)).then_with(|| {
+                a.compare(b).unwrap_or_else(|| match (a.as_f64(), b.as_f64()) {
+                    (Some(x), Some(y)) => x.total_cmp(&y),
+                    _ => a.to_java_string().cmp(&b.to_java_string()),
+                })
+            })
+        }
     }
 }
 

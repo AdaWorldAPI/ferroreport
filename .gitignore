@@ -5,3 +5,8 @@
 !site/examples/*/jasper.pdf
 __pycache__/
 bindings/java/target/
+/fuzz/target
+/fuzz/corpus
+/fuzz/artifacts
+/fuzz/coverage
+/fuzz/Cargo.lock

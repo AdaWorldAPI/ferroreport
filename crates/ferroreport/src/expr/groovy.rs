@@ -325,7 +325,7 @@ fn list_method<'a>(
                 keyed.push((v, key));
             }
             let mut error = None;
-            keyed.sort_by(|a, b| match &with {
+            let keyed = merge_sort(keyed, &mut |a, b| match &with {
                 Some(c) if c.params.len() == 2 => match c.call(vec![a.0.clone(), b.0.clone()]) {
                     Ok(r) => order(&r),
                     Err(e) => {
@@ -525,6 +525,9 @@ fn string_method(s: &str, name: &str, values: impl Fn() -> Result<Vec<Value>>, e
         }),
         "padLeft" | "padRight" | "center" => {
             let width = count(0)?;
+            if width > 64 << 20 {
+                return Err(fail(format!("{name}: a width over 64 million characters")));
+            }
             let with = pad(1)?;
             if width <= chars.len() || with.is_empty() {
                 return Ok(Some(Value::str(s)));
@@ -844,6 +847,31 @@ fn java_split(s: &str, pattern: &str) -> Result<Vec<String>> {
         parts.pop();
     }
     Ok(parts)
+}
+
+/// A stable merge sort that, unlike the standard one, accepts a comparison that is not a total
+/// order (a template's closure can answer anything) without panicking.
+pub(crate) fn merge_sort<T: Clone>(items: Vec<T>, compare: &mut dyn FnMut(&T, &T) -> Ordering) -> Vec<T> {
+    if items.len() <= 1 {
+        return items;
+    }
+    let mut right = items;
+    let left: Vec<T> = right.drain(..right.len() / 2).collect();
+    let (left, right) = (merge_sort(left, compare), merge_sort(right, compare));
+    let mut out = Vec::with_capacity(left.len() + right.len());
+    let (mut i, mut j) = (0, 0);
+    while i < left.len() && j < right.len() {
+        if compare(&right[j], &left[i]) == Ordering::Less {
+            out.push(right[j].clone());
+            j += 1;
+        } else {
+            out.push(left[i].clone());
+            i += 1;
+        }
+    }
+    out.extend_from_slice(&left[i..]);
+    out.extend_from_slice(&right[j..]);
+    out
 }
 
 /// A closure's answer as a comparator's: a number's sign.
