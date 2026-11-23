@@ -2009,7 +2009,11 @@ fn place_symbol(
         let id = fonts.resolve(&spec);
         let face = fonts.face(id);
         let upem = face.units_per_em as f64;
-        let advances: Vec<f64> = t.text.chars().map(|c| face.advance(face.glyph(c)) as f64 * t.size / upem).collect();
+        let advances: Vec<f64> = t
+            .text
+            .chars()
+            .map(|c| if c.is_control() { 0.0 } else { face.advance(face.glyph(c)) as f64 * t.size / upem })
+            .collect();
         // SVG textLength with lengthAdjust="spacing", as Batik does it: glyph positions are
         // scaled about the first one so that the ink of the last glyph ends at the given length.
         let n = advances.len();

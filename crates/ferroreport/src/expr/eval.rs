@@ -110,6 +110,24 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
                     return decode_bytes(v);
                 }
             }
+            // `x.getClass().getSimpleName()` / `.getName()`: the Java class of a value.
+            if let Expr::Method { target: inner, name: get_class, args: none } = target.as_ref() {
+                if &**get_class == "getClass"
+                    && none.is_empty()
+                    && matches!(&**name, "getSimpleName" | "getName" | "getCanonicalName")
+                {
+                    let v = eval(inner, scope, env)?;
+                    if v.is_null() {
+                        return Err(Error::eval("NullPointerException: getClass() on null"));
+                    }
+                    let full = java_class(&v);
+                    return Ok(Value::str(if &**name == "getSimpleName" {
+                        full.rsplit('.').next().unwrap_or(full)
+                    } else {
+                        full
+                    }));
+                }
+            }
             let recv = eval(target, scope, env)?;
             let argv = args.iter().map(|a| eval(a, scope, env)).collect::<Result<Vec<_>>>()?;
             method(recv, name, argv, env)
@@ -122,6 +140,8 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
                     Ok(Value::str(crate::format::message::message_format(&pattern, argv.get(1..).unwrap_or(&[]), env.locale)))
                 }
                 ("", "str") => resource(&argv.first().map(|v| v.to_java_string()).unwrap_or_default(), scope),
+                ("", f) => super::functions::call(f, argv, env),
+                (c, f) if super::functions::is_function_class(c) => super::functions::call(f, argv, env),
                 _ => static_call(class, name, argv, env),
             }
         }
@@ -130,6 +150,25 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
             let argv = args.iter().map(|a| eval(a, scope, env)).collect::<Result<Vec<_>>>()?;
             construct(class, argv, env)
         }
+    }
+}
+
+/// The Java class a value would have.
+fn java_class(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "java.lang.Boolean",
+        Value::Int(_) => "java.lang.Integer",
+        Value::Long(_) => "java.lang.Long",
+        Value::Float(_) => "java.lang.Float",
+        Value::Double(_) => "java.lang.Double",
+        Value::Decimal(_) => "java.math.BigDecimal",
+        Value::Str(_) => "java.lang.String",
+        Value::Date(_) => "java.util.Date",
+        Value::Bytes(_) => "[B",
+        Value::Json(_) | Value::List(_) => "java.util.ArrayList",
+        Value::DateRange(r) if r.start == r.end => "net.sf.jasperreports.types.date.FixedDate",
+        Value::DateRange(_) => "net.sf.jasperreports.types.date.RelativeDateRange",
     }
 }
 
@@ -338,6 +377,11 @@ fn method(recv: Value, name: &str, args: Vec<Value>, env: &EvalEnv) -> Result<Va
     }
     match &recv {
         Value::Str(s) => string_method(s, name, &args),
+        Value::DateRange(r) => match name {
+            "getStart" => Ok(Value::Date(r.start)),
+            "getEnd" => Ok(Value::Date(r.end)),
+            _ => Err(Error::eval(format!("unsupported method DateRange.{name}()"))),
+        },
         Value::Json(j) => json_method(j, name, &args),
         Value::Bool(b) if name == "booleanValue" => Ok(Value::Bool(*b)),
         Value::Date(d) => match name {
@@ -491,6 +535,9 @@ fn number_method(v: &Value, name: &str, args: &[Value], env: &EvalEnv) -> Result
             Value::Decimal(r)
         }
         "isNaN" => Value::Bool(v.as_f64().is_some_and(f64::is_nan)),
+        "toPlainString" => Value::str(d()?.to_string()),
+        "stripTrailingZeros" => Value::Decimal(d()?.normalize()),
+        "scale" => Value::Int(d()?.scale() as i32),
         _ => {
             let _ = env;
             return Err(Error::eval(format!("unsupported method {}.{name}()", v.type_name())));

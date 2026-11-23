@@ -11,9 +11,21 @@ pub use number::NumberPattern;
 use crate::value::Value;
 
 /// Formats a value for display in a text field, applying `pattern` when given.
+/// `DateFormat.getDateTimeInstance(SHORT, SHORT)` on Java 21.
+pub fn short_date_time(locale: &Locale) -> &'static str {
+    if locale.tag.starts_with("es") {
+        "d/M/yy, H:mm"
+    } else {
+        "M/d/yy, h:mm\u{202F}a"
+    }
+}
+
 pub fn format_value(value: &Value, pattern: Option<&str>, locale: &Locale) -> String {
     match (value, pattern) {
         (Value::Date(dt), Some(p)) if !p.is_empty() => date::format_date(p, dt, locale).unwrap_or_else(|| value.to_java_string()),
+        // A date with no pattern is written in the locale's short date and time, as
+        // JasperReports does (DateFormat.SHORT, SHORT).
+        (Value::Date(dt), _) => date::format_date(short_date_time(locale), dt, locale).unwrap_or_else(|| value.to_java_string()),
         (v, Some(p)) if !p.is_empty() && v.is_numeric() => {
             NumberPattern::parse(p, locale).format(v, locale).unwrap_or_else(|| v.to_java_string())
         }

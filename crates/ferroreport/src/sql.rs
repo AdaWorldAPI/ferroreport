@@ -94,6 +94,18 @@ pub fn sql_value(v: &Value) -> SqlValue {
             serde_json::Value::Null => SqlValue::Null,
             other => SqlValue::Text(other.to_string()),
         },
+        Value::List(items) => SqlValue::Text(Value::List(items.clone()).to_java_string()),
+        // On its own, a range stands for its start; the comparisons below pick the end where
+        // JasperReports does.
+        Value::DateRange(r) => SqlValue::DateTime(r.start),
+    }
+}
+
+/// A comparison's value: for a date range, its start or its end.
+fn edge(v: &Value, start: bool) -> SqlValue {
+    match v {
+        Value::DateRange(r) => SqlValue::DateTime(if start { r.start } else { r.end }),
+        other => sql_value(other),
     }
 }
 
@@ -108,6 +120,7 @@ fn items(v: &Value) -> Vec<SqlValue> {
             serde_json::Value::Null => Vec::new(),
             _ => vec![sql_value(v)],
         },
+        Value::List(list) => list.iter().map(sql_value).collect(),
         other => vec![sql_value(other)],
     }
 }
@@ -205,6 +218,20 @@ fn clause(
             }
             sql.push(')');
         }
+        // A date range is equal to a column that falls inside it.
+        "EQUAL" | "NOTEQUAL" if matches!(value(2)?, Value::DateRange(_)) => {
+            let range = value(2)?;
+            let not = function == "NOTEQUAL";
+            sql.push('(');
+            sql.push_str(column);
+            sql.push_str(if not { " < " } else { " >= " });
+            bind(sql, edge(&range, true));
+            sql.push_str(if not { " OR " } else { " AND " });
+            sql.push_str(column);
+            sql.push_str(if not { " > " } else { " <= " });
+            bind(sql, edge(&range, false));
+            sql.push(')');
+        }
         "EQUAL" | "NOTEQUAL" => {
             let v = sql_value(&value(2)?);
             let not = function == "NOTEQUAL";
@@ -217,7 +244,9 @@ fn clause(
             }
         }
         "LESS" | "LESS]" | "GREATER" | "[GREATER" => {
-            let v = sql_value(&value(2)?);
+            // Before a range is before its start; after it, after its end; the inclusive forms
+            // take the other edge.
+            let v = edge(&value(2)?, matches!(function.as_str(), "LESS" | "[GREATER"));
             if v == SqlValue::Null {
                 sql.push_str("0 = 0");
             } else {
@@ -233,7 +262,7 @@ fn clause(
             }
         }
         "BETWEEN" | "[BETWEEN" | "BETWEEN]" | "[BETWEEN]" => {
-            let (low, high) = (sql_value(&value(2)?), sql_value(&value(3)?));
+            let (low, high) = (edge(&value(2)?, function.starts_with('[')), edge(&value(3)?, function.ends_with(']')));
             let lower = if function.starts_with('[') { " >= " } else { " > " };
             let upper = if function.ends_with(']') { " <= " } else { " < " };
             match (low == SqlValue::Null, high == SqlValue::Null) {

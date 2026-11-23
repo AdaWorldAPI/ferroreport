@@ -139,6 +139,9 @@ impl FaceData {
                 self.out.push(PathOp::Close);
             }
         }
+        if c.is_control() {
+            return;
+        }
         let Ok(face) = ttf_parser::Face::parse(&self.data, 0) else { return };
         let mut b = Builder { out, k: size / self.units_per_em as f64, x, y };
         face.outline_glyph(ttf_parser::GlyphId(self.glyph(c)), &mut b);
@@ -174,6 +177,9 @@ impl FaceData {
     }
 
     pub fn fill_char_width(&self, c: char, size: f32) -> f32 {
+        if c.is_control() {
+            return 0.0;
+        }
         (self.advance(self.glyph(c)) as f64 * size as f64 / self.units_per_em as f64) as f32
     }
 
@@ -191,6 +197,10 @@ impl FaceData {
 
     /// Glyph advance in thousandths of an em, truncated.
     fn advance_millis(&self, c: char) -> i64 {
+        // Control characters (U+0000-001F, U+007F-009F) are neither drawn nor measured, as in Java.
+        if c.is_control() {
+            return 0;
+        }
         (self.advance(self.glyph(c)) as f64 * 1000.0 / self.units_per_em as f64) as i64
     }
 

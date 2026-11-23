@@ -29,6 +29,22 @@ pub enum Value {
     /// Structured data from the JSON source: a list of rows (`java.util.List`, a data
     /// source for a subreport) or a nested object.
     Json(Arc<serde_json::Value>),
+    /// A list made by an expression: a Groovy `[1, 2, 3]` or what `findAll` and `collect` give.
+    List(Arc<Vec<Value>>),
+    /// `net.sf.jasperreports.types.date.DateRange`, what `DATERANGE()` gives.
+    DateRange(Arc<DateRange>),
+}
+
+/// A span of time, as JasperReports' `DATERANGE("MONTH-1")` or `DATERANGE("2026-03-05")`
+/// gives it: `$X{}` clauses compare columns with its start or its end.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DateRange {
+    /// The first instant.
+    pub start: NaiveDateTime,
+    /// The last instant (the millisecond before the next unit, for a relative range).
+    pub end: NaiveDateTime,
+    /// How it was written, which is what it prints as.
+    pub text: String,
 }
 
 /// Java classes a field, parameter or variable can be declared with.
@@ -53,6 +69,8 @@ pub enum JavaType {
     Bytes,
     /// `java.util.List`, `Collection`, `JRDataSource`: nested rows.
     List,
+    /// `net.sf.jasperreports.types.date.DateRange`.
+    DateRange,
     Object,
 }
 
@@ -81,6 +99,7 @@ impl JavaType {
             "List" | "Collection" | "ArrayList" | "Set" | "JRDataSource" | "JRRewindableDataSource" | "JsonDataSource" => {
                 JavaType::List
             }
+            "DateRange" => JavaType::DateRange,
             _ => JavaType::Object,
         }
     }
@@ -176,6 +195,8 @@ impl Value {
             (Value::Str(a), Value::Str(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Date(a), Value::Date(b)) => a == b,
+            (Value::List(a), Value::List(b)) => a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.java_equals(y)),
+            (Value::DateRange(a), Value::DateRange(b)) => a.start == b.start && a.end == b.end,
             (a, b) if a.is_numeric() && b.is_numeric() => compare_numbers(a, b) == Some(Ordering::Equal),
             _ => false,
         }
@@ -205,7 +226,8 @@ impl Value {
             Value::Str(_) => "String",
             Value::Date(_) => "Date",
             Value::Bytes(_) => "byte[]",
-            Value::Json(_) => "List",
+            Value::Json(_) | Value::List(_) => "List",
+            Value::DateRange(_) => "DateRange",
         }
     }
 
@@ -223,6 +245,9 @@ impl Value {
             Value::Date(d) => d.format("%a %b %d %H:%M:%S UTC %Y").to_string(),
             Value::Bytes(b) => format!("[B@{:x}", b.len()),
             Value::Json(j) => j.to_string(),
+            // As Groovy prints a list.
+            Value::List(items) => format!("[{}]", items.iter().map(Value::to_java_string).collect::<Vec<_>>().join(", ")),
+            Value::DateRange(r) => r.text.clone(),
         }
     }
 }

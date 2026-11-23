@@ -69,6 +69,13 @@ pub fn json_to_value(v: &serde_json::Value, ty: JavaType) -> Result<Value> {
             _ => return Err(bad()),
         },
         JavaType::List => Value::Json(std::sync::Arc::new(v.clone())),
+        // `"MONTH-1"`, `"2026-03-05"`: what DATERANGE() takes.
+        JavaType::DateRange => match v {
+            J::String(s) => {
+                crate::expr::functions::date_range_from_text(s, chrono::Utc::now().naive_utc(), &crate::format::locale::EN_US)?
+            }
+            _ => return Err(bad()),
+        },
         JavaType::Object => match v {
             J::String(s) => Value::str(s.clone()),
             J::Bool(b) => Value::Bool(*b),

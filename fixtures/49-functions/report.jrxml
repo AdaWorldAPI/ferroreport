@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- JasperReports' function library (IF, SUM, DATEFORMAT, DATERANGE...), one result per line;
+     tests/functions.rs holds what JasperReports 6.20.6 gives for each. -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="functions" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="7"/>
+	<detail>
+		<band height="550">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[DATE(2026,3,5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[YEAR(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[MONTH(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[DAY(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[WEEKDAY(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[WEEKDAY(DATE(2026,3,5), true)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[WEEKDAY(DATE(2026,3,5), false)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[HOUR(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[DAYSINMONTH(DATE(2026,2,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[DAYSINYEAR(DATE(2028,2,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[ISLEAPYEAR(DATE(2028,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[EDATE(DATE(2026,1,31), 1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[EDATE(DATE(2026,3,5), -14)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,5), 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,6), -1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="165" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,1), DATE(2026,3,31))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="176" width="555" height="11"/><textFieldExpression><![CDATA[DAYS(DATE(2026,1,1), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="187" width="555" height="11"/><textFieldExpression><![CDATA[DAYS(DATE(2026,3,5), DATE(2026,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="198" width="555" height="11"/><textFieldExpression><![CDATA[WEEKS(DATE(2026,1,1), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="209" width="555" height="11"/><textFieldExpression><![CDATA[MONTHS(DATE(2026,1,31), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="220" width="555" height="11"/><textFieldExpression><![CDATA[YEARS(DATE(2020,6,1), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="231" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATE(2026,3,5), "dd/MM/yyyy")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="242" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATE(2026,3,5), "EEEE d 'de' MMMM")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="253" width="555" height="11"/><textFieldExpression><![CDATA[DATEVALUE(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="264" width="555" height="11"/><textFieldExpression><![CDATA[DATE(2026,3,5).getTime()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="275" width="555" height="11"/><textFieldExpression><![CDATA[TIME(10, 30, 15)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="286" width="555" height="11"/><textFieldExpression><![CDATA[TIME(10, 30, 15, "hh:mm a")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="297" width="555" height="11"/><textFieldExpression><![CDATA[MINUTE(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="308" width="555" height="11"/><textFieldExpression><![CDATA[SECOND(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="319" width="555" height="11"/><textFieldExpression><![CDATA[YEAR("2026-03-05")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="330" width="555" height="11"/><textFieldExpression><![CDATA[DAYS("2026-01-01", "2026-03-05")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="341" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="352" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3.5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="363" width="555" height="11"/><textFieldExpression><![CDATA[ABS(new java.math.BigDecimal("-2.50"))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="374" width="555" height="11"/><textFieldExpression><![CDATA[FACT(5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="385" width="555" height="11"/><textFieldExpression><![CDATA[ISEVEN(4)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="396" width="555" height="11"/><textFieldExpression><![CDATA[ISODD(4)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="407" width="555" height="11"/><textFieldExpression><![CDATA[PRODUCT(2, 3, 4)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="418" width="555" height="11"/><textFieldExpression><![CDATA[PRODUCT(2, 3.5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="429" width="555" height="11"/><textFieldExpression><![CDATA[SIGN(-7)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="440" width="555" height="11"/><textFieldExpression><![CDATA[SIGN(0.0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="451" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(16)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="462" width="555" height="11"/><textFieldExpression><![CDATA[SUM(1, 2, 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="473" width="555" height="11"/><textFieldExpression><![CDATA[SUM(1, 2.5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="484" width="555" height="11"/><textFieldExpression><![CDATA[SUM(new java.math.BigDecimal("1.10"), 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="495" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1, 7, 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="506" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1, 7.5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="517" width="555" height="11"/><textFieldExpression><![CDATA[MIN(4, 2, 9)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="528" width="555" height="11"/><textFieldExpression><![CDATA[FLOOR(2.7)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="539" width="555" height="11"/><textFieldExpression><![CDATA[FLOOR(-2.5)]]></textFieldExpression></textField>
+		</band>
+		<band height="550">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[CEIL(2.1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[AND(true, true, false)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[OR(false, true)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[NOT(true)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[IF(1 > 2, "yes", "no")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[IF(true, 5, "x")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[EQUALS(1, 1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[EQUALS(1, 1L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[EQUALS(null, null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[EQUALS("a", null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[TRUE()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(2.345, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(2.5, 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_EVEN(2.5, 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_EVEN(2.345, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="165" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_DOWN(2.345, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="176" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_UP(2.341, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="187" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_DOWN(2.349, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="198" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_CEILING(-2.341, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="209" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_FLOOR(-2.341, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="220" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(new java.math.BigDecimal("2.345"), 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="231" width="555" height="11"/><textFieldExpression><![CDATA[ISEVEN(3.7)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="242" width="555" height="11"/><textFieldExpression><![CDATA[ISODD(-3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="253" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="264" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(new java.math.BigDecimal("2.25"))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="275" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="286" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3.5f)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="297" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1L, 7)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="308" width="555" height="11"/><textFieldExpression><![CDATA[MAX(new java.math.BigDecimal("2.5"), 1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="319" width="555" height="11"/><textFieldExpression><![CDATA[MIN(2.5f, 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="330" width="555" height="11"/><textFieldExpression><![CDATA[PRODUCT(new java.math.BigDecimal("1.5"), 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="341" width="555" height="11"/><textFieldExpression><![CDATA[SUM(1L, 2L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="352" width="555" height="11"/><textFieldExpression><![CDATA[FACT(0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="363" width="555" height="11"/><textFieldExpression><![CDATA[FACT(20)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="374" width="555" height="11"/><textFieldExpression><![CDATA[CEIL(-2.1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="385" width="555" height="11"/><textFieldExpression><![CDATA[FLOOR(new java.math.BigDecimal("2.9"))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="396" width="555" height="11"/><textFieldExpression><![CDATA[SIGN(new java.math.BigDecimal("-0.5"))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="407" width="555" height="11"/><textFieldExpression><![CDATA[EXACT("Abc", "abc")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="418" width="555" height="11"/><textFieldExpression><![CDATA[EXACT("Abc", "Abc")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="429" width="555" height="11"/><textFieldExpression><![CDATA[DOUBLE_VALUE("3.25")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="440" width="555" height="11"/><textFieldExpression><![CDATA[FLOAT_VALUE("3.25")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="451" width="555" height="11"/><textFieldExpression><![CDATA[INTEGER_VALUE("42")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="462" width="555" height="11"/><textFieldExpression><![CDATA[LONG_VALUE("42")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="473" width="555" height="11"/><textFieldExpression><![CDATA[CODE("A")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="484" width="555" height="11"/><textFieldExpression><![CDATA[CODE("ñ")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="495" width="555" height="11"/><textFieldExpression><![CDATA[CHAR(65)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="506" width="555" height="11"/><textFieldExpression><![CDATA[CHAR(241)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="517" width="555" height="11"/><textFieldExpression><![CDATA[FIND("b", "abcb")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="528" width="555" height="11"/><textFieldExpression><![CDATA[FIND("b", "abcb", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="539" width="555" height="11"/><textFieldExpression><![CDATA[FIND("B", "abcb")]]></textFieldExpression></textField>
+		</band>
+		<band height="550">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[FIND("z", "abcb")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("B", "abcb")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("b?", "abcb")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("c*", "abcb")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("b", "abcb", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[LEN("ñandú")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[LEFT("hello")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[LEFT("hello", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[RIGHT("hello", 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[RIGHT("hello")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[MID("hello", 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[MID("hello", 2, 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[LOWER("ÁBC")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[UPPER("ñandú")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[PROPER("hello WORLD foo-bar o'neil 3rd")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="165" width="555" height="11"/><textFieldExpression><![CDATA[TRIM("  a   b  ")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="176" width="555" height="11"/><textFieldExpression><![CDATA[LTRIM("  a  ")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="187" width="555" height="11"/><textFieldExpression><![CDATA[RTRIM("  a  ")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="198" width="555" height="11"/><textFieldExpression><![CDATA[CLEAN("a\tb\nc")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="209" width="555" height="11"/><textFieldExpression><![CDATA[CONCATENATE("a", "b", "c")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="220" width="555" height="11"/><textFieldExpression><![CDATA[CONCATENATE("a", null, "c")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="231" width="555" height="11"/><textFieldExpression><![CDATA[REPLACE("abcdef", 2, 3, "XY")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="242" width="555" height="11"/><textFieldExpression><![CDATA[REPT("ab", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="253" width="555" height="11"/><textFieldExpression><![CDATA[REPT("ab", 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="264" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE("a-b-c", "-", "+")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="275" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE("a-b-c", "-", "+", 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="286" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE("a-b-c", "-", "+", 5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="297" width="555" height="11"/><textFieldExpression><![CDATA[T("text")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="308" width="555" height="11"/><textFieldExpression><![CDATA[T(5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="319" width="555" height="11"/><textFieldExpression><![CDATA[T(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="330" width="555" height="11"/><textFieldExpression><![CDATA[BASE(255, 16)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="341" width="555" height="11"/><textFieldExpression><![CDATA[BASE(5, 2, 8)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="352" width="555" height="11"/><textFieldExpression><![CDATA[BASE(255, 36)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="363" width="555" height="11"/><textFieldExpression><![CDATA[LEN(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="374" width="555" height="11"/><textFieldExpression><![CDATA[UPPER(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="385" width="555" height="11"/><textFieldExpression><![CDATA[LEFT(null, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="396" width="555" height="11"/><textFieldExpression><![CDATA[TRIM(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="407" width="555" height="11"/><textFieldExpression><![CDATA[ABS(new java.math.BigDecimal("-2.50")).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="418" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3.5f).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="429" width="555" height="11"/><textFieldExpression><![CDATA[ABS(-3L).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="440" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1, 7, 3).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="451" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1L, 7L).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="462" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1.5f, 2.5f).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="473" width="555" height="11"/><textFieldExpression><![CDATA[MAX(new java.math.BigDecimal("2.5"), new java.math.BigDecimal("3.5")).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="484" width="555" height="11"/><textFieldExpression><![CDATA[MAX(new java.math.BigDecimal("2.5"), 1).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="495" width="555" height="11"/><textFieldExpression><![CDATA[MIN(2.5f, 3).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="506" width="555" height="11"/><textFieldExpression><![CDATA[MIN(2.5, 3.5).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="517" width="555" height="11"/><textFieldExpression><![CDATA[SUM(1, 2).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="528" width="555" height="11"/><textFieldExpression><![CDATA[SUM(new java.math.BigDecimal("1.10"), new java.math.BigDecimal("2.20")).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="539" width="555" height="11"/><textFieldExpression><![CDATA[SUM(new java.math.BigDecimal("1.10"), new java.math.BigDecimal("2.20"))]]></textFieldExpression></textField>
+		</band>
+		<band height="550">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[PRODUCT(new java.math.BigDecimal("1.5"), new java.math.BigDecimal("2")).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[PRODUCT(new java.math.BigDecimal("1.5"), new java.math.BigDecimal("2"))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(16).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(new java.math.BigDecimal("2.25")).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(2.5, 0).getClass().getSimpleName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(2.345, 2).toPlainString()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(0.1 + 0.2, 20)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[ROUND_HALF_UP(2.675, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[FIND("abcb", "b")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[FIND("abcb", "b", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[FIND("abcb", "B")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[FIND("abcb", "z")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[FIND("abcb", "")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("abcb", "B")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("abcb", "b", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="165" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("b", "ABCB")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="176" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("bc", "abcb", 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="187" width="555" height="11"/><textFieldExpression><![CDATA[SUM(1, null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="198" width="555" height="11"/><textFieldExpression><![CDATA[MAX(null, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="209" width="555" height="11"/><textFieldExpression><![CDATA[ABS(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="220" width="555" height="11"/><textFieldExpression><![CDATA[SIGN(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="231" width="555" height="11"/><textFieldExpression><![CDATA[SUM()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="242" width="555" height="11"/><textFieldExpression><![CDATA[YEAR(1772668800000L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="253" width="555" height="11"/><textFieldExpression><![CDATA[YEAR(new java.sql.Timestamp(0L))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="264" width="555" height="11"/><textFieldExpression><![CDATA[YEAR(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="275" width="555" height="11"/><textFieldExpression><![CDATA[DAYS(DATE(2026,3,5), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="286" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,2), DATE(2026,3,6))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="297" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,2), DATE(2026,3,2))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="308" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,1), DATE(2026,3,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="319" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,6), DATE(2026,3,9))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="330" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,9), DATE(2026,3,6))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="341" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(DATE(2026,3,7), DATE(2026,3,8))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="352" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,7), 1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="363" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,7), 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="374" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,8), -1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="385" width="555" height="11"/><textFieldExpression><![CDATA[WORKDAY(DATE(2026,3,6), 5)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="396" width="555" height="11"/><textFieldExpression><![CDATA[MONTHS(DATE(2026,1,31), DATE(2026,2,28))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="407" width="555" height="11"/><textFieldExpression><![CDATA[MONTHS(DATE(2026,3,5), DATE(2026,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="418" width="555" height="11"/><textFieldExpression><![CDATA[MONTHS(DATE(2026,1,5), DATE(2026,3,4))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="429" width="555" height="11"/><textFieldExpression><![CDATA[YEARS(DATE(2020,3,5), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="440" width="555" height="11"/><textFieldExpression><![CDATA[YEARS(DATE(2020,3,6), DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="451" width="555" height="11"/><textFieldExpression><![CDATA[WEEKS(DATE(2026,1,1), DATE(2026,1,7))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="462" width="555" height="11"/><textFieldExpression><![CDATA[WEEKS(DATE(2026,1,1), DATE(2026,1,8))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="473" width="555" height="11"/><textFieldExpression><![CDATA[WEEKS(DATE(2026,1,4), DATE(2026,1,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="484" width="555" height="11"/><textFieldExpression><![CDATA[WEEKNUM(DATE(2026,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="495" width="555" height="11"/><textFieldExpression><![CDATA[WEEKNUM(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="506" width="555" height="11"/><textFieldExpression><![CDATA[WEEKNUM(DATE(2026,12,31))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="517" width="555" height="11"/><textFieldExpression><![CDATA[WEEKNUM(DATE(2027,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="528" width="555" height="11"/><textFieldExpression><![CDATA[WEEKSINYEAR(DATE(2026,3,5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="539" width="555" height="11"/><textFieldExpression><![CDATA[WEEKSINYEAR(DATE(2020,3,5))]]></textFieldExpression></textField>
+		</band>
+		<band height="550">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[EDATE(DATE(2024,2,29), 12)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[EDATE(DATE(2026,3,31), -1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(null, "yyyy")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATE(2026,3,5), null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[TIME(10, 30, 15).length()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[DAYSINMONTH(DATE(2024,2,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[HOUR(new java.util.Date(3600000L * 5))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[DATE(2026, 3, 5).getClass().getName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01+3").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01+3").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01-3").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01-3").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01 14:25:48").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01 14:25:48").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01 14:25").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01 14:25").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01T14:25:48").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01T14:25:48").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01 14:25:48.123").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01 14:25:48.123").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="165" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE("2017-05-01 14").getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE("2017-05-01 14").getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="176" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE(DATE(2026,3,5)).getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE(DATE(2026,3,5)).getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="187" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(DATERANGE(new java.util.Date(1772715600000L)).getStart(), "yyyy-MM-dd HH:mm:ss.SSS") + " / " + DATEFORMAT(DATERANGE(new java.util.Date(1772715600000L)).getEnd(), "yyyy-MM-dd HH:mm:ss.SSS")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="198" width="555" height="11"/><textFieldExpression><![CDATA[DATERANGE("2017-05-01")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="209" width="555" height="11"/><textFieldExpression><![CDATA[DATERANGE("2017-05-01").getClass().getName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="220" width="555" height="11"/><textFieldExpression><![CDATA[DATERANGE(DATE(2026,3,5)).getClass().getName()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="231" width="555" height="11"/><textFieldExpression><![CDATA[MID("abcdefg", 3)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="242" width="555" height="11"/><textFieldExpression><![CDATA[MID("abcdefg", 1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="253" width="555" height="11"/><textFieldExpression><![CDATA[MID("ab", 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="264" width="555" height="11"/><textFieldExpression><![CDATA[DAYS(new java.util.Date(1772704800000L), new java.util.Date(1772784000000L))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="275" width="555" height="11"/><textFieldExpression><![CDATA[DAYS(new java.util.Date(1772784000000L), new java.util.Date(1772704800000L))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="286" width="555" height="11"/><textFieldExpression><![CDATA[MONTHS(new java.util.Date(1772704800000L), new java.util.Date(1775390400000L))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="297" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(EDATE(new java.util.Date(1772704800000L), 1), "yyyy-MM-dd HH:mm:ss")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="308" width="555" height="11"/><textFieldExpression><![CDATA[DATEFORMAT(WORKDAY(new java.util.Date(1772704800000L), 1), "yyyy-MM-dd HH:mm:ss")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="319" width="555" height="11"/><textFieldExpression><![CDATA[NETWORKDAYS(new java.util.Date(1772704800000L), new java.util.Date(1772784000000L))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="330" width="555" height="11"/><textFieldExpression><![CDATA[FACT(-1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="341" width="555" height="11"/><textFieldExpression><![CDATA[REPT("ab", -1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="352" width="555" height="11"/><textFieldExpression><![CDATA[DOUBLE_VALUE(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="363" width="555" height="11"/><textFieldExpression><![CDATA[DOUBLE_VALUE(" 2.5 ")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="374" width="555" height="11"/><textFieldExpression><![CDATA[EXACT(null, "a")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="385" width="555" height="11"/><textFieldExpression><![CDATA[EXACT(null, null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="396" width="555" height="11"/><textFieldExpression><![CDATA[AND(true, null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="407" width="555" height="11"/><textFieldExpression><![CDATA[IF(null, 1, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="418" width="555" height="11"/><textFieldExpression><![CDATA[NOT(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="429" width="555" height="11"/><textFieldExpression><![CDATA[BASE(-255, 16)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="440" width="555" height="11"/><textFieldExpression><![CDATA[BASE(5, 2, 2)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="451" width="555" height="11"/><textFieldExpression><![CDATA[LTRIM("\t\n a")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="462" width="555" height="11"/><textFieldExpression><![CDATA[CLEAN("a\u0007b\u007fc\u0085d")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="473" width="555" height="11"/><textFieldExpression><![CDATA[DATEVALUE(1772704800000L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="484" width="555" height="11"/><textFieldExpression><![CDATA[DAY(0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="495" width="555" height="11"/><textFieldExpression><![CDATA[DAY(5L)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="506" width="555" height="11"/><textFieldExpression><![CDATA[YEAR(DATE(1,1,1))]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="517" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE("aaa", "a", "b", 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="528" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE("aaa", "", "b")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="539" width="555" height="11"/><textFieldExpression><![CDATA[SUBSTITUTE(null, "a", "b")]]></textFieldExpression></textField>
+		</band>
+		<band height="165">
+			<textField><reportElement x="0" y="0" width="555" height="11"/><textFieldExpression><![CDATA[SEARCH("b", null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="11" width="555" height="11"/><textFieldExpression><![CDATA[FIND(null, "b")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="22" width="555" height="11"/><textFieldExpression><![CDATA[LEFT("hello", 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="33" width="555" height="11"/><textFieldExpression><![CDATA[REPLACE("abc", 2, 0, "Z")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="44" width="555" height="11"/><textFieldExpression><![CDATA[TIME(0, 0, 0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="55" width="555" height="11"/><textFieldExpression><![CDATA[TIME(23, 59, 59, "HH:mm")]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="66" width="555" height="11"/><textFieldExpression><![CDATA[WEEKDAY(null)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="77" width="555" height="11"/><textFieldExpression><![CDATA[CONCATENATE()]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="88" width="555" height="11"/><textFieldExpression><![CDATA[SQRT(-1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="99" width="555" height="11"/><textFieldExpression><![CDATA[FACT(21)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="110" width="555" height="11"/><textFieldExpression><![CDATA[ISEVEN(-4)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="121" width="555" height="11"/><textFieldExpression><![CDATA[SIGN(-0.0)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="132" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="143" width="555" height="11"/><textFieldExpression><![CDATA[MAX(1, 2.0f)]]></textFieldExpression></textField>
+			<textField><reportElement x="0" y="154" width="555" height="11"/><textFieldExpression><![CDATA[ABS(Integer.MIN_VALUE)]]></textFieldExpression></textField>
+		</band>
+	</detail>
+</jasperReport>

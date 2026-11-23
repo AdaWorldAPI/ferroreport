@@ -279,6 +279,11 @@ impl Parser {
         if !TYPE_NAMES.contains(&last.as_str()) {
             return false;
         }
+        // A primitive type can be cast to before a sign: `(short) -3`.
+        let primitive = last.chars().next().is_some_and(char::is_lowercase);
+        if primitive && matches!(self.peek_at(n + 1), Token::Op("-") | Token::Op("+")) {
+            return true;
+        }
         matches!(
             self.peek_at(n + 1),
             Token::Ident(_)
@@ -379,7 +384,11 @@ impl Parser {
                         }
                     }
                     // The functions every expression has: msg(pattern, args...) and str(key).
-                    if parts.len() == 1 && matches!(parts[0].as_str(), "msg" | "str") && self.peek() == &Token::LParen {
+                    // And JasperReports' function library: IF(...), SUM(...), DATEFORMAT(...).
+                    let library = parts.len() == 1 && super::functions::is_function(&parts[0]);
+                    if (library || parts.len() == 1 && matches!(parts[0].as_str(), "msg" | "str"))
+                        && self.peek() == &Token::LParen
+                    {
                         let args = self.args()?;
                         return Ok(Expr::Static { class: "".into(), name: parts.remove(0).into(), args });
                     }

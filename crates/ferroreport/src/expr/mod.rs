@@ -1,6 +1,7 @@
 //! JRXML expression language: a safe, interpreted subset of Java and Groovy.
 
 pub mod eval;
+pub mod functions;
 pub mod lexer;
 pub mod parser;
 

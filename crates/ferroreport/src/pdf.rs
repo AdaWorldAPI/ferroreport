@@ -1287,7 +1287,10 @@ impl<W: std::io::Write> PdfStream<W> {
                             continue;
                         }
                         let mut encode = |s: &str| -> Vec<u8> {
-                            s.chars().flat_map(|ch| used.code(face.glyph(ch), ch).to_be_bytes()).collect()
+                            s.chars()
+                                .filter(|ch| !ch.is_control())
+                                .flat_map(|ch| used.code(face.glyph(ch), ch).to_be_bytes())
+                                .collect()
                         };
                         c.set_text_matrix([1.0, 0.0, 0.0, 1.0, r2(line.x), r2(ph - line.baseline)]);
                         if line.word_spacing.abs() > 1e-4 {
