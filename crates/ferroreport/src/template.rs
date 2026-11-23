@@ -995,7 +995,7 @@ fn lay_out_list(n: &mut Node) -> Result<()> {
             if contents.attr("height").is_none() {
                 set_attr(contents, "height", height.unwrap_or(20.0));
             }
-            height = Some(height.map_or(0.0, |h: f32| h).max(num_attr(contents, "height").unwrap_or(0.0)));
+            height = Some(height.unwrap_or(0.0).max(num_attr(contents, "height").unwrap_or(0.0)));
         }
     }
     if let Some(h) = height {

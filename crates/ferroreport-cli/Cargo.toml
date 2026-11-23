@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-# The database drivers need a newer Rust than the library (1.80): SQLite 3.54 comes with
+# The database drivers need a newer Rust than the library (1.86): SQLite 3.54 comes with
 # rusqlite 0.41, which needs 1.89.
 rust-version = "1.89"
 readme = "../../README.md"
