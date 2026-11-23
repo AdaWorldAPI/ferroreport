@@ -38,6 +38,7 @@ A template or its data cannot make a render use unbounded stack, memory or time:
 | Sizes in a template (widths, heights, font sizes) | finite numbers up to 10 million; `inf`, `NaN` and the like are refused |
 | Pages in a report | yours to set: `--max-pages`, `Limits::max_pages`, `max_pages=`, `maxPages` |
 | Time for a render | yours to set: `--timeout`, `Limits::timeout`, `timeout=`; 60 s by default in `ferroreport serve` |
+| One row of JSON data | 256 MB by default (`--max-row`, `JsonRows::max_row_bytes`); the buffer never grows past the limit before the row is refused |
 | HTTP request body (`ferroreport serve`) | 50 MB by default (`--max-body`). Rows sent one per line (`application/x-ndjson`) are read as they are needed and have no size limit of their own: the time and page limits stop them |
 | Memory for one document waiting to be sent | 32 MB by default (`--spool-memory`); the rest goes to a file |
 | Disk for documents waiting to be sent, all requests together | 4 GB by default (`--spool-disk`); over it the answer is `507` |
@@ -48,9 +49,23 @@ people. The time limit is checked on every page, every few hundred rows and at e
 subreport, table and list, so it also stops work that happens inside them. (In the browser
 build there is no clock to check: use `maxPages` there.)
 
-Memory does not grow with the report for PDF and CSV: rows are read as they are needed and
-pages are written as they are finished. Excel workbooks are built in memory, in proportion to
-their size.
+Memory does not grow with the report: rows are read as they are needed and each page is
+written as it is finished, in PDF, Excel, Word, CSV and HTML alike. What is kept until the end
+is small and grows only with what the report declares: page totals waiting for the last page
+("page X of Y"), Excel's styles, merged ranges, pictures and links, the PDF's bookmarks and
+named anchors. Encrypted PDFs are encrypted object by object as they are written.
+
+## PDF encryption
+
+`--user-password`, `--owner-password` and `--permissions` (and the template's
+`net.sf.jasperreports.export.pdf.encrypted` properties) encrypt PDFs with AES-256, the standard
+security handler of PDF 2.0 (revision 6). Keys, salts and initialization vectors come from the
+operating system's random numbers. Without an owner password, a random one nobody knows is used,
+so the permissions cannot be lifted. Permissions are honoured by readers, not enforced by
+cryptography: anyone who can open the document can read it, so use a user password for
+documents that must stay private. Pass passwords through `FERROREPORT_PDF_USER_PASSWORD` and
+`FERROREPORT_PDF_OWNER_PASSWORD` rather than the command line, where other users of the machine
+can see them; ferroreport never writes them to its output or its logs.
 
 ## How this is tested
 

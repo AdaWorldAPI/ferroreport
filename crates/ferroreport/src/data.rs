@@ -196,8 +196,12 @@ impl<R: std::io::Read> JsonRows<R> {
         if self.buf.len() > self.max_row {
             return Err(Error::Limit(format!("row {} is larger than {} MB of JSON", self.index + 1, self.max_row >> 20)));
         }
+        // Grow by what is buffered (or 256 KiB), but never past one byte over the limit, so a
+        // row too large is found before more memory than the limit is taken for it.
         let old = self.buf.len();
-        self.buf.resize(old + old.max(256 * 1024), 0);
+        let grow = old.max(256 * 1024).min(self.max_row + 1 - old);
+        self.buf.reserve_exact(grow);
+        self.buf.resize(old + grow, 0);
         let n = loop {
             match self.reader.read(&mut self.buf[old..]) {
                 Ok(n) => break n,
@@ -338,6 +342,17 @@ mod stream_tests {
         let rows = JsonRows::new(&report(), Drip(big.as_bytes(), 64 << 10)).max_row_bytes(1 << 20);
         let e = rows.collect::<Result<Vec<Record>>>().unwrap_err();
         assert!(e.to_string().contains("row 1 is larger than 1 MB"), "{e}");
+        // The buffer never holds more than the limit and one byte.
+        let mut rows = JsonRows::new(&report(), Drip(big.as_bytes(), 64 << 10)).max_row_bytes(1 << 20);
+        assert!(rows.next().unwrap().is_err());
+        assert!(rows.buf.capacity() <= (1 << 20) + 1 + (256 << 10), "{}", rows.buf.capacity());
+        // Exactly at the limit is allowed; one byte over is not.
+        let row = format!("[{{\"id\": 1, \"name\": \"{}\"}}]", "x".repeat(1000));
+        let size = row.len() - 2;
+        let at = JsonRows::new(&report(), Drip(row.as_bytes(), 7)).max_row_bytes(size + 1);
+        assert_eq!(at.count(), 1);
+        let over = JsonRows::new(&report(), Drip(row.as_bytes(), 7)).max_row_bytes(size - 10);
+        assert!(over.collect::<Result<Vec<Record>>>().is_err());
         // Under the limit, the same row is read.
         let rows = JsonRows::new(&report(), Drip(big.as_bytes(), 64 << 10)).max_row_bytes(8 << 20);
         assert_eq!(rows.count(), 1);
