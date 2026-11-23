@@ -198,6 +198,9 @@ report "Employees" lang=en
         <tr><td><code>gap=</code></td><td>On a band, frame, row or stack: the space between its parts, in points (4 unless you say)</td></tr>
         <tr><td><code>def name params...</code></td><td>A definition: the parts under it, with <code>{{param}}</code> where a value goes</td></tr>
         <tr><td><code>use name param=value</code></td><td>The definition's parts, with the values in place. A width (<code>1fr</code>) and other attributes on <code>use</code> go to its parts</td></tr>
+        <tr><td><code>if : condition</code></td><td>Its parts print only when the condition holds, and take no room when it does not (a frame with <code>printWhenExpression</code> and <code>removeLineWhenBlank</code>)</td></tr>
+        <tr><td><code>each : $F{lines}</code></td><td>Its parts repeat for every row of a nested list; <code>field</code> lines inside it declare the rows' fields (a list component over a subdataset)</td></tr>
+        <tr><td><code>import "parts.ferro"</code></td><td>Another file's definitions, styles and fields, from the template's folder or the resource folders</td></tr>
       </table>
       <p>A part placed this way floats (it moves down when the one above it grows) and a text field grows with its text, so nothing
         overlaps when a value is longer than expected. Parts that give <code>x,y</code> stay where they say. <code>convert</code> writes

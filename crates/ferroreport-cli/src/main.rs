@@ -47,6 +47,8 @@ RENDER OPTIONS:
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
         --max-row <MB>          Stop at a row of data larger than this (default: 256)
+    -w, --watch                 Render again whenever the template, its folder, the rows or the
+                                parameters change (stop with Ctrl+C)
         --sign-key <key>        Sign the PDF (PAdES B-B) with this private key: PEM (PKCS#8 RSA
                                 or ECDSA P-256) or a .p12/.pfx, whose password goes in
                                 FERROREPORT_SIGN_PASSWORD (or FERROREPORT_SIGN_KEY)
@@ -146,6 +148,7 @@ fn main() -> ExitCode {
 fn run() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
+        Some("render") if args.iter().any(|a| a == "--watch" || a == "-w") => watch(&args[1..]),
         Some("render") => render(&args[1..]),
         Some("doctor") => doctor(&args[1..]),
         Some("serve") => serve(&args[1..]),
@@ -302,7 +305,7 @@ fn compare_with_jasper(
             let stem = r.file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             template = dir.join(format!("{stem}.jrxml"));
             let source = std::fs::read_to_string(&r.file).map_err(|e| format!("{}: {e}", r.file.display()))?;
-            match ferroreport::template::to_jrxml(&source) {
+            match ferro_to_jrxml(&source, source_dir) {
                 Ok(jrxml) => std::fs::write(&template, jrxml).map_err(|e| format!("{}: {e}", template.display()))?,
                 Err(_) => continue,
             }
@@ -594,7 +597,7 @@ fn migrate(args: &[String]) -> CliResult {
             let converted = match to.as_str() {
                 "ferro" if version == ".ferro" => Ok(source.clone()),
                 "ferro" => ferroreport::template::from_jrxml(&source),
-                "jrxml" if version == ".ferro" => ferroreport::template::to_jrxml(&source),
+                "jrxml" if version == ".ferro" => ferro_to_jrxml(&source, file.parent().unwrap_or(Path::new("."))),
                 "jrxml" => ferroreport::convert::jrxml_to_v7(&source),
                 other => return Err(format!("--to {other}: say ferro or jrxml").into()),
             };
@@ -782,9 +785,10 @@ fn convert(args: &[String]) -> CliResult {
         (None, _) if from_template => "jrxml",
         (None, _) => "ferro",
     };
+    let input_dir = Path::new(&input).parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
     let converted = match (from_template, to) {
-        (true, "jrxml") => ferroreport::template::to_jrxml(&source)?,
-        (true, _) => ferroreport::template::from_jrxml(&ferroreport::template::to_jrxml(&source)?)?,
+        (true, "jrxml") => ferro_to_jrxml(&source, input_dir)?,
+        (true, _) => ferroreport::template::from_jrxml(&ferro_to_jrxml(&source, input_dir)?)?,
         (false, "jrxml") => ferroreport::convert::jrxml_to_v7(&source)?,
         (false, _) => ferroreport::template::from_jrxml(&source)?,
     };
@@ -1015,6 +1019,79 @@ fn render(args: &[String]) -> CliResult {
         );
     }
     Ok(())
+}
+
+/// A `.ferro` template as JRXML, its `import`s read from `dir`.
+fn ferro_to_jrxml(source: &str, dir: &Path) -> ferroreport::Result<String> {
+    let load = |name: &str| -> Option<Vec<u8>> {
+        let path = dir.join(name);
+        // Only below the template's folder.
+        let inside = path.canonicalize().ok()?.starts_with(dir.canonicalize().ok()?);
+        inside.then(|| std::fs::read(&path).ok()).flatten()
+    };
+    ferroreport::template::to_jrxml_with(source, Some(&load))
+}
+
+/// `render --watch`: renders, then again whenever the template, its folder (subreports, images,
+/// style templates), the rows, the parameters or a resource folder change.
+fn watch(args: &[String]) -> CliResult {
+    let args: Vec<String> = args.iter().filter(|a| *a != "--watch" && *a != "-w").cloned().collect();
+    let mut watched: Vec<PathBuf> = Vec::new();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "-d" | "--data" | "-p" | "--params" | "-r" | "--resources" => watched.extend(it.next().map(PathBuf::from)),
+            "-o" | "--output" | "-f" | "--format" | "-l" | "--locale" | "--font" | "--now" | "--db" | "--pdfa" | "--attach"
+            | "--max-row" | "--max-pages" | "--timeout" | "--user-password" | "--owner-password" | "--permissions" => {
+                it.next();
+            }
+            s if s.starts_with("--sign-") => {
+                it.next();
+            }
+            s if !s.starts_with('-') => {
+                let template = PathBuf::from(s);
+                watched.push(template.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new(".")).to_path_buf());
+                watched.push(template);
+            }
+            _ => {}
+        }
+    }
+    watched.retain(|p| p.as_os_str() != "-");
+    // The newest modification time among the files watched (a folder's direct files).
+    let stamp = |paths: &[PathBuf]| -> Option<std::time::SystemTime> {
+        let mut newest = None;
+        let mut see = |p: &Path| {
+            if let Ok(t) = std::fs::metadata(p).and_then(|m| m.modified()) {
+                newest = newest.max(Some(t));
+            }
+        };
+        for p in paths {
+            see(p);
+            if p.is_dir() {
+                for entry in std::fs::read_dir(p).into_iter().flatten().flatten() {
+                    let path = entry.path();
+                    if path.is_file() && !path.to_string_lossy().ends_with(".part") {
+                        see(&path);
+                    }
+                }
+            }
+        }
+        newest
+    };
+    eprintln!("watching {} (Ctrl+C to stop)", watched.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "));
+    let mut last = None;
+    loop {
+        let now = stamp(&watched);
+        if now != last {
+            last = now;
+            if let Err(e) = render(&args) {
+                eprintln!("error: {e}");
+            }
+            // What the render wrote (the output, when it is beside the template) is not a change.
+            last = stamp(&watched).max(last);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
 }
 
 /// `--sign-key`, `--sign-cert` and the signature's details.

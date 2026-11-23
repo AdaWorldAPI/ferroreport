@@ -1,0 +1,3 @@
+[{"number":"F-001","customer":"Caribe SRL","overdue":true,"lines":[{"product":"Cable","qty":2,"price":3.5},{"product":"Router","qty":1,"price":89.9}]},
+ {"number":"F-002","customer":"Ana Pérez","overdue":false,"lines":[{"product":"Mouse","qty":3,"price":12.0}]},
+ {"number":"F-003","customer":"Luis Gómez","overdue":true,"lines":[]}]

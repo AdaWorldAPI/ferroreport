@@ -365,6 +365,35 @@ report "Employees" lang=en
       use money 1fr value=$F{salary}
 ```
 
+**Logic.** `if : condition` shows its parts only when the condition holds, and takes no room
+when it does not; `each : $F{lines}` repeats its parts for every row of a nested list, whose
+fields are declared inside it; `import "parts.ferro"` brings in another file's definitions and
+styles (read from the template's folder or the resource folders).
+
+```text
+report "Invoices" lang=en
+  import "parts.ferro"
+  field number String
+  field overdue Boolean
+  field lines List
+  detail gap=2
+    textField bold : $F{number}
+    if : $F{overdue}
+      staticText forecolor=#B00020 : Overdue: send a reminder
+    each : $F{lines}
+      field product String
+      field qty Integer
+      field price Double
+      row height=14
+        textField 3fr : $F{product}
+        use money 1fr value="$F{qty} * $F{price}"
+```
+
+They become what JasperReports knows (a frame with `printWhenExpression` and
+`removeLineWhenBlank`, a list component over a subdataset), so the converted JRXML runs in
+JasperReports too: [examples/invoices.ferro](examples/invoices.ferro) renders the same in both,
+pixel for pixel.
+
 `ferroreport convert` writes the result as JRXML with every coordinate worked out, so Jaspersoft
 Studio and JasperReports open it as any other report ([the whole example](examples/employees.ferro),
 which JasperReports 7.1.1 renders pixel for pixel like ferroreport).

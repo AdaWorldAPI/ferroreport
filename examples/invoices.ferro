@@ -1,0 +1,24 @@
+// import, if and each. tagged=false only so JasperReports 7 can render the converted JRXML for
+// comparison (it needs an extension to write tagged PDFs); ferroreport tags it either way.
+report "Invoices" lang=en tagged=false
+  import "parts.ferro"
+  field number String
+  field customer String
+  field overdue Boolean
+  field lines List
+
+  title gap=6
+    h1 height=26 fontSize=16 : Invoices
+  detail gap=2
+    row height=18
+      textField 2fr bold : $F{number} + " · " + $F{customer}
+    if : $F{overdue}
+      staticText height=14 forecolor=#B00020 : Overdue: send a reminder
+    each : $F{lines}
+      field product String
+      field qty Integer
+      field price Double
+      row height=14
+        textField 3fr : $F{product}
+        textField 1fr hTextAlign=Right : $F{qty}
+        use money 1fr value="$F{qty} * $F{price}"

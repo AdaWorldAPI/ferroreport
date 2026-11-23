@@ -74,7 +74,10 @@ fn parse_with(source: &str, raw: bool) -> Result<Node> {
     reader.config_mut().trim_text(false);
     let mut stack: Vec<Node> = Vec::new();
     let mut root: Option<Node> = None;
-    let err = |e: &dyn std::fmt::Display, pos: u64| Error::Xml(format!("{e} (byte {pos})"));
+    let err = |e: &dyn std::fmt::Display, pos: u64| {
+        let (line, column) = crate::error::line_column(source, pos as usize);
+        Error::Xml(format!("line {line}, column {column}: {e}"))
+    };
 
     loop {
         let pos = reader.buffer_position();

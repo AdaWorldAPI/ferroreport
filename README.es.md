@@ -255,6 +255,15 @@ componente propio de la muestra. Las 171 muestras de JRXML 7 van a `.ferro` y vu
 cambios (dos con sus propiedades en otro orden). Cada fixture sale con los mismos píxeles desde
 su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures convertidos.
 
+### Lógica en .ferro
+
+`if : condición` muestra sus partes solo cuando se cumple (y si no, no ocupan espacio);
+`each : $F{lineas}` repite sus partes por cada fila de una lista anidada, con sus campos
+declarados dentro; `import "partes.ferro"` trae las definiciones y estilos de otro archivo. Se
+convierten en lo que JasperReports entiende (un frame con `printWhenExpression`, un componente
+lista), así que el JRXML convertido funciona también en JasperReports:
+[examples/invoices.ferro](examples/invoices.ferro) sale igual en los dos, píxel por píxel.
+
 ## Qué soporta
 
 - Bandas completas, incluida la división de bandas y frames entre páginas (`splitType`), y un

@@ -91,8 +91,16 @@ pub fn is_template(source: &str) -> bool {
 
 /// Compiles a template in this format to JRXML (as JasperReports 7 writes it).
 pub fn to_jrxml(source: &str) -> Result<String> {
+    to_jrxml_with(source, None)
+}
+
+/// Compiles a template whose `import` lines are read with `load` (from the template's folder
+/// and the resource folders, as subreports are).
+pub fn to_jrxml_with(source: &str, load: Option<crate::jrxml::Loader>) -> Result<String> {
     let items = parse_lines(source)?;
+    let items = imports(items, load, 0)?;
     let items = expand_definitions(items)?;
+    let items = logic(items)?;
     let mut roots = items.into_iter();
     let root = roots.next().ok_or_else(|| err(0, "the template is empty"))?;
     if let Some(extra) = roots.next() {
@@ -527,6 +535,108 @@ const MAX_EXPANDED: usize = 100_000;
 
 /// Takes the `def` blocks out of the outline and puts a copy of one wherever a `use` names it,
 /// with `{{param}}` replaced by the value the `use` gives.
+/// `import "parts.ferro"`: the lines of another template (its definitions, styles, fields...)
+/// in place of the import. A file whose top is `styles` or `report` gives what is under it.
+fn imports(items: Vec<Item>, load: Option<crate::jrxml::Loader>, depth: usize) -> Result<Vec<Item>> {
+    let mut out = Vec::with_capacity(items.len());
+    for mut item in items {
+        // `import "parts.ferro"` is a file; `import java.text.*` stays JRXML's class import.
+        let file = match (item.head.as_str(), item.tokens.first()) {
+            ("import", Some(Token::Word(w))) if w.ends_with(".ferro") || w.ends_with(".jrtx") || w.contains('/') => {
+                Some(w.clone())
+            }
+            _ => None,
+        };
+        let Some(name) = file else {
+            item.kids = imports(std::mem::take(&mut item.kids), load, depth)?;
+            out.push(item);
+            continue;
+        };
+        if depth >= 16 {
+            return Err(err(item.line, "imports nested more than 16 deep (does a file import itself?)"));
+        }
+        let load = load.ok_or_else(|| {
+            err(item.line, "`import` needs the template to be read from a file or with resource folders, where it looks")
+        })?;
+        let bytes = load(&name)
+            .ok_or_else(|| err(item.line, &format!("`{name}` was not found next to the template or in its resource folders")))?;
+        let text = String::from_utf8(bytes).map_err(|_| err(item.line, &format!("`{name}` is not UTF-8 text")))?;
+        let mut roots = parse_lines(&text).map_err(|e| Error::template(format!("in `{name}`: {e}")))?;
+        if roots.len() == 1 && matches!(roots[0].head.as_str(), "styles" | "report" | "jasperTemplate") {
+            roots = std::mem::take(&mut roots[0].kids);
+        }
+        out.extend(imports(roots, Some(load), depth + 1)?);
+    }
+    Ok(out)
+}
+
+/// `if : condition` and `each : list` blocks, written as what JasperReports knows: a frame that
+/// prints only when the condition holds (and takes no room when it does not), and a list
+/// component over the rows of a nested list, whose `field` lines declare their fields.
+fn logic(mut items: Vec<Item>) -> Result<Vec<Item>> {
+    fn rewrite(items: Vec<Item>, datasets: &mut Vec<Item>, n: &mut usize) -> Result<Vec<Item>> {
+        let mut out = Vec::with_capacity(items.len());
+        for mut item in items {
+            item.kids = rewrite(std::mem::take(&mut item.kids), datasets, n)?;
+            let line = item.line;
+            let plain = |head: &str, tokens: Vec<Token>, text: Option<String>, kids: Vec<Item>| Item {
+                line,
+                head: head.to_string(),
+                tokens,
+                text,
+                kids,
+            };
+            match item.head.as_str() {
+                "if" => {
+                    let condition = item.text.take().ok_or_else(|| err(line, "`if` needs a condition: if : $F{total} > 0"))?;
+                    let mut kids = vec![plain("printWhenExpression", Vec::new(), Some(condition), Vec::new())];
+                    kids.extend(item.kids);
+                    let mut tokens = item.tokens;
+                    tokens.push(Token::Pair("removeLineWhenBlank".into(), "true".into()));
+                    out.push(plain("frame", tokens, None, kids));
+                }
+                "each" => {
+                    let list = item.text.take().ok_or_else(|| err(line, "`each` needs a list: each : $F{lines}"))?;
+                    *n += 1;
+                    let name = format!("each{n}");
+                    let (declared, parts): (Vec<Item>, Vec<Item>) = item
+                        .kids
+                        .into_iter()
+                        .partition(|k| matches!(k.head.as_str(), "field" | "variable" | "parameter" | "sortField" | "group"));
+                    datasets.push(plain("dataset", vec![Token::Word(name.clone())], None, declared));
+                    let source = if list.trim_start().starts_with("new ") {
+                        list
+                    } else {
+                        format!("new net.sf.jasperreports.engine.data.JRMapCollectionDataSource({})", list.trim())
+                    };
+                    let run = plain(
+                        "datasetRun",
+                        vec![Token::Pair("subDataset".into(), name)],
+                        None,
+                        vec![plain("dataSourceExpression", Vec::new(), Some(source), Vec::new())],
+                    );
+                    let contents = plain("contents", Vec::new(), None, parts);
+                    let list =
+                        plain("list", vec![Token::Pair("printOrder".into(), "Vertical".into())], None, vec![run, contents]);
+                    out.push(plain("component", item.tokens, None, vec![list]));
+                }
+                _ => out.push(item),
+            }
+        }
+        Ok(out)
+    }
+    let mut datasets = Vec::new();
+    let mut n = 0;
+    for root in &mut items {
+        root.kids = rewrite(std::mem::take(&mut root.kids), &mut datasets, &mut n)?;
+        // The datasets go first, where JasperReports expects them.
+        let kids = std::mem::take(&mut root.kids);
+        root.kids = std::mem::take(&mut datasets);
+        root.kids.extend(kids);
+    }
+    Ok(items)
+}
+
 fn expand_definitions(items: Vec<Item>) -> Result<Vec<Item>> {
     fn collect(items: Vec<Item>, defs: &mut Vec<Item>) -> Vec<Item> {
         let mut out = Vec::with_capacity(items.len());
@@ -677,7 +787,7 @@ fn lay_out_report(report: &mut Node) -> Result<()> {
             _ => {}
         }
     }
-    Ok(())
+    size_lists(report)
 }
 
 /// Whether a part needs placing: it has no position, or a width that is a share.
@@ -755,6 +865,8 @@ fn stack(kids: Vec<Node>, left: f32, top: f32, width: f32, gap: f32) -> Result<(
                 set_attr(&mut kid, "height", h);
                 flow(&mut kid, placed_any);
                 lay_out_frame(&mut kid)?;
+                // A frame (or a list) may have grown to hold its parts.
+                let h = num_attr(&kid, "height").unwrap_or(h);
                 y = num_attr(&kid, "y").unwrap_or(y) + h + gap;
                 placed_any = true;
                 out.push(kid);
@@ -820,7 +932,13 @@ fn row(
         }
         x += w + gap;
     }
-    Ok((out, h))
+    // As tall as its tallest part once frames have grown to hold theirs.
+    let grown = out
+        .iter()
+        .filter(|p| p.name == "element")
+        .filter_map(|p| Some(num_attr(p, "y")? - top + num_attr(p, "height")?))
+        .fold(h, f32::max);
+    Ok((out, grown))
 }
 
 /// A placed part goes down when what is above it grows (Float), and a text field grows with
@@ -834,8 +952,11 @@ fn flow(n: &mut Node, below: bool) {
     }
 }
 
-/// The parts of a frame, laid out inside it.
+/// The parts of a frame, laid out inside it (and those of a list's row).
 fn lay_out_frame(n: &mut Node) -> Result<()> {
+    if n.attr("kind") == Some("component") {
+        return lay_out_list(n);
+    }
     if n.attr("kind") != Some("frame") || !n.children.iter().any(needs_layout) {
         return Ok(());
     }
@@ -849,6 +970,47 @@ fn lay_out_frame(n: &mut Node) -> Result<()> {
     n.children.extend(els);
     if num_attr(n, "height").map_or(true, |h| h < used) {
         set_attr(n, "height", used);
+    }
+    Ok(())
+}
+
+/// A list component's row (`contents`): as wide as the component, its parts laid out in it,
+/// and the component as tall as the row.
+fn lay_out_list(n: &mut Node) -> Result<()> {
+    let width = num_attr(n, "width").unwrap_or(0.0);
+    let mut height = num_attr(n, "height");
+    for list in n.children.iter_mut().filter(|c| c.name == "component" && c.attr("kind") == Some("list")) {
+        for contents in list.children.iter_mut().filter(|c| c.name == "contents") {
+            let w = num_attr(contents, "width").unwrap_or(width);
+            if contents.children.iter().any(needs_layout) {
+                if contents.attr("width").is_none() {
+                    set_attr(contents, "width", w);
+                }
+                let (parts, used) = stack(std::mem::take(&mut contents.children), 0.0, 0.0, w, 0.0)?;
+                contents.children = parts;
+                if contents.attr("height").is_none() {
+                    set_attr(contents, "height", used);
+                }
+            }
+            if contents.attr("height").is_none() {
+                set_attr(contents, "height", height.unwrap_or(20.0));
+            }
+            height = Some(height.map_or(0.0, |h: f32| h).max(num_attr(contents, "height").unwrap_or(0.0)));
+        }
+    }
+    if let Some(h) = height {
+        set_attr(n, "height", h);
+    }
+    Ok(())
+}
+
+/// Lists placed by coordinates still need their row's size.
+fn size_lists(n: &mut Node) -> Result<()> {
+    for c in &mut n.children {
+        size_lists(c)?;
+    }
+    if n.name == "element" && n.attr("kind") == Some("component") {
+        lay_out_list(n)?;
     }
     Ok(())
 }

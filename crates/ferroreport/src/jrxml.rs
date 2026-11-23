@@ -23,10 +23,25 @@ pub fn parse_report(source: &str) -> Result<Report> {
 
 /// Parses JRXML source into a [`Report`], reading the style templates it uses with `load`.
 pub fn parse_report_with(source: &str, load: Loader) -> Result<Report> {
+    parse_report_located(source, load).map_err(|e| match e {
+        // Where the expression is in the template (the first place its text appears).
+        Error::ExprParse { expr, message, line: 0, .. } => {
+            let text = expr.trim_end_matches('…');
+            let (line, column) = match source.find(text) {
+                Some(at) => crate::error::line_column(source, at),
+                None => (0, 0),
+            };
+            Error::ExprParse { expr, message, line, column }
+        }
+        other => other,
+    })
+}
+
+fn parse_report_located(source: &str, load: Loader) -> Result<Report> {
     // ferroreport's own format (`.ferro`) is compiled to JRXML first.
     let compiled;
     let source = if crate::template::is_template(source) {
-        compiled = crate::template::to_jrxml(source)?;
+        compiled = crate::template::to_jrxml_with(source, Some(load))?;
         compiled.as_str()
     } else {
         source
@@ -538,7 +553,7 @@ impl Parser {
                 Some((i, _)) => format!("{}…", &t[..i]),
                 None => t.to_string(),
             };
-            Error::ExprParse { expr, message }
+            Error::ExprParse { expr, message, line: 0, column: 0 }
         })
     }
 
