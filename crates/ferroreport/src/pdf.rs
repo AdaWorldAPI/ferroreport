@@ -661,13 +661,15 @@ pub struct PdfStream<W: std::io::Write> {
     /// The standard fonts used (index into `standard::STANDARD`).
     standard: std::collections::BTreeSet<u8>,
     images: BTreeMap<usize, (String, Ref)>,
-    /// The content streams of each page.
-    pages: Vec<Vec<Ref>>,
-    /// The form fields of each page, and those of the page being drawn.
-    fields: Vec<Vec<Widget>>,
+    /// The content stream of each page; pages drawn on again later ("page X of Y") have more,
+    /// in `more_contents`. Kept this small because it is the one thing kept for every page.
+    pages: Vec<Ref>,
+    more_contents: BTreeMap<usize, Vec<Ref>>,
+    /// The form fields of the pages that have some, and those of the page being drawn.
+    fields: BTreeMap<usize, Vec<Widget>>,
     pending_fields: Vec<Widget>,
-    /// The links of each page, and those of the page being drawn.
-    links: Vec<Vec<PageLink>>,
+    /// The links of the pages that have some, and those of the page being drawn.
+    links: BTreeMap<usize, Vec<PageLink>>,
     pending_links: Vec<PageLink>,
     /// Anchors (named destinations): name, page and top, in the order they are met.
     dests: Vec<(String, usize, f32)>,
@@ -682,6 +684,9 @@ pub struct PdfStream<W: std::io::Write> {
 
 /// Named destinations: name and object.
 type NamedDests = Vec<(String, Ref)>;
+
+/// Annotations of the pages that have some, by page number.
+type PageAnnots = BTreeMap<usize, Vec<Ref>>;
 
 /// Parent tree keys of link annotations start here, after any page's.
 const LINK_KEYS: i32 = 1 << 24;
@@ -724,15 +729,16 @@ impl<W: std::io::Write> PdfStream<W> {
             page_height,
             faces: BTreeMap::new(),
             standard: Default::default(),
-            fields: Vec::new(),
+            fields: BTreeMap::new(),
             pending_fields: Vec::new(),
-            links: Vec::new(),
+            links: BTreeMap::new(),
             pending_links: Vec::new(),
             dests: Vec::new(),
             bookmarks: Vec::new(),
             link_parents: Vec::new(),
             images: BTreeMap::new(),
             pages: Vec::new(),
+            more_contents: BTreeMap::new(),
             tags: None,
             crypt: None,
         };
@@ -1342,9 +1348,14 @@ impl<W: std::io::Write> PdfStream<W> {
     pub fn page(&mut self, items: &[PrintItem], fonts: &FontSet) -> Result<()> {
         let (raw, nodes, numbered) = self.draw(items, fonts, self.pages.len())?;
         let id = self.content_stream(&raw)?;
-        self.pages.push(vec![id]);
-        self.fields.push(std::mem::take(&mut self.pending_fields));
-        self.links.push(std::mem::take(&mut self.pending_links));
+        let number = self.pages.len();
+        self.pages.push(id);
+        if !self.pending_fields.is_empty() {
+            self.fields.insert(number, std::mem::take(&mut self.pending_fields));
+        }
+        if !self.pending_links.is_empty() {
+            self.links.insert(number, std::mem::take(&mut self.pending_links));
+        }
         if self.tags.is_some() {
             self.tag_page(&nodes, numbered)?;
         }
@@ -1399,7 +1410,8 @@ impl<W: std::io::Write> PdfStream<W> {
             let annot = self.next_id();
             let key = LINK_KEYS + self.link_parents.len() as i32;
             self.link_parents.push((key, id));
-            if let Some(link) = self.links.last_mut().and_then(|l| l.get_mut(index)) {
+            let current = self.pages.len().saturating_sub(1);
+            if let Some(link) = self.links.get_mut(&current).and_then(|l| l.get_mut(index)) {
                 link.id = Some(annot);
                 link.key = Some(key);
             }
@@ -1496,16 +1508,16 @@ impl<W: std::io::Write> PdfStream<W> {
         }
         let (raw, _, _) = self.draw(items, fonts, page)?;
         let id = self.content_stream(&raw)?;
-        if let Some(p) = self.pages.get_mut(page) {
-            p.push(id);
-        }
-        let late = std::mem::take(&mut self.pending_fields);
-        if let Some(f) = self.fields.get_mut(page) {
-            f.extend(late);
-        }
-        let late = std::mem::take(&mut self.pending_links);
-        if let Some(l) = self.links.get_mut(page) {
-            l.extend(late);
+        if page < self.pages.len() {
+            self.more_contents.entry(page).or_default().push(id);
+            let late = std::mem::take(&mut self.pending_fields);
+            if !late.is_empty() {
+                self.fields.entry(page).or_default().extend(late);
+            }
+            let late = std::mem::take(&mut self.pending_links);
+            if !late.is_empty() {
+                self.links.entry(page).or_default().extend(late);
+            }
         }
         Ok(())
     }
@@ -1588,10 +1600,10 @@ impl<W: std::io::Write> PdfStream<W> {
     }
 
     /// Writes the link annotations of each page.
-    fn write_links(&mut self, page_ids: &[Ref]) -> Result<Vec<Vec<Ref>>> {
+    fn write_links(&mut self, page_ids: &[Ref]) -> Result<PageAnnots> {
         use pdf_writer::types::ActionType;
-        let mut out = Vec::new();
-        for list in std::mem::take(&mut self.links) {
+        let mut out = BTreeMap::new();
+        for (number, list) in std::mem::take(&mut self.links) {
             let mut refs = Vec::with_capacity(list.len());
             for link in list {
                 let id = match link.id {
@@ -1642,7 +1654,7 @@ impl<W: std::io::Write> PdfStream<W> {
                 self.put(id, &chunk)?;
                 refs.push(id);
             }
-            out.push(refs);
+            out.insert(number, refs);
         }
         Ok(out)
     }
@@ -1713,11 +1725,11 @@ impl<W: std::io::Write> PdfStream<W> {
 
     /// Writes the fonts, the page tree and the trailer, and returns the output.
     /// Writes the form fields: the annotations of each page and the form they make up.
-    fn write_fields(&mut self) -> Result<(Vec<Vec<Ref>>, Option<Ref>)> {
+    fn write_fields(&mut self) -> Result<(PageAnnots, Option<Ref>)> {
         use crate::model::FieldKind;
         let fields = std::mem::take(&mut self.fields);
-        if fields.iter().all(|f| f.is_empty()) {
-            return Ok((Vec::new(), None));
+        if fields.values().all(|f| f.is_empty()) {
+            return Ok((BTreeMap::new(), None));
         }
         let helv = self.next_id();
         let zadb = self.next_id();
@@ -1740,14 +1752,14 @@ impl<W: std::io::Write> PdfStream<W> {
         };
         let rgb3 = |c: Color| [c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0];
         let mut top_level: Vec<Ref> = Vec::new();
-        let mut annots: Vec<Vec<Ref>> = vec![Vec::new(); fields.len()];
+        let mut annots: BTreeMap<usize, Vec<Ref>> = BTreeMap::new();
         // Radio buttons with the same name are one field.
         let mut radios: Vec<(String, Ref, Vec<Ref>, Option<String>)> = Vec::new();
         let mut unnamed = 0;
-        for (page, list) in fields.iter().enumerate() {
+        for (&page, list) in fields.iter() {
             for w in list {
                 let id = self.next_id();
-                annots[page].push(id);
+                annots.entry(page).or_default().push(id);
                 let f = &w.field;
                 let name = f.name.clone().unwrap_or_else(|| {
                     unnamed += 1;
@@ -2066,14 +2078,12 @@ impl<W: std::io::Write> PdfStream<W> {
             });
         }
         let link_annots = self.write_links(&page_ids)?;
-        for (number, list) in link_annots.into_iter().enumerate() {
-            if annots.len() <= number {
-                annots.resize(number + 1, Vec::new());
-            }
-            annots[number].extend(list);
+        for (number, list) in link_annots {
+            annots.entry(number).or_default().extend(list);
         }
         let (dests, outline) = self.write_destinations(&page_ids)?;
-        for (number, contents) in std::mem::take(&mut self.pages).into_iter().enumerate() {
+        let mut more_contents = std::mem::take(&mut self.more_contents);
+        for (number, first) in std::mem::take(&mut self.pages).into_iter().enumerate() {
             let tagged = self.tags.as_ref().and_then(|t| t.pages.get(number).copied());
             let page_id = page_ids[number];
             let mut chunk = Chunk::new();
@@ -2082,16 +2092,16 @@ impl<W: std::io::Write> PdfStream<W> {
             if let Some((_, Some(_))) = tagged {
                 p.struct_parents(number as i32).tab_order(pdf_writer::types::TabOrder::StructureOrder);
             }
-            match contents.as_slice() {
-                [one] => {
-                    p.contents(*one);
+            match more_contents.remove(&number) {
+                None => {
+                    p.contents(first);
                 }
-                many => {
-                    p.contents_array(many.iter().copied());
+                Some(more) => {
+                    p.contents_array(std::iter::once(first).chain(more));
                 }
             }
             p.pair(Name(b"Resources"), resources);
-            if let Some(list) = annots.get(number).filter(|l| !l.is_empty()) {
+            if let Some(list) = annots.get(&number).filter(|l| !l.is_empty()) {
                 p.annotations(list.iter().copied());
             }
             p.finish();
