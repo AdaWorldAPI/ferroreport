@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
+#[cfg(feature = "db")]
+mod db;
 mod serve;
 mod spool;
 
@@ -44,6 +46,10 @@ RENDER OPTIONS:
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
         --max-row <MB>          Stop at a row of data larger than this (default: 256)
+        --db <url>              Fill the report from its own SQL query, and its subreports from
+                                theirs: postgres://, mysql://, sqlserver://, sqlite:file.db (a
+                                jdbc: URL works too). Or FERROREPORT_DB; the password goes in
+                                FERROREPORT_DB_PASSWORD
         --user-password <pw>    Encrypt the PDF (AES-256); this password opens it (an empty one opens
                                 it without asking). Also FERROREPORT_PDF_USER_PASSWORD, which
                                 keeps it out of the list of processes
@@ -96,6 +102,8 @@ add format xlsx, docx, csv or html to the request for Excel, Word, CSV or a web 
                                 FERROREPORT_ALLOW_ANONYMOUS=1): only for ports your own
                                 services alone can reach
         --rate-limit <n>        Most requests per minute from one client address (answers 429)
+        --db <url>              The database the SQL queries of templates from --templates run
+                                on (or FERROREPORT_DB; password in FERROREPORT_DB_PASSWORD)
         --spool-memory <MB>     How much of one document is kept in memory until it is complete
                                 (default: 32; the rest goes to a file)
         --spool-dir <dir>       Where those files go (default: the system's temporary directory;
@@ -197,9 +205,10 @@ fn describe(c: &Compared) -> String {
     format!("{rows}: {pages}, {text}; JasperReports {:.0} ms, ferroreport {:.1} ms", c.jasper_ms, c.ours_ms)
 }
 
-/// A note that only says rows come from the caller, not from the template's SQL query.
+/// A note that only says rows come from the caller, not from the template's query (one in a
+/// language other than SQL: SQL queries run with `--db`).
 fn about_data(warning: &str) -> bool {
-    warning.contains("query is ignored")
+    warning.contains("query is not run")
 }
 
 /// What `migrate` found in one template.
@@ -638,7 +647,7 @@ fn migrate(args: &[String]) -> CliResult {
         }
     }
     println!(
-        "\n{} templates: {ready} supported, {data_only} supported once you pass the rows their SQL query gave, {partial} use features not supported yet, {failed} cannot be loaded; {render_fail} stop when rendered with no rows (they may need rows, parameters or pictures)",
+        "\n{} templates: {ready} supported, {data_only} supported once you pass the rows their non-SQL query gave, {partial} use features not supported yet, {failed} cannot be loaded; {render_fail} stop when rendered with no rows (they may need rows, parameters or pictures)",
         results.len()
     );
     let compared: Vec<&Compared> = results.iter().filter_map(|r| r.jasper.as_ref()).collect();
@@ -681,7 +690,7 @@ fn migrate(args: &[String]) -> CliResult {
             }))?
         } else {
             let mut md = format!(
-                "# Migration report\n\n{} templates: **{ready}** supported, **{data_only}** supported once you pass the rows their SQL query gave, **{partial}** use features not supported yet, **{failed}** cannot be loaded.\n\n| Template | Format | Result | Notes |\n|---|---|---|---|\n",
+                "# Migration report\n\n{} templates: **{ready}** supported, **{data_only}** supported once you pass the rows their non-SQL query gave, **{partial}** use features not supported yet, **{failed}** cannot be loaded.\n\n| Template | Format | Result | Notes |\n|---|---|---|---|\n",
                 results.len()
             );
             for r in &results {
@@ -796,11 +805,13 @@ fn render(args: &[String]) -> CliResult {
     let mut permissions: Option<String> = None;
     let mut attachments = Vec::new();
     let mut limits = ferroreport::Limits::default();
+    let mut db = std::env::var("FERROREPORT_DB").ok().filter(|u| !u.is_empty());
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
         match a.as_str() {
             "-d" | "--data" => data = Some(value(a)?),
+            "--db" => db = Some(value(a)?),
             "-f" | "--format" => format = Some(value(a)?.to_ascii_lowercase()),
             "--xlsx-numbers" => xlsx_numbers = true,
             "--csv-safe" => csv_safe = true,
@@ -887,8 +898,13 @@ fn render(args: &[String]) -> CliResult {
     for dir in &resources {
         renderer = renderer.resource_dir(dir);
     }
+    if let Some(url) = &db {
+        renderer = renderer.connection(Some(connect_db(url)?));
+    }
     // Parsed here, where the resource folders are known: style templates are read from them.
     let report = renderer.parse(&source)?;
+    // Without rows of its own, a report with a query is filled from the database.
+    let from_db = db.is_some() && data.is_none() && report.query.is_some();
     if let Some(n) = now {
         let dt = ferroreport::data::parse_datetime(&n).ok_or("--now expects YYYY-MM-DDTHH:MM:SS")?;
         renderer = renderer.now(dt);
@@ -932,7 +948,12 @@ fn render(args: &[String]) -> CliResult {
     let to_stdout = output.as_os_str() == "-";
     let stats = if to_stdout {
         quiet = true;
-        renderer.render_rows_to(&report, &mut rows, params, format, std::io::BufWriter::new(std::io::stdout().lock()))?
+        let out = std::io::BufWriter::new(std::io::stdout().lock());
+        if from_db {
+            renderer.render_query_to(&report, params, format, out)?
+        } else {
+            renderer.render_rows_to(&report, &mut rows, params, format, out)?
+        }
     } else {
         // Written beside the output and moved into place, so a failed render leaves no
         // half-written file behind.
@@ -940,7 +961,13 @@ fn render(args: &[String]) -> CliResult {
         name.push(".part");
         let part = output.with_file_name(name);
         let file = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", output.display()))?;
-        match renderer.render_rows_to(&report, &mut rows, params, format, std::io::BufWriter::with_capacity(1 << 16, file)) {
+        let out = std::io::BufWriter::with_capacity(1 << 16, file);
+        let result = if from_db {
+            renderer.render_query_to(&report, params, format, out)
+        } else {
+            renderer.render_rows_to(&report, &mut rows, params, format, out)
+        };
+        match result {
             Ok(stats) => {
                 std::fs::rename(&part, &output).map_err(|e| format!("{}: {e}", output.display()))?;
                 stats
@@ -974,6 +1001,17 @@ fn render(args: &[String]) -> CliResult {
     Ok(())
 }
 
+/// Opens the database a report's queries run on (`--db`).
+#[cfg(feature = "db")]
+fn connect_db(url: &str) -> Result<std::sync::Arc<dyn ferroreport::sql::Connection>, Box<dyn std::error::Error>> {
+    Ok(db::connect(url)?)
+}
+
+#[cfg(not(feature = "db"))]
+fn connect_db(_: &str) -> Result<std::sync::Arc<dyn ferroreport::sql::Connection>, Box<dyn std::error::Error>> {
+    Err("this build has no database drivers (build with --features db)".into())
+}
+
 fn serve(args: &[String]) -> CliResult {
     let mut host = std::env::var("FERROREPORT_HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let mut port = std::env::var("FERROREPORT_PORT").unwrap_or_else(|_| "8080".into());
@@ -992,6 +1030,7 @@ fn serve(args: &[String]) -> CliResult {
     let mut spool_memory = megabytes("FERROREPORT_SPOOL_MEMORY", 32);
     let mut spool_disk = megabytes("FERROREPORT_SPOOL_DISK", 4096);
     let mut spool_dir = std::env::var("FERROREPORT_SPOOL_DIR").ok().filter(|d| !d.is_empty()).map(PathBuf::from);
+    let mut db = std::env::var("FERROREPORT_DB").ok().filter(|u| !u.is_empty());
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
@@ -1015,6 +1054,7 @@ fn serve(args: &[String]) -> CliResult {
             "--spool-memory" => spool_memory = value(a)?.parse().map_err(|_| "--spool-memory expects megabytes")?,
             "--spool-disk" => spool_disk = value(a)?.parse().map_err(|_| "--spool-disk expects megabytes")?,
             "--rate-limit" => rate_limit = Some(value(a)?.parse().map_err(|_| "--rate-limit expects requests per minute")?),
+            "--db" => db = Some(value(a)?),
             s => return Err(format!("unknown option {s}").into()),
         }
     }
@@ -1033,6 +1073,10 @@ fn serve(args: &[String]) -> CliResult {
         spool_memory: (spool_memory as usize).saturating_mul(1024 * 1024),
         spool_dir,
         spool_disk: spool_disk.saturating_mul(1024 * 1024),
+        connection: match &db {
+            Some(url) => Some(connect_db(url)?),
+            None => None,
+        },
     })
 }
 

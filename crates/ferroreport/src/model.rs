@@ -37,6 +37,15 @@ pub struct Parameter {
     pub default: Option<Expr>,
 }
 
+/// A dataset's query (`<queryString>` in JRXML 6, `<query>` in 7), run on a database
+/// connection when one is given (see [`crate::sql`]).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Query {
+    /// `SQL` (or empty, which means SQL).
+    pub language: String,
+    pub text: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Field {
     pub name: String,
@@ -560,6 +569,8 @@ pub struct Report {
     pub no_data: Option<Band>,
     /// `<subDataset>` definitions, used by tables.
     pub datasets: Vec<Dataset>,
+    /// The query that gives the report its rows, when it is filled from a database.
+    pub query: Option<Query>,
     /// Features found in the template that are not rendered (yet).
     /// Expressions read `$P{REPORT_DATA_SOURCE}` (records then keep their source JSON row).
     pub uses_data_source: bool,
@@ -686,7 +697,8 @@ pub struct SubreportElement {
     pub parameters: Vec<(String, Expr)>,
     pub parameters_map: Option<Expr>,
     pub data_source: Option<Expr>,
-    /// A JDBC connection expression is present (not supported: the subreport gets no rows).
+    /// A `connectionExpression` is given: rows come from the subreport's query, on the
+    /// renderer's connection.
     pub connection: bool,
     pub returns: Vec<ReturnValue>,
 }
@@ -708,6 +720,7 @@ pub struct Dataset {
     pub fields: Vec<Field>,
     pub variables: Vec<Variable>,
     pub groups: Vec<Group>,
+    pub query: Option<Query>,
 }
 
 /// A `<datasetRun>`: the subdataset a table or list iterates over and where its rows and
@@ -719,6 +732,8 @@ pub struct DatasetRun {
     pub parameters: Vec<(String, Expr)>,
     pub parameters_map: Option<Expr>,
     pub data_source: Option<Expr>,
+    /// A `connectionExpression` is given: rows come from the subdataset's query.
+    pub connection: bool,
     /// Page height of the containing report (the report built for the run uses it).
     pub page_height: f32,
     /// Expression language of the containing report.

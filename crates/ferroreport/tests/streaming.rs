@@ -62,7 +62,8 @@ fn every_fixture_streams_to_the_same_document() {
     let mut checked = 0;
     for entry in std::fs::read_dir(fixture("")).unwrap() {
         let dir = entry.unwrap().path();
-        if !dir.join("expected.json").exists() {
+        // A fixture filled from a database is checked by `fixtures.rs`.
+        if !dir.join("expected.json").exists() || dir.join("data.sql").exists() {
             continue;
         }
         let name = dir.file_name().unwrap().to_string_lossy().to_string();

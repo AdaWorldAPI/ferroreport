@@ -92,10 +92,18 @@ def main() -> int:
         if params.exists():
             cmd.append(str(params))
         # Run Jasper from the fixture directory so relative resource paths resolve there.
-        pj, tj = run(cmd, cwd=fx)
+        # A fixture filled from a database needs a JDBC driver for the reference run.
+        pj, tj = run(cmd, cwd=fx) if not (fx / "data.sql").exists() else (None, 0.0)
         cmd = [args.bin, "render", str(fx / "report.jrxml"), "-o", str(ours_pdf), "-q", "--now", "2026-01-15T10:30:00"]
         if data.exists():
             cmd += ["-d", str(data)]
+        if (fx / "data.sql").exists():
+            # Filled from its own query, on a SQLite database built from data.sql.
+            import sqlite3
+            db = out / "data.sqlite"
+            with sqlite3.connect(db) as c:
+                c.executescript((fx / "data.sql").read_text())
+            cmd += ["--db", f"sqlite:{db}"]
         if params.exists():
             cmd += ["-p", str(params)]
         po, to = run(cmd)
@@ -105,7 +113,7 @@ def main() -> int:
         if not jasper_pdf.exists() and skip_note.exists() and po.returncode == 0:
             row["skipped"] = skip_note.read_text().strip().splitlines()[0]
         elif not jasper_pdf.exists():
-            row["error"] = "jasper failed: " + (pj.stdout + pj.stderr)[-500:]
+            row["error"] = "jasper failed: " + ((pj.stdout + pj.stderr)[-500:] if pj else "no reference run")
         elif po.returncode != 0:
             row["error"] = "ferroreport failed: " + po.stderr[-500:]
         else:

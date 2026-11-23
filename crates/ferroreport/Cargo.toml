@@ -41,3 +41,4 @@ getrandom = { version = "0.2", features = ["js"] }
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 
 [dev-dependencies]
+rusqlite = { version = "0.43", features = ["bundled"] }

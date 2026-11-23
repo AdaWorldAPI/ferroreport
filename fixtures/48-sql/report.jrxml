@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="departments" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="30" bottomMargin="30">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="9"/>
+	<parameter name="DEPTS" class="java.util.List"/>
+	<parameter name="MIN_SALARY" class="java.lang.Double"><defaultValueExpression><![CDATA[0.0]]></defaultValueExpression></parameter>
+	<parameter name="ORDER" class="java.lang.String" isForPrompting="false"><defaultValueExpression><![CDATA["d.name"]]></defaultValueExpression></parameter>
+	<queryString language="SQL"><![CDATA[SELECT d.id AS dept_id, d.name AS dept_name, d.city AS CITY,
+       (SELECT COUNT(*) FROM emp e WHERE e.dept_id = d.id AND e.salary >= $P{MIN_SALARY}) AS headcount
+  FROM dept d
+ WHERE $X{IN, d.name, DEPTS}
+ ORDER BY $P!{ORDER}]]></queryString>
+	<field name="dept_id" class="java.lang.Integer"/>
+	<field name="dept_name" class="java.lang.String"/>
+	<field name="city" class="java.lang.String"/>
+	<field name="headcount" class="java.lang.Integer"/>
+	<variable name="dept_total" class="java.lang.Double" calculation="System"/>
+	<variable name="grand_total" class="java.lang.Double" calculation="Sum"><variableExpression><![CDATA[$V{dept_total}]]></variableExpression></variable>
+	<title><band height="30"><staticText><reportElement x="0" y="0" width="515" height="24"/><textElement><font size="16" isBold="true"/></textElement><text><![CDATA[Payroll by department]]></text></staticText></band></title>
+	<detail>
+		<band height="22">
+			<textField><reportElement mode="Opaque" x="0" y="4" width="515" height="16" forecolor="#FFFFFF" backcolor="#2B4C7E"/><box leftPadding="4"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><textFieldExpression><![CDATA[$F{dept_name} + " - " + ($F{city} == null ? "remote" : $F{city}) + " (" + $F{headcount} + " people)"]]></textFieldExpression></textField>
+		</band>
+		<band height="20">
+			<subreport>
+				<reportElement x="0" y="2" width="515" height="16"/>
+				<subreportParameter name="DEPT_ID"><subreportParameterExpression><![CDATA[$F{dept_id}]]></subreportParameterExpression></subreportParameter>
+				<subreportParameter name="MIN_SALARY"><subreportParameterExpression><![CDATA[$P{MIN_SALARY}]]></subreportParameterExpression></subreportParameter>
+				<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+				<returnValue subreportVariable="total" toVariable="dept_total"/>
+				<subreportExpression><![CDATA["employees.jasper"]]></subreportExpression>
+			</subreport>
+		</band>
+	</detail>
+	<summary><band height="24">
+		<textField pattern="#,##0.00"><reportElement x="215" y="6" width="300" height="16"/><textElement textAlignment="Right"><font size="11" isBold="true"/></textElement><textFieldExpression><![CDATA["Total payroll " + new java.text.DecimalFormat("#,##0.00").format($V{grand_total})]]></textFieldExpression></textField>
+	</band></summary>
+</jasperReport>

@@ -158,7 +158,7 @@ class Checks:
 
 def same_documents(binary, server, checks, tmp):
     wrong, count = [], 0
-    for fx in sorted(p for p in (ROOT / "fixtures").iterdir() if (p / "report.jrxml").exists()):
+    for fx in sorted(p for p in (ROOT / "fixtures").iterdir() if (p / "report.jrxml").exists() and not (p / "data.sql").exists()):
         name, head, rows = fixture_request(fx)
         for fmt in ("pdf", "csv", "xlsx"):
             out = tmp / f"cli.{fmt}"

@@ -6,7 +6,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-rust-version.workspace = true
+# The database drivers need a newer Rust than the library (1.80): SQLite 3.54 comes with
+# rusqlite 0.41, which needs 1.89.
+rust-version = "1.89"
 readme = "../../README.md"
 homepage.workspace = true
 keywords = ["jasperreports", "jrxml", "pdf", "report", "cli"]
@@ -22,3 +24,21 @@ serde_json = "1"
 tiny_http = "0.12"
 httpdate = "1"
 socket2 = "0.6"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+base64 = "0.22"
+# Databases (feature `db`, on by default): the template's query, run as JasperReports runs it.
+rusqlite = { version = "0.43", features = ["bundled"], optional = true }
+postgres = { version = "0.19", features = ["with-chrono-0_4"], optional = true }
+tokio-postgres-rustls = { version = "0.14", optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+webpki-roots = { version = "1", optional = true }
+rust_decimal = { version = "1", features = ["db-postgres"], optional = true }
+mysql = { version = "28", default-features = false, features = ["minimal-rust", "rustls-tls-ring"], optional = true }
+tiberius = { version = "0.13", default-features = false, features = ["tds73", "rustls", "rustls-webpki-roots", "chrono", "rust_decimal"], optional = true }
+tokio = { version = "1", features = ["rt", "net"], optional = true }
+tokio-util = { version = "0.7", features = ["compat"], optional = true }
+futures-util = { version = "0.3", default-features = false, optional = true }
+
+[features]
+default = ["db"]
+db = ["dep:rusqlite", "dep:postgres", "dep:tokio-postgres-rustls", "dep:rustls", "dep:webpki-roots", "dep:rust_decimal", "dep:mysql", "dep:tiberius", "dep:tokio", "dep:tokio-util", "dep:futures-util"]

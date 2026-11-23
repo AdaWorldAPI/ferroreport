@@ -158,7 +158,9 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         fields: Vec::new(),
         variables: Vec::new(),
         groups: Vec::new(),
+        query: None,
     });
+    let query = dataset.query.clone();
     let detail = band(columns, &|c| c.detail.as_ref(), false, Tag::DataCell);
     let column_header = band(columns, &|c| c.column_header.as_ref(), false, Tag::HeaderCell);
     let title = band(columns, &|c| c.table_header.as_ref(), false, Tag::HeaderCell);
@@ -232,6 +234,7 @@ pub fn report(table: &TableElement, columns: &[FillColumn], width: f32) -> Repor
         summary,
         no_data,
         datasets: Vec::new(),
+        query,
         uses_data_source: true,
         horizontal: false,
         pdf: Default::default(),
@@ -253,7 +256,9 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         fields: Vec::new(),
         variables: Vec::new(),
         groups: Vec::new(),
+        query: None,
     });
+    let query = dataset.query.clone();
     Report {
         name: dataset.name,
         resource_bundle: None,
@@ -286,6 +291,7 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
         summary: None,
         no_data: None,
         datasets: Vec::new(),
+        query,
         uses_data_source: true,
         horizontal: columns > 1,
         pdf: Default::default(),
@@ -297,6 +303,7 @@ pub fn list_report(list: &ListElement, width: f32) -> Report {
 /// subdataset's rows, and the chart (its dataset now filled from them) as the summary.
 pub fn chart_report(chart: crate::chart::ChartElement, run: &DatasetRun, width: f32, height: f32) -> Report {
     let dataset = run.dataset.clone().unwrap_or_default();
+    let query = dataset.query.clone();
     let element = Element {
         key: None,
         x: 0.0,
@@ -351,6 +358,7 @@ pub fn chart_report(chart: crate::chart::ChartElement, run: &DatasetRun, width: 
         summary: Some(Band { height, split_type: SplitType::Stretch, print_when: None, elements: vec![element] }),
         no_data: None,
         datasets: Vec::new(),
+        query,
         uses_data_source: true,
         horizontal: false,
         pdf: Default::default(),

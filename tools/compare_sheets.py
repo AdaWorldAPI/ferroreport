@@ -89,7 +89,8 @@ def main() -> int:
     fixtures = [
         fx
         for fx in sorted((ROOT / "fixtures").iterdir())
-        if (fx / "report.jrxml").exists() and (not args.only or args.only in fx.name)
+        # A fixture filled from a database (data.sql) needs a JDBC driver for the reference.
+        if (fx / "report.jrxml").exists() and not (fx / "data.sql").exists() and (not args.only or args.only in fx.name)
     ]
     with ThreadPoolExecutor(args.jobs) as pool:
         results = list(pool.map(lambda fx: compare(fx, args), fixtures))

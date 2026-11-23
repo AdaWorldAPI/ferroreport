@@ -116,7 +116,7 @@ curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
         <tr><td><code>byte[]</code> (images)</td><td>Base64 text or a <code>data:</code> URI</td></tr>
         <tr><td><code>List</code>, <code>Collection</code></td><td>A nested array, usually the rows of a subreport</td></tr>
       </table>
-      <p>Reports without a data source can omit the data. Templates with an embedded SQL query do not run it: send the rows.</p>
+      <p>Reports without a data source can omit the data. A template's SQL query runs on the database given with <code>--db</code> (see <a href="#database">Rows from a database</a>); without it, send the rows.</p>
 
       <h3>Parameters</h3>
       <p>A JSON object with one key per <code>&lt;parameter&gt;</code>, converted with the same rules. Parameters you leave out take
@@ -232,6 +232,7 @@ ferroreport serve [options]</pre>
         <tr><td><code>--permissions &lt;list&gt;</code></td><td>What readers allow without the owner password: <code>print</code>, <code>copy</code>, <code>modify</code>, <code>annotate</code>, <code>fill</code>, <code>accessibility</code>, <code>assemble</code>, <code>all</code>, separated by commas (default: none). Encrypts the PDF too</td></tr>
         <tr><td><code>--max-pages &lt;n&gt;</code></td><td>Stops if the report goes over this many pages. See <a href="#large">Large reports and limits</a></td></tr>
         <tr><td><code>--max-row &lt;MB&gt;</code></td><td>Stops at a row of data larger than this. Default 256</td></tr>
+        <tr><td><code>--db &lt;url&gt;</code></td><td>Fills the report from its own SQL query, and its subreports from theirs (<code>FERROREPORT_DB</code>; password in <code>FERROREPORT_DB_PASSWORD</code>). See <a href="#database">Rows from a database</a></td></tr>
         <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Stops if the render takes longer than this</td></tr>
         <tr><td><code>-l, --locale &lt;tag&gt;</code></td><td>Number and date formatting: <code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>--font Family=file.ttf[:bold][:italic]</code></td><td>Registers an extra font. Repeat it for each style</td></tr>
@@ -282,11 +283,11 @@ compared with JasperReports: 46 the same pages and text, 0 differ, 2 JasperRepor
 <pre>$ ferroreport migrate reports/ --report migration.md
 ✓ reports/invoice.jrxml (JRXML 6)
 ✓ reports/sales.jrxml (JRXML 6)
-    - embedded SQL query is ignored; data comes from the provided data source
+    - hql query is not run (only SQL is): pass the rows it gives
 ! reports/legacy/map.jrxml (JRXML 6)
     - &lt;component&gt; elements are not supported yet and are skipped
 
-3 templates: 1 supported, 1 supported once you pass the rows their SQL query gave, 1 use features not supported yet, 0 cannot be loaded; 0 stop when rendered with no rows (they may need rows, parameters or pictures)</pre>
+3 templates: 1 supported, 1 supported once you pass the rows their non-SQL query gave, 1 use features not supported yet, 0 cannot be loaded; 0 stop when rendered with no rows (they may need rows, parameters or pictures)</pre>
       <h3>serve</h3>
       <p>Starts the <a href="#http">HTTP API</a>. <code>POST /render/invoice</code> renders <code>invoice.jrxml</code> from the
         templates directory, or <code>invoice.ferro</code> when there is no JRXML.</p>
@@ -300,6 +301,7 @@ compared with JasperReports: 46 the same pages and text, 0 differ, 2 JasperRepor
         <tr><td><code>--allow-anonymous</code></td><td><code>FERROREPORT_ALLOW_ANONYMOUS=1</code></td><td>Listens beyond localhost without a token. Only for ports that your own services alone can reach</td></tr>
         <tr><td><code>--rate-limit &lt;n&gt;</code></td><td></td><td>Most requests per minute from one client address; over it the answer is <code>429</code>. Default: no limit</td></tr>
         <tr><td><code>--max-body &lt;MB&gt;</code></td><td></td><td>Largest request accepted. Default 50</td></tr>
+        <tr><td><code>--db &lt;url&gt;</code></td><td><code>FERROREPORT_DB</code></td><td>The database the SQL queries of templates from <code>--templates</code> run on, when a request sends no rows. Templates sent in a request never get it</td></tr>
         <tr><td><code>--workers &lt;n&gt;</code></td><td></td><td>Requests rendered in parallel. Default: the number of CPUs</td></tr>
         <tr><td><code>--timeout &lt;seconds&gt;</code></td><td></td><td>Longest a render may take. Default 60; <code>0</code> for no limit</td></tr>
         <tr><td><code>--max-pages &lt;n&gt;</code></td><td></td><td>Most pages a report may have. Default: no limit</td></tr>
@@ -627,7 +629,7 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p>Supported: columns and nested column groups, table header and footer, column headers (printed again on every page
         the table continues on), column footers, detail cells, group header and footer cells for the subdataset's groups,
         <code>printWhenExpression</code> on columns, the no-data cell (<code>whenNoDataType="NoDataCell"</code>) and
-        subdataset variables. The SQL query of a subdataset is not run: the rows come from the data source expression.</p>
+        subdataset variables. The rows come from the data source expression, or, when the dataset run passes <code>$P{REPORT_CONNECTION}</code>, from the subdataset's SQL query on the report's database.</p>
       <p>Lists (<code>jr:list</code>) use the same <code>datasetRun</code>: the list contents are repeated for each row, one
         below the other, and continue on the next page when they do not fit.</p>
 
@@ -798,8 +800,30 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p>A render that goes over stops with an error (<code>413</code> from the server) and leaves no file behind.</p>
 
       <h2 id="database">Rows from a database</h2>
-      <p>The engine does not open database connections: your application already has one, with its credentials and its pool. Hand
-        it the rows as they come and nothing is held in memory. Templates with an embedded SQL query do not run it.</p>
+      <p>A template's own SQL query runs the way JasperReports runs it over JDBC: <code>$P{}</code> values are bound parameters,
+        <code>$P!{}</code> is pasted into the SQL text, and <code>$X{IN, column, PARAM}</code> (with <code>NOTIN</code>, <code>EQUAL</code>,
+        <code>NOTEQUAL</code>, <code>LESS</code>, <code>LESS]</code>, <code>GREATER</code>, <code>[GREATER</code> and the <code>BETWEEN</code> forms)
+        becomes its clause. Subreports, tables, lists, crosstabs and charts that pass <code>$P{REPORT_CONNECTION}</code> run their
+        own query on the same database. Rows are read as the report needs them.</p>
+<pre>ferroreport render sales.jrxml --db postgres://reports@db:5432/erp -p params.json -o sales.pdf
+ferroreport render sales.jrxml --db mysql://reports@db:3306/erp -o sales.xlsx
+ferroreport render sales.jrxml --db "jdbc:sqlserver://db:1433;databaseName=erp;user=reports" -o sales.pdf
+ferroreport render sales.jrxml --db sqlite:app.db -o sales.pdf</pre>
+      <table>
+        <tr><th>Database</th><th>URL</th></tr>
+        <tr><td>PostgreSQL</td><td><code>postgres://user@host:5432/db</code> (or <code>postgresql://</code>, <code>jdbc:postgresql://</code>); <code>sslmode</code> as in <code>psql</code>: <code>disable</code>, <code>prefer</code> (default) and <code>require</code> encrypt without checking the certificate, <code>verify-ca</code> / <code>verify-full</code> check it, against <code>sslrootcert</code> when given</td></tr>
+        <tr><td>MySQL, MariaDB</td><td><code>mysql://user@host:3306/db</code> (or <code>mariadb://</code>, <code>jdbc:mysql://</code>)</td></tr>
+        <tr><td>SQL Server</td><td><code>sqlserver://host:1433;databaseName=db;user=u</code> (JDBC form; or <code>mssql://</code>)</td></tr>
+        <tr><td>SQLite</td><td><code>sqlite:file.db</code>, or a path ending in <code>.db</code> / <code>.sqlite</code>; opened read-only</td></tr>
+      </table>
+      <p>The password goes in <code>FERROREPORT_DB_PASSWORD</code> rather than in the URL, where the process list would show it;
+        <code>FERROREPORT_DB</code> can hold the URL. Use a database user that can only read: the query runs as the template wrote it.
+        <code>serve --db</code> gives the database to templates from <code>--templates</code> only; a template sent in a request never
+        gets it, and a request cannot set a parameter that is pasted into a query (<code>$P!{}</code>). In Rust, implement
+        <code>ferroreport::sql::Connection</code> for your own pool and use <code>Renderer::connection</code> and
+        <code>Renderer::render_query_to</code>.</p>
+      <p>Queries in other languages (HQL, XPath, MDX, MongoDB...) and other databases (Oracle) are not run: hand the engine the rows
+        your application already reads, as they come, and nothing is held in memory.</p>
 <pre># PostgreSQL: one JSON object per row, straight into the report
 psql -At -c "select row_to_json(s) from (select * from sales order by region) s" mydb \
   | ferroreport render sales.jrxml -d - -o sales.pdf

@@ -54,6 +54,9 @@ pub struct Config {
     pub spool_dir: Option<PathBuf>,
     /// Bytes all requests together may keep on disk.
     pub spool_disk: u64,
+    /// The database the queries of templates from `templates` run on (`--db`). Templates
+    /// sent in a request never get it: they could run any statement.
+    pub connection: Option<Arc<dyn ferroreport::sql::Connection>>,
 }
 
 /// Counts each client's requests in the current minute.
@@ -299,6 +302,10 @@ struct Job {
     limits: ferroreport::Limits,
     params: serde_json::Value,
     format: ferroreport::Format,
+    /// The database, for a template from the templates directory.
+    connection: Option<Arc<dyn ferroreport::sql::Connection>>,
+    /// Filled from its own query: the request sent no rows.
+    from_db: bool,
 }
 
 /// What a write fails with once the client has closed the connection.
@@ -386,6 +393,22 @@ fn prepare(
         r.parse(text)
     };
     let (report, cached) = state.cache.get(&source, &parse).map_err(failed)?;
+    let named = name.is_some() || body.get("templateName").and_then(|v| v.as_str()).is_some();
+    let connection = if named { cfg.connection.clone() } else { None };
+    let params = body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default()));
+    if connection.is_some() {
+        // A value pasted into the SQL text ($P!{}) is the template's to choose, not a client's.
+        if let (Some(query), Some(given)) = (&report.query, params.as_object()) {
+            for pasted in pasted_params(&query.text) {
+                if given.contains_key(&pasted) {
+                    return Err(bad(format!(
+                        "parameter `{pasted}` is pasted into the query ($P!{{{pasted}}}): the server does not take it from requests"
+                    )));
+                }
+            }
+        }
+    }
+    let from_db = connection.is_some() && body.get("data").is_none() && report.query.is_some();
     let counter = if cached { &state.metrics.cache_hits } else { &state.metrics.cache_misses };
     counter.fetch_add(1, Ordering::Relaxed);
     Ok(Job {
@@ -425,9 +448,16 @@ fn prepare(
         },
         xlsx_numbers: flag("xlsxNumbers"),
         limits: cfg.limits,
-        params: body.get("params").cloned().unwrap_or_else(|| serde_json::Value::Object(Default::default())),
+        params,
         format,
+        connection,
+        from_db,
     })
+}
+
+/// The parameters a query pastes in as text: `$P!{NAME}`.
+fn pasted_params(sql: &str) -> Vec<String> {
+    sql.match_indices("$P!{").filter_map(|(i, _)| sql[i + 4..].split_once('}').map(|(name, _)| name.trim().to_string())).collect()
 }
 
 impl Job {
@@ -456,7 +486,12 @@ impl Job {
             r.add_resource(name, bytes.clone());
         }
         let params = ferroreport::params_from_json(&self.report, &self.params).map_err(failed)?;
-        r.render_rows_to(&self.report, rows, params, self.format, out).map_err(failed)
+        r = r.connection(self.connection.clone());
+        if self.from_db {
+            r.render_query_to(&self.report, params, self.format, out).map_err(failed)
+        } else {
+            r.render_rows_to(&self.report, rows, params, self.format, out).map_err(failed)
+        }
     }
 
     /// Whether the rows may be asked for a second time.
@@ -861,10 +896,12 @@ fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) 
                 counter.fetch_add(1, Ordering::Relaxed);
                 error(status, message)
             };
-            let job = match prepare(state, &body, name, format) {
+            let mut job = match prepare(state, &body, name, format) {
                 Ok(job) => job,
                 Err(e) => return refuse(e),
             };
+            // Rows sent one per line are the report's rows, whatever its query.
+            job.from_db &= !lines;
             if streaming {
                 // The response starts while the report renders, and a request cannot be read
                 // and answered at once: its rows are set aside first (on disk when large).
@@ -1114,7 +1151,14 @@ mod tests {
             spool_memory: 1 << 20,
             spool_dir: None,
             spool_disk: 1 << 30,
+            connection: None,
         }
+    }
+
+    #[test]
+    fn finds_the_parameters_pasted_into_a_query() {
+        assert_eq!(pasted_params("SELECT * FROM t WHERE a = $P{A} ORDER BY $P!{ORDER}, $P!{ DIR }"), ["ORDER", "DIR"]);
+        assert!(pasted_params("SELECT 1").is_empty());
     }
 
     #[test]

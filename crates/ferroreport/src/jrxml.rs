@@ -562,21 +562,13 @@ impl Parser {
         // Subdatasets first: tables in the bands refer to them.
         for d in root.children_named("subDataset").chain(root.children_named("dataset")) {
             let dataset = self.dataset(d)?;
-            if d.child("queryString").is_some() || d.child("query").is_some() {
-                self.warnings.push(format!(
-                    "subdataset `{}`: its query is ignored; tables get rows from their dataSourceExpression",
-                    dataset.name
-                ));
-            }
             self.datasets.insert(dataset.name.clone(), dataset);
         }
-        let Dataset { parameters, fields, variables, groups, .. } = self.dataset(root)?;
+        let Dataset { parameters, fields, variables, groups, query, .. } = self.dataset(root)?;
         if root.child("scriptlet").is_some() {
             self.warnings.push("<scriptlet> is not supported yet".into());
         }
-        if root.child("queryString").is_some() || root.child("query").is_some() {
-            self.warnings.push("embedded SQL query is ignored; data comes from the provided data source".into());
-        }
+
         let band =
             |p: &mut Parser, name: &str| -> Result<Option<Band>> { Ok(p.section_bands(root.child(name))?.into_iter().next()) };
         let report = Report {
@@ -625,6 +617,7 @@ impl Parser {
             summary: band(&mut self, "summary")?,
             no_data: band(&mut self, "noData")?,
             datasets: Vec::new(),
+            query,
             uses_data_source: false,
             horizontal: attr(root, &["printOrder"]) == Some("Horizontal")
                 && attr(root, &["columnCount"]).and_then(number::<u32>).unwrap_or(1) > 1,
@@ -719,7 +712,16 @@ impl Parser {
                 footer: self.section_bands(g.child("groupFooter"))?,
             });
         }
-        Ok(Dataset { name: node.attr("name").unwrap_or_default().to_string(), parameters, fields, variables, groups })
+        let query = node
+            .child("queryString")
+            .or_else(|| node.child("query"))
+            .map(|q| Query { language: q.attr("language").unwrap_or_default().to_string(), text: q.text.trim().to_string() });
+        if let Some(q) = &query {
+            if !q.language.is_empty() && !q.language.eq_ignore_ascii_case("sql") && !q.text.is_empty() {
+                self.warnings.push(format!("{} query is not run (only SQL is): pass the rows it gives", q.language));
+            }
+        }
+        Ok(Dataset { name: node.attr("name").unwrap_or_default().to_string(), parameters, fields, variables, groups, query })
     }
 
     /// A `<datasetRun>` (of a table or list).
@@ -735,16 +737,14 @@ impl Parser {
             None => None,
         };
         let mut parameters = Vec::new();
-        let (mut parameters_map, mut data_source) = (None, None);
+        let (mut parameters_map, mut data_source, mut connection) = (None, None, false);
         if let Some(r) = run {
             for c in r.children.iter().filter(|c| c.name == "datasetParameter" || c.name == "parameter") {
                 if let Some(e) = self.child_expr(c, &["datasetParameterExpression", "expression"])? {
                     parameters.push((c.attr("name").unwrap_or_default().to_string(), e));
                 }
             }
-            if r.child("connectionExpression").is_some() && r.child("dataSourceExpression").is_none() {
-                self.warnings.push(format!("{what}s with a connectionExpression get no rows (only data sources are supported)"));
-            }
+            connection = r.child("connectionExpression").is_some() && r.child("dataSourceExpression").is_none();
             parameters_map = self.child_expr(r, &["parametersMapExpression"])?;
             data_source = self.child_expr(r, &["dataSourceExpression"])?;
         }
@@ -753,6 +753,7 @@ impl Parser {
             parameters,
             parameters_map,
             data_source,
+            connection,
             page_height: self.page_height,
             language: if self.groovy { Language::Groovy } else { Language::Java },
         })
@@ -2055,10 +2056,6 @@ impl Parser {
                     })
                     .collect();
                 let connection = n.child("connectionExpression").is_some();
-                if connection {
-                    self.warnings
-                        .push("subreports with a connectionExpression get no rows (only data sources are supported)".into());
-                }
                 ElementKind::Subreport(Box::new(SubreportElement {
                     expr: self.child_expr(n, &["subreportExpression", "expression"])?,
                     parameters,

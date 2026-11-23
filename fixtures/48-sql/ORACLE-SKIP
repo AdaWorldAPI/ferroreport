@@ -1,0 +1,1 @@
+Filled from SQLite (data.sql): the reference run needs a JDBC driver; checked against JasperReports 6.20.6 fed the same rows as JSON (CSV identical, PDF pixel-identical).

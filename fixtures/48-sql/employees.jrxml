@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="employees" pageWidth="515" pageHeight="842" columnWidth="515" leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0">
+	<style name="B" isDefault="true" fontName="DejaVu Sans" fontSize="8"/>
+	<parameter name="DEPT_ID" class="java.lang.Integer"/>
+	<parameter name="MIN_SALARY" class="java.lang.Double"/>
+	<queryString><![CDATA[SELECT name, salary, hired, active FROM emp WHERE dept_id = $P{DEPT_ID} AND salary >= $P{MIN_SALARY} ORDER BY salary DESC]]></queryString>
+	<field name="name" class="java.lang.String"/>
+	<field name="salary" class="java.math.BigDecimal"/>
+	<field name="hired" class="java.lang.String"/>
+	<field name="active" class="java.lang.Integer"/>
+	<variable name="total" class="java.lang.Double" calculation="Sum"><variableExpression><![CDATA[$F{salary}.doubleValue()]]></variableExpression></variable>
+	<columnHeader><band height="14">
+		<staticText><reportElement mode="Opaque" x="0" y="0" width="255" height="14" backcolor="#E8EEF6"/><box leftPadding="3"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Employee]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="255" y="0" width="100" height="14" backcolor="#E8EEF6"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Hired]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="355" y="0" width="60" height="14" backcolor="#E8EEF6"/><textElement verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Status]]></text></staticText>
+		<staticText><reportElement mode="Opaque" x="415" y="0" width="100" height="14" backcolor="#E8EEF6"/><box rightPadding="3"/><textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement><text><![CDATA[Salary]]></text></staticText>
+	</band></columnHeader>
+	<detail><band height="13">
+		<textField><reportElement x="0" y="0" width="255" height="13"/><box leftPadding="3"/><textFieldExpression><![CDATA[$F{name}]]></textFieldExpression></textField>
+		<textField><reportElement x="255" y="0" width="100" height="13"/><textFieldExpression><![CDATA[$F{hired}]]></textFieldExpression></textField>
+		<textField><reportElement x="355" y="0" width="60" height="13"/><textFieldExpression><![CDATA[$F{active} == 1 ? "active" : "leave"]]></textFieldExpression></textField>
+		<textField pattern="#,##0.00"><reportElement x="415" y="0" width="100" height="13"/><box rightPadding="3"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$F{salary}]]></textFieldExpression></textField>
+	</band></detail>
+	<summary><band height="16">
+		<textField pattern="#,##0.00"><reportElement x="315" y="2" width="200" height="13"/><box rightPadding="3"><topPen lineWidth="0.5"/></box><textElement textAlignment="Right"><font isBold="true"/></textElement><textFieldExpression><![CDATA[$V{total}]]></textFieldExpression></textField>
+	</band></summary>
+</jasperReport>

@@ -98,7 +98,12 @@ pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
 }
 
 /// Builds one record from a JSON object, typed according to `fields`.
-fn record_from_json(fields: &[crate::model::Field], keep_row: bool, i: usize, row: &serde_json::Value) -> Result<Record> {
+pub(crate) fn record_from_json(
+    fields: &[crate::model::Field],
+    keep_row: bool,
+    i: usize,
+    row: &serde_json::Value,
+) -> Result<Record> {
     let obj = row.as_object().ok_or_else(|| Error::Data(format!("row {i} is not an object")))?;
     let mut rec = Record::with_capacity(fields.len() + keep_row as usize);
     if keep_row {

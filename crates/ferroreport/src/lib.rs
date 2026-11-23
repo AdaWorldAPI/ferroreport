@@ -38,6 +38,7 @@ pub mod print;
 mod raster;
 pub mod rich;
 pub mod rtf;
+pub mod sql;
 pub mod standard;
 pub mod svg;
 pub mod table;
@@ -421,6 +422,39 @@ impl Renderer {
         };
         sheet.finish()?;
         Ok(stats)
+    }
+
+    /// The database that reports, subreports, tables, lists, charts and crosstabs with a
+    /// query get their rows from (a subreport or dataset run uses it when it has a
+    /// `connectionExpression`). The engine has no driver of its own: see [`sql::Connection`].
+    pub fn connection(mut self, connection: Option<std::sync::Arc<dyn sql::Connection>>) -> Renderer {
+        self.images.connection = connection.map(sql::Shared);
+        self
+    }
+
+    /// Renders `report` with the rows of its own query, run on the renderer's
+    /// [`Renderer::connection`] with `params` (and the defaults of the other parameters), as
+    /// JasperReports fills a report from a JDBC connection. Rows are read from the database
+    /// as the report needs them.
+    pub fn render_query_to<W: std::io::Write>(
+        &mut self,
+        report: &Report,
+        params: HashMap<String, Value>,
+        format: Format,
+        out: W,
+    ) -> Result<FillStats> {
+        let connection = self
+            .images
+            .connection
+            .clone()
+            .ok_or_else(|| Error::Data("render_query_to needs a connection (Renderer::connection)".into()))?;
+        if report.query.is_none() {
+            return Err(Error::Data(format!("`{}` has no query to fill it from a database", report.name)));
+        }
+        let resolved = fill::resolve_params(report, params.clone(), &self.env(report))?;
+        let conn: &dyn sql::Connection = connection.0.as_ref();
+        let mut rows = || sql::query_rows(report, &resolved, conn);
+        self.render_rows_to(report, &mut rows, params, format, out)
     }
 
     /// Exports a filled document to CSV, laid out like JasperReports' CSV exporter.

@@ -644,7 +644,8 @@ fn chart_over_run(
     inner.evaluation_time = EvaluationTime::Now;
     inner.evaluation_group = None;
     let report = crate::table::chart_report(inner, run, w, h);
-    let (params, records) = run_inputs(run, &report, scope, env, "chart")?;
+    let connection = images.connection.clone();
+    let (params, records) = run_inputs(run, &report, scope, env, "chart", connection.as_ref())?;
     if images.depth >= MAX_SUBREPORT_DEPTH {
         return Err(Error::Unsupported(format!("chart: nested more than {MAX_SUBREPORT_DEPTH} levels")));
     }
@@ -2145,15 +2146,26 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
 
-    let rows = match &sr.data_source {
-        Some(e) => match eval(e, le.scope, le.env)? {
-            Value::Json(j) => j,
-            Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
-            other => return Err(Error::eval(format!("subreport data source is a {}, expected a list", other.type_name()))),
-        },
-        None => Arc::new(serde_json::Value::Array(Vec::new())),
+    let connection = le.images.connection.clone();
+    let records = match (&sr.data_source, sr.connection, connection, &report.query) {
+        (None, true, Some(conn), Some(_)) => {
+            let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
+            query_records(&report, &params, &conn, &env)?
+        }
+        _ => {
+            let rows = match &sr.data_source {
+                Some(e) => match eval(e, le.scope, le.env)? {
+                    Value::Json(j) => j,
+                    Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
+                    other => {
+                        return Err(Error::eval(format!("subreport data source is a {}, expected a list", other.type_name())))
+                    }
+                },
+                None => Arc::new(serde_json::Value::Array(Vec::new())),
+            };
+            crate::data::records_from_json(&report, &rows)?
+        }
     };
-    let records = crate::data::records_from_json(&report, &rows)?;
     let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
 
     count_run(le, &location)?;
@@ -2314,15 +2326,24 @@ fn fill_crosstab(le: &mut LayoutEnv, ct: &CrosstabElement, el: &Element) -> Resu
         for (name, e) in &run.parameters {
             run_params.insert(name.clone(), eval(e, le.scope, le.env)?);
         }
-        let rows = match &run.data_source {
-            Some(e) => match eval(e, le.scope, le.env)? {
-                Value::Json(j) => j,
-                Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
-                other => return Err(Error::eval(format!("crosstab data source is a {}, expected a list", other.type_name()))),
-            },
-            None => Arc::new(serde_json::Value::Array(Vec::new())),
+        let connection = le.images.connection.clone();
+        let records = match (&run.data_source, run.connection, connection, &report.query) {
+            (None, true, Some(conn), Some(_)) => query_records(&report, &run_params, &conn, le.env)?,
+            _ => {
+                let rows = match &run.data_source {
+                    Some(e) => match eval(e, le.scope, le.env)? {
+                        Value::Json(j) => j,
+                        Value::Null => Arc::new(serde_json::Value::Array(Vec::new())),
+                        other => {
+                            return Err(Error::eval(format!("crosstab data source is a {}, expected a list", other.type_name())))
+                        }
+                    },
+                    None => Arc::new(serde_json::Value::Array(Vec::new())),
+                };
+                crate::data::records_from_json(&report, &rows)?
+            }
         };
-        own_records = crate::data::records_from_json(&report, &rows)?.into_iter().map(Row::Owned).collect();
+        own_records = records.into_iter().map(Row::Owned).collect();
         dataset_fields = report.fields.clone();
     }
     let (records, fields): (&[Row], &[Field]) =
@@ -2695,7 +2716,8 @@ fn run_dataset_report(le: &mut LayoutEnv, run: &DatasetRun, report: &Report, wha
     if le.images.depth >= MAX_SUBREPORT_DEPTH {
         return Err(Error::Unsupported(format!("{what}: nested more than {MAX_SUBREPORT_DEPTH} levels")));
     }
-    let (params, records) = run_inputs(run, report, le.scope, le.env, what)?;
+    let connection = le.images.connection.clone();
+    let (params, records) = run_inputs(run, report, le.scope, le.env, what, connection.as_ref())?;
     let env = EvalEnv { locale: le.env.locale, groovy: report.language == Language::Groovy, now: le.env.now };
     count_run(le, what)?;
     le.images.depth += 1;
@@ -2711,6 +2733,7 @@ fn run_inputs(
     scope: &dyn Scope,
     env: &EvalEnv,
     what: &str,
+    connection: Option<&crate::sql::Shared>,
 ) -> Result<(HashMap<String, Value>, Vec<Record>)> {
     let mut params = HashMap::new();
     if let Some(e) = &run.parameters_map {
@@ -2730,6 +2753,10 @@ fn run_inputs(
     if let Ok(bundle) = scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
         params.entry(crate::expr::eval::RESOURCE_BUNDLE.into()).or_insert(bundle);
     }
+    if let (None, true, Some(conn), Some(_)) = (&run.data_source, run.connection, connection, &report.query) {
+        let records = query_records(report, &params, conn, env)?;
+        return Ok((params, records));
+    }
     let rows = match &run.data_source {
         Some(e) => match eval(e, scope, env)? {
             Value::Json(j) => j,
@@ -2740,6 +2767,49 @@ fn run_inputs(
     };
     let records = crate::data::records_from_json(report, &rows)?;
     Ok((params, records))
+}
+
+/// The parameters a report fills with: those given, the built-in ones, then the defaults of
+/// the others (which may use earlier ones), as JasperReports resolves them before running the
+/// report's query.
+pub(crate) fn resolve_params(
+    report: &Report,
+    mut params: HashMap<String, Value>,
+    env: &EvalEnv,
+) -> Result<HashMap<String, Value>> {
+    for name in ["REPORT_PARAMETERS_MAP", "REPORT_CONNECTION", "REPORT_DATA_SOURCE", "REPORT_SCRIPTLET", "REPORT_MAX_COUNT"] {
+        params.entry(name.to_string()).or_insert(Value::Null);
+    }
+    params.entry("REPORT_LOCALE".into()).or_insert_with(|| Value::str(env.locale.tag));
+    params.entry("REPORT_TIME_ZONE".into()).or_insert_with(|| Value::str("UTC"));
+    for p in &report.parameters {
+        if let Some(v) = params.remove(&p.name) {
+            params.insert(p.name.clone(), p.class.coerce(v));
+            continue;
+        }
+        let v = match &p.default {
+            Some(e) => {
+                let empty = HashMap::new();
+                let ctx =
+                    Ctx { record: None, report, params: &params, vars: &[], var_index: &empty, page_number: 1, column_number: 1 };
+                eval(e, &ctx, env)?
+            }
+            None => Value::Null,
+        };
+        params.insert(p.name.clone(), v);
+    }
+    Ok(params)
+}
+
+/// The rows of a (sub)report's or dataset's query, run on the render's connection.
+fn query_records(
+    report: &Report,
+    params: &HashMap<String, Value>,
+    conn: &crate::sql::Shared,
+    env: &EvalEnv,
+) -> Result<Vec<Record>> {
+    let params = resolve_params(report, params.clone(), env)?;
+    crate::sql::query_rows(report, &params, conn.0.as_ref())?.collect()
 }
 
 // ---------------------------------------------------------------------------------------------

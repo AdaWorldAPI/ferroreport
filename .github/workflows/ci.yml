@@ -31,6 +31,60 @@ jobs:
       - uses: actions/checkout@v5
       - uses: EmbarkStudios/cargo-deny-action@v2
 
+  # The database drivers against real servers: PostgreSQL, MariaDB and SQL Server.
+  databases:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-pw
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-only-pw
+          MARIADB_DATABASE: fr
+        ports: ["3306:3306"]
+        options: --health-cmd "healthcheck.sh --connect" --health-interval 5s --health-retries 20
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Ci-only-pw-2026
+        ports: ["1433:1433"]
+    env:
+      FERROREPORT_TEST_POSTGRES: postgres://postgres:ci-only-pw@127.0.0.1:5432/postgres
+      FERROREPORT_TEST_MYSQL: mysql://root:ci-only-pw@127.0.0.1:3306/fr
+      FERROREPORT_TEST_MSSQL: sqlserver://127.0.0.1:1433;user=sa;password=Ci-only-pw-2026;TrustServerCertificate=true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p ferroreport-cli
+      # SQL Server takes a while to start and has no health check in its image.
+      - name: Wait for SQL Server
+        run: |
+          for i in $(seq 1 60); do
+            (echo > /dev/tcp/127.0.0.1/1433) 2>/dev/null && break
+            sleep 2
+          done
+          sleep 10
+      - run: cargo test --release -p ferroreport-cli db::tests -- --test-threads=1
+      # The same report from each database gives the same document as from SQLite.
+      - name: The SQL fixture from every database
+        run: |
+          python3 -c "import sqlite3; c = sqlite3.connect('/tmp/fx.sqlite'); c.executescript(open('fixtures/48-sql/data.sql').read()); c.commit()"
+          docker run --rm --network host -e PGPASSWORD=ci-only-pw -v "$PWD/fixtures/48-sql:/fx" postgres:16 psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE fx" -q
+          docker run --rm --network host -e PGPASSWORD=ci-only-pw -v "$PWD/fixtures/48-sql:/fx" postgres:16 psql -h 127.0.0.1 -U postgres -d fx -q -f /fx/data.sql
+          docker run --rm --network host -v "$PWD/fixtures/48-sql:/fx" mariadb:11 sh -c "mariadb -h 127.0.0.1 -uroot -pci-only-pw --default-character-set=utf8mb4 fr < /fx/data.sql"
+          render() { ./target/release/ferroreport render fixtures/48-sql/report.jrxml -p fixtures/48-sql/params.json -q --db "$1" -o "$2"; }
+          render sqlite:/tmp/fx.sqlite /tmp/sqlite.csv
+          render "postgres://postgres:ci-only-pw@127.0.0.1:5432/fx" /tmp/postgres.csv
+          render "mysql://root:ci-only-pw@127.0.0.1:3306/fr" /tmp/mariadb.csv
+          diff /tmp/sqlite.csv /tmp/postgres.csv
+          diff /tmp/sqlite.csv /tmp/mariadb.csv
+
   python:
     runs-on: ubuntu-latest
     steps:

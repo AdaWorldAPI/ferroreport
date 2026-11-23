@@ -153,6 +153,24 @@ ferroreport render nomina.jrxml -d filas.json -o nomina.pdf --user-password 0423
   RemotePage, con su tooltip), las anclas y los marcadores (`bookmarkLevel`, que forman el índice
   del PDF) funcionan en PDF, Excel, Word y HTML, como en JasperReports.
 
+### Desde una base de datos
+
+La consulta SQL de la plantilla se ejecuta como la ejecuta JasperReports por JDBC: `$P{}` va
+como parámetro, `$P!{}` se pega en el texto y `$X{IN, columna, PARAM}` (y los demás `$X{}`) se
+convierte en su condición. Los subreportes, tablas, listas, crosstabs y gráficos que pasan
+`$P{REPORT_CONNECTION}` hacen su propia consulta en la misma base. Las filas se leen a medida
+que el reporte las necesita.
+
+```bash
+ferroreport render ventas.jrxml --db postgres://reportes@db:5432/erp -p params.json -o ventas.pdf
+ferroreport render ventas.jrxml --db "jdbc:sqlserver://db:1433;databaseName=erp;user=reportes" -o ventas.xlsx
+```
+
+PostgreSQL, MySQL y MariaDB, SQL Server y SQLite; la URL puede ser la JDBC que ya tiene el
+proyecto. La contraseña va en `FERROREPORT_DB_PASSWORD`, no en la URL, y conviene un usuario
+de solo lectura. En `serve --db`, solo las plantillas de `--templates` usan la base; una
+plantilla enviada en la petición nunca la recibe.
+
 ## Plantillas: JRXML o .ferro
 
 ferroreport lee JRXML como lo escriben JasperReports 6 y 7, y un formato propio, `.ferro`: los
@@ -284,7 +302,8 @@ su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures
 - PDF/A-2 y PDF/A-3, archivos adjuntos, cifrado AES-256 con permisos, enlaces, anclas y el
   índice de marcadores.
 - Aún no: comparadores propios en crosstabs, algunos tipos de Barbecue (PDF417, PostNet, USPS,
-  SCC-14, GTIN), personalizadores de gráficos, firmas digitales, conexiones JDBC.
+  SCC-14, GTIN), personalizadores de gráficos, firmas digitales, consultas en lenguajes que no son SQL
+  (HQL, XPath, MDX: pásale las filas).
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento

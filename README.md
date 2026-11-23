@@ -222,8 +222,34 @@ The packages and the server take the same options: `pdfa`, `attachments`, `passw
 
 ### Rows from a database
 
-The engine does not open database connections: your application already has one, with its
-credentials and its pool. Hand it the rows as they come and nothing is held in memory.
+A template's own SQL query runs the way JasperReports runs it over JDBC: `$P{}` values are sent
+as bound parameters, `$P!{}` is pasted into the SQL text, and `$X{IN, column, PARAM}` (with
+`NOTIN`, `EQUAL`, `NOTEQUAL`, `LESS`, `LESS]`, `GREATER`, `[GREATER` and the `BETWEEN` forms)
+becomes the clause it stands for. Subreports, tables, lists, crosstabs and charts that pass
+`$P{REPORT_CONNECTION}` run their own query on the same database. Rows are read as the report
+needs them, so a large result is never in memory whole.
+
+```bash
+ferroreport render sales.jrxml --db postgres://reports@db:5432/erp -p params.json -o sales.pdf
+ferroreport render sales.jrxml --db mysql://reports@db:3306/erp -o sales.xlsx
+ferroreport render sales.jrxml --db "jdbc:sqlserver://db:1433;databaseName=erp;user=reports" -o sales.pdf
+ferroreport render sales.jrxml --db sqlite:app.db -o sales.pdf
+```
+
+The drivers are PostgreSQL, MySQL and MariaDB, SQL Server and SQLite. The URL can be written
+the way a JasperReports project already has it (`jdbc:postgresql://...`). Put the password in
+`FERROREPORT_DB_PASSWORD` rather than in the URL, where the process list would show it, and
+use a database user that can only read: the query runs as the template wrote it. For
+PostgreSQL, `sslmode` works as it does in `psql`: `prefer` (the default) and `require` encrypt
+without checking the certificate, `verify-full` checks it (against `sslrootcert` when given).
+`serve --db` gives the database to the templates of `--templates` only: a template sent in a
+request never gets it, and a request cannot set a parameter that is pasted into a query
+(`$P!{}`). The same fixture renders the same from SQLite, PostgreSQL and MariaDB, and the same
+as JasperReports given those rows. In Rust, implement `ferroreport::sql::Connection` for your
+own pool and call `Renderer::connection` and `Renderer::render_query_to`.
+
+Queries in other languages (HQL, XPath, MDX, MongoDB...) and other databases (Oracle) are not
+run: hand the engine the rows your application reads, as they come.
 
 ```bash
 # PostgreSQL: one JSON object per row, straight into the report
@@ -248,7 +274,6 @@ rows = (dict(zip(("region", "amount"), r)) for r in cursor)
 ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)
 ```
 
-Templates with an embedded SQL query do not run it: send the rows.
 
 ### Excel and CSV
 
@@ -372,7 +397,7 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 | Images | PNG, JPEG and GIF (its first frame, with its transparent color); SVG (drawn as vectors in PDF, as pictures in Excel and Word); scale modes RetainShape, FillFrame, Clip; alignment; `onErrorType` | remote URLs (by design), other formats |
 | Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, XY bar, scatter, bubble, time series, candlestick, high-low, Gantt, meter, thermometer, multi-axis; titles, legends, axis labels, series colors, range limits, tick formats, pie label formats; datasets by record, group, page or report, with `evaluationTime`, and from a subdataset | chart customizers and themes. Charts follow JFreeChart's default look closely but are not pixel-identical |
 | Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), parameters, return values, splitting across pages with reprinted column headers | JDBC connections |
-| Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | embedded SQL queries (data comes from JSON) |
+| Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | queries in languages other than SQL (HQL, XPath, MDX...: pass the rows) |
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules, string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale) | arbitrary Java classes (scriptlets, static methods of your own) |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font`; text in a font no one provides is written like JasperReports writes it, in the PDF standard font of its `pdfFontName` (Helvetica by default) | font extension jars |
@@ -384,9 +409,9 @@ example the Dominican e-CF stamp).
 
 Run `ferroreport doctor template.jrxml` to get this verdict for a specific template, or
 `ferroreport migrate folder/` for every template of a project. Over the 171 JRXML 7 samples of
-JasperReports 7.1.1: 149 load with everything they use supported (74 of them once you pass the
-rows their SQL query gave), 18 use something not supported yet and 4 do not load (Groovy
-closures, a scriptlet and `DATERANGE`).
+JasperReports 7.1.1: 151 load with everything they use supported (24 of them once you pass the
+rows their HQL, XPath, MDX or other non-SQL query gave), 16 use something not supported yet and 4
+do not load (Groovy closures, a scriptlet and `DATERANGE`).
 
 ## How output is verified
 
