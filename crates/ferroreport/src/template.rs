@@ -968,7 +968,7 @@ fn lay_out_frame(n: &mut Node) -> Result<()> {
     let (els, used) = stack(els, 0.0, 0.0, width, gap)?;
     n.children = others;
     n.children.extend(els);
-    if num_attr(n, "height").map_or(true, |h| h < used) {
+    if num_attr(n, "height").is_none_or(|h| h < used) {
         set_attr(n, "height", used);
     }
     Ok(())

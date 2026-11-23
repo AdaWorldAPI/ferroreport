@@ -2292,7 +2292,7 @@ fn percentage(value: &Value, total: &Value, class: JavaType) -> Value {
     if value.is_null() {
         return Value::Null;
     }
-    if total.as_f64().map_or(true, |t| t == 0.0) {
+    if total.as_f64().is_none_or(|t| t == 0.0) {
         return class.zero();
     }
     match class {

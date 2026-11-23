@@ -273,7 +273,7 @@ pub fn encode(content: &str, ecl: Ecl, version: Option<u8>) -> Result<QrCode, St
     for mask in 0..8u8 {
         let m = build_matrix(&final_bits.0, ecl, version, mask, size);
         let penalty = m.penalty();
-        if best.as_ref().map_or(true, |(p, _, _)| penalty < *p) {
+        if best.as_ref().is_none_or(|(p, _, _)| penalty < *p) {
             best = Some((penalty, mask, m));
         }
     }

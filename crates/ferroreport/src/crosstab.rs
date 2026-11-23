@@ -82,7 +82,7 @@ pub(crate) fn sorted_paths(paths: &[Vec<Value>], descending: &[bool], order_by: 
 pub(crate) fn prefixes(sorted: &[Vec<Value>], len: usize) -> Vec<Vec<Value>> {
     let mut out: Vec<Vec<Value>> = Vec::new();
     for p in sorted {
-        if out.last().map_or(true, |last| key(last) != key(&p[..len])) {
+        if out.last().is_none_or(|last| key(last) != key(&p[..len])) {
             out.push(p[..len].to_vec());
         }
     }

@@ -146,7 +146,7 @@ pub fn encode(msg: &str) -> Result<Vec<u32>, String> {
         if pairs >= 2 || digits == n {
             if odd {
                 let fnc = chars[i..].iter().position(|&c| c == FNC1).map(|p| p + i);
-                if fnc.map_or(true, |f| f > i + digits) {
+                if fnc.is_none_or(|f| f > i + digits) {
                     i += 1;
                 }
             }

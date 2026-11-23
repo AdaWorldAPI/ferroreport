@@ -330,7 +330,7 @@ mod tests {
             let (kind, code) = (args[0], args[1].replace('_', " "));
             let spec = Spec {
                 kind: kind.into(),
-                draw_text: args.get(2).map_or(true, |v| *v == "true"),
+                draw_text: args.get(2).is_none_or(|v| *v == "true"),
                 checksum: args.get(3).is_some_and(|v| *v == "true"),
                 bar_width: args.get(4).and_then(|v| v.parse().ok()),
                 bar_height: args.get(5).and_then(|v| v.parse().ok()),

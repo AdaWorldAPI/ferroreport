@@ -422,7 +422,7 @@ pub fn matrix(msg: &str, o: &Options) -> Result<(Vec<Vec<bool>>, usize), String>
     let mut codewords = Vec::with_capacity(cols * rows);
     codewords.push((m + pad + 1) as u16);
     codewords.extend(&data);
-    codewords.extend(std::iter::repeat(900u16).take(pad));
+    codewords.extend(std::iter::repeat_n(900u16, pad));
     let ec = error_correction(&codewords, o.level);
     codewords.extend(ec);
 
