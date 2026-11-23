@@ -766,7 +766,7 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
 
       <h2 id="large">Large reports and limits</h2>
       <p>A report does not have to fit in memory. Rows are read as the report asks for them and each page is written as soon as it
-        is finished, so a million rows and 23,810 pages render in about 11 MB, at about 85,000 rows a second on one core.</p>
+        is finished, so a million rows and 23,810 pages render in about 13 MB, at about 70,000 rows a second on one core.</p>
       <table>
         <tr><th>From</th><th>How</th></tr>
         <tr><td>Command line</td><td>Nothing to do: <code>ferroreport render sales.jrxml -d sales.json -o sales.pdf</code> already reads and writes as it goes. The rows can be a JSON array or one object per line, from a file or from standard input</td></tr>

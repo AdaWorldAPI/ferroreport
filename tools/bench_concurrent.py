@@ -48,7 +48,10 @@ def main():
     subprocess.run(["javac", "-proc:none", "-nowarn", "-cp", f"{args.lib}/*", "-d", str(classes),
                     str(ROOT / "tools" / "oracle" / "Oracle.java"), str(ROOT / "tools" / "oracle" / "Concurrent.java")], check=True)
     example = ROOT / "target" / "release" / "examples" / "concurrent"
-    out = {"machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}", "seconds": args.seconds, "reports": {}}
+    version = subprocess.run([str(ROOT / "target" / "release" / "ferroreport"), "--version"], capture_output=True, text=True).stdout.strip()
+    jar = next(Path(args.lib).glob("jasperreports-[0-9]*.jar"), None)
+    out = {"ferroreport": version, "jasperreports": jar.stem.split("-", 1)[1] if jar else "unknown",
+           "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}", "seconds": args.seconds, "reports": {}}
     for name in args.fixtures:
         fx = ROOT / "fixtures" / name
         data, params = fx / "data.json", fx / "params.json"

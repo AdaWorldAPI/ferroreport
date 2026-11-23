@@ -1,7 +1,7 @@
 # ferroreport for Python
 
 **Reports in milliseconds from Python**: a template and your data in, a PDF, an Excel workbook
-or a CSV out. An invoice takes about 2 ms, and a million rows take about 12 seconds and 11 MB
+or a CSV out. An invoice takes about 2 ms, and a million rows take about 14 seconds and 13 MB
 of memory, because rows are read as they are needed and pages are written as they are finished.
 
 It reads **JasperReports `.jrxml` templates** and gives the same output, verified pixel by pixel
@@ -42,7 +42,7 @@ with open("invoice.pdf", "wb") as f:
   (`.pdf`, `.xlsx`, `.csv`). It returns `{"pages": ..., "rows": ...}`.
 - For rows that do not fit in memory, give `data_file="rows.jsonl"` instead of `data`: a JSON
   array or one object per line, read as the report needs it. A million rows render in about
-  11 MB.
+  13 MB.
 - `max_pages=` and `timeout=` (seconds) stop a report that grows past what you expect; set
   them when templates or data come from other people. `csv_safe=True` guards CSV against
   spreadsheet formulas in the data, and `xlsx_numbers=True` writes numbers as numbers.

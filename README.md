@@ -3,7 +3,7 @@
 **Reports in milliseconds, from any language.** ferroreport is a report engine: give it a
 template and your data and it writes the PDF, the Excel workbook, the Word document, the CSV or
 a web preview. An invoice takes
-**2 ms**; a **million rows** take 12 seconds and **11 MB of memory**, because rows are read as
+**2 ms**; a **million rows** take 14 seconds and **13 MB of memory**, because rows are read as
 they are needed and pages are written as they are finished. It is one small binary with no
 runtime to install, and templates **cannot run code** on your server.
 
@@ -516,9 +516,9 @@ memory (median of 5 to 7 runs):
 
 | Report | JasperReports | ferroreport | Faster |
 |---|---|---|---|
-| Invoice, 2 pages | 2.98 s, 190 MiB | 11 ms, 10 MiB | 274× |
-| Grouped sales, 4 pages | 3.13 s, 184 MiB | 13 ms, 11 MiB | 245× |
-| 20,000 rows, 477 pages | 6.44 s, 461 MiB | 0.26 s, 10 MiB | 25× |
+| Invoice, 2 pages | 3.03 s, 192 MiB | 11 ms, 13 MiB | 284× |
+| Grouped sales, 4 pages | 3.45 s, 192 MiB | 11 ms, 13 MiB | 315× |
+| 20,000 rows, 477 pages | 7.13 s, 447 MiB | 0.35 s, 11 MiB | 20× |
 
 **Warm: a service that stays up.** JasperReports at its best: one JVM, the template compiled
 once, the JIT warmed up by hundreds of runs, rows already converted to Java objects, the PDF
@@ -527,10 +527,10 @@ time per report:
 
 | Report | JasperReports | ferroreport | Faster |
 |---|---|---|---|
-| Invoice, 2 pages | 8.2 ms | 2.2 ms | 3.8× |
-| Employee list, 2 pages | 6.2 ms | 1.3 ms | 4.7× |
-| Grouped sales, 4 pages | 11.8 ms | 3.6 ms | 3.3× |
-| 20,000 rows, 477 pages | 1258.7 ms | 206.1 ms | 6.1× |
+| Invoice, 2 pages | 8.2 ms | 2.3 ms | 3.6× |
+| Employee list, 2 pages | 6.2 ms | 1.4 ms | 4.5× |
+| Grouped sales, 4 pages | 12.6 ms | 3.7 ms | 3.4× |
+| 20,000 rows, 477 pages | 1274.5 ms | 225.6 ms | 5.6× |
 
 **Many at once: a service under load.** The same warm JVM and the same ferroreport, now with
 several threads rendering the invoice at the same time for 8 seconds, on 2 CPUs
@@ -540,14 +540,14 @@ report too):
 
 | Threads | Reports/s, JasperReports | Reports/s, ferroreport | 95% under, JasperReports | 95% under, ferroreport | Memory, JasperReports | Memory, ferroreport |
 |---|---|---|---|---|---|---|
-| 1 | 100 | 442 | 15 ms | 4 ms | 317 MiB | 10 MiB |
-| 2 | 136 | 869 | 25 ms | 3 ms | 382 MiB | 11 MiB |
-| 10 | 151 | 942 | 104 ms | 22 ms | 467 MiB | 18 MiB |
-| 50 | 143 | 893 | 884 ms | 131 ms | 655 MiB | 58 MiB |
-| 100 | 160 | 957 | 1834 ms | 318 ms | 812 MiB | 90 MiB |
+| 1 | 104 | 459 | 15 ms | 3 ms | 312 MiB | 12 MiB |
+| 2 | 124 | 886 | 27 ms | 3 ms | 397 MiB | 13 MiB |
+| 10 | 134 | 829 | 117 ms | 19 ms | 450 MiB | 20 MiB |
+| 50 | 142 | 762 | 777 ms | 159 ms | 690 MiB | 58 MiB |
+| 100 | 117 | 822 | 2032 ms | 342 ms | 740 MiB | 93 MiB |
 
-Four to six times the reports per second at every load, 95% of them finished four to eight
-times sooner, in a ninth to a thirtieth of the memory. Over HTTP, `ferroreport serve` answers an
+Four to seven times the reports per second at every load, 95% of them finished five to nine
+times sooner, in an eighth to a thirtieth of the memory. Over HTTP, `ferroreport serve` answers an
 invoice in about 3 ms on a connection that is kept open.
 
 **Large: rows by the hundred thousand.** The same report with more rows, cold, JasperReports
@@ -556,8 +556,14 @@ finishes it, so its memory does not grow with the report:
 
 | Report | JasperReports | ferroreport | Faster | Less memory |
 |---|---|---|---|---|
-| 100,000 rows, 2,382 pages | 12.38 s, 679 MiB | 1.27 s, 10 MiB | 9.7× | 70× |
-| 1,000,000 rows, 23,810 pages | 70.06 s, 1,731 MiB | 11.79 s, 11 MiB | 5.9× | 151× |
+| 100,000 rows, 2,382 pages | 12.55 s, 872 MiB | 1.40 s, 11 MiB | 9.0× | 77× |
+| 1,000,000 rows, 23,810 pages | 75.71 s, 1,728 MiB | 13.67 s, 13 MiB | 5.5× | 136× |
+
+**Against JasperReports 7.1.1.** The same runs, with the fixtures converted to JRXML 7 for both
+engines ([docs/benchmarks-7.1.1.json](docs/benchmarks-7.1.1.json)): cold, 263× and 269× faster
+for the invoice and the grouped sales, 23× for 20,000 rows; warm, 3.1 to 4.6×; a million rows
+in 14.65 s and 13 MiB against 61.85 s and 1,725 MiB (4.2× faster, 136× less memory).
+JasperReports 7 is faster than 6 on large reports, so there the gap is smaller.
 
 In short: most of JasperReports' time on a small report is starting the JVM and compiling the
 template, so the gap is two orders of magnitude when a process starts per report and 3 to 6×
@@ -577,7 +583,7 @@ depends on what you make.
 |---|---|---|
 | Documents written by hand: papers, books, letters, math | **Typst** (or LaTeX) | Not its job. Typst sets text better (paragraph layout, hyphenation, math), has a real programming language, a package ecosystem and a company and community behind it |
 | JasperReports templates you already have, without a JVM | **ferroreport** | The same pages, pixel for pixel on every fixture; 3 to 6× faster than a warm JVM, about 250× from a cold start, a tenth of the memory or less |
-| Data reports: groups, running totals, "page X of Y", crosstabs, charts, a million rows | **ferroreport** or JasperReports | Bands, groups, variables and late values are what the format is made of; rows stream in and pages stream out (a million rows in 11 MB). In Typst you would program that yourself, and the document is laid out in memory |
+| Data reports: groups, running totals, "page X of Y", crosstabs, charts, a million rows | **ferroreport** or JasperReports | Bands, groups, variables and late values are what the format is made of; rows stream in and pages stream out (a million rows in 13 MB). In Typst you would program that yourself, and the document is laid out in memory |
 | One template to PDF, Excel, Word, CSV and HTML | **ferroreport**, JasperReports, Carbone | Typst writes PDF, PNG and SVG (HTML is experimental), not spreadsheets or Word |
 | Templates that business users design in Word or LibreOffice | **Carbone** | Templates come from Jaspersoft Studio or are written as text; there is no designer of its own yet |
 | A visual designer, viewers, a report server, dashboards | **Telerik, DevExpress, Stimulsoft**, Jaspersoft Studio and Server | None of these yet |

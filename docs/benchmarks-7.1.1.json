@@ -1,0 +1,96 @@
+{
+ "ferroreport": "ferroreport 0.12.0",
+ "jasperreports": "7.1.1",
+ "java": "openjdk version \"21.0.13.0.3\" 2026-10-24",
+ "machine": "2 CPUs, Linux x86_64",
+ "cold": {
+  "02-invoice": {
+   "jasper": {
+    "seconds": 2.779145,
+    "mib": 180.72265625,
+    "bytes": 65047
+   },
+   "ferroreport": {
+    "seconds": 0.010564,
+    "mib": 12.51953125,
+    "bytes": 47517
+   }
+  },
+  "03-grouped-sales": {
+   "jasper": {
+    "seconds": 2.814745,
+    "mib": 189.5,
+    "bytes": 65152
+   },
+   "ferroreport": {
+    "seconds": 0.010446,
+    "mib": 12.66796875,
+    "bytes": 48247
+   }
+  },
+  "09-large": {
+   "jasper": {
+    "seconds": 5.524393,
+    "mib": 364.41796875,
+    "bytes": 1034265
+   },
+   "ferroreport": {
+    "seconds": 0.242537,
+    "mib": 11.234375,
+    "bytes": 1236290
+   }
+  }
+ },
+ "warm": {
+  "02-invoice": {
+   "jasper_ms": 8.026,
+   "ferroreport_ms": 2.223,
+   "ferroreport_parsed_ms": 1.967
+  },
+  "01-employee-list": {
+   "jasper_ms": 6.282,
+   "ferroreport_ms": 1.368,
+   "ferroreport_parsed_ms": 1.262
+  },
+  "03-grouped-sales": {
+   "jasper_ms": 11.564,
+   "ferroreport_ms": 3.676,
+   "ferroreport_parsed_ms": 3.457
+  },
+  "09-large": {
+   "jasper_ms": 988.487,
+   "ferroreport_ms": 241.622,
+   "ferroreport_parsed_ms": 228.639
+  }
+ },
+ "large": [
+  {
+   "rows": 100000,
+   "ferroreport": {
+    "seconds": 1.580631,
+    "mib": 11.2265625,
+    "bytes": 6101994
+   },
+   "jasper": {
+    "seconds": 12.293675,
+    "mib": 782.44140625,
+    "bytes": 5038645,
+    "heap": "default"
+   }
+  },
+  {
+   "rows": 1000000,
+   "ferroreport": {
+    "seconds": 14.64743,
+    "mib": 12.6875,
+    "bytes": 60967502
+   },
+   "jasper": {
+    "seconds": 61.845796,
+    "mib": 1725.1171875,
+    "bytes": 50209580,
+    "heap": "default"
+   }
+  }
+ ]
+}

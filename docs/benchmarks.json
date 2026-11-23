@@ -1,78 +1,79 @@
 {
- "ferroreport": "ferroreport 0.6.1",
+ "ferroreport": "ferroreport 0.12.0",
+ "jasperreports": "6.20.6",
  "java": "openjdk version \"21.0.13.0.3\" 2026-10-24",
  "machine": "2 CPUs, Linux x86_64",
  "cold": {
   "02-invoice": {
    "jasper": {
-    "seconds": 2.983155,
-    "mib": 190.07421875,
+    "seconds": 3.026526,
+    "mib": 192.390625,
     "bytes": 79595
    },
    "ferroreport": {
-    "seconds": 0.010869,
-    "mib": 10.43359375,
-    "bytes": 47438
+    "seconds": 0.010655,
+    "mib": 12.51171875,
+    "bytes": 47517
    }
   },
   "03-grouped-sales": {
    "jasper": {
-    "seconds": 3.126781,
-    "mib": 183.671875,
+    "seconds": 3.450737,
+    "mib": 191.89453125,
     "bytes": 95860
    },
    "ferroreport": {
-    "seconds": 0.012784,
-    "mib": 10.51953125,
-    "bytes": 48168
+    "seconds": 0.010947,
+    "mib": 12.71484375,
+    "bytes": 48247
    }
   },
   "09-large": {
    "jasper": {
-    "seconds": 6.435123,
-    "mib": 460.6171875,
+    "seconds": 7.127638,
+    "mib": 447.38671875,
     "bytes": 4549335
    },
    "ferroreport": {
-    "seconds": 0.258714,
-    "mib": 9.671875,
-    "bytes": 1236211
+    "seconds": 0.348588,
+    "mib": 11.1796875,
+    "bytes": 1236290
    }
   }
  },
  "warm": {
   "02-invoice": {
-   "jasper_ms": 8.176,
-   "ferroreport_ms": 2.161,
-   "ferroreport_parsed_ms": 1.918
+   "jasper_ms": 8.23,
+   "ferroreport_ms": 2.266,
+   "ferroreport_parsed_ms": 2.009
   },
   "01-employee-list": {
-   "jasper_ms": 6.152,
-   "ferroreport_ms": 1.32,
-   "ferroreport_parsed_ms": 1.216
+   "jasper_ms": 6.193,
+   "ferroreport_ms": 1.377,
+   "ferroreport_parsed_ms": 1.263
   },
   "03-grouped-sales": {
-   "jasper_ms": 11.846,
-   "ferroreport_ms": 3.596,
-   "ferroreport_parsed_ms": 3.397
+   "jasper_ms": 12.627,
+   "ferroreport_ms": 3.693,
+   "ferroreport_parsed_ms": 3.467
   },
   "09-large": {
-   "jasper_ms": 1258.681,
-   "ferroreport_ms": 206.063,
-   "ferroreport_parsed_ms": 206.928
+   "jasper_ms": 1274.5,
+   "ferroreport_ms": 225.637,
+   "ferroreport_parsed_ms": 219.354
   }
  },
  "large": [
   {
    "rows": 100000,
    "ferroreport": {
-    "seconds": 1.274637,
-    "mib": 9.7578125,
-    "bytes": 6101915
+    "seconds": 1.400009,
+    "mib": 11.28125,
+    "bytes": 6101994
    },
    "jasper": {
-    "seconds": 12.378843,
-    "mib": 678.5703125,
+    "seconds": 12.55457,
+    "mib": 871.5859375,
     "bytes": 8942874,
     "heap": "default"
    }
@@ -80,13 +81,13 @@
   {
    "rows": 1000000,
    "ferroreport": {
-    "seconds": 11.79043,
-    "mib": 11.44921875,
-    "bytes": 60967423
+    "seconds": 13.670041,
+    "mib": 12.6640625,
+    "bytes": 60967502
    },
    "jasper": {
-    "seconds": 70.060555,
-    "mib": 1730.734375,
+    "seconds": 75.712893,
+    "mib": 1728.35546875,
     "bytes": 58563676,
     "heap": "default"
    }

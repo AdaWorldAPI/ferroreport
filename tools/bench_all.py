@@ -11,6 +11,9 @@ Three situations are measured, because they answer different questions:
   large  100,000 and 1,000,000 rows (the 09-large fixture's rows repeated), with peak memory.
 
 Usage: JASPER_LIB=/path/to/jars tools/bench_all.py [--quick] [--out docs/benchmarks.json]
+
+With the jars of JasperReports 7, the fixtures are first converted to JRXML 7 (with
+`ferroreport convert`), and both engines render those.
 Needs a release build (`cargo build --release --example warm`), a JDK and a C compiler.
 """
 
@@ -28,6 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / "target" / "release" / "ferroreport"
 WARM = ROOT / "target" / "release" / "examples" / "warm"
 CLASSES = ROOT / "target" / "oracle"
+FIXTURES = ROOT / "fixtures"
 
 
 def run(cmd):
@@ -65,7 +69,7 @@ def fixture_args(fx):
 
 
 def cold(lib, name, runs, tmp):
-    fx = ROOT / "fixtures" / name
+    fx = FIXTURES / name
     data, params = fixture_args(fx)
     jasper = java(lib, "Oracle", fx / "report.jrxml", data or "-", tmp / "j.pdf", *([params] if params else []))
     ferro = [BIN, "render", fx / "report.jrxml", "-o", tmp / "f.pdf", "-q"]
@@ -80,7 +84,7 @@ def cold(lib, name, runs, tmp):
 
 
 def warm(lib, name, warmup, runs):
-    fx = ROOT / "fixtures" / name
+    fx = FIXTURES / name
     data, params = fixture_args(fx)
     # The best of three rounds of each: the machine's noise only ever makes a round slower.
     j = min(
@@ -92,14 +96,14 @@ def warm(lib, name, warmup, runs):
 
 
 def large(lib, rows, tmp, jasper_heap=None, ferro_runs=3):
-    src = json.loads((ROOT / "fixtures" / "09-large" / "data.json").read_text())
+    src = json.loads((FIXTURES / "09-large" / "data.json").read_text())
     data = tmp / f"{rows}.json"
     with data.open("w") as f:
         f.write("[")
         for i in range(rows):
             f.write(("," if i else "") + json.dumps(src[i % len(src)]))
         f.write("]")
-    tpl = ROOT / "fixtures" / "09-large" / "report.jrxml"
+    tpl = FIXTURES / "09-large" / "report.jrxml"
     out = {"rows": rows}
     results = [measured([str(BIN), "render", str(tpl), "-d", str(data), "-o", str(tmp / "f.pdf"), "-q"]) for _ in range(ferro_runs)]
     out["ferroreport"] = {"seconds": statistics.median(r[0] for r in results), "mib": statistics.median(r[1] for r in results),
@@ -115,15 +119,31 @@ def main():
     ap.add_argument("--quick", action="store_true", help="skip the million-row run")
     ap.add_argument("--out", default=str(ROOT / "docs" / "benchmarks.json"))
     args = ap.parse_args()
+    global CLASSES, FIXTURES
     lib = os.environ.get("JASPER_LIB") or sys.exit("set JASPER_LIB to a directory with the JasperReports jars")
+    jar = next(Path(lib).glob("jasperreports-[0-9]*.jar"), None)
+    jasper_version = jar.stem.split("-", 1)[1] if jar else "unknown"
+    CLASSES = ROOT / "target" / f"oracle-bench-{jasper_version}"
     CLASSES.mkdir(parents=True, exist_ok=True)
+    converted = None
+    if jasper_version.startswith("7"):
+        # JasperReports 7 reads JRXML 7 only: both engines render the fixtures converted to it.
+        converted = tempfile.TemporaryDirectory()
+        FIXTURES = Path(converted.name)
+        for name in ("01-employee-list", "02-invoice", "03-grouped-sales", "09-large"):
+            (FIXTURES / name).mkdir()
+            for f in (ROOT / "fixtures" / name).iterdir():
+                if f.suffix == ".jrxml":
+                    run([BIN, "convert", f, "-o", FIXTURES / name / f.name])
+                elif f.is_file():
+                    (FIXTURES / name / f.name).write_bytes(f.read_bytes())
     subprocess.run(["cc", "-O2", "-o", str(LAUNCHER), str(ROOT / "tools" / "maxrss.c")], check=True)
     subprocess.run(["javac", "-proc:none", "-nowarn", "-cp", f"{lib}/*", "-d", str(CLASSES),
                     str(ROOT / "tools/oracle/Oracle.java"), str(ROOT / "tools/oracle/Warm.java")], check=True, stderr=subprocess.DEVNULL)
     version = subprocess.run([str(BIN), "--version"], capture_output=True, text=True).stdout.strip()
     jvm = subprocess.run(["java", "-version"], capture_output=True, text=True).stderr
     jvm = next((l for l in jvm.splitlines() if "version" in l and "Picked" not in l), "")
-    result = {"ferroreport": version, "java": jvm, "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}",
+    result = {"ferroreport": version, "jasperreports": jasper_version, "java": jvm, "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}",
               "cold": {}, "warm": {}, "large": []}
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
