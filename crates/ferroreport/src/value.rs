@@ -33,6 +33,8 @@ pub enum Value {
     List(Arc<Vec<Value>>),
     /// `net.sf.jasperreports.types.date.DateRange`, what `DATERANGE()` gives.
     DateRange(Arc<DateRange>),
+    /// A Groovy map (`[a: 1, b: 2]`), its entries in the order they were added.
+    Map(Arc<Vec<(Value, Value)>>),
 }
 
 /// A span of time, as JasperReports' `DATERANGE("MONTH-1")` or `DATERANGE("2026-03-05")`
@@ -197,6 +199,9 @@ impl Value {
             (Value::Date(a), Value::Date(b)) => a == b,
             (Value::List(a), Value::List(b)) => a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.java_equals(y)),
             (Value::DateRange(a), Value::DateRange(b)) => a.start == b.start && a.end == b.end,
+            (Value::Map(a), Value::Map(b)) => {
+                a.len() == b.len() && a.iter().all(|(k, v)| b.iter().any(|(k2, v2)| k.java_equals(k2) && v.java_equals(v2)))
+            }
             (a, b) if a.is_numeric() && b.is_numeric() => compare_numbers(a, b) == Some(Ordering::Equal),
             _ => false,
         }
@@ -228,6 +233,7 @@ impl Value {
             Value::Bytes(_) => "byte[]",
             Value::Json(_) | Value::List(_) => "List",
             Value::DateRange(_) => "DateRange",
+            Value::Map(_) => "Map",
         }
     }
 
@@ -248,6 +254,15 @@ impl Value {
             // As Groovy prints a list.
             Value::List(items) => format!("[{}]", items.iter().map(Value::to_java_string).collect::<Vec<_>>().join(", ")),
             Value::DateRange(r) => r.text.clone(),
+            // As a Java map prints.
+            Value::Map(entries) => format!(
+                "{{{}}}",
+                entries
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k.to_java_string(), v.to_java_string()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }

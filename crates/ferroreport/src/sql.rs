@@ -94,7 +94,7 @@ pub fn sql_value(v: &Value) -> SqlValue {
             serde_json::Value::Null => SqlValue::Null,
             other => SqlValue::Text(other.to_string()),
         },
-        Value::List(items) => SqlValue::Text(Value::List(items.clone()).to_java_string()),
+        Value::List(_) | Value::Map(_) => SqlValue::Text(v.to_java_string()),
         // On its own, a range stands for its start; the comparisons below pick the end where
         // JasperReports does.
         Value::DateRange(r) => SqlValue::DateTime(r.start),

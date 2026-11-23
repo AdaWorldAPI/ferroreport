@@ -15,9 +15,24 @@ pub enum Token {
     Op(&'static str),
     LParen,
     RParen,
+    /// `[` and `]`: Groovy lists and maps, and indexing.
+    LBracket,
+    RBracket,
+    /// `{` and `}`: Groovy closures.
+    LBrace,
+    RBrace,
     Comma,
     Dot,
+    /// A Groovy string with `${...}` or `$name` in it.
+    GString(Vec<GPart>),
     Eof,
+}
+
+/// A piece of a Groovy string: literal text, or the source of an expression put in it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GPart {
+    Text(String),
+    Code(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,7 +56,11 @@ impl NumLit {
     }
 }
 
-const OPS: &[&str] = &["?:", "==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "%", "<", ">", "!", "?", ":"];
+/// Longest first, so `<=>` is not read as `<=` and `>`.
+const OPS: &[&str] = &[
+    "<=>", "..<", "?:", "?.", "->", "**", "..", "==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "%", "<", ">", "!", "?",
+    ":",
+];
 
 /// Splits `src` into tokens. `groovy` changes how unsuffixed decimals are typed.
 pub fn tokenize(src: &str, groovy: bool) -> Result<Vec<Token>, String> {
@@ -160,12 +179,62 @@ pub fn tokenize(src: &str, groovy: bool) -> Result<Vec<Token>, String> {
         if c == '"' || c == '\'' {
             let quote = c;
             let mut s = String::new();
+            // Groovy puts `${expression}` and `$name` into double-quoted strings.
+            let mut parts: Vec<GPart> = Vec::new();
+            let interpolate = groovy && quote == '"';
             i += 1;
             loop {
                 let Some(&ch) = chars.get(i) else { return Err("unterminated string literal".into()) };
                 i += 1;
                 if ch == quote {
                     break;
+                }
+                if interpolate && ch == '$' {
+                    // `$F{name}` in a Groovy string is the field's value (JasperReports would
+                    // print the Java code it stands for, which no report wants).
+                    if matches!(chars.get(i), Some('F' | 'P' | 'V' | 'R')) && chars.get(i + 1) == Some(&'{') {
+                        if let Some(end) = (i + 2..chars.len()).find(|&k| chars[k] == '}') {
+                            parts.push(GPart::Text(std::mem::take(&mut s)));
+                            parts.push(GPart::Code(chars[i - 1..=end].iter().collect()));
+                            i = end + 1;
+                            continue;
+                        }
+                    }
+                    if chars.get(i) == Some(&'{') {
+                        let mut depth = 1;
+                        let mut j = i + 1;
+                        while j < chars.len() && depth > 0 {
+                            match chars[j] {
+                                '{' => depth += 1,
+                                '}' => depth -= 1,
+                                _ => {}
+                            }
+                            j += 1;
+                        }
+                        if depth > 0 {
+                            return Err("unterminated ${ in a string".into());
+                        }
+                        parts.push(GPart::Text(std::mem::take(&mut s)));
+                        parts.push(GPart::Code(chars[i + 1..j - 1].iter().collect()));
+                        i = j;
+                        continue;
+                    }
+                    if chars.get(i).is_some_and(|c| c.is_alphabetic() || *c == '_') {
+                        let start = i;
+                        while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                            i += 1;
+                        }
+                        // `$name.property` too, but not a trailing full stop.
+                        while chars.get(i) == Some(&'.') && chars.get(i + 1).is_some_and(|c| c.is_alphabetic()) {
+                            i += 1;
+                            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                                i += 1;
+                            }
+                        }
+                        parts.push(GPart::Text(std::mem::take(&mut s)));
+                        parts.push(GPart::Code(chars[start..i].iter().collect()));
+                        continue;
+                    }
                 }
                 if ch == '\\' {
                     let Some(&esc) = chars.get(i) else { return Err("bad escape".into()) };
@@ -189,7 +258,12 @@ pub fn tokenize(src: &str, groovy: bool) -> Result<Vec<Token>, String> {
                     s.push(ch);
                 }
             }
-            out.push(Token::Str(s));
+            if parts.is_empty() {
+                out.push(Token::Str(s));
+            } else {
+                parts.push(GPart::Text(s));
+                out.push(Token::GString(parts));
+            }
             continue;
         }
         if c.is_alphabetic() || c == '_' || c == '$' {
@@ -203,10 +277,14 @@ pub fn tokenize(src: &str, groovy: bool) -> Result<Vec<Token>, String> {
         match c {
             '(' => out.push(Token::LParen),
             ')' => out.push(Token::RParen),
+            '[' => out.push(Token::LBracket),
+            ']' => out.push(Token::RBracket),
+            '{' => out.push(Token::LBrace),
+            '}' => out.push(Token::RBrace),
             ',' => out.push(Token::Comma),
-            '.' => out.push(Token::Dot),
+            '.' if chars.get(i + 1) != Some(&'.') => out.push(Token::Dot),
             _ => {
-                let rest: String = chars[i..chars.len().min(i + 2)].iter().collect();
+                let rest: String = chars[i..chars.len().min(i + 3)].iter().collect();
                 let op = OPS.iter().find(|op| rest.starts_with(**op)).ok_or_else(|| format!("unexpected character `{c}`"))?;
                 out.push(Token::Op(op));
                 i += op.chars().count();

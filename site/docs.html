@@ -51,6 +51,7 @@
       <a href="#database">Rows from a database</a>
       <a href="#fonts">Fonts</a>
       <a href="#locale">Locale and dates</a>
+      <a href="#expressions">Expressions</a>
       <a href="#check">Check a template</a>
       <a href="#errors">Errors</a>
       <a href="#support">What is supported</a>
@@ -850,6 +851,39 @@ ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)</pre>
         separators, month and day names. Supported: <code>en_US</code>, <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code>.</p>
       <p>Dates are kept as written, without time zone conversion. <code>new Date()</code> in an expression is the current time, unless you
         fix it with <code>now</code>, which makes the output byte-for-byte reproducible.</p>
+
+      <h2 id="expressions">Expressions</h2>
+      <p>Expressions are written in Java (<code>language="java"</code>, the default) or Groovy (<code>language="groovy"</code>), as in
+        JasperReports, and give what JasperReports gives. They are interpreted from a fixed list of operations: a template cannot
+        load classes, read files or reach the network, and a Groovy expression that loops too long stops with an error.</p>
+      <p><b>JasperReports' function library</b>, as Jaspersoft Studio's expression editor lists it, with JasperReports' results
+        (checked case by case against JasperReports 6.20.6):</p>
+      <table>
+        <tr><th>Kind</th><th>Functions</th></tr>
+        <tr><td>Logical</td><td><code>IF</code>, <code>AND</code>, <code>OR</code>, <code>NOT</code>, <code>EQUALS</code>, <code>TRUE</code>, <code>FALSE</code></td></tr>
+        <tr><td>Math</td><td><code>ABS</code>, <code>SUM</code>, <code>PRODUCT</code>, <code>MAX</code>, <code>MIN</code>, <code>FLOOR</code>, <code>CEIL</code>, <code>SQRT</code>, <code>SIGN</code>, <code>FACT</code>, <code>ISEVEN</code>, <code>ISODD</code>, <code>RAND</code>, <code>RANDBETWEEN</code>, <code>ROUND_HALF_UP</code> and the other <code>ROUND_*</code> modes</td></tr>
+        <tr><td>Text</td><td><code>LEFT</code>, <code>RIGHT</code>, <code>MID</code>, <code>LEN</code>, <code>FIND</code>, <code>SEARCH</code>, <code>SUBSTITUTE</code>, <code>REPLACE</code>, <code>REPT</code>, <code>TRIM</code>, <code>LTRIM</code>, <code>RTRIM</code>, <code>CLEAN</code>, <code>LOWER</code>, <code>UPPER</code>, <code>PROPER</code>, <code>CONCATENATE</code>, <code>EXACT</code>, <code>CHAR</code>, <code>CODE</code>, <code>BASE</code>, <code>T</code>, <code>DOUBLE_VALUE</code>, <code>INTEGER_VALUE</code>...</td></tr>
+        <tr><td>Dates</td><td><code>DATE</code>, <code>TODAY</code>, <code>NOW</code>, <code>YEAR</code>, <code>MONTH</code>, <code>DAY</code>, <code>WEEKDAY</code>, <code>HOUR</code>, <code>DATEFORMAT</code>, <code>DATEVALUE</code>, <code>EDATE</code>, <code>WORKDAY</code>, <code>NETWORKDAYS</code>, <code>DAYS</code>, <code>WEEKS</code>, <code>MONTHS</code>, <code>YEARS</code>, <code>WEEKNUM</code>, <code>DAYSINMONTH</code>, <code>ISLEAPYEAR</code>, <code>TIME</code>, <code>DATERANGE</code></td></tr>
+      </table>
+      <p><code>DATERANGE("DAY")</code>, <code>"WEEK-1"</code>, <code>"MONTH+2"</code>, <code>"QUARTER"</code>, <code>"SEMI"</code>, <code>"YEAR"</code> (relative to
+        the render's date) or <code>"2026-03-05"</code> / <code>"2026-03-05 14:30:00"</code> give a range with <code>getStart()</code> and
+        <code>getEnd()</code>; a <code>DateRange</code> parameter takes the same text, and <code>$X{[GREATER, column, Range}</code> and the other
+        <code>$X{}</code> clauses compare the column with the range's start or end as JasperReports does.</p>
+<pre>IF($F{balance} &lt; 0, "Overdue", "OK")
+DATEFORMAT(EDATE($F{issued}, 1), "dd/MM/yyyy")
+SUBSTITUTE(PROPER($F{name}), " ", "_")</pre>
+      <p><b>Groovy</b>: lists, maps and ranges (<code>[1, 2]</code>, <code>[a: 1]</code>, <code>1..5</code>); closures given to
+        <code>findAll</code>, <code>find</code>, <code>collect</code>, <code>sum</code>, <code>max</code>, <code>min</code>, <code>sort</code>,
+        <code>any</code>, <code>every</code>, <code>count</code>, <code>inject</code>, <code>groupBy</code>, <code>collectEntries</code>, <code>each</code>,
+        <code>withIndex</code>; strings with <code>${...}</code>; <code>?.</code>, <code>?:</code>, <code>**</code>, <code>&lt;=&gt;</code>, <code>in</code>,
+        <code>as</code>, <code>list[i]</code>, <code>text[0..2]</code>; <code>padLeft</code>, <code>padRight</code>, <code>center</code>, <code>tokenize</code>,
+        <code>capitalize</code>, <code>reverse</code>, <code>take</code>, <code>drop</code>, <code>toInteger</code>, <code>intdiv</code>, <code>round</code>.
+        Groovy's arithmetic too: <code>5 / 2</code> is 2.5 and <code>1234.50 / 3</code> is 411.50.</p>
+<pre>$F{lines}.findAll { it.qty &gt; 0 }.sum { it.qty * it.price }
+"${$F{first}} ${$F{last}}".toUpperCase()
+$F{tags}.collect { it.capitalize() }.join(", ")</pre>
+      <p>Not supported: your own Java classes and scriptlets, and Groovy statements (<code>def</code>, loops, <code>if</code> blocks).
+        <code>ferroreport doctor</code> says so when a template uses them.</p>
 
       <h2 id="check">Check a template</h2>
       <p>Before you depend on a template, ask the engine what it thinks of it:</p>

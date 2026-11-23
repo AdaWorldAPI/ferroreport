@@ -568,6 +568,9 @@ impl Parser {
         if root.child("scriptlet").is_some() {
             self.warnings.push("<scriptlet> is not supported yet".into());
         }
+        if root.attr("scriptletClass").is_some_and(|c| !c.trim().is_empty() && !c.ends_with("JRDefaultScriptlet")) {
+            self.warnings.push("scriptletClass (a Java scriptlet) is not run: expressions that call it fail".into());
+        }
 
         let band =
             |p: &mut Parser, name: &str| -> Result<Option<Band>> { Ok(p.section_bands(root.child(name))?.into_iter().next()) };

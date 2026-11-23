@@ -263,6 +263,12 @@ su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures
   desplegables, casillas y botones de opción.
 - Estilos con herencia y estilos condicionales, texto justificado, `isRemoveLineWhenBlank`,
   `isPrintRepeatedValues`, grupos, variables y tiempos de evaluación.
+- Expresiones en Java y en Groovy: la librería de funciones de JasperReports tal como la ofrece
+  Jaspersoft Studio (`IF`, `SUM`, `ROUND_HALF_UP`, `LEFT`, `SUBSTITUTE`, `DATEFORMAT`, `EDATE`,
+  `WORKDAY`, `NETWORKDAYS`... 78 funciones, 265 casos comprobados contra JasperReports),
+  `DATERANGE("MONTH-1")`, y de Groovy las listas, mapas, rangos, closures (`findAll`, `collect`,
+  `sum`, `groupBy`...), los textos con `${...}`, `?.`, `**`, `in` y `as`, con los mismos
+  resultados que JasperReports.
 - Los QR se codifican igual que ZXing (misma versión, máscara y módulos) y se dibujan como los
   dibuja JasperReports: sirven para facturas electrónicas impresas, como el sello del e-CF
   dominicano.
@@ -303,7 +309,8 @@ su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures
   índice de marcadores.
 - Aún no: comparadores propios en crosstabs, algunos tipos de Barbecue (PDF417, PostNet, USPS,
   SCC-14, GTIN), personalizadores de gráficos, firmas digitales, consultas en lenguajes que no son SQL
-  (HQL, XPath, MDX: pásale las filas).
+  (HQL, XPath, MDX: pásale las filas), scriptlets de Java e instrucciones de Groovy (`def`,
+  bucles).
   La tabla completa está en el [README en inglés](README.md#compatibility).
 
 ## Rendimiento

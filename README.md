@@ -398,7 +398,7 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 | Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, XY bar, scatter, bubble, time series, candlestick, high-low, Gantt, meter, thermometer, multi-axis; titles, legends, axis labels, series colors, range limits, tick formats, pie label formats; datasets by record, group, page or report, with `evaluationTime`, and from a subdataset | chart customizers and themes. Charts follow JFreeChart's default look closely but are not pixel-identical |
 | Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), parameters, return values, splitting across pages with reprinted column headers | JDBC connections |
 | Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | queries in languages other than SQL (HQL, XPath, MDX...: pass the rows) |
-| Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules, string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale) | arbitrary Java classes (scriptlets, static methods of your own) |
+| Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules (and Groovy's: `5 / 2` is a BigDecimal 2.5), string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale); JasperReports' function library as Jaspersoft Studio lists it (`IF`, `AND`, `SUM`, `MAX`, `ROUND_HALF_UP`, `LEFT`, `MID`, `FIND`, `SUBSTITUTE`, `PROPER`, `DATE`, `DATEFORMAT`, `EDATE`, `WORKDAY`, `NETWORKDAYS`, `WEEKNUM`, `TIME` and the rest: 78 functions, 265 cases checked against JasperReports); `DATERANGE("MONTH-1")` and fixed ranges, with `getStart()`/`getEnd()` and in `$X{}` clauses; Groovy lists, maps and ranges (`[1, 2]`, `[a: 1]`, `1..5`), closures given to `findAll`, `collect`, `sum`, `inject`, `sort`, `groupBy` and the rest, `"${...}"` strings, `?.`, `**`, `<=>`, `in`, `as`, indexing, and string helpers (`padLeft`, `tokenize`, `capitalize`...) | arbitrary Java classes (scriptlets, static methods of your own), Groovy statements (`def`, loops, `if` blocks), regular expressions beyond a literal or `\s+` |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font`; text in a font no one provides is written like JasperReports writes it, in the PDF standard font of its `pdfFontName` (Helvetica by default) | font extension jars |
 | Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), digital signatures, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
@@ -409,16 +409,16 @@ example the Dominican e-CF stamp).
 
 Run `ferroreport doctor template.jrxml` to get this verdict for a specific template, or
 `ferroreport migrate folder/` for every template of a project. Over the 171 JRXML 7 samples of
-JasperReports 7.1.1: 151 load with everything they use supported (24 of them once you pass the
-rows their HQL, XPath, MDX or other non-SQL query gave), 16 use something not supported yet and 4
-do not load (Groovy closures, a scriptlet and `DATERANGE`).
+JasperReports 7.1.1: all of them load, 152 with everything they use supported (24 of them once you
+pass the rows their HQL, XPath, MDX or other non-SQL query gave) and 19 with something not
+supported yet (Java scriptlets, maps and other custom components).
 
 ## How output is verified
 
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-44 comparable fixtures match. Barcode geometry is also checked bar by bar against barcode4j itself
+46 comparable fixtures match (07-groovy with a Java 17 runtime, see ¹). Barcode geometry is also checked bar by bar against barcode4j itself
 (`crates/ferroreport/tests/barcode4j.rs`) and against Barbecue (`crates/ferroreport/tests/data/barbecue.txt`: 57
 barcodes as Barbecue draws them for JasperReports).
 
@@ -443,7 +443,7 @@ with as many pages as its PDF.
 | 04b-stretch-prevent-split | frames, floating elements, stretching text, conditional printing | identical |
 | 05-no-data | `whenNoDataType="NoDataSection"` | identical |
 | 06-expressions | Java semantics, formatting, variables (First, Lowest, StdDev, BigDecimal average) | identical |
-| 07-groovy | Groovy expressions | checked by hand¹ |
+| 07-groovy | Groovy expressions | identical¹ |
 | 08-styles-and-shapes | style inheritance, borders, dashes, line spacing, shapes, Unicode | identical |
 | 09-large | 20,000 rows, 477 pages | identical |
 | 10-band-split-across-pages | a band larger than the space left on the page | identical |
@@ -484,9 +484,16 @@ with as many pages as its PDF.
 | 45-svg-images | SVG images: scale modes, sizes without units and in millimeters, gradients | identical |
 | 46-links | Links to web addresses, anchors, pages and an anchor in another file (with a tooltip), named anchors, bookmarks at two levels | identical |
 | 47-barbecue | Barbecue barcodes: Code 128 (automatic and C), Code 39 with check character, EAN-13, UPC-A, 2 of 5 interleaved and standard, Codabar, EAN-128, SSCC-18, rotated left, right and upside down, one per row | identical |
+| 48-sql | The report's SQL query with `$P{}`, `$P!{}` and `$X{IN}`, and a subreport that runs its own query per row on `$P{REPORT_CONNECTION}` | identical² |
+| 49-functions | 265 expressions of JasperReports' function library (`IF`, `SUM`, `DATEFORMAT`, `WORKDAY`, `DATERANGE`...) | identical |
 
-¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21; run the comparison on Java 17 to
-include it.
+¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21: set `ORACLE_JAVA` to a Java 17
+runtime and `tools/compare.py` includes it. The Groovy subset is also checked expression by
+expression against JasperReports on Java 17 (`crates/ferroreport/tests/groovy.rs`, 128 cases).
+
+² Filled from SQLite with the template's own query; the reference run would need a JDBC driver,
+so it was checked against JasperReports 6.20.6 given the same rows (CSV identical, PDF
+pixel-identical), and CI renders it from SQLite, PostgreSQL and MariaDB to the same document.
 
 To run it yourself you need a JDK and the JasperReports jars (`jasperreports`,
 `jasperreports-fonts` and their dependencies) in one directory:

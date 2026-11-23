@@ -2,6 +2,7 @@
 
 pub mod eval;
 pub mod functions;
+pub mod groovy;
 pub mod lexer;
 pub mod parser;
 

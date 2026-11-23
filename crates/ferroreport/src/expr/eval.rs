@@ -17,6 +17,10 @@ pub trait Scope {
     fn field(&self, name: &str) -> Result<Value>;
     fn param(&self, name: &str) -> Result<Value>;
     fn variable(&self, name: &str) -> Result<Value>;
+    /// A closure's parameter (`it`, `x`): none outside closures.
+    fn local(&self, _name: &str) -> Option<Value> {
+        None
+    }
 }
 
 /// Evaluation settings that are fixed for a whole report run.
@@ -94,7 +98,7 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
                 other => other.coerce(v),
             })
         }
-        Expr::Method { target, name, args } => {
+        Expr::Method { target, name, args, safe, property } => {
             // `new SimpleDateFormat(p).format(x)` / `new DecimalFormat(p).format(x)`
             if let Expr::New { class, args: ctor } = target.as_ref() {
                 if &**name == "format" && matches!(&**class, "SimpleDateFormat" | "DecimalFormat") {
@@ -111,7 +115,7 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
                 }
             }
             // `x.getClass().getSimpleName()` / `.getName()`: the Java class of a value.
-            if let Expr::Method { target: inner, name: get_class, args: none } = target.as_ref() {
+            if let Expr::Method { target: inner, name: get_class, args: none, .. } = target.as_ref() {
                 if &**get_class == "getClass"
                     && none.is_empty()
                     && matches!(&**name, "getSimpleName" | "getName" | "getCanonicalName")
@@ -129,8 +133,44 @@ pub fn eval(expr: &Expr, scope: &dyn Scope, env: &EvalEnv) -> Result<Value> {
                 }
             }
             let recv = eval(target, scope, env)?;
+            if *safe && recv.is_null() {
+                return Ok(Value::Null);
+            }
+            if let Some(result) = super::groovy::method(&recv, name, args, *property, scope, env) {
+                return result;
+            }
             let argv = args.iter().map(|a| eval(a, scope, env)).collect::<Result<Vec<_>>>()?;
-            method(recv, name, argv, env)
+            match method(recv.clone(), name, argv, env) {
+                // Groovy reads `date.time` with the getter, getTime().
+                Err(e) if *property => {
+                    let mut getter = String::from("get");
+                    let mut chars = name.chars();
+                    getter.extend(chars.next().map(|c| c.to_ascii_uppercase()));
+                    getter.extend(chars);
+                    method(recv, &getter, Vec::new(), env).map_err(|_| e)
+                }
+                other => other,
+            }
+        }
+        Expr::List(items) => {
+            Ok(Value::List(std::sync::Arc::new(items.iter().map(|e| eval(e, scope, env)).collect::<Result<Vec<_>>>()?)))
+        }
+        Expr::Map(entries) => Ok(Value::Map(std::sync::Arc::new(
+            entries.iter().map(|(k, v)| Ok((eval(k, scope, env)?, eval(v, scope, env)?))).collect::<Result<Vec<_>>>()?,
+        ))),
+        Expr::Range(a, b, exclusive) => super::groovy::range(eval(a, scope, env)?, eval(b, scope, env)?, *exclusive),
+        Expr::Closure { .. } => {
+            Err(Error::eval("a closure can only be given to a method that runs it, such as findAll or collect"))
+        }
+        Expr::Local(name) => scope.local(name).ok_or_else(|| Error::eval(format!("unknown variable `{name}`"))),
+        Expr::Index(target, index) => super::groovy::index(eval(target, scope, env)?, eval(index, scope, env)?),
+        Expr::As(ty, e) => super::groovy::as_type(eval(e, scope, env)?, *ty, env),
+        Expr::GString(parts) => {
+            let mut out = String::new();
+            for p in parts {
+                out.push_str(&eval(p, scope, env)?.to_java_string());
+            }
+            Ok(Value::str(out))
         }
         Expr::Static { class, name, args } => {
             let argv = args.iter().map(|a| eval(a, scope, env)).collect::<Result<Vec<_>>>()?;
@@ -167,6 +207,7 @@ fn java_class(v: &Value) -> &'static str {
         Value::Date(_) => "java.util.Date",
         Value::Bytes(_) => "[B",
         Value::Json(_) | Value::List(_) => "java.util.ArrayList",
+        Value::Map(_) => "java.util.LinkedHashMap",
         Value::DateRange(r) if r.start == r.end => "net.sf.jasperreports.types.date.FixedDate",
         Value::DateRange(_) => "net.sf.jasperreports.types.date.RelativeDateRange",
     }
@@ -181,15 +222,7 @@ fn decode_bytes(v: Value) -> Result<Value> {
     }
 }
 
-fn groovy_truth(v: &Value) -> bool {
-    match v {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Str(s) => !s.is_empty(),
-        v if v.is_numeric() => v.as_f64() != Some(0.0),
-        _ => true,
-    }
-}
+use super::groovy::groovy_truth;
 
 /// Converts a condition value to a boolean (Java requires Boolean; Groovy is lenient).
 pub fn truthy(v: &Value, env: &EvalEnv) -> Result<bool> {
@@ -302,9 +335,7 @@ fn arithmetic(op: BinOp, l: &Value, r: &Value, env: &EvalEnv) -> Result<Value> {
                     if b.is_zero() {
                         return Err(div0());
                     }
-                    // Groovy uses a scale of max(10, operand scales) with HALF_UP.
-                    let scale = 10u32.max(a.scale()).max(b.scale());
-                    (a / b).round_dp_with_strategy(scale, RoundingStrategy::MidpointAwayFromZero).normalize()
+                    groovy_divide(a, b)
                 }
                 BinOp::Rem => a.checked_rem(b).ok_or_else(div0)?,
                 _ => unreachable!(),
@@ -313,8 +344,31 @@ fn arithmetic(op: BinOp, l: &Value, r: &Value, env: &EvalEnv) -> Result<Value> {
     })
 }
 
-fn binary(op: BinOp, l: Value, r: Value, env: &EvalEnv) -> Result<Value> {
+/// Groovy's BigDecimal division: an exact quotient keeps the scale BigDecimal.divide prefers
+/// (1234.50 / 3 is 411.50, 6 / 2 is 3); one that does not end is rounded half up to 10
+/// decimals.
+fn groovy_divide(a: Decimal, b: Decimal) -> Decimal {
+    if let Some(q) = a.checked_div(b) {
+        if q.checked_mul(b) == Some(a) {
+            let q = q.normalize();
+            let preferred = a.scale() as i64 - b.scale() as i64;
+            let scale = (q.scale() as i64).max(preferred).clamp(0, 28) as u32;
+            let mut r = q;
+            r.rescale(scale);
+            return r;
+        }
+    }
+    let mut r = (a / b).round_dp_with_strategy(10, RoundingStrategy::MidpointAwayFromZero);
+    r.rescale(10);
+    r
+}
+
+pub(crate) fn binary(op: BinOp, l: Value, r: Value, env: &EvalEnv) -> Result<Value> {
+    if let Some(result) = super::groovy::binary(op, &l, &r) {
+        return result;
+    }
     match op {
+        BinOp::Pow | BinOp::Cmp | BinOp::In => Err(Error::eval(format!("operator {op:?} not applicable"))),
         BinOp::Add if matches!(l, Value::Str(_)) || matches!(r, Value::Str(_)) => {
             Ok(Value::str(format!("{}{}", l.to_java_string(), r.to_java_string())))
         }

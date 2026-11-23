@@ -202,7 +202,7 @@ def sample_classes(sample, lib, out_root, done={}):
         done[sample] = None
         if sources:
             classes.mkdir(parents=True, exist_ok=True)
-            p = subprocess.run(["javac", "-proc:none", "-nowarn", "-cp", f"{lib}/*", "-d", str(classes), *sources], capture_output=True, text=True)
+            p = subprocess.run(["javac", "--release", "17", "-proc:none", "-nowarn", "-cp", f"{lib}/*", "-d", str(classes), *sources], capture_output=True, text=True)
             if p.returncode == 0:
                 done[sample] = classes
     return done[sample]
@@ -237,7 +237,7 @@ def main():
     oracle = ROOT / "target" / "oracle"
     if not (oracle / "Oracle.class").exists():
         oracle.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["javac", "-proc:none", "-nowarn", "-cp", f"{args.lib}/*", "-d", str(oracle), str(ROOT / "tools" / "oracle" / "Oracle.java")], check=True)
+        subprocess.run(["javac", "--release", "17", "-proc:none", "-nowarn", "-cp", f"{args.lib}/*", "-d", str(oracle), str(ROOT / "tools" / "oracle" / "Oracle.java")], check=True)
     out_root = Path(args.out).resolve()
     results = []
     for template in sorted((demo / "samples").rglob("*.jrxml")):
@@ -271,7 +271,8 @@ def main():
         jasper_pdf, ours_pdf = out / "jasper.pdf", out / "ferroreport.pdf"
         classes = sample_classes(sample, args.lib, out_root)
         classpath = os.pathsep.join([str(oracle), f"{args.lib}/*", *([str(classes)] if classes else []), str(sample / "src"), str(template.parent), str(sample)])
-        jcode, jtext, jsec = run(["java", "-Djava.awt.headless=true", f"-Duser.home={out_root / '.java-home'}", "-cp", classpath, "Oracle", str(template),
+        # ORACLE_JAVA: a Java 17 runtime lets JasperReports 6.20.6 compile Groovy expressions.
+        jcode, jtext, jsec = run([os.environ.get("ORACLE_JAVA", "java"), "-Djava.awt.headless=true", f"-Duser.home={out_root / '.java-home'}", "-cp", classpath, "Oracle", str(template),
                                   str(data_file) if rows is not None else "-", str(jasper_pdf), str(params_file)], cwd=sample)
         cmd = [args.bin, "render", str(template), "-o", str(ours_pdf), "-q", "-p", str(params_file), "--timeout", "120"]
         for r in resources:
