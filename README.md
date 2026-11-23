@@ -20,16 +20,15 @@ JRXML and accessible by default. Against JasperReports itself it is about **250�
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
 
-> Status: **beta, version 0.12.** All 44 comparable test templates render pixel for pixel like
+> Status: **stable, version 1.0.** All 48 comparable test templates render pixel for pixel like
 > JasperReports 6.20, including band splitting, images (SVG too), subreports, tables, lists,
 > crosstabs, QR, PDF417, Barbecue and other barcodes, links, styled text and multi-column
-> layouts; charts follow JFreeChart's look closely. All 46 also export the same Excel and CSV
-> files as Jasper, all 47 pass veraPDF's PDF/UA-1, PDF/A-2a and PDF/A-3b checks, and
-> JasperReports' own samples are checked
-> against 6.20.6 and 7.1.1. `ferroreport doctor` tells you whether everything in your template is supported; what
-> is not yet is listed under [compatibility](#compatibility). Until 1.0 the API can still
-> change, and every change is in the release notes. Not affiliated with Jaspersoft or Cloud
-> Software Group.
+> layouts; charts follow JFreeChart's look closely. All 49 that can be exported by both engines
+> give the same Excel and CSV files, all 51 pass veraPDF's PDF/UA-1, PDF/A-2a, PDF/A-3b and
+> (signed) PDF/A-2b checks, and JasperReports' own samples are checked against 6.20.6 and
+> 7.1.1. `ferroreport doctor` tells you whether everything in your template is supported; what
+> is not yet is listed under [compatibility](#compatibility). From 1.0 on, versions follow
+> [semantic versioning](#stability). Not affiliated with Jaspersoft or Cloud Software Group.
 
 ## Why
 
@@ -430,13 +429,13 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 |---|---|---|
 | Templates | JRXML 6.x schema; JRXML 7 as JasperReports 7 writes it; `.ferro` (ferroreport's own format), with `ferroreport convert` between them; subdatasets (for tables); style templates (`<template>`, `.jrtx` files, with the templates they include, found next to the report or in a resource folder) | `.jasper` files (by design), scriptlets, subdataset queries |
 | Bands | title (going on over several pages when it does not fit one, as in JasperReports), page header/footer, column header/footer, detail (multiple bands), summary, no data, background, last page footer; splitting bands across pages (`splitType` Stretch, Prevent, Immediate); multi-column layout (vertical and horizontal print order, `isStartNewColumn`, column breaks); with no rows and `AllSectionsNoDetail`, group headers and footers print once | |
-| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG, JPEG or GIF from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical and horizontal), icon label, charts, barcodes (barcode4j components: QR code, DataMatrix, PDF417, Code 128, EAN-128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail and USPS Intelligent Mail; Barbecue components: Code 128, EAN-128, SSCC-18, Code 39, 2 of 5, Codabar, EAN-13, UPC-A, rotated), hyperlinks, anchors and bookmarks, PDF form fields (`net.sf.jasperreports.export.pdf.field.*`: text, combo and list boxes, check boxes, radio buttons), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, UPC/EAN add-ons, rotated barcode4j barcodes, the Barbecue types PDF417, PostNet, USPS, SCC-14, GTIN, shipment number and random-weight UPC-A, maps and other custom components |
+| Elements | static text, text field, line, rectangle (rounded), ellipse, frame (split across pages), image (PNG, JPEG or GIF from files, base64 or `byte[]`), subreport, crosstab (row and column groups with totals at the start or end, header positions, several measures with Sum, Count, DistinctCount, Average, Highest, Lowest and First, percentages of the grand total (`percentageOf`), buckets ordered by a total (`orderByExpression`), `$V{measure_group_ALL}` totals, crosstab parameters, data from the report or a subdataset; column parts as wide as the element and rows continuing on the next pages with repeated headers), table component (column groups, table/column/group headers and footers, hidden columns, no-data cell, headers repeated on every page), list component (vertical and horizontal), icon label, charts, barcodes (barcode4j components: QR code, DataMatrix, PDF417, Code 128, EAN-128, Code 39 with full ASCII, EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5, Codabar, POSTNET, Royal Mail and USPS Intelligent Mail; Barbecue components: every type but PostNet, rotated), hyperlinks, anchors and bookmarks, PDF form fields (`net.sf.jasperreports.export.pdf.field.*`: text, combo and list boxes, check boxes, radio buttons), page break (applied after its band) | crosstab bucket comparators, crosstabs over a group's rows, UPC/EAN add-ons, rotated barcode4j barcodes, Barbecue's PostNet (Barbecue draws it as bars of one height; barcode4j's POSTNET is drawn), maps and other custom components |
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled, HTML and RTF markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks; HTML lists, bulleted and numbered, nested), also across page breaks; rotation (Left, Right, UpsideDown); cutting a text that does not fit at a character and with a suffix (`net.sf.jasperreports.text.truncate.*`) | |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style (also what styles without a parent inherit from), parent styles, element overrides, conditional styles (up to 4 per style), styles from style templates (a style defined again replaces the earlier one for what comes after, as in JasperReports) | |
-| Images | PNG, JPEG and GIF (its first frame, with its transparent color); SVG (drawn as vectors in PDF, as pictures in Excel and Word); scale modes RetainShape, FillFrame, Clip; alignment; `onErrorType` | remote URLs (by design), other formats |
+| Images | PNG, JPEG and GIF (its first frame, with its transparent color); SVG (drawn as vectors in PDF, as pictures in Excel and Word); scale modes RetainShape, FillFrame, Clip, RealHeight and RealSize (the element takes the picture's size, as in JasperReports); alignment; `onErrorType` | remote URLs (by design), other formats |
 | Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, XY bar, scatter, bubble, time series, candlestick, high-low, Gantt, meter, thermometer, multi-axis; titles, legends, axis labels, series colors, range limits, tick formats, pie label formats; datasets by record, group, page or report, with `evaluationTime`, and from a subdataset | chart customizers and themes. Charts follow JFreeChart's default look closely but are not pixel-identical |
-| Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), parameters, return values, splitting across pages with reprinted column headers | JDBC connections |
+| Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), subreports that run their own SQL query on `$P{REPORT_CONNECTION}` (with `--db`), parameters, return values, splitting across pages with reprinted column headers | connections built in Java (`DriverManager.getConnection(...)` in an expression) |
 | Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | queries in languages other than SQL (HQL, XPath, MDX...: pass the rows) |
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules (and Groovy's: `5 / 2` is a BigDecimal 2.5), string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale); JasperReports' function library as Jaspersoft Studio lists it (`IF`, `AND`, `SUM`, `MAX`, `ROUND_HALF_UP`, `LEFT`, `MID`, `FIND`, `SUBSTITUTE`, `PROPER`, `DATE`, `DATEFORMAT`, `EDATE`, `WORKDAY`, `NETWORKDAYS`, `WEEKNUM`, `TIME` and the rest: 78 functions, 265 cases checked against JasperReports); `DATERANGE("MONTH-1")` and fixed ranges, with `getStart()`/`getEnd()` and in `$X{}` clauses; Groovy lists, maps and ranges (`[1, 2]`, `[a: 1]`, `1..5`), closures given to `findAll`, `collect`, `sum`, `inject`, `sort`, `groupBy` and the rest, `"${...}"` strings, `?.`, `**`, `<=>`, `in`, `as`, indexing, and string helpers (`padLeft`, `tokenize`, `capitalize`...) | arbitrary Java classes (scriptlets, static methods of your own), Groovy statements (`def`, loops, `if` blocks), regular expressions beyond a literal or `\s+` |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
@@ -449,29 +448,31 @@ example the Dominican e-CF stamp).
 
 Run `ferroreport doctor template.jrxml` to get this verdict for a specific template, or
 `ferroreport migrate folder/` for every template of a project. Over the 171 JRXML 7 samples of
-JasperReports 7.1.1: all of them load, 152 with everything they use supported (24 of them once you
-pass the rows their HQL, XPath, MDX or other non-SQL query gave) and 19 with something not
-supported yet (Java scriptlets, maps and other custom components).
+JasperReports 7.1.1: all of them load, 163 with everything they use supported (24 of them once you
+pass the rows their HQL, XPath, MDX or other non-SQL query gave) and 8 with something not
+supported yet: Java code (scriptlets, a chart customizer) or third-party components (spider
+chart, XChart, a generic element).
 
 ## How output is verified
 
 `tools/compare.py` renders every template in `fixtures/` with JasperReports 6.20.6 and with
 ferroreport, rasterizes both PDFs and compares them pixel by pixel. A fixture matches when fewer
 than 0.15% of the inked pixels differ (font anti-aliasing noise); most match exactly. Today all
-46 comparable fixtures match (07-groovy with a Java 17 runtime, see ¹). Barcode geometry is also checked bar by bar against barcode4j itself
-(`crates/ferroreport/tests/barcode4j.rs`) and against Barbecue (`crates/ferroreport/tests/data/barbecue.txt`: 57
-barcodes as Barbecue draws them for JasperReports).
+48 comparable fixtures match (07-groovy with a Java 17 runtime, see ¹). Barcode geometry is also checked bar by bar against barcode4j itself
+(`crates/ferroreport/tests/barcode4j.rs`) and against Barbecue (`crates/ferroreport/tests/data/barbecue.txt`: 115
+barcodes of every type as Barbecue draws them for JasperReports).
 
 `tools/compare_sheets.py` does the same for spreadsheets: both engines export every fixture to
 XLSX and CSV, and the worksheet XML, the styles XML and the CSV text must be byte for byte the
-same, and every picture anchored to the same cells. All 47 fixtures it can compare pass (48-sql
+same, and every picture anchored to the same cells. All 49 fixtures it can compare pass (48-sql
 needs a JDBC driver for the reference). Jasper's output for five
 of them is kept in `fixtures/*/jasper-xlsx/`, so `cargo test` checks them without Java.
 
 `tools/pdfua.sh` renders every fixture as a tagged PDF and checks it against PDF/UA-1 with
 veraPDF, the validator the PDF Association maintains, and `tools/pdfa.sh` renders them again as
-PDF/A-2a and as PDF/A-3b with a file attached and checks those; they run on every push, and all
-47 pass all three. Encrypted PDFs are checked by opening them with qpdf and pikepdf: every
+PDF/A-2a, as PDF/A-3b with a file attached and as signed PDF/A-2b and checks those; they run on
+every push, and all 51 pass all four. The signatures are verified with poppler's `pdfsig` and
+with pyHanko. Encrypted PDFs are checked by opening them with qpdf and pikepdf: every
 fixture decrypts to the same pages and text as without encryption.
 Word documents follow JasperReports' DOCX exporter; every fixture's `.docx` opens in LibreOffice
 with as many pages as its PDF.
@@ -527,6 +528,8 @@ with as many pages as its PDF.
 | 47-barbecue | Barbecue barcodes: Code 128 (automatic and C), Code 39 with check character, EAN-13, UPC-A, 2 of 5 interleaved and standard, Codabar, EAN-128, SSCC-18, rotated left, right and upside down, one per row | identical |
 | 48-sql | The report's SQL query with `$P{}`, `$P!{}` and `$X{IN}`, and a subreport that runs its own query per row on `$P{REPORT_CONNECTION}` | identical² |
 | 49-functions | 265 expressions of JasperReports' function library (`IF`, `SUM`, `DATEFORMAT`, `WORKDAY`, `DATERANGE`...) | identical |
+| 50-barbecue-types | The other Barbecue types: USPS, SCC-14, GTIN, shipment number, UCC-128 with its application identifier, EAN-128 with a check digit, random-weight UPC-A, Bookland, Code 39 extended, PDF417, a long Code 128 | identical (6.20.6 and 7.1.1) |
+| 51-real-size | `scaleImage` RealHeight and RealSize: elements that grow and shrink with their picture, narrowed to their width, aligned, with padding, moved to the next page when they do not fit | identical |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21: set `ORACLE_JAVA_GROOVY` to a
 Java 17 runtime and `tools/compare.py` uses it for Groovy templates (the others stay on Java 21,
@@ -668,35 +671,43 @@ depends on what you make.
 What would make ferroreport the first choice in more of these rows is on the roadmap below: a
 designer of its own, more of JasperReports' components, and time in production.
 
+## Stability
+
+From 1.0, ferroreport follows [semantic versioning](https://semver.org). Within 1.x, these do
+not change in a way that breaks what works today:
+
+- the Rust API of the `ferroreport` crate (enums that may grow are marked `#[non_exhaustive]`);
+- the command line: commands, options, exit codes and the JSON of `inspect` and `migrate`;
+- the HTTP API of `ferroreport serve`;
+- the APIs of the JavaScript, Python and Java packages;
+- the `.ferro` template format: a 1.0 template keeps rendering the same.
+
+What a minor version may change is the output itself, in one direction only: closer to what
+JasperReports prints. When ferroreport and JasperReports disagree on a template, that is a bug
+of ferroreport, and its fix goes in the release notes. The minimum Rust version (1.86 for the
+library, 1.89 for the command line) may rise in a minor version, never in a patch. Every
+change is listed in [CHANGELOG.md](CHANGELOG.md).
+
 ## Roadmap
 
-- **Phase 2 (in progress):** done: band splitting, images, subreports, conditional styles,
-  justified text, QR codes and barcodes, multi-column layout, styled/HTML text, rotated text, charts and
-  tables, lists and crosstabs, constant memory for huge reports (rows streamed in, pages
-  streamed out), page and time limits, mutation tests.
-- **Phase 3:** npm and PyPI packages, WebAssembly build with a browser playground, VS Code
-  live preview.
-- **Phase 4:** done: Excel (XLSX) and CSV export, every JasperReports chart type.
-- **Done in 0.12:** links, anchors and bookmarks in every format; PDF/A-2 and PDF/A-3 with
-  attachments; AES-256 PDF encryption with passwords and permissions; Barbecue barcodes;
-  `.ferro` without coordinates (rows, stacks, gaps) and with definitions; `ferroreport migrate`
-  for whole projects; a limit on the size of one row of data.
-- **Done in 0.11:** a template format of its own (`.ferro`), short, readable and accessible by
-  default; `ferroreport convert` between it and JRXML, and from JRXML 6 to 7; Word (DOCX)
-  output; PDF417 barcodes; SVG images; tagged PDFs checked against PDF/UA-1 with veraPDF; JRXML 7
-  read the way JasperReports 7 writes it; the release workflow ready to publish the Java library
-  on Maven Central.
-- **Done in 0.10:** the nine missing chart types, RTF markup, HTML lists, DataMatrix, EAN-128,
-  UPC-E and postal barcodes, PDF form fields, icon labels, Helvetica for text without a font,
-  lists and spanning cells in tagged PDFs, titles over several pages; checked against the
-  samples of JasperReports 7.1.1 too.
-- **Done in 0.8:** HTML output for previews, a Java library that streams a `ResultSet`, rows
-  from any database through a pipe or an iterator, a server that refuses to run open to the
-  network and can limit each client.
-- **Next:** the Java library on Maven Central and the Python package on PyPI (publishing waits
-  only for the accounts), a visual template designer (Jaspersoft Studio works with
-  ferroreport's templates meanwhile, and `.ferro` can be written by hand), maps and the
-  remaining Barbecue types.
+1.0 covers what JasperReports users need to switch: the same pages from the same templates,
+from JSON or SQL, in PDF (tagged, PDF/A, encrypted, signed), Excel, Word, CSV and HTML, with
+the function library, Groovy expressions, every chart type, the barcodes, and a template format
+of its own. What comes next, in 1.x releases:
+
+- **A visual designer** in the browser, for `.ferro` and JRXML (Jaspersoft Studio works with
+  ferroreport's templates meanwhile; for `.ferro`, the VS Code extension highlights it and
+  `render --watch` renders it again on every save).
+- **More output:** ODS, ODT and PPTX, as JasperReports' exporters write them.
+- **Text of every script:** right-to-left (Arabic, Hebrew), complex scripts (Devanagari, Thai)
+  with their shaping, and hyphenation. Today text is set left to right without shaping.
+- **Charts pixel for pixel** like JFreeChart (today they follow its look closely).
+- **Maps** and the remaining custom components; PAdES signatures with timestamps (B-T, B-LT)
+  and a visible signature box.
+- **Packages:** the Java library on Maven Central and the Python one on PyPI (publishing waits
+  only for the accounts; JitPack and the GitHub releases have them already).
+
+What each release brought is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 

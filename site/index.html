@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://cristianencarnacion.github.io/ferroreport/img/invoice.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:title" content="ferroreport: a fast JasperReports JRXML engine in Rust">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "ferroreport", "description": "Open-source report engine in Rust that renders JasperReports JRXML templates to PDF, Excel, Word, CSV and HTML without a JVM, pixel-identical to JasperReports.", "codeRepository": "https://github.com/cristianEncarnacion/ferroreport", "url": "https://cristianencarnacion.github.io/ferroreport/", "programmingLanguage": ["Rust", "JavaScript", "Python", "Java"], "license": "https://opensource.org/licenses/MIT", "version": "0.12.0", "author": {"@type": "Person", "name": "Cristian Encarnación"}, "keywords": "JasperReports alternative, JRXML, report engine, PDF generator, Rust, PDF/A, PDF/UA, invoice, Excel, Word"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "ferroreport", "description": "Open-source report engine in Rust that renders JasperReports JRXML templates to PDF, Excel, Word, CSV and HTML without a JVM, pixel-identical to JasperReports.", "codeRepository": "https://github.com/cristianEncarnacion/ferroreport", "url": "https://cristianencarnacion.github.io/ferroreport/", "programmingLanguage": ["Rust", "JavaScript", "Python", "Java"], "license": "https://opensource.org/licenses/MIT", "version": "1.0.0", "author": {"@type": "Person", "name": "Cristian Encarnación"}, "keywords": "JasperReports alternative, JRXML, report engine, PDF generator, Rust, PDF/A, PDF/UA, invoice, Excel, Word"}</script>
 <meta property="og:description" content="An invoice in 2 ms, a million rows in 13 MB. Reads your JasperReports templates, no JVM. Watch it race JasperReports.">
 <link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
@@ -103,7 +103,7 @@
       <div class="num"><b>2 ms</b><span>for a two-page invoice, in a service that is already running</span></div>
       <div class="num"><b>13 MB</b><span>of memory for a million rows and 23,810 pages</span></div>
       <div class="num"><b>~250×</b><span>faster than JasperReports from a cold start; 3 to 6× faster than a warm JVM</span></div>
-      <div class="num"><b>44 of 44</b><span>test reports pixel-identical to JasperReports</span></div>
+      <div class="num"><b>48 of 48</b><span>test reports pixel-identical to JasperReports</span></div>
     </div>
   </section>
 
@@ -427,7 +427,7 @@ ferroreport doctor invoice.jrxml   # what this template uses, and whether it is 
 curl -X POST localhost:8080/render/invoice -H 'Authorization: Bearer change-me' -H 'Content-Type: application/json' \\
   -d '{"data": [{"item": "Cemento", "amount": 395}], "params": {"CUSTOMER": "Caribe"}}' -o invoice.pdf`,
   java: `// pom.xml: repository https://jitpack.io, then
-// com.github.cristianEncarnacion:ferroreport:v0.12.0
+// com.github.cristianEncarnacion:ferroreport:v1.0.0
 
 Ferroreport reports = Ferroreport.local();
 byte[] pdf = reports.template(Path.of("invoice.jrxml")).rows(lines).param("CUSTOMER", "Distribuidora Caribe").render();

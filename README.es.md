@@ -20,16 +20,16 @@ mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperRe
 [Descargas](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport)
 
-> Estado: **beta, versión 0.12.** Las 44 plantillas comparables de la batería de pruebas salen
+> Estado: **estable, versión 1.0.** Las 48 plantillas comparables de la batería de pruebas salen
 > píxel por píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas,
 > imágenes (también SVG), subreportes, tablas, listas, crosstabs, códigos QR, PDF417, Barbecue
 > y de barras, enlaces, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 46 también exportan el mismo Excel y CSV que Jasper, las 47 pasan
-> las pruebas PDF/UA-1, PDF/A-2a y PDF/A-3b de veraPDF, y las muestras del propio JasperReports se comparan contra 6.20.6 y 7.1.1.
-> `ferroreport doctor` te dice si todo lo de tu plantilla está soportado; lo que aún falta está
-> en [compatibilidad](README.md#compatibility). Hasta la 1.0 la API todavía puede cambiar, y
-> cada cambio va en las notas de la versión. No está afiliado a Jaspersoft ni a Cloud Software
-> Group.
+> estilo de JFreeChart. Las 49 que ambos motores pueden exportar dan el mismo Excel y CSV, las
+> 51 pasan las pruebas PDF/UA-1, PDF/A-2a, PDF/A-3b y PDF/A-2b (firmado) de veraPDF, y las
+> muestras del propio JasperReports se comparan contra 6.20.6 y 7.1.1. `ferroreport doctor` te
+> dice si todo lo de tu plantilla está soportado; lo que aún falta está en
+> [compatibilidad](README.md#compatibility). Desde la 1.0 las versiones siguen
+> [versionado semántico](#estabilidad). No está afiliado a Jaspersoft ni a Cloud Software Group.
 
 ## Por qué
 
@@ -38,8 +38,8 @@ mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperRe
   las páginas salen sin acumularse: un reporte de un millón de filas usa la memoria de uno de
   diez.
 - **Salida idéntica.** Cada fixture se renderiza con los dos motores y se compara píxel por
-  píxel: hoy los 44 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
-  celda por celda, y las 46 coinciden.
+  píxel: hoy los 48 comparables salen idénticos. Sus exportaciones a Excel y CSV se comparan
+  celda por celda, y las 49 coinciden.
 - **PDF, Excel, Word, CSV y HTML.** La misma plantilla da un PDF (etiquetado para lectores de
   pantalla si quieres, PDF/UA-1), un `.xlsx` armado como el de JasperReports (celdas combinadas,
   fuentes, rellenos, bordes, alturas de fila, imágenes y gráficos), un `.docx` armado como el
@@ -273,8 +273,10 @@ lista), así que el JRXML convertido funciona también en JasperReports:
   componentes barcode4j: QR, DataMatrix, PDF417, Code 128,
   EAN-128, Code 39 (con ASCII completo), EAN-13, EAN-8, UPC-A, UPC-E, Interleaved 2 of 5,
   Codabar, POSTNET, Royal Mail y USPS Intelligent Mail. Cada barra se verifica contra barcode4j.
-  Y los del componente Barbecue: Code 128, EAN-128, SSCC-18, Code 39, 2 of 5, Codabar, EAN-13 y
-  UPC-A, también rotados, verificados barra por barra contra Barbecue.
+  Y todos los del componente Barbecue menos PostNet (USPS, SCC-14, GTIN, UCC-128, PDF417,
+  Bookland y los demás), también rotados, verificados barra por barra contra Barbecue.
+- Imágenes con `scaleImage` RealHeight y RealSize: el elemento toma el tamaño de la imagen, como
+  en JasperReports.
 - Campos de formulario PDF (`net.sf.jasperreports.export.pdf.field.*`): texto, listas
   desplegables, casillas y botones de opción.
 - Estilos con herencia y estilos condicionales, texto justificado, `isRemoveLineWhenBlank`,
@@ -323,8 +325,8 @@ lista), así que el JRXML convertido funciona también en JasperReports:
   como listas.
 - PDF/A-2 y PDF/A-3, archivos adjuntos, cifrado AES-256 con permisos, enlaces, anclas y el
   índice de marcadores.
-- Aún no: comparadores propios en crosstabs, algunos tipos de Barbecue (PDF417, PostNet, USPS,
-  SCC-14, GTIN), personalizadores de gráficos, firmas con sello de tiempo (PAdES B-T), consultas en lenguajes que no son SQL
+- Aún no: comparadores propios en crosstabs, el PostNet de Barbecue (Barbecue lo dibuja con
+  barras de una sola altura; el POSTNET de barcode4j sí se dibuja), personalizadores de gráficos, firmas con sello de tiempo (PAdES B-T), consultas en lenguajes que no son SQL
   (HQL, XPath, MDX: pásale las filas), scriptlets de Java e instrucciones de Groovy (`def`,
   bucles).
   La tabla completa está en el [README en inglés](README.md#compatibility).
@@ -420,35 +422,46 @@ que la respuesta honesta a "¿cuál uso?" depende de lo que hagas.
 Lo que haría de ferroreport la primera opción en más filas está en el roadmap: un diseñador
 propio, más componentes de JasperReports y tiempo en producción.
 
+## Estabilidad
+
+Desde la 1.0, ferroreport sigue el [versionado semántico](https://semver.org). Dentro de la 1.x
+no cambia, de forma que rompa lo que hoy funciona:
+
+- la API de Rust del crate `ferroreport` (los enums que pueden crecer están marcados
+  `#[non_exhaustive]`);
+- la línea de comandos: comandos, opciones, códigos de salida y el JSON de `inspect` y
+  `migrate`;
+- la API HTTP de `ferroreport serve`;
+- las APIs de los paquetes de JavaScript, Python y Java;
+- el formato `.ferro`: una plantilla de la 1.0 sigue saliendo igual.
+
+Lo que una versión menor sí puede cambiar es la salida, en una sola dirección: más parecida a lo
+que imprime JasperReports. Si ferroreport y JasperReports no coinciden en una plantilla, es un
+error de ferroreport, y su arreglo va en las notas de la versión. La versión mínima de Rust (1.86
+para la librería, 1.89 para la línea de comandos) puede subir en una versión menor, nunca en un
+parche. Cada cambio está en [CHANGELOG.md](CHANGELOG.md).
+
 ## Roadmap
 
-- **Fase 2 (en curso):** listo: división de bandas, imágenes, subreportes, estilos
-  condicionales, texto justificado, códigos QR y de barras, multicolumna, texto con formato, texto rotado, gráficos
-  tablas, listas y crosstabs, memoria constante en reportes enormes (las filas entran y las
-  páginas salen sin acumularse), límites de páginas y tiempo, pruebas de mutación.
-- **Fase 3:** paquetes para npm y PyPI, versión WebAssembly con playground en el navegador y
-  vista previa en vivo para VS Code.
-- **Fase 4:** listo: exportación a Excel (XLSX) y CSV, todos los tipos de gráfico de JasperReports.
-- **Listo en 0.12:** enlaces, anclas y marcadores en todos los formatos; PDF/A-2 y PDF/A-3 con
-  adjuntos; cifrado AES-256 de PDF con contraseñas y permisos; códigos Barbecue; `.ferro` sin
-  coordenadas (filas, pilas, espacios) y con definiciones; `ferroreport migrate` para proyectos
-  enteros; un límite al tamaño de una fila de datos.
-- **Listo en 0.11:** un formato de plantilla propio (`.ferro`), corto, legible y accesible por
-  defecto; `ferroreport convert` entre ese formato y JRXML, y de JRXML 6 a 7; salida a Word
-  (DOCX); códigos PDF417; imágenes SVG; PDF etiquetado verificado con veraPDF (PDF/UA-1); JRXML 7
-  leído tal como lo escribe JasperReports 7; el flujo de publicación listo para subir la librería
-  de Java a Maven Central.
-- **Listo en 0.10:** los nueve tipos de gráfico que faltaban, markup RTF, listas HTML, DataMatrix,
-  EAN-128, UPC-E y códigos postales, campos de formulario PDF, icon labels, Helvetica para el
-  texto sin fuente, listas y celdas combinadas en PDF etiquetado, títulos de varias páginas;
-  verificado también contra las muestras de JasperReports 7.1.1.
-- **Listo en 0.8:** salida HTML para vistas previas, librería de Java que lee un `ResultSet`
-  fila por fila, filas desde cualquier base de datos por tubería o iterador, y un servidor que
-  se niega a quedar abierto a la red y puede limitar a cada cliente.
-- **Siguiente:** la librería de Java en Maven Central y el paquete de Python en PyPI (la
-  publicación solo espera las cuentas), un diseñador visual (mientras tanto, Jaspersoft Studio
-  sirve para diseñar las plantillas, y `.ferro` se escribe a mano), mapas y los tipos de
-  Barbecue que faltan.
+La 1.0 cubre lo que necesita quien viene de JasperReports: las mismas páginas desde las mismas
+plantillas, con datos de JSON o SQL, en PDF (etiquetado, PDF/A, cifrado, firmado), Excel, Word,
+CSV y HTML, con la librería de funciones, expresiones Groovy, todos los tipos de gráfico, los
+códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 1.x:
+
+- **Un diseñador visual** en el navegador, para `.ferro` y JRXML (mientras tanto Jaspersoft
+  Studio sirve para las plantillas; para `.ferro`, la extensión de VS Code lo resalta y
+  `render --watch` lo vuelve a renderizar cada vez que guardas).
+- **Más formatos:** ODS, ODT y PPTX, como los escriben los exportadores de JasperReports.
+- **Texto de cualquier escritura:** de derecha a izquierda (árabe, hebreo), escrituras complejas
+  (devanagari, tailandés) con su composición, y separación silábica. Hoy el texto va de
+  izquierda a derecha y sin composición.
+- **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
+- **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con
+  recuadro visible.
+- **Paquetes:** la librería de Java en Maven Central y la de Python en PyPI (la publicación solo
+  espera las cuentas; JitPack y las versiones de GitHub ya las tienen).
+
+Lo que trajo cada versión está en [CHANGELOG.md](CHANGELOG.md).
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).
