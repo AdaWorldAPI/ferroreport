@@ -18,7 +18,7 @@ USAGE:
     ferroreport doctor <template.jrxml|template.ferro>
     ferroreport serve [OPTIONS]
     ferroreport convert <template> [-o <output>] [--to ferro|jrxml]
-    ferroreport migrate <folder|template...> [--report <file.md|file.json>] [--resources <folder>] [--to ferro|jrxml --out <folder>]
+    ferroreport migrate <folder|template...> [--report <file.md|file.json>] [--resources <folder>] [--strict] [--jasper <lib> [--keep <folder>]] [--to ferro|jrxml --out <folder>]
 
 RENDER OPTIONS:
     -d, --data <file.json>      Rows: a JSON array of objects, or one JSON object per line
@@ -70,7 +70,13 @@ MIGRATE:
     no rows (pictures are looked for next to each template, in its parent folder and in
     every --resources folder). Prints a summary; --report writes every template's result as Markdown or JSON.
     With --to and --out it also writes each template converted, in the same folders.
-    Exits with 1 when a template cannot be loaded.
+    With --jasper <folder of JasperReports jars> (and a JDK 11 or newer on the PATH), every
+    template that loads is also rendered by JasperReports and by ferroreport from the same rows
+    (<name>.json or data.json next to it, parameters from <name>.params.json or params.json):
+    pages, every text and number (their CSV exports) and times are compared. --keep <folder>
+    keeps both PDFs and CSVs of each. Nothing is written next to your templates.
+    Exits with 1 when a template cannot be loaded; with --strict, also when one uses something
+    not supported yet, stops when rendered with no rows, or differs from JasperReports.
 
 CONVERT:
     Rewrites a template: JRXML (JasperReports 6 or 7) as a .ferro template, ferroreport's own
@@ -166,6 +172,31 @@ impl Drop for RemoveOnDrop {
     }
 }
 
+/// One line on how a template came out in both engines.
+fn describe(c: &Compared) -> String {
+    if let Some(e) = &c.jasper_error {
+        return format!("JasperReports could not render it: {e}");
+    }
+    if let Some(e) = &c.ours_error {
+        return format!("JasperReports rendered it ({} pages); ferroreport stopped: {e}", c.jasper_pages);
+    }
+    let rows = c.rows.as_deref().map_or("with no rows".to_string(), |r| format!("with the rows of {r}"));
+    let text = if c.csv_diff.0 == 0 {
+        "every text and number the same".to_string()
+    } else {
+        format!("{} of {} lines of text differ", c.csv_diff.0, c.csv_diff.1)
+    };
+    let plural = |n: usize| if n == 1 { "1 page".to_string() } else { format!("{n} pages") };
+    let pages = if c.jasper_pages == 0 && c.ours_pages == 0 {
+        "no pages in either (give it rows to compare more)".to_string()
+    } else if c.jasper_pages == c.ours_pages {
+        format!("{} in both", plural(c.ours_pages))
+    } else {
+        format!("JasperReports {}, ferroreport {}", plural(c.jasper_pages), plural(c.ours_pages))
+    };
+    format!("{rows}: {pages}, {text}; JasperReports {:.0} ms, ferroreport {:.1} ms", c.jasper_ms, c.ours_ms)
+}
+
 /// A note that only says rows come from the caller, not from the template's SQL query.
 fn about_data(warning: &str) -> bool {
     warning.contains("query is ignored")
@@ -183,6 +214,220 @@ struct Checked {
     /// Rendering it with no rows failed: why.
     render: Option<String>,
     converted: Option<String>,
+    file: PathBuf,
+    /// What JasperReports made of it next to ferroreport (`--jasper`).
+    jasper: Option<Compared>,
+}
+
+/// One template rendered by both engines with the same rows.
+struct Compared {
+    /// JasperReports could not render it: why.
+    jasper_error: Option<String>,
+    /// ferroreport could not render it with those rows: why.
+    ours_error: Option<String>,
+    jasper_pages: usize,
+    ours_pages: usize,
+    /// Fill and PDF export, in milliseconds.
+    jasper_ms: f64,
+    ours_ms: f64,
+    /// Lines of the CSV exports that differ, of the longer one.
+    csv_diff: (usize, usize),
+    rows: Option<String>,
+}
+
+impl Compared {
+    fn same(&self) -> bool {
+        self.jasper_error.is_none() && self.ours_error.is_none() && self.jasper_pages == self.ours_pages && self.csv_diff.0 == 0
+    }
+}
+
+/// The rows and parameters next to a template: `<name>.json` or `data.json`, and
+/// `<name>.params.json` or `params.json`.
+fn data_beside(file: &Path) -> (Option<PathBuf>, Option<PathBuf>) {
+    let dir = file.parent().unwrap_or(Path::new("."));
+    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let first = |names: [String; 2]| names.into_iter().map(|n| dir.join(n)).find(|p| p.is_file());
+    (first([format!("{stem}.json"), "data.json".into()]), first([format!("{stem}.params.json"), "params.json".into()]))
+}
+
+/// Renders every template that loads with JasperReports (the jars in `lib`, run with the
+/// `java` of the machine) and with ferroreport, from the same rows, and compares pages, the
+/// CSV export (every text and number, in place) and times.
+fn compare_with_jasper(
+    results: &mut [Checked],
+    lib: &Path,
+    resources: &[PathBuf],
+    keep: Option<&Path>,
+    base: &Path,
+) -> CliResult {
+    use std::io::{BufRead, Write};
+    let work = std::env::temp_dir().join(format!("ferroreport-migrate-{}", std::process::id()));
+    let _cleanup = RemoveDirOnDrop(work.clone());
+    std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
+    let program = work.join("MigrateCheck.java");
+    std::fs::write(&program, include_str!("MigrateCheck.java")).map_err(|e| format!("{}: {e}", program.display()))?;
+    let mut jobs = String::new();
+    for (i, r) in results.iter().enumerate() {
+        if r.error.is_some() {
+            continue;
+        }
+        // Jasper writes its compiled subreports and both outputs here; the template's own
+        // folder is only read.
+        let dir = work.join(i.to_string());
+        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        let source_dir = r.file.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        let mut template = r.file.clone();
+        if r.version == ".ferro" {
+            // Jasper reads the same report as JRXML 7.
+            let stem = r.file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            template = dir.join(format!("{stem}.jrxml"));
+            let source = std::fs::read_to_string(&r.file).map_err(|e| format!("{}: {e}", r.file.display()))?;
+            match ferroreport::template::to_jrxml(&source) {
+                Ok(jrxml) => std::fs::write(&template, jrxml).map_err(|e| format!("{}: {e}", template.display()))?,
+                Err(_) => continue,
+            }
+        }
+        let (rows, params) = data_beside(&r.file);
+        let path = |p: &Option<PathBuf>| p.as_ref().map_or("-".to_string(), |p| p.to_string_lossy().into_owned());
+        jobs.push_str(&format!(
+            "{i}\t{}\t{}\t{}\t{}\t{}\n",
+            template.display(),
+            path(&rows),
+            path(&params),
+            dir.join("jasper").display(),
+            source_dir.display()
+        ));
+    }
+    let separator = if cfg!(windows) { ";" } else { ":" };
+    let classpath = format!("{}{separator}{}", lib.join("*").display(), work.display());
+    let mut child = std::process::Command::new("java")
+        .args(["-Djava.awt.headless=true", "-cp", &classpath])
+        .arg(&program)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("--jasper needs Java 11 or newer (a JDK) on the PATH: {e}"))?;
+    let mut stdin = child.stdin.take().ok_or("java: no standard input")?;
+    let feeder = std::thread::spawn(move || stdin.write_all(jobs.as_bytes()));
+    let stdout = child.stdout.take().ok_or("java: no standard output")?;
+    let mut answered = std::collections::HashMap::new();
+    for line in std::io::BufReader::new(stdout).lines() {
+        let line = line.map_err(|e| format!("java: {e}"))?;
+        let f: Vec<&str> = line.splitn(6, '\t').collect();
+        if f.len() == 6 {
+            if let Ok(i) = f[0].parse::<usize>() {
+                answered.insert(
+                    i,
+                    (f[1] == "ok", f[2].parse::<usize>().unwrap_or(0), f[4].parse::<f64>().unwrap_or(0.0), f[5].to_string()),
+                );
+            }
+        }
+    }
+    let _ = feeder.join();
+    let mut stderr = String::new();
+    if let Some(mut e) = child.stderr.take() {
+        let _ = std::io::Read::read_to_string(&mut e, &mut stderr);
+    }
+    let status = child.wait().map_err(|e| format!("java: {e}"))?;
+    if answered.is_empty() && !status.success() {
+        let why: Vec<&str> = stderr.lines().filter(|l| !l.starts_with("Picked up") && !l.trim().is_empty()).take(6).collect();
+        return Err(format!("JasperReports could not be run from {}:\n{}", lib.display(), why.join("\n")).into());
+    }
+    for (i, r) in results.iter_mut().enumerate() {
+        let Some((ok, pages, ms, message)) = answered.remove(&i) else { continue };
+        let dir = work.join(i.to_string());
+        let (rows_file, params_file) = data_beside(&r.file);
+        let mut compared = Compared {
+            jasper_error: (!ok).then_some(message),
+            ours_error: None,
+            jasper_pages: pages,
+            ours_pages: 0,
+            jasper_ms: ms,
+            ours_ms: 0.0,
+            csv_diff: (0, 0),
+            rows: rows_file.as_ref().map(|p| p.to_string_lossy().into_owned()),
+        };
+        // ferroreport, from the same rows and with the same defaults.
+        let source_dir = r.file.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new(".")).to_path_buf();
+        let mut renderer = Renderer::new().resource_dir(&source_dir);
+        for res in resources {
+            renderer = renderer.resource_dir(res);
+        }
+        let mut ours = || -> ferroreport::Result<(usize, f64)> {
+            let source = std::fs::read_to_string(&r.file).map_err(|e| ferroreport::Error::Io(e.to_string()))?;
+            let report = renderer.parse(&source)?;
+            let params_json = match &params_file {
+                Some(p) => serde_json::from_slice(&std::fs::read(p).map_err(|e| ferroreport::Error::Io(e.to_string()))?)
+                    .map_err(|e| ferroreport::Error::Data(e.to_string()))?,
+                None => serde_json::Value::Object(Default::default()),
+            };
+            let rows = |report: &ferroreport::Report| -> ferroreport::Result<ferroreport::RowIter<'static>> {
+                Ok(match &rows_file {
+                    Some(p) => Box::new(ferroreport::JsonRows::new(
+                        report,
+                        std::fs::File::open(p).map_err(|e| ferroreport::Error::Io(e.to_string()))?,
+                    )),
+                    None => Box::new(std::iter::empty()),
+                })
+            };
+            let pdf = std::fs::File::create(dir.join("ferroreport.pdf")).map_err(|e| ferroreport::Error::Io(e.to_string()))?;
+            let started = std::time::Instant::now();
+            let params = ferroreport::params_from_json(&report, &params_json)?;
+            let stats =
+                renderer.render_to(&report, rows(&report)?, params, ferroreport::Format::Pdf, std::io::BufWriter::new(pdf))?;
+            let ms = started.elapsed().as_secs_f64() * 1e3;
+            let csv = std::fs::File::create(dir.join("ferroreport.csv")).map_err(|e| ferroreport::Error::Io(e.to_string()))?;
+            let params = ferroreport::params_from_json(&report, &params_json)?;
+            renderer.render_to(&report, rows(&report)?, params, ferroreport::Format::Csv, std::io::BufWriter::new(csv))?;
+            Ok((stats.pages, ms))
+        };
+        match ours() {
+            Ok((pages, ms)) => {
+                compared.ours_pages = pages;
+                compared.ours_ms = ms;
+            }
+            Err(e) => compared.ours_error = Some(e.to_string()),
+        }
+        if compared.jasper_error.is_none() && compared.ours_error.is_none() {
+            let theirs = std::fs::read_to_string(dir.join("jasper.csv")).unwrap_or_default();
+            let mine = std::fs::read_to_string(dir.join("ferroreport.csv")).unwrap_or_default();
+            let (a, b): (Vec<&str>, Vec<&str>) = (theirs.lines().collect(), mine.lines().collect());
+            let n = a.len().max(b.len());
+            let differ = (0..n).filter(|&k| a.get(k) != b.get(k)).count();
+            compared.csv_diff = (differ, n);
+        }
+        if let Some(keep) = keep {
+            let stem = r.file.with_extension("");
+            // Where the template is under the folder given to migrate.
+            let rel = stem.strip_prefix(base).unwrap_or(&stem).to_path_buf();
+            let rel = rel.strip_prefix("/").unwrap_or(&rel).to_path_buf();
+            let target = keep.join(rel);
+            if let Some(parent) = target.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            for (from, suffix) in [
+                ("jasper.pdf", "jasper.pdf"),
+                ("ferroreport.pdf", "ferroreport.pdf"),
+                ("jasper.csv", "jasper.csv"),
+                ("ferroreport.csv", "ferroreport.csv"),
+            ] {
+                let mut name = target.as_os_str().to_os_string();
+                name.push(format!(".{suffix}"));
+                let _ = std::fs::copy(dir.join(from), PathBuf::from(name));
+            }
+        }
+        r.jasper = Some(compared);
+    }
+    Ok(())
+}
+
+struct RemoveDirOnDrop(PathBuf);
+
+impl Drop for RemoveDirOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 fn find_templates(path: &Path, out: &mut Vec<PathBuf>) {
@@ -212,6 +457,9 @@ fn migrate(args: &[String]) -> CliResult {
     let mut to = None;
     let mut out_dir = None;
     let mut resources: Vec<PathBuf> = Vec::new();
+    let mut strict = false;
+    let mut jasper: Option<PathBuf> = None;
+    let mut keep: Option<PathBuf> = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -219,6 +467,9 @@ fn migrate(args: &[String]) -> CliResult {
             "--to" => to = it.next().cloned(),
             "--out" => out_dir = it.next().cloned(),
             "--resources" => resources.push(it.next().ok_or("--resources needs a folder")?.into()),
+            "--strict" => strict = true,
+            "--jasper" => jasper = Some(it.next().ok_or("--jasper needs the folder of the JasperReports jars")?.into()),
+            "--keep" => keep = Some(it.next().ok_or("--keep needs a folder")?.into()),
             s if s.starts_with('-') => return Err(format!("unknown option {s}").into()),
             s => inputs.push(PathBuf::from(s)),
         }
@@ -249,6 +500,8 @@ fn migrate(args: &[String]) -> CliResult {
                     elements: Default::default(),
                     render: None,
                     converted: None,
+                    file: file.clone(),
+                    jasper: None,
                 });
                 continue;
             }
@@ -282,6 +535,8 @@ fn migrate(args: &[String]) -> CliResult {
             elements: Default::default(),
             render: None,
             converted: None,
+            file: file.clone(),
+            jasper: None,
         };
         match renderer.parse(&source) {
             Err(e) => checked.error = Some(e.to_string()),
@@ -340,6 +595,13 @@ fn migrate(args: &[String]) -> CliResult {
         }
         results.push(checked);
     }
+    if let Some(lib) = &jasper {
+        eprintln!(
+            "rendering {} templates with JasperReports and ferroreport...",
+            results.iter().filter(|r| r.error.is_none()).count()
+        );
+        compare_with_jasper(&mut results, lib, &resources, keep.as_deref(), &base)?;
+    }
     let failed = results.iter().filter(|r| r.error.is_some()).count();
     let partial = results.iter().filter(|r| r.error.is_none() && r.warnings.iter().any(|w| !about_data(w))).count();
     let data_only = results
@@ -371,11 +633,28 @@ fn migrate(args: &[String]) -> CliResult {
         if let Some(e) = &r.render {
             println!("    with no rows: {e}");
         }
+        if let Some(c) = &r.jasper {
+            println!("    {}", describe(c));
+        }
     }
     println!(
         "\n{} templates: {ready} supported, {data_only} supported once you pass the rows their SQL query gave, {partial} use features not supported yet, {failed} cannot be loaded; {render_fail} stop when rendered with no rows (they may need rows, parameters or pictures)",
         results.len()
     );
+    let compared: Vec<&Compared> = results.iter().filter_map(|r| r.jasper.as_ref()).collect();
+    if jasper.is_some() {
+        let same = compared.iter().filter(|c| c.same()).count();
+        let jasper_failed = compared.iter().filter(|c| c.jasper_error.is_some()).count();
+        let differ = compared.len() - same - jasper_failed;
+        let (theirs, ours): (f64, f64) = compared
+            .iter()
+            .filter(|c| c.jasper_error.is_none() && c.ours_error.is_none())
+            .fold((0.0, 0.0), |(a, b), c| (a + c.jasper_ms, b + c.ours_ms));
+        println!(
+            "compared with JasperReports: {same} the same pages and text, {differ} differ, {jasper_failed} JasperReports could not render; filling and writing the PDFs took JasperReports {:.0} ms in all (its first template includes starting up), ferroreport {:.0} ms",
+            theirs, ours
+        );
+    }
     if let Some(file) = report_file {
         let text = if file.ends_with(".json") {
             let list: Vec<serde_json::Value> = results
@@ -387,6 +666,13 @@ fn migrate(args: &[String]) -> CliResult {
                         "unsupported": r.warnings, "elements": r.elements,
                         "rendersWithoutRows": r.error.is_none() && r.render.is_none(), "renderError": r.render,
                         "converted": r.converted,
+                        "jasper": r.jasper.as_ref().map(|c| serde_json::json!({
+                            "same": c.same(), "rows": c.rows,
+                            "jasperError": c.jasper_error, "ferroreportError": c.ours_error,
+                            "jasperPages": c.jasper_pages, "ferroreportPages": c.ours_pages,
+                            "jasperMs": (c.jasper_ms * 10.0).round() / 10.0, "ferroreportMs": (c.ours_ms * 10.0).round() / 10.0,
+                            "csvLinesDiffering": c.csv_diff.0, "csvLines": c.csv_diff.1,
+                        })),
                     })
                 })
                 .collect();
@@ -405,6 +691,9 @@ fn migrate(args: &[String]) -> CliResult {
                 if let Some(e) = &r.render {
                     notes.push(format!("with no rows: {e}"));
                 }
+                if let Some(c) = &r.jasper {
+                    notes.push(describe(c));
+                }
                 let notes = notes.join("; ").replace('|', "\\|").replace('\n', " ");
                 md.push_str(&format!("| `{}` | {} | {result} | {notes} |\n", r.path, r.version));
             }
@@ -415,6 +704,13 @@ fn migrate(args: &[String]) -> CliResult {
     }
     if failed > 0 {
         return Err(format!("{failed} template(s) cannot be loaded").into());
+    }
+    let different = compared.iter().filter(|c| !c.same() && c.jasper_error.is_none()).count();
+    if strict && (partial > 0 || render_fail > 0 || different > 0) {
+        return Err(format!(
+            "--strict: {partial} template(s) use features not supported yet, {render_fail} stop when rendered with no rows, {different} differ from JasperReports"
+        )
+        .into());
     }
     Ok(())
 }

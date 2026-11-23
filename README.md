@@ -62,7 +62,9 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
   once. `ferroreport convert` turns one format into the other, and JRXML 6 into 7.
 - **Move a whole project at once.** `ferroreport migrate reports/` checks every template of a
   folder (does it load, what does it use, what is not supported yet, does it render), writes
-  the result as Markdown or JSON and, if you ask, the converted templates.
+  the result as Markdown or JSON and, if you ask, the converted templates. Give it your
+  JasperReports jars (`--jasper lib/`) and it renders every template with both engines from
+  the same rows and compares pages, every text and number, and times.
 - **Use it from any language.** Packages for JavaScript (Node.js, Deno, Bun, browsers), Python
   and Java, a Rust library, a CLI, and an HTTP API in a Docker image for everything else (C#,
   PHP, Go, Ruby...).
@@ -144,6 +146,7 @@ ferroreport render invoice.jrxml --data rows.json --params params.json -o invoic
 ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .docx, .csv, .html)
 ferroreport doctor invoice.jrxml     # what in this template is (not yet) supported
 ferroreport migrate reports/ --report migration.md   # the same for a whole folder
+ferroreport migrate reports/ --jasper jasper/lib --strict   # and compared with JasperReports itself
 ferroreport convert invoice.jrxml -o invoice.ferro   # the same template in ferroreport's format
 ```
 

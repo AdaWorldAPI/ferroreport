@@ -55,7 +55,9 @@ mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperRe
   se define una vez. `ferroreport convert` pasa de uno a otro, y de JRXML 6 a 7.
 - **Migra un proyecto entero de una vez.** `ferroreport migrate reportes/` revisa cada plantilla
   de una carpeta (si carga, qué usa, qué no está soportado aún, si se renderiza), escribe el
-  resultado en Markdown o JSON y, si lo pides, las plantillas convertidas.
+  resultado en Markdown o JSON y, si lo pides, las plantillas convertidas. Si le das los jars
+  de JasperReports (`--jasper lib/`), renderiza cada plantilla con los dos motores y los mismos
+  datos, y compara páginas, cada texto y número, y tiempos.
 - **Seguro con plantillas ajenas.** JasperReports compila las expresiones a Java y carga
   archivos `.jasper` serializados; así ocurrieron fallos recientes de ejecución remota de código
   (CVE-2025-10492, CVE-2026-6009). ferroreport nunca deserializa objetos e interpreta las
@@ -111,6 +113,7 @@ ferroreport render factura.jrxml --data filas.json --params parametros.json -o f
 ferroreport render factura.jrxml --data filas.json -o factura.xlsx   # Excel (o .docx, .csv, .html)
 ferroreport doctor factura.jrxml     # qué soporta (y qué no) esta plantilla
 ferroreport migrate reportes/ --report migracion.md   # lo mismo para una carpeta entera
+ferroreport migrate reportes/ --jasper jasper/lib --strict   # y comparado con JasperReports
 ferroreport convert factura.jrxml -o factura.ferro   # la misma plantilla en el formato de ferroreport
 ```
 
