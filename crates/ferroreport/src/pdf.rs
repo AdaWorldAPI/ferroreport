@@ -36,6 +36,11 @@ pub struct PdfOptions {
     pub attachments: Vec<Attachment>,
     /// Encrypt the document: a password to open it, permissions an owner password lifts.
     pub encryption: Option<crate::crypt::Encryption>,
+    /// Sign the document (PAdES B-B). The writer leaves room for the signature;
+    /// [`crate::sign::apply`] puts it in once the whole file is written.
+    pub signature: Option<crate::sign::Signature>,
+    /// When it is signed (the signature's `/M`).
+    pub signed_at: Option<chrono::NaiveDateTime>,
 }
 
 /// A PDF/A conformance: part 2 or 3, level A (tagged), B (basic) or U (text extractable).
@@ -788,6 +793,40 @@ impl<W: std::io::Write> PdfStream<W> {
         self.out.write_all(chunk.as_bytes()).map_err(io)?;
         self.pos += chunk.len() as u64;
         Ok(())
+    }
+
+    /// An object written as it is: the signature's, which must not be encrypted.
+    fn put_raw(&mut self, id: Ref, bytes: &[u8]) -> Result<()> {
+        self.offsets[id.get() as usize - 1] = self.pos;
+        self.out.write_all(bytes).map_err(io)?;
+        self.pos += bytes.len() as u64;
+        Ok(())
+    }
+
+    /// The signature's value, with room for the signature and its byte range.
+    fn write_signature(&mut self) -> Result<Option<(Ref, Ref)>> {
+        let Some(sig) = self.options.signature.clone() else { return Ok(None) };
+        if self.crypt.is_some() {
+            return Err(Error::Unsupported("signing an encrypted PDF (sign it, or encrypt it, not both)".into()));
+        }
+        let (value, field) = (self.next_id(), self.next_id());
+        let when = self.options.signed_at.unwrap_or_else(|| chrono::Utc::now().naive_utc());
+        let mut text = format!(
+            "{} 0 obj\n<<\n  /Type /Sig\n  /Filter /Adobe.PPKLite\n  /SubFilter /ETSI.CAdES.detached\n  {}\n  /Contents <{}>\n  /M (D:{}Z)\n",
+            value.get(),
+            crate::sign::BYTE_RANGE_PLACEHOLDER,
+            "0".repeat(crate::sign::RESERVED * 2),
+            when.format("%Y%m%d%H%M%S"),
+        );
+        for (key, v) in [("Name", &sig.name), ("Reason", &sig.reason), ("Location", &sig.location), ("ContactInfo", &sig.contact)]
+        {
+            if let Some(v) = v {
+                text.push_str(&format!("  /{key} {}\n", crate::sign::pdf_text(v)));
+            }
+        }
+        text.push_str(">>\nendobj\n\n");
+        self.put_raw(value, text.as_bytes())?;
+        Ok(Some((field, value)))
     }
 
     fn content_stream(&mut self, raw: &[u8]) -> Result<Ref> {
@@ -1728,18 +1767,20 @@ impl<W: std::io::Write> PdfStream<W> {
 
     /// Writes the fonts, the page tree and the trailer, and returns the output.
     /// Writes the form fields: the annotations of each page and the form they make up.
-    fn write_fields(&mut self) -> Result<(PageAnnots, Option<Ref>)> {
+    fn write_fields(&mut self, signature: Option<(Ref, Ref)>) -> Result<(PageAnnots, Option<Ref>)> {
         use crate::model::FieldKind;
         let fields = std::mem::take(&mut self.fields);
-        if fields.values().all(|f| f.is_empty()) {
+        let no_fields = fields.values().all(|f| f.is_empty());
+        if no_fields && signature.is_none() {
             return Ok((BTreeMap::new(), None));
         }
         let helv = self.next_id();
         let zadb = self.next_id();
         let mut chunk = Chunk::new();
         chunk.type1_font(helv).base_font(Name(b"Helvetica")).encoding_predefined(Name(b"WinAnsiEncoding"));
-        chunk.type1_font(zadb).base_font(Name(b"ZapfDingbats"));
         self.put(helv, &chunk)?;
+        let mut chunk = Chunk::new();
+        chunk.type1_font(zadb).base_font(Name(b"ZapfDingbats"));
         self.put(zadb, &chunk)?;
         let text_str = |s: &str| -> Vec<u8> {
             // PDF text strings: Latin-1 as it is, anything else as UTF-16.
@@ -1932,11 +1973,31 @@ impl<W: std::io::Write> PdfStream<W> {
             self.put(parent, &chunk)?;
             top_level.push(parent);
         }
+        // The signature: an invisible field on the first page.
+        if let Some((field, value)) = signature {
+            let mut chunk = Chunk::new();
+            let mut d = chunk.indirect(field).dict();
+            d.pair(Name(b"Type"), Name(b"Annot")).pair(Name(b"Subtype"), Name(b"Widget"));
+            d.pair(Name(b"FT"), Name(b"Sig")).pair(Name(b"T"), Str(b"Signature1")).pair(Name(b"V"), value);
+            d.insert(Name(b"Rect")).array().items([0.0f32, 0.0, 0.0, 0.0]);
+            // Print and locked.
+            d.pair(Name(b"F"), 132);
+            d.finish();
+            self.put(field, &chunk)?;
+            top_level.push(field);
+            annots.entry(0).or_default().push(field);
+        }
         let form = self.next_id();
         let mut chunk = Chunk::new();
         let mut d = chunk.indirect(form).dict();
         d.insert(Name(b"Fields")).array().items(top_level);
-        d.pair(Name(b"NeedAppearances"), true);
+        if signature.is_some() {
+            // Signed, and only appended to after it (incremental updates keep the signature).
+            d.pair(Name(b"SigFlags"), 3);
+        }
+        if !no_fields {
+            d.pair(Name(b"NeedAppearances"), true);
+        }
         d.pair(Name(b"DA"), Str(b"/Helv 0 Tf 0 g"));
         {
             let mut dr = d.insert(Name(b"DR")).dict();
@@ -2070,7 +2131,8 @@ impl<W: std::io::Write> PdfStream<W> {
         self.put(resources, &chunk)?;
 
         let (catalog_id, tree_id, info_id) = (Ref::new(1), Ref::new(2), Ref::new(3));
-        let (mut annots, acroform) = self.write_fields()?;
+        let signature = self.write_signature()?;
+        let (mut annots, acroform) = self.write_fields(signature)?;
         // Every page's object first: links and bookmarks lead to them.
         let mut page_ids = Vec::with_capacity(self.pages.len());
         for number in 0..self.pages.len() {
@@ -2300,5 +2362,9 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
     for page in &doc.pages {
         pdf.page(&page.items, fonts)?;
     }
-    pdf.finish(fonts)
+    let mut bytes = pdf.finish(fonts)?;
+    if let Some(signature) = &options.signature {
+        crate::sign::apply(&mut bytes, signature)?;
+    }
+    Ok(bytes)
 }

@@ -129,10 +129,11 @@ Las imágenes y subreportes se buscan junto a la plantilla (agrega más carpetas
 alimentan subreportes, por ejemplo `new JRMapCollectionDataSource($F{lineas})` o
 `((JsonDataSource)$P{REPORT_DATA_SOURCE}).subDataSource("lineas")`.
 
-### PDF/A, adjuntos, cifrado y enlaces
+### PDF/A, adjuntos, firmas, cifrado y enlaces
 
 ```bash
 ferroreport render factura.jrxml -d filas.json -o factura.pdf --pdfa 3b --attach factura.xml
+FERROREPORT_SIGN_PASSWORD=... ferroreport render factura.jrxml -d filas.json -o factura.pdf --sign-key empresa.p12 --sign-reason "Aprobada"
 ferroreport render nomina.jrxml -d filas.json -o nomina.pdf --user-password 0423 --permissions print
 ```
 
@@ -142,6 +143,12 @@ ferroreport render nomina.jrxml -d filas.json -o nomina.pdf --user-password 0423
   mismo.
 - `--attach archivo[:tipo/mime]` lleva un archivo dentro del PDF (PDF/A-3 acepta cualquiera;
   PDF/A-2 no).
+- `--sign-key` firma el PDF con PAdES B-B (firma CAdES separada sobre todo el archivo), que
+  aceptan Adobe Reader, los validadores europeos y `pdfsig`. La clave puede ser un `.p12`/`.pfx`
+  (los AES de OpenSSL 3 y los antiguos Triple DES/RC2) con su contraseña en
+  `FERROREPORT_SIGN_PASSWORD`, o una clave PEM (RSA o ECDSA P-256) con `--sign-cert`;
+  `--sign-reason`, `--sign-location`, `--sign-name` y `--sign-contact` completan los datos. Va
+  con PDF/A, no con cifrado. `serve --sign-key` firma cada PDF que entrega.
 - `--user-password` cifra el PDF con AES-256 y pide esa contraseña para abrirlo;
   `--owner-password` levanta los permisos; `--permissions` dice qué se permite sin ella
   (`print`, `copy`, `modify`, `annotate`, `fill`, `accessibility`, `assemble`, `all`). Las
@@ -308,7 +315,7 @@ su JRXML, su JRXML 7 y su `.ferro`, y JasperReports 7.1.1 renderiza los fixtures
 - PDF/A-2 y PDF/A-3, archivos adjuntos, cifrado AES-256 con permisos, enlaces, anclas y el
   índice de marcadores.
 - Aún no: comparadores propios en crosstabs, algunos tipos de Barbecue (PDF417, PostNet, USPS,
-  SCC-14, GTIN), personalizadores de gráficos, firmas digitales, consultas en lenguajes que no son SQL
+  SCC-14, GTIN), personalizadores de gráficos, firmas con sello de tiempo (PAdES B-T), consultas en lenguajes que no son SQL
   (HQL, XPath, MDX: pásale las filas), scriptlets de Java e instrucciones de Groovy (`def`,
   bucles).
   La tabla completa está en el [README en inglés](README.md#compatibility).
@@ -431,8 +438,8 @@ propio, más componentes de JasperReports y tiempo en producción.
   se niega a quedar abierto a la red y puede limitar a cada cliente.
 - **Siguiente:** la librería de Java en Maven Central y el paquete de Python en PyPI (la
   publicación solo espera las cuentas), un diseñador visual (mientras tanto, Jaspersoft Studio
-  sirve para diseñar las plantillas, y `.ferro` se escribe a mano), firmas digitales, mapas y
-  los tipos de Barbecue que faltan.
+  sirve para diseñar las plantillas, y `.ferro` se escribe a mano), mapas y los tipos de
+  Barbecue que faltan.
 
 La documentación completa (compatibilidad, cómo se verifica la salida, cómo contribuir) está en
 el [README en inglés](README.md).

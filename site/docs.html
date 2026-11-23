@@ -46,7 +46,7 @@
       <a href="#word">Word</a>
       <a href="#html">HTML previews</a>
       <a href="#tagged">Accessible PDFs</a>
-      <a href="#pdf">PDF/A, encryption, links</a>
+      <a href="#pdf">PDF/A, signatures, encryption, links</a>
       <a href="#large">Large reports and limits</a>
       <a href="#database">Rows from a database</a>
       <a href="#fonts">Fonts</a>
@@ -726,7 +726,7 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         the untagged one. A tagged PDF is larger (an entry per text) and a value known only later, such as "page 3 of 240", makes its page wait instead
         of being added afterwards.</p>
 
-      <h2 id="pdf">PDF/A, attachments, encryption, links</h2>
+      <h2 id="pdf">PDF/A, attachments, signatures, encryption, links</h2>
       <h3>PDF/A</h3>
       <p>For documents that must be kept for years (invoices, statements, records). <code>--pdfa 2b</code> (or <code>2u</code>,
         <code>2a</code>, <code>3b</code>, <code>3u</code>, <code>3a</code>; <code>pdfa</code> in the packages and the HTTP API) writes PDF/A:
@@ -738,6 +738,22 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
       <p><code>--attach invoice.xml</code> (or <code>invoice.xml:application/xml</code>) carries a file inside the PDF, the way electronic
         invoices carry their XML. PDF/A-3 allows any file; PDF/A-2 refuses them. In the packages: <code>attachments</code>, a list of
         paths or of (name, bytes, MIME type).</p>
+      <h3>Signatures</h3>
+      <p><code>--sign-key</code> signs the PDF with PAdES baseline B-B: a CAdES detached signature (<code>/ETSI.CAdES.detached</code>) over
+        the whole file, with the signer's certificate bound to it by the <code>signing-certificate-v2</code> attribute, as Adobe Reader, EU
+        validators and <code>pdfsig</code> expect.</p>
+<pre>FERROREPORT_SIGN_PASSWORD=... ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --sign-key company.p12 --sign-reason "Approved"
+ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --sign-key key.pem --sign-cert cert.pem --sign-location "Santo Domingo"</pre>
+      <table>
+        <tr><th>Option</th><th>Meaning</th></tr>
+        <tr><td><code>--sign-key</code></td><td>A <code>.p12</code>/<code>.pfx</code> (the AES files OpenSSL 3 writes, and the older Triple DES and RC2 ones), its password in <code>FERROREPORT_SIGN_PASSWORD</code>; or a PEM private key, RSA (2048 bits or more) or ECDSA P-256. <code>FERROREPORT_SIGN_KEY</code> does the same</td></tr>
+        <tr><td><code>--sign-cert</code></td><td>With a PEM key: the signer's certificate and its chain (repeatable). The one that matches the key goes first</td></tr>
+        <tr><td><code>--sign-reason</code>, <code>--sign-location</code>, <code>--sign-name</code>, <code>--sign-contact</code></td><td>The signature's details, shown by readers</td></tr>
+      </table>
+      <p>A signature goes with PDF/A (every fixture is signed as PDF/A-2b, checked by veraPDF and verified by pdfsig and pyHanko on every
+        push), not with encryption. <code>serve --sign-key</code> signs every PDF the server sends. In Rust, implement
+        <code>ferroreport::sign::Signer</code> (a hardware token, a signing service) and pass it to <code>Renderer::sign</code>: the private key
+        never has to reach ferroreport. A signed document is written in memory before it is sent, since the signature covers all of it.</p>
       <h3>Encryption</h3>
       <p>The PDF is encrypted with AES-256, the security handler of PDF 2.0, which every current reader opens.</p>
       <table>

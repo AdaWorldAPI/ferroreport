@@ -38,6 +38,7 @@ pub mod print;
 mod raster;
 pub mod rich;
 pub mod rtf;
+pub mod sign;
 pub mod sql;
 pub mod standard;
 pub mod svg;
@@ -130,6 +131,7 @@ pub struct Renderer {
     pdfa: Option<pdf::PdfA>,
     attachments: Vec<pdf::Attachment>,
     encryption: Option<crypt::Encryption>,
+    signature: Option<sign::Signature>,
 }
 
 impl Default for Renderer {
@@ -151,6 +153,7 @@ impl Renderer {
             pdfa: None,
             attachments: Vec::new(),
             encryption: None,
+            signature: None,
             csv: Default::default(),
             html: Default::default(),
         }
@@ -208,8 +211,16 @@ impl Renderer {
         self
     }
 
+    /// Signs PDF output (PAdES B-B) with `signature`'s key and certificates.
+    pub fn sign(mut self, signature: Option<sign::Signature>) -> Renderer {
+        self.signature = signature;
+        self
+    }
+
     fn pdf_options(&self, title: &str, settings: &model::PdfSettings) -> pdf::PdfOptions {
         pdf::PdfOptions {
+            signature: self.signature.clone(),
+            signed_at: self.now,
             encryption: self.encryption.clone().or_else(|| settings.encryption.clone()),
             pdfa: self.pdfa.or(settings.pdfa),
             attachments: self.attachments.clone(),
@@ -318,6 +329,16 @@ impl Renderer {
         match format {
             Format::Pdf => {
                 let options = self.pdf_options(&report.name, &report.pdf);
+                // A signature covers the whole file: it is written in memory, signed, then sent.
+                if let Some(signature) = options.signature.clone() {
+                    let mut sink = pdf::PdfStream::new(Vec::new(), report.page_width, report.page_height, options)?;
+                    let stats =
+                        fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                    let mut pdf = sink.finish(&self.fonts)?;
+                    sign::apply(&mut pdf, &signature)?;
+                    out.write_all(&pdf).and_then(|_| out.flush()).map_err(|e| Error::Io(e.to_string()))?;
+                    return Ok(stats);
+                }
                 let mut sink = pdf::PdfStream::new(out, report.page_width, report.page_height, options)?;
                 let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
                 sink.finish(&self.fonts)?;

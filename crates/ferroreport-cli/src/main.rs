@@ -9,6 +9,7 @@ use std::time::Instant;
 #[cfg(feature = "db")]
 mod db;
 mod serve;
+mod signing;
 mod spool;
 
 const USAGE: &str = "\
@@ -46,6 +47,13 @@ RENDER OPTIONS:
         --max-pages <n>         Stop if the report goes over this many pages
         --timeout <seconds>     Stop if the render takes longer than this
         --max-row <MB>          Stop at a row of data larger than this (default: 256)
+        --sign-key <key>        Sign the PDF (PAdES B-B) with this private key: PEM (PKCS#8 RSA
+                                or ECDSA P-256) or a .p12/.pfx, whose password goes in
+                                FERROREPORT_SIGN_PASSWORD (or FERROREPORT_SIGN_KEY)
+        --sign-cert <cert.pem>  The signer's certificate and its chain (repeatable; or
+                                FERROREPORT_SIGN_CERT)
+        --sign-reason <text>    Why it is signed; also --sign-name, --sign-location,
+                                --sign-contact
         --db <url>              Fill the report from its own SQL query, and its subreports from
                                 theirs: postgres://, mysql://, sqlserver://, sqlite:file.db (a
                                 jdbc: URL works too). Or FERROREPORT_DB; the password goes in
@@ -102,6 +110,9 @@ add format xlsx, docx, csv or html to the request for Excel, Word, CSV or a web 
                                 FERROREPORT_ALLOW_ANONYMOUS=1): only for ports your own
                                 services alone can reach
         --rate-limit <n>        Most requests per minute from one client address (answers 429)
+        --sign-key <key>        Sign every PDF (PAdES B-B): a PEM key, or a .p12 with its password
+                                in FERROREPORT_SIGN_PASSWORD; --sign-cert, --sign-reason... as
+                                in render
         --db <url>              The database the SQL queries of templates from --templates run
                                 on (or FERROREPORT_DB; password in FERROREPORT_DB_PASSWORD)
         --spool-memory <MB>     How much of one document is kept in memory until it is complete
@@ -806,9 +817,13 @@ fn render(args: &[String]) -> CliResult {
     let mut attachments = Vec::new();
     let mut limits = ferroreport::Limits::default();
     let mut db = std::env::var("FERROREPORT_DB").ok().filter(|u| !u.is_empty());
+    let mut sign = SignOptions::default();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
+        if sign.option(a, &mut value)? {
+            continue;
+        }
         match a.as_str() {
             "-d" | "--data" => data = Some(value(a)?),
             "--db" => db = Some(value(a)?),
@@ -901,6 +916,7 @@ fn render(args: &[String]) -> CliResult {
     if let Some(url) = &db {
         renderer = renderer.connection(Some(connect_db(url)?));
     }
+    renderer = renderer.sign(sign.signature()?);
     // Parsed here, where the resource folders are known: style templates are read from them.
     let report = renderer.parse(&source)?;
     // Without rows of its own, a report with a query is filled from the database.
@@ -1001,6 +1017,53 @@ fn render(args: &[String]) -> CliResult {
     Ok(())
 }
 
+/// `--sign-key`, `--sign-cert` and the signature's details.
+#[derive(Default)]
+struct SignOptions {
+    key: Option<String>,
+    certs: Vec<String>,
+    name: Option<String>,
+    reason: Option<String>,
+    location: Option<String>,
+    contact: Option<String>,
+}
+
+impl SignOptions {
+    /// Takes `--sign-*` options; false for any other.
+    fn option(&mut self, a: &str, value: &mut dyn FnMut(&str) -> Result<String, String>) -> Result<bool, String> {
+        match a {
+            "--sign-key" => self.key = Some(value(a)?),
+            "--sign-cert" => self.certs.push(value(a)?),
+            "--sign-name" => self.name = Some(value(a)?),
+            "--sign-reason" => self.reason = Some(value(a)?),
+            "--sign-location" => self.location = Some(value(a)?),
+            "--sign-contact" => self.contact = Some(value(a)?),
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    fn signature(self) -> Result<Option<ferroreport::sign::Signature>, Box<dyn std::error::Error>> {
+        let Some(key) = self.key.or_else(|| std::env::var("FERROREPORT_SIGN_KEY").ok().filter(|k| !k.is_empty())) else {
+            if !self.certs.is_empty() {
+                return Err("--sign-cert needs --sign-key".into());
+            }
+            return Ok(None);
+        };
+        let mut certs = self.certs;
+        if certs.is_empty() {
+            certs.extend(std::env::var("FERROREPORT_SIGN_CERT").ok().filter(|c| !c.is_empty()));
+        }
+        Ok(Some(ferroreport::sign::Signature {
+            signer: signing::load(&key, &certs)?,
+            name: self.name,
+            reason: self.reason,
+            location: self.location,
+            contact: self.contact,
+        }))
+    }
+}
+
 /// Opens the database a report's queries run on (`--db`).
 #[cfg(feature = "db")]
 fn connect_db(url: &str) -> Result<std::sync::Arc<dyn ferroreport::sql::Connection>, Box<dyn std::error::Error>> {
@@ -1031,9 +1094,13 @@ fn serve(args: &[String]) -> CliResult {
     let mut spool_disk = megabytes("FERROREPORT_SPOOL_DISK", 4096);
     let mut spool_dir = std::env::var("FERROREPORT_SPOOL_DIR").ok().filter(|d| !d.is_empty()).map(PathBuf::from);
     let mut db = std::env::var("FERROREPORT_DB").ok().filter(|u| !u.is_empty());
+    let mut sign = SignOptions::default();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or_else(|| format!("{name} needs a value"));
+        if sign.option(a, &mut value)? {
+            continue;
+        }
         match a.as_str() {
             "--host" => host = value(a)?,
             "-P" | "--port" => port = value(a)?,
@@ -1077,6 +1144,7 @@ fn serve(args: &[String]) -> CliResult {
             Some(url) => Some(connect_db(url)?),
             None => None,
         },
+        signature: sign.signature()?,
     })
 }
 

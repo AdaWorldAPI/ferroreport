@@ -57,6 +57,8 @@ pub struct Config {
     /// The database the queries of templates from `templates` run on (`--db`). Templates
     /// sent in a request never get it: they could run any statement.
     pub connection: Option<Arc<dyn ferroreport::sql::Connection>>,
+    /// Every PDF is signed with this key (`--sign-key`).
+    pub signature: Option<ferroreport::sign::Signature>,
 }
 
 /// Counts each client's requests in the current minute.
@@ -306,6 +308,7 @@ struct Job {
     connection: Option<Arc<dyn ferroreport::sql::Connection>>,
     /// Filled from its own query: the request sent no rows.
     from_db: bool,
+    signature: Option<ferroreport::sign::Signature>,
 }
 
 /// What a write fails with once the client has closed the connection.
@@ -452,6 +455,7 @@ fn prepare(
         format,
         connection,
         from_db,
+        signature: cfg.signature.clone(),
     })
 }
 
@@ -486,7 +490,7 @@ impl Job {
             r.add_resource(name, bytes.clone());
         }
         let params = ferroreport::params_from_json(&self.report, &self.params).map_err(failed)?;
-        r = r.connection(self.connection.clone());
+        r = r.connection(self.connection.clone()).sign(self.signature.clone());
         if self.from_db {
             r.render_query_to(&self.report, params, self.format, out).map_err(failed)
         } else {
@@ -1152,6 +1156,7 @@ mod tests {
             spool_dir: None,
             spool_disk: 1 << 30,
             connection: None,
+            signature: None,
         }
     }
 

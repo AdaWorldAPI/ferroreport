@@ -1,7 +1,8 @@
 name: PDF/UA
 
-# Tagged PDFs checked against PDF/UA-1, and PDF/A documents against PDF/A-2a and PDF/A-3b, by
-# veraPDF, the validator the PDF Association maintains.
+# Tagged PDFs checked against PDF/UA-1, and PDF/A documents against PDF/A-2a, PDF/A-3b and
+# (signed) PDF/A-2b, by veraPDF, the validator the PDF Association maintains; the signatures are
+# then verified with poppler's pdfsig and with pyHanko.
 on:
   push:
     branches: [main]
@@ -18,6 +19,12 @@ jobs:
       - run: tools/pdfua.sh
       - if: always()
         run: tools/pdfa.sh
+      - name: Signatures verify
+        if: always()
+        run: |
+          sudo apt-get install -y -q poppler-utils > /dev/null
+          pip install -q "pyhanko[cli]"
+          python3 tools/check_signatures.py target/pdfa/2b target/pdfa/sign.crt
       - if: always()
         uses: actions/upload-artifact@v5
         with:

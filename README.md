@@ -192,10 +192,11 @@ println!("{} pages from {} rows", stats.pages, stats.rows);
 `rows` is any iterator of records, so they can come from a database cursor or a queue just as
 well; and `fill_to` hands each finished page to a `PageSink` of your own.
 
-### PDF/A, attachments, encryption and links
+### PDF/A, attachments, signatures, encryption and links
 
 ```bash
 ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --pdfa 3b --attach invoice.xml
+FERROREPORT_SIGN_PASSWORD=... ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --sign-key company.p12 --sign-reason "Approved"
 ferroreport render payslip.jrxml -d rows.json -o payslip.pdf --user-password 0423 --permissions print
 ```
 
@@ -205,6 +206,16 @@ ferroreport render payslip.jrxml -d rows.json -o payslip.pdf --user-password 042
   `net.sf.jasperreports.export.pdfa.conformance` property asks for the same.
 - `--attach file[:mime/type]` carries a file inside the PDF (PDF/A-3 allows any file; PDF/A-2
   refuses them).
+- `--sign-key` signs the PDF: PAdES baseline B-B (a CAdES detached signature over the whole
+  file, with the signer's certificate bound to it), which Adobe Reader, EU validators and
+  `pdfsig` accept. The key is a `.p12`/`.pfx` (both the AES files of OpenSSL 3 and the older
+  Triple DES/RC2 ones) with its password in `FERROREPORT_SIGN_PASSWORD`, or a PEM key (RSA or
+  ECDSA P-256) with `--sign-cert cert.pem` for the certificate and its chain;
+  `--sign-reason`, `--sign-location`, `--sign-name` and `--sign-contact` fill in the details.
+  It goes with PDF/A (every fixture is signed as PDF/A-2b, checked by veraPDF, then verified by
+  pdfsig and pyHanko on every push), not with encryption. `serve --sign-key` signs every PDF it
+  sends. In Rust, implement `ferroreport::sign::Signer` (a hardware token, a signing service)
+  and pass it to `Renderer::sign`; the key never has to reach ferroreport.
 - `--user-password` encrypts the PDF with AES-256 (PDF 2.0's security handler) and asks for that
   password to open it; `--owner-password` lifts the permissions; `--permissions` lists what
   readers allow without it (`print`, `copy`, `modify`, `annotate`, `fill`, `accessibility`,
@@ -401,7 +412,7 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules (and Groovy's: `5 / 2` is a BigDecimal 2.5), string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale); JasperReports' function library as Jaspersoft Studio lists it (`IF`, `AND`, `SUM`, `MAX`, `ROUND_HALF_UP`, `LEFT`, `MID`, `FIND`, `SUBSTITUTE`, `PROPER`, `DATE`, `DATEFORMAT`, `EDATE`, `WORKDAY`, `NETWORKDAYS`, `WEEKNUM`, `TIME` and the rest: 78 functions, 265 cases checked against JasperReports); `DATERANGE("MONTH-1")` and fixed ranges, with `getStart()`/`getEnd()` and in `$X{}` clauses; Groovy lists, maps and ranges (`[1, 2]`, `[a: 1]`, `1..5`), closures given to `findAll`, `collect`, `sum`, `inject`, `sort`, `groupBy` and the rest, `"${...}"` strings, `?.`, `**`, `<=>`, `in`, `as`, indexing, and string helpers (`padLeft`, `tokenize`, `capitalize`...) | arbitrary Java classes (scriptlets, static methods of your own), Groovy statements (`def`, loops, `if` blocks), regular expressions beyond a literal or `\s+` |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font`; text in a font no one provides is written like JasperReports writes it, in the PDF standard font of its `pdfFontName` (Helvetica by default) | font extension jars |
-| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), digital signatures, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
+| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; PAdES B-B digital signatures (`--sign-key`); links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), signatures with timestamps or long-term validation (PAdES B-T, B-LT), visible signature boxes, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
 
 QR codes are encoded exactly like ZXing (same version, mask and modules) and are drawn the way
 JasperReports draws them, which makes them a good fit for printed electronic invoices (for
@@ -653,8 +664,8 @@ designer of its own, more of JasperReports' components, and time in production.
   network and can limit each client.
 - **Next:** the Java library on Maven Central and the Python package on PyPI (publishing waits
   only for the accounts), a visual template designer (Jaspersoft Studio works with
-  ferroreport's templates meanwhile, and `.ferro` can be written by hand), digital signatures,
-  maps and the remaining Barbecue types.
+  ferroreport's templates meanwhile, and `.ferro` can be written by hand), maps and the
+  remaining Barbecue types.
 
 ## Contributing
 
