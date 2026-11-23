@@ -456,6 +456,56 @@ pub fn matrix(msg: &str, o: &Options) -> Result<(Vec<Vec<bool>>, usize), String>
     Ok((out, cols))
 }
 
+/// The modules of a PDF417 symbol as the Barbecue library draws it: every message in byte
+/// compaction, 12 data columns, at least 3 rows, error correction level 0. Barbecue writes the
+/// length descriptor without the padding, counts the rows from 1 in the row indicators and
+/// starts every row with `11111110110101000`; all of it is followed here, since that is what
+/// JasperReports prints.
+pub fn barbecue_matrix(msg: &str) -> Result<Vec<Vec<bool>>, String> {
+    const COLS: usize = 12;
+    if let Some(c) = msg.chars().find(|c| !c.is_ascii()) {
+        return Err(format!("Barbecue's PDF417 cannot encode {c:?}"));
+    }
+    let mut data = Vec::new();
+    encode_binary(msg.as_bytes(), 0, msg.len(), BYTE, &mut data);
+    let k = ec_count(0);
+    let rows = (data.len() + 1 + k).div_ceil(COLS).max(3);
+    if rows * COLS > 928 {
+        return Err(format!("PDF417: the message is too long ({} codewords)", data.len()));
+    }
+    let mut codewords = Vec::with_capacity(rows * COLS);
+    codewords.push((data.len() + 1) as u16);
+    codewords.extend(&data);
+    codewords.resize(rows * COLS - k, 900);
+    let ec = error_correction(&codewords, 0);
+    codewords.extend(ec);
+    let mut out = Vec::with_capacity(rows);
+    for (y, row_codewords) in codewords.chunks(COLS).enumerate() {
+        let cluster = y % 3;
+        let base = 30 * (y / 3);
+        let (left, right) = match cluster {
+            0 => (base + rows / 3, base + COLS - 1),
+            1 => (base + rows % 3, base + rows / 3),
+            _ => (base + COLS - 1, base + rows % 3),
+        };
+        let mut row = Vec::with_capacity(17 * COLS + 69);
+        let mut put = |pattern: u32, len: u32| {
+            for bit in (0..len).rev() {
+                row.push(pattern & (1 << bit) != 0);
+            }
+        };
+        put(0b11111110110101000, 17);
+        put(tables::CODEWORDS[cluster][left], 17);
+        for &c in row_codewords {
+            put(tables::CODEWORDS[cluster][c as usize], 17);
+        }
+        put(tables::CODEWORDS[cluster][right], 17);
+        put(260649, 18);
+        out.push(row);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

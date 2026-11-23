@@ -1149,6 +1149,33 @@ fn load_image(le: &mut LayoutEnv, img: &ImageElement) -> Result<Option<Arc<Image
 
 /// Positions an image inside its box the way JasperReports' PDF exporter does: natural size
 /// is one point per pixel, alignment offsets are whole points.
+/// The height (and for `RealSize` the width) of an image element sized from its picture, the
+/// way `JRFillImage.fitImage` works it out in whole points: the picture at one point a pixel,
+/// narrowed to the element's width; on a page with less `room`, it goes to the next page,
+/// or, at the top of a page already, shrinks to the room.
+fn real_image_size(
+    real: RealImage,
+    data: &ImageData,
+    el: &Element,
+    room: Option<f32>,
+    first_on_page: bool,
+) -> (f32, Option<f32>) {
+    let (real_w, real_h) = (f64::from(data.width), f64::from(data.height));
+    let width = el.width.trunc() as f64;
+    let (mut h, mut w) = (real_h, real_w);
+    if real_w > width {
+        h = (width / real_w * real_h).trunc();
+        w = width;
+    }
+    if let Some(room) = room.map(|r| r.trunc() as f64) {
+        if h > room && first_on_page {
+            h = room.max(0.0);
+            w = (h / real_h * real_w).trunc();
+        }
+    }
+    (h as f32, (real == RealImage::Size).then_some(w as f32))
+}
+
 fn place_image(img: &ImageElement, data: Arc<ImageData>, x: f32, y: f32, w: f32, h: f32) -> PrintItem {
     let p = img.boxed.padding;
     let (bx, by) = (x + p.left, y + p.top);
@@ -1203,6 +1230,8 @@ struct Measured {
     content: Option<Arc<Vec<Segment>>>,
     /// Laid-out barcode symbol.
     symbol: Option<crate::barcode::Symbol>,
+    /// An image sized from its picture (`RealSize`): its x offset and width.
+    image_box: Option<(f32, f32)>,
     /// A crosstab: where it starts, and the room it gets on this page (`None`: all of it).
     crosstab: Option<(crate::crosstab::Rest, Option<f32>)>,
 }
@@ -1258,6 +1287,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             content: None,
             symbol: None,
             crosstab: None,
+            image_box: None,
         };
         if visible {
             match &el.kind {
@@ -1281,6 +1311,19 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 ElementKind::Image(img) => {
                     m.image = load_image(le, img)?;
                     m.blank = m.image.is_none();
+                    if let (Some(real), Some(data)) = (img.real, &m.image) {
+                        let room = avail.map(|a| a - el.y - img.boxed.padding.top - img.boxed.padding.bottom);
+                        let (h, w) = real_image_size(real, data, el, room, le.first_on_page);
+                        m.new_h = h + img.boxed.padding.top + img.boxed.padding.bottom;
+                        if let Some(w) = w.filter(|w| *w != el.width) {
+                            let dx = match img.halign {
+                                HAlign::Right => el.width - w,
+                                HAlign::Center => (0.5 * (el.width - w)).trunc(),
+                                _ => 0.0,
+                            };
+                            m.image_box = Some((dx, w));
+                        }
+                    }
                 }
                 ElementKind::Frame { children, .. } => {
                     let inner = layout_elements(le, children, el.height, None)?;
@@ -1739,6 +1782,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                 close_mark(&mut out.items, mark);
             }
             ElementKind::Image(img) => {
+                let (x, w) = m.image_box.map_or((x, w), |(dx, iw)| (x + dx, iw));
                 let shape = Shape::Image { data: m.image.clone(), scale: img.scale, halign: img.halign, valign: img.valign };
                 let mark = open_mark(&mut out.items, el, shape, Some(img.boxed), x, y, w, h);
                 // The image's tooltip is what it shows, in words.
@@ -1901,11 +1945,16 @@ fn barcode_symbol(bc: &BarcodeElement, el: &Element, le: &mut LayoutEnv) -> Resu
             crate::barcode::pdf417_symbol(&code, spec, el.height as f64, *text_position, bc.font_size.map(|s| s as f64))
         }
         Symbology::DataMatrix { module_width, shape } => crate::barcode::datamatrix_symbol(&code, *module_width, *shape),
-        Symbology::Barbecue { spec, rotation } => {
+        Symbology::Barbecue { spec, application_identifier, rotation } => {
             if !crate::barcode::barbecue::TYPES.contains(&spec.kind.as_str()) {
                 return Ok(None);
             }
-            crate::barcode::barbecue::symbol(spec, &code).map(|s| rotate_symbol(s, *rotation))
+            let mut spec = spec.clone();
+            if let Some(e) = application_identifier {
+                let ai = eval(e, le.scope, le.env)?;
+                spec.application_identifier = (!ai.is_null()).then(|| ai.to_java_string());
+            }
+            crate::barcode::barbecue::symbol(&spec, &code).map(|s| rotate_symbol(s, *rotation))
         }
         Symbology::Postnet { module_width, short_bar, gap, add_checksum } => {
             let mm = crate::barcode::pt2mm;

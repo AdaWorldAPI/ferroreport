@@ -318,7 +318,18 @@ impl<W: std::io::Write> XlsxStream<W> {
 
     /// Ends the sheet and writes the rest of the workbook.
     pub fn finish(mut self) -> crate::Result<W> {
-        let mut end = String::from("</sheetData>\n");
+        let mut end = String::new();
+        if self.pages_done == 0 {
+            // A report without pages: JasperReports still writes one empty row the height of a
+            // page, and no anchor for it.
+            let xf = self.styles.xf(0, Color::WHITE, 0, 0, "wrapText=\"true\"", false);
+            let _ = writeln!(
+                end,
+                "<row r=\"1\" customHeight=\"1\" ht=\"{}\">\n<c r=\"A1\" s=\"{xf}\" t=\"inlineStr\"/>\n</row>",
+                self.height
+            );
+        }
+        end.push_str("</sheetData>\n");
         if !self.merges.is_empty() {
             end.push_str("<mergeCells>\n");
             end.push_str(&self.merges);
@@ -347,13 +358,20 @@ impl<W: std::io::Write> XlsxStream<W> {
         zip.add(
             "xl/workbook.xml",
             format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{1}'!$A$1</definedName>\n{2}</definedNames>\n</workbook>\n",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workbook\n xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\n xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<workbookPr filterPrivacy=\"1\" codeName=\"ThisWorkbook\"/>\n<sheets>\n  <sheet name=\"{0}\" sheetId=\"1\" r:id=\"rId1\"/>\n</sheets>\n{1}</workbook>\n",
                 escape(name),
-                escape(&name.replace('\'', "''")),
-                self.anchors
-                    .iter()
-                    .map(|(n, cell)| format!("<definedName name=\"{n}\">'{}'!{cell}</definedName>\n", escape(&name.replace('\'', "''"))))
-                    .collect::<String>()
+                if self.pages_done == 0 {
+                    String::new()
+                } else {
+                    format!(
+                        "<definedNames>\n<definedName name=\"JR_PAGE_ANCHOR_0_1\">'{}'!$A$1</definedName>\n{}</definedNames>\n",
+                        escape(&name.replace('\'', "''")),
+                        self.anchors
+                            .iter()
+                            .map(|(n, cell)| format!("<definedName name=\"{n}\">'{}'!{cell}</definedName>\n", escape(&name.replace('\'', "''"))))
+                            .collect::<String>()
+                    )
+                }
             )
             .as_bytes(),
         )

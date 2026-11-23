@@ -1,0 +1,58 @@
+[
+ {
+  "label": "row 1: photo.jpg",
+  "image": "photo.jpg"
+ },
+ {
+  "label": "row 2: gray.png",
+  "image": "gray.png"
+ },
+ {
+  "label": "row 3: logo.png",
+  "image": "logo.png"
+ },
+ {
+  "label": "row 4: hidpi.png",
+  "image": "hidpi.png"
+ },
+ {
+  "label": "row 5: photo.jpg",
+  "image": "photo.jpg"
+ },
+ {
+  "label": "row 6: gray.png",
+  "image": "gray.png"
+ },
+ {
+  "label": "row 7: logo.png",
+  "image": "logo.png"
+ },
+ {
+  "label": "row 8: hidpi.png",
+  "image": "hidpi.png"
+ },
+ {
+  "label": "row 9: photo.jpg",
+  "image": "photo.jpg"
+ },
+ {
+  "label": "row 10: gray.png",
+  "image": "gray.png"
+ },
+ {
+  "label": "row 11: logo.png",
+  "image": "logo.png"
+ },
+ {
+  "label": "row 12: hidpi.png",
+  "image": "hidpi.png"
+ },
+ {
+  "label": "row 13: photo.jpg",
+  "image": "photo.jpg"
+ },
+ {
+  "label": "row 14: gray.png",
+  "image": "gray.png"
+ }
+]

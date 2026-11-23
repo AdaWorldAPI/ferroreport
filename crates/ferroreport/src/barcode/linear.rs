@@ -245,7 +245,7 @@ pub(crate) const CODE39: [&str; 43] = [
 pub(crate) const CODE39_STAR: &str = "010010100";
 
 /// Full-ASCII Code 39: each character as one or two characters of the basic set.
-fn code39_escape(c: char) -> Result<String, String> {
+pub(super) fn code39_escape(c: char) -> Result<String, String> {
     let v = c as u32;
     let pair = |p: char, base: u32, off: u32| format!("{p}{}", char::from_u32(base + v - off).unwrap_or('?'));
     Ok(match c {

@@ -5,10 +5,37 @@
 use super::linear::{mod10, upc_code, CODABAR, CODABAR_CHARS, CODE39, CODE39_CHARS, CODE39_STAR, EAN13_PARITY, I25};
 use super::Symbol;
 
-/// The `type` names Barbecue draws here.
+/// The `type` names Barbecue draws here: all of JasperReports' but `PostNet`, which Barbecue
+/// 1.5 draws as bars of one height a module apart (not a POSTNET code a reader takes; use the
+/// barcode4j `POSTNET` component, which is drawn).
 pub const TYPES: &[&str] = &[
-    "Code128", "Code128A", "Code128B", "Code128C", "EAN128", "SSCC18", "Code39", "3of9", "USD3", "Int2of5", "Std2of5", "Codabar",
-    "2of7", "NW7", "Monarch", "USD4", "EAN13", "UPCA",
+    "Code128",
+    "Code128A",
+    "Code128B",
+    "Code128C",
+    "EAN128",
+    "UCC128",
+    "SSCC18",
+    "SCC14ShippingCode",
+    "GlobalTradeItemNumber",
+    "ShipmentIdentificationNumber",
+    "USPS",
+    "Code39",
+    "Code39 (Extended)",
+    "3of9",
+    "USD3",
+    "Int2of5",
+    "Std2of5",
+    "Codabar",
+    "2of7",
+    "NW7",
+    "Monarch",
+    "USD4",
+    "EAN13",
+    "Bookland",
+    "UPCA",
+    "RandomWeightUPCA",
+    "PDF417",
 ];
 
 /// What a `barbecue` element asks for.
@@ -20,6 +47,8 @@ pub struct Spec {
     /// Width of the narrowest bar, in pixels (Barbecue's default: 2).
     pub bar_width: Option<u32>,
     pub bar_height: Option<u32>,
+    /// The application identifier of a `UCC128` code (`applicationIdentifierExpression`).
+    pub application_identifier: Option<String>,
 }
 
 /// One bar or space, in modules; `long` bars go below the others (UPC and EAN guards).
@@ -47,12 +76,44 @@ fn wide_narrow(out: &mut Vec<Element>, pattern: &str, wide: u32) {
     }
 }
 
-/// Default height of the Code 128 family: it grows with the length of the text.
-fn grows(chars: i64) -> u32 {
-    (chars * 7).div_euclid(6).saturating_add(7).max(18) as u32
+/// Default height of the Code 128 family: it grows with the number of characters Barbecue
+/// encodes (for UCC/EAN-128, with FNC1, the application identifier and the check digit),
+/// whatever the bar width. Measured on Barbecue for 1 to 128 characters.
+fn grows(chars: usize) -> u32 {
+    let h = (chars as u64).saturating_mul(1164).saturating_add(3718) / 1000;
+    h.clamp(18, u64::from(u32::MAX)) as u32
 }
 
-fn code128_values(kind: &str, code: &str) -> Result<Vec<u32>, String> {
+/// The application identifier of a UCC/EAN-128 type, and whether Barbecue adds a check digit.
+fn ucc(spec: &Spec) -> Result<(String, bool), String> {
+    Ok(match spec.kind.as_str() {
+        "EAN128" => ("01".into(), spec.checksum),
+        "SSCC18" => ("00".into(), spec.checksum),
+        "SCC14ShippingCode" | "GlobalTradeItemNumber" => ("01".into(), true),
+        "ShipmentIdentificationNumber" => ("402".into(), true),
+        "USPS" => ("420".into(), true),
+        _ => {
+            let ai = spec
+                .application_identifier
+                .clone()
+                .ok_or("UCC128 needs an application identifier (applicationIdentifierExpression)")?;
+            if ai.is_empty() || !ai.chars().all(|c| c.is_ascii_digit()) {
+                return Err(format!("the application identifier of a UCC128 code is digits, not {ai:?}"));
+            }
+            (ai, spec.checksum)
+        }
+    })
+}
+
+/// Barbecue's UCC/EAN-128 check digit: 5, plus every second digit (from the second) times
+/// its rank, modulo 10. It is not the GS1 one, but it is what JasperReports prints.
+fn ucc_check_digit(data: &[u32]) -> u32 {
+    let sum: u32 = data.iter().skip(1).step_by(2).zip(1u32..).map(|(d, k)| d * k % 10).sum();
+    (5 + sum) % 10
+}
+
+fn code128_values(spec: &Spec, code: &str) -> Result<Vec<u32>, String> {
+    let kind = spec.kind.as_str();
     let chars: Vec<char> = code.chars().collect();
     let b = |c: char| match c as u32 {
         32..=127 => Ok(c as u32 - 32),
@@ -87,15 +148,22 @@ fn code128_values(kind: &str, code: &str) -> Result<Vec<u32>, String> {
             }
             v.extend(digits.chunks(2).map(|p| p[0] * 10 + p[1]));
         }
-        "EAN128" | "SSCC18" => {
-            // Start C, FNC1, the application identifier and the digits that follow it, in pairs.
+        "EAN128"
+        | "UCC128"
+        | "SSCC18"
+        | "SCC14ShippingCode"
+        | "GlobalTradeItemNumber"
+        | "ShipmentIdentificationNumber"
+        | "USPS" => {
+            // Start C, FNC1, the application identifier, the digits that follow it and the
+            // check digit, in pairs (an odd digit at the end is left out, as Barbecue does).
             v.extend([105, 102]);
-            let prefix = if kind == "SSCC18" { "00" } else { "01" };
-            let mut digits: Vec<u32> = prefix
-                .chars()
-                .chain(chars.iter().copied().take_while(char::is_ascii_digit))
-                .map(|c| c as u32 - '0' as u32)
-                .collect();
+            let (ai, check) = ucc(spec)?;
+            let data: Vec<u32> = chars.iter().take_while(|c| c.is_ascii_digit()).map(|c| *c as u32 - '0' as u32).collect();
+            let mut digits: Vec<u32> = ai.chars().map(|c| c as u32 - '0' as u32).chain(data.iter().copied()).collect();
+            if check {
+                digits.push(ucc_check_digit(&data));
+            }
             digits.truncate(digits.len() / 2 * 2);
             v.extend(digits.chunks(2).map(|p| p[0] * 10 + p[1]));
         }
@@ -131,7 +199,12 @@ fn code128_values(kind: &str, code: &str) -> Result<Vec<u32>, String> {
     Ok(v)
 }
 
-fn code39(code: &str, checksum: bool) -> Result<Vec<Element>, String> {
+fn code39(code: &str, checksum: bool, extended: bool) -> Result<Vec<Element>, String> {
+    let code = if extended {
+        code.chars().map(super::linear::code39_escape).collect::<Result<String, String>>()?
+    } else {
+        code.to_string()
+    };
     let mut values = Vec::new();
     for c in code.chars() {
         values.push(CODE39_CHARS.find(c).ok_or_else(|| format!("Code 39 cannot encode {c:?}"))?);
@@ -264,32 +337,88 @@ fn upc_ean(kind: &str, code: &str) -> Result<Vec<Element>, String> {
     Ok(out)
 }
 
+/// An ISBN-10 (its check digit included) as the EAN-13 code of a book: 978 and its first nine
+/// digits.
+fn bookland(code: &str) -> Result<String, String> {
+    let chars: Vec<char> = code.chars().collect();
+    let valid = chars.len() == 10
+        && chars[..9].iter().all(char::is_ascii_digit)
+        && (chars[9].is_ascii_digit() || chars[9] == 'X' || chars[9] == 'x');
+    if !valid {
+        return Err(format!("Bookland takes an ISBN of 10 characters, not {code:?}"));
+    }
+    Ok(format!("978{}", chars[..9].iter().collect::<String>()))
+}
+
+/// PDF417 as Barbecue draws it: modules 2 pixels wide and 7 high, 4 pixels of margin (3
+/// below), whatever the bar width and height.
+fn pdf417(code: &str) -> Result<Symbol, String> {
+    let rows = super::pdf417::barbecue_matrix(code)?;
+    let mut rects: Vec<[f64; 4]> = Vec::new();
+    for (y, row) in rows.iter().enumerate() {
+        let top = 4.0 + 7.0 * y as f64;
+        let mut x = 0;
+        while x < row.len() {
+            if !row[x] {
+                x += 1;
+                continue;
+            }
+            let start = x;
+            while x < row.len() && row[x] {
+                x += 1;
+            }
+            rects.push([4.0 + 2.0 * start as f64, top, 2.0 * (x - start) as f64, 7.0]);
+        }
+    }
+    let width = rows.first().map_or(0, Vec::len);
+    Ok(Symbol { width: 8.0 + 2.0 * width as f64, height: 7.0 + 7.0 * rows.len() as f64, rects, texts: Vec::new() })
+}
+
 /// The symbol of `code`, in pixels, before any rotation.
 pub fn symbol(spec: &Spec, code: &str) -> Result<Symbol, String> {
     let kind = spec.kind.as_str();
     let bw = spec.bar_width.filter(|w| *w > 0).unwrap_or(2);
-    let n = code.chars().count() as i64;
+    let n = code.chars().count();
+    if kind == "PDF417" {
+        return pdf417(code);
+    }
     let (elements, quiet_left, quiet_right, default_height) = match kind {
-        "Code128" | "Code128A" | "Code128B" | "Code128C" | "EAN128" | "SSCC18" => {
+        "Code128" | "Code128A" | "Code128B" | "Code128C" => {
             let mut out = Vec::new();
-            for v in code128_values(kind, code)? {
+            for v in code128_values(spec, code)? {
                 widths(&mut out, super::code128::PATTERNS[v as usize]);
             }
             widths(&mut out, super::code128::STOP);
-            let grow = if kind.starts_with("Code128") { n - 3 } else { n };
-            (out, 10, 10, grows(grow))
+            (out, 10, 10, grows(n))
         }
-        "Code39" | "3of9" | "USD3" => (code39(code, spec.checksum)?, 0, 0, 50),
+        "EAN128"
+        | "UCC128"
+        | "SSCC18"
+        | "SCC14ShippingCode"
+        | "GlobalTradeItemNumber"
+        | "ShipmentIdentificationNumber"
+        | "USPS" => {
+            let mut out = Vec::new();
+            for v in code128_values(spec, code)? {
+                widths(&mut out, super::code128::PATTERNS[v as usize]);
+            }
+            widths(&mut out, super::code128::STOP);
+            let (ai, check) = ucc(spec)?;
+            (out, 10, 10, grows(1 + ai.len() + n + usize::from(check)))
+        }
+        "Code39" | "3of9" | "USD3" => (code39(code, spec.checksum, false)?, 0, 0, 50),
+        "Code39 (Extended)" => (code39(code, spec.checksum, true)?, 0, 0, 50),
         "Int2of5" => (interleaved(code, spec.checksum)?, 0, 0, 50),
         "Std2of5" => (standard(code, spec.checksum)?, 0, 0, 50),
         "Codabar" | "2of7" | "NW7" | "Monarch" | "USD4" => (codabar(code)?, 0, 0, 50),
         "EAN13" => (upc_ean(kind, code)?, 11, 7, 50),
-        "UPCA" => (upc_ean(kind, code)?, 11, 11, 50),
+        "Bookland" => (upc_ean("EAN13", &bookland(code)?)?, 11, 7, 50),
+        "UPCA" | "RandomWeightUPCA" => (upc_ean("UPCA", code)?, 11, 11, 50),
         other => return Err(format!("barbecue type `{other}` is not supported yet")),
     };
     let height = spec.bar_height.filter(|h| *h > 0).unwrap_or(default_height) as f64;
     // UPC and EAN: Barbecue keeps room under the bars for the text (even when it cannot draw it).
-    let (long_h, short_h) = if matches!(kind, "EAN13" | "UPCA") {
+    let (long_h, short_h) = if matches!(kind, "EAN13" | "Bookland" | "UPCA" | "RandomWeightUPCA") {
         let long = if spec.draw_text { height - 5.0 * bw as f64 } else { height };
         (long, long - 6.0 * bw as f64)
     } else {
@@ -316,6 +445,18 @@ pub fn symbol(spec: &Spec, code: &str) -> Result<Symbol, String> {
 mod tests {
     use super::*;
 
+    fn pixels(rects: &[[f64; 4]]) -> std::collections::BTreeSet<(i64, i64)> {
+        let mut out = std::collections::BTreeSet::new();
+        for r in rects {
+            for x in r[0] as i64..(r[0] + r[2]) as i64 {
+                for y in r[1] as i64..(r[1] + r[3]) as i64 {
+                    out.insert((x, y));
+                }
+            }
+        }
+        out
+    }
+
     /// What Barbecue 1.5 drew through JasperReports for each case (`r` lines are its black
     /// rectangles), against what is drawn here.
     #[test]
@@ -327,13 +468,15 @@ mod tests {
             let mut lines = case.lines();
             let args: Vec<&str> = lines.next().unwrap_or("").split_whitespace().collect();
             let rest: Vec<&str> = lines.collect();
-            let (kind, code) = (args[0], args[1].replace('_', " "));
+            let (kind, code) = (args[0].replace('_', " "), args[1].replace('_', " "));
+            let kind = kind.as_str();
             let spec = Spec {
                 kind: kind.into(),
                 draw_text: args.get(2).is_none_or(|v| *v == "true"),
                 checksum: args.get(3).is_some_and(|v| *v == "true"),
                 bar_width: args.get(4).and_then(|v| v.parse().ok()),
                 bar_height: args.get(5).and_then(|v| v.parse().ok()),
+                application_identifier: args.get(6).filter(|v| **v != "-").map(|v| v.to_string()),
             };
             let ours = symbol(&spec, &code);
             if rest.first().is_some_and(|l| l.starts_with("error")) {
@@ -364,7 +507,9 @@ mod tests {
                     [v[0], v[1], v[2], v[3]]
                 })
                 .collect();
-            if [ours.width, ours.height] != [size[0], size[1]] || ours.rects != theirs {
+            // Barbecue draws PDF417 a pixel at a time: compare the pixels covered.
+            let same_bars = if kind == "PDF417" { pixels(&ours.rects) == pixels(&theirs) } else { ours.rects == theirs };
+            if [ours.width, ours.height] != [size[0], size[1]] || !same_bars {
                 failures.push(format!(
                     "{}: size {}x{} (Barbecue {}x{}), {} bars (Barbecue {}), first difference {:?}",
                     args.join(" "),

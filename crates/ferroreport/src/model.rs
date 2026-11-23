@@ -329,6 +329,13 @@ pub enum ScaleImage {
     RetainShape,
 }
 
+/// The sizes an image element takes from its picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RealImage {
+    Height,
+    Size,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OnErrorType {
     Error,
@@ -339,6 +346,9 @@ pub enum OnErrorType {
 #[derive(Debug, Clone)]
 pub struct ImageElement {
     pub expr: Option<Expr>,
+    /// `scaleImage="RealHeight"` or `"RealSize"`: the element takes the height (and with
+    /// `RealSize` the width) of the picture, which is then drawn as `RetainShape`.
+    pub real: Option<RealImage>,
     /// `hyperlinkTooltipExpression`: used as the image's description in tagged PDFs.
     pub tooltip: Option<Expr>,
     pub scale: ScaleImage,
@@ -658,6 +668,8 @@ pub enum Symbology {
     /// The `barbecue` component (the Barbecue library), drawn rotated by `rotation`.
     Barbecue {
         spec: crate::barcode::barbecue::Spec,
+        /// `applicationIdentifierExpression`, for `UCC128`.
+        application_identifier: Option<Expr>,
         rotation: Rotation,
     },
     /// Royal Mail 4-state (`usps: false`) or USPS Intelligent Mail (sizes in points).

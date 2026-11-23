@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="barbecue-types" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="40" bottomMargin="40">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="10"/>
+	<title>
+		<band height="658">
+			<staticText>
+				<reportElement x="0" y="0" width="150" height="16"/>
+				<text><![CDATA[USPS]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="0" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="USPS" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["12345"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="58" width="150" height="16"/>
+				<text><![CDATA[SCC14ShippingCode]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="58" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="SCC14ShippingCode" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["1234567890123"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="116" width="150" height="16"/>
+				<text><![CDATA[GlobalTradeItemNumber]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="116" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="GlobalTradeItemNumber" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["9876543210987"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="174" width="150" height="16"/>
+				<text><![CDATA[ShipmentIdentificationNumber]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="174" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="ShipmentIdentificationNumber" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["1234567890"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="232" width="150" height="16"/>
+				<text><![CDATA[UCC128]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="232" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="UCC128" drawText="true" checksumRequired="true">
+					<jr:codeExpression><![CDATA["0012345"]]></jr:codeExpression>
+					<jr:applicationIdentifierExpression><![CDATA["10"]]></jr:applicationIdentifierExpression>
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="290" width="150" height="16"/>
+				<text><![CDATA[EAN128]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="290" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="EAN128" drawText="true" checksumRequired="true">
+					<jr:codeExpression><![CDATA["12345"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="348" width="150" height="16"/>
+				<text><![CDATA[RandomWeightUPCA]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="348" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="RandomWeightUPCA" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["21234567890"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="406" width="150" height="16"/>
+				<text><![CDATA[Bookland]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="406" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Bookland" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["0306406152"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="464" width="150" height="16"/>
+				<text><![CDATA[Code39 (Extended)]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="464" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Code39 (Extended)" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["Ferro-1.0"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="522" width="150" height="16"/>
+				<text><![CDATA[PDF417]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="522" width="355" height="70"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="PDF417" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["ferroreport 1.0: JRXML without a JVM"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="600" width="150" height="16"/>
+				<text><![CDATA[Code128]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="160" y="600" width="355" height="50"/>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Code128" drawText="true" checksumRequired="false">
+					<jr:codeExpression><![CDATA["A much longer Code 128 text, 40 chars!"]]></jr:codeExpression>
+					
+				</jr:barbecue>
+			</componentElement>
+		</band>
+	</title>
+</jasperReport>

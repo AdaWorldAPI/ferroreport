@@ -2017,10 +2017,18 @@ impl Parser {
                 ElementKind::Frame { children, boxed: props.box_style(forecolor) }
             }
             "image" => {
+                // RealHeight and RealSize print as RetainShape in an element sized from the
+                // picture (not for lazy images, which JasperReports does not load to fill).
+                let lazy = attr(n, &["isLazy", "lazy"]).is_some_and(|v| v == "true");
+                let real = match attr(n, &["scaleImage"]) {
+                    Some("RealHeight") if !lazy => Some(crate::model::RealImage::Height),
+                    Some("RealSize") if !lazy => Some(crate::model::RealImage::Size),
+                    _ => None,
+                };
                 let scale = match attr(n, &["scaleImage"]) {
                     Some("Clip") => ScaleImage::Clip,
                     Some("FillFrame") => ScaleImage::FillFrame,
-                    Some("RetainShape") | None => ScaleImage::RetainShape,
+                    Some("RetainShape" | "RealHeight" | "RealSize") | None => ScaleImage::RetainShape,
                     Some(other) => {
                         self.warnings.push(format!("scaleImage=\"{other}\" is rendered as RetainShape"));
                         ScaleImage::RetainShape
@@ -2043,6 +2051,7 @@ impl Parser {
                 };
                 ElementKind::Image(ImageElement {
                     expr: self.child_expr(n, &["imageExpression", "expression"])?,
+                    real,
                     tooltip: self.child_expr(n, &["hyperlinkTooltipExpression"])?,
                     scale,
                     halign,
@@ -2124,11 +2133,14 @@ impl Parser {
                 };
                 let symbology = if name == "barbecue" {
                     let kind = c.attr("type").unwrap_or("Code128").to_string();
-                    if !crate::barcode::barbecue::TYPES.contains(&kind.as_str()) {
+                    if kind == "PostNet" {
+                        self.warnings.push(
+                            "barbecue type `PostNet` is skipped: Barbecue draws it as bars of one height that no reader \
+                             takes; the barcode4j POSTNET component draws a real one"
+                                .into(),
+                        );
+                    } else if !crate::barcode::barbecue::TYPES.contains(&kind.as_str()) {
                         self.warnings.push(format!("barbecue type `{kind}` is not supported yet and is skipped"));
-                    }
-                    if c.child("applicationIdentifierExpression").is_some() {
-                        self.warnings.push("barbecue applicationIdentifierExpression is ignored".into());
                     }
                     let whole = |a: &str| c.attr(a).and_then(number::<f64>).filter(|v| *v > 0.0).map(|v| v as u32);
                     Symbology::Barbecue {
@@ -2138,7 +2150,9 @@ impl Parser {
                             checksum: c.attr("checksumRequired").is_some_and(|v| v.eq_ignore_ascii_case("true")),
                             bar_width: whole("barWidth"),
                             bar_height: whole("barHeight"),
+                            application_identifier: None,
                         },
+                        application_identifier: self.child_expr(c, &["applicationIdentifierExpression"])?,
                         rotation: match c.attr("rotation") {
                             Some("Left") => Rotation::Left,
                             Some("Right") => Rotation::Right,
