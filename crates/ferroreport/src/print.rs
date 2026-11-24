@@ -7,7 +7,10 @@ use crate::image::ImageData;
 use crate::model::{Color, Pen};
 use std::sync::Arc;
 
+/// One line of a printed text. New fields may be added in minor versions, so build it inside
+/// the crate only; code outside reads it.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct PrintLine {
     pub text: String,
     /// Left edge of the line.

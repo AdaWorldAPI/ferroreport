@@ -194,21 +194,20 @@ arrastrarlos a las bandas y darles estilo, enseña el PDF mientras trabajas y gu
 
 ```text
 report "Empleados" lang=es
-  style Base default fontName="DejaVu Sans" fontSize=10
-  field nombre String
+  style Base default fontName="DejaVu Sans" size=10
   field salario Double
-  variable total Double calculation=Sum : $F{salario}
+  variable total Double calculation=Sum : {salario}
 
   title 40
-    h1 0,0 555x30 fontSize=18 : Empleados
+    h1 0,0 555x30 size=18 : Empleados
   columnHeader 20
-    staticText 0,0 300x20 bold : Nombre
-    staticText 300,0 255x20 bold hTextAlign=Right : Salario
+    text 0,0 300x20 bold : Nombre
+    text 300,0 255x20 bold align=right : Salario
   detail 20
-    textField 0,0 300x20 : $F{nombre}
-    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salario}
+    text 0,0 300x20 : {nombre}
+    text 300,0 255x20 pattern=#,##0.00 align=right : {salario}
   summary 20
-    textField 300,0 255x20 bold hTextAlign=Right : $V{total}
+    text 300,0 255x20 bold pattern=#,##0.00 align=right : $V{total}
 ```
 
 Cada línea es una parte del reporte: qué es (en un elemento, su tipo), luego su posición y
@@ -222,6 +221,15 @@ con márgenes de 20 puntos salvo que diga `page=Letter` (o `A3`, `A5`, `Legal`, 
 ` :`, un nivel más adentro. Las líneas que empiezan con `//` son comentarios. Todo lo que dice
 un JRXML 7 se puede decir en `.ferro`: lo que no tiene forma corta conserva su nombre de JRXML
 (`box`, `pen lineWidth=0.5`, `component`...).
+
+**Textos y campos.** `text` imprime lo que va después de ` : `. Donde lleva `{nombre}`, va el
+valor del campo `nombre` (`text : Factura {numero} · {cliente}`); `$P{}` y `$V{}` funcionan
+igual, y un texto que empieza con `=` es una expresión (`text : ={cantidad} * {precio}`). Un
+campo escrito como `{nombre}` no necesita su línea `field`; decláralo cuando se use en cuentas
+o condiciones, o para darle una clase. `color=`, `background=`, `align=`, `valign=` y `size=`
+son los nombres sencillos de `forecolor`, `backcolor`, `hTextAlign`, `vTextAlign` y
+`fontSize`, y los colores se pueden nombrar (`red`, `gray`...). Las formas de JasperReports
+(`staticText`, `textField`, `$F{nombre}`, `hTextAlign=Right`) siguen funcionando.
 
 **Accesible por defecto.** Un reporte `.ferro` da un PDF etiquetado que los lectores de pantalla
 pueden recorrer (salvo que diga `tagged=false`), en el idioma de `lang=`. `h1` a `h6` son

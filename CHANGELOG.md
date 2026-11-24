@@ -122,8 +122,9 @@ the JRXML 1.0.2 made of the examples, the documentation and every fixture).
   0.6 s, of the Devanagari one about 0.7 s. Latin text pays one check per text for characters
   that need shaping (09-large: 2% more instructions).
 - API: `print::PrintLine` has a new field, `shaped` (the line's glyphs when it is shaped).
-  Code that builds a `PrintLine` itself needs `shaped: None`; code that reads one is not
-  affected. The new `shape` module says whether a text needs shaping (`needs_shaping`), whether
+  Code that builds a `PrintLine` itself no longer compiles; code that reads one is not
+  affected. This breaks the letter of the 1.x promise for a type that is only meant to be read,
+  so `PrintLine` is now `#[non_exhaustive]`: fields added later will not break anyone. The new `shape` module says whether a text needs shaping (`needs_shaping`), whether
   it runs right to left (`is_rtl`), and shapes a line (`line`).
 - Still to do: hyphenation, fallback to another font for characters the chosen one lacks, and
   Arabic and Hebrew vowel marks that the font moves up or sideways can come out of `pdftotext`

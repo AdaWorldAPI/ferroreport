@@ -337,21 +337,20 @@ the bands and style them, shows the PDF as you go, and saves `.ferro` and `.jrxm
 
 ```text
 report "Employees" lang=en
-  style Base default fontName="DejaVu Sans" fontSize=10
-  field name String
+  style Base default fontName="DejaVu Sans" size=10
   field salary Double
-  variable total Double calculation=Sum : $F{salary}
+  variable total Double calculation=Sum : {salary}
 
   title 40
-    h1 0,0 555x30 fontSize=18 : Employees
+    h1 0,0 555x30 size=18 : Employees
   columnHeader 20
-    staticText 0,0 300x20 bold : Name
-    staticText 300,0 255x20 bold hTextAlign=Right : Salary
+    text 0,0 300x20 bold : Name
+    text 300,0 255x20 bold align=right : Salary
   detail 20
-    textField 0,0 300x20 : $F{name}
-    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salary}
+    text 0,0 300x20 : {name}
+    text 300,0 255x20 pattern=#,##0.00 align=right : {salary}
   summary 20
-    textField 300,0 255x20 bold hTextAlign=Right : $V{total}
+    text 300,0 255x20 bold pattern=#,##0.00 align=right : $V{total}
 ```
 
 Each line is one part of the report: what it is (for an element, its kind), then its position
@@ -364,6 +363,15 @@ points tall. Fields, parameters and variables take their name and class (`String
 several lines goes under a line that ends in ` :`, one level further in. Lines that start with
 `//` are comments. Everything JRXML 7 can say, `.ferro` can say: what has no shorthand keeps
 its JRXML name (`box`, `pen lineWidth=0.5`, `component`...).
+
+**Text and fields.** `text` prints what follows ` : `. Where it has `{name}`, that is the value
+of the field `name` (`text : Invoice {number} · {customer}`); `$P{}` and `$V{}` work the same,
+and a text that starts with `=` is an expression (`text : ={qty} * {price}`). A field written
+as `{name}` needs no `field` line; declare it when it is used in arithmetic or a condition, or
+to give it a class. `color=`, `background=`, `align=`, `valign=` and `size=` are the plain
+names of `forecolor`, `backcolor`, `hTextAlign`, `vTextAlign` and `fontSize`, and colors can
+be named (`red`, `gray`...). The JasperReports forms (`staticText`, `textField`, `$F{name}`,
+`hTextAlign=Right`) keep working.
 
 **Without coordinates.** Positions and sizes can be left out. Parts without `x,y` go one under
 the other, as wide as the band, and the band grows to hold them; `row` puts parts side by side,
@@ -378,18 +386,17 @@ other attributes on `use` go to the parts.
 
 ```text
 report "Employees" lang=en
-  field name String
   field salary Double
 
   def money value
-    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+    textField pattern=#,##0.00 align=right : {{value}}
 
   title gap=6
-    h1 height=30 fontSize=18 : Employees
+    h1 height=30 size=18 : Employees
   detail
     row height=16
-      textField 3fr : $F{name}
-      use money 1fr value=$F{salary}
+      text 3fr : {name}
+      use money 1fr value={salary}
 ```
 
 **Logic.** `if : condition` shows its parts only when the condition holds, and takes no room
@@ -400,20 +407,18 @@ styles (read from the template's folder or the resource folders).
 ```text
 report "Invoices" lang=en
   import "parts.ferro"
-  field number String
   field overdue Boolean
   field lines List
   detail gap=2
-    textField bold : $F{number}
-    if : $F{overdue}
-      staticText forecolor=#B00020 : Overdue: send a reminder
-    each : $F{lines}
-      field product String
+    text bold : {number}
+    if : {overdue}
+      text color=#B00020 : Overdue: send a reminder
+    each : {lines}
       field qty Integer
       field price Double
       row height=14
-        textField 3fr : $F{product}
-        use money 1fr value="$F{qty} * $F{price}"
+        text 3fr : {product}
+        use money 1fr value="{qty} * {price}"
 ```
 
 They become what JasperReports knows (a frame with `printWhenExpression` and
