@@ -157,6 +157,8 @@ public class FerroreportTest {
         assertEquals(Format.XLSX, Format.of("Sales.XLSX"));
         assertEquals(Format.HTML, Format.of("preview.htm"));
         assertEquals(Format.PDF, Format.of("invoice"));
+        assertEquals(Format.ODS, Format.of("sales.ods"));
+        assertEquals(Format.ODT, Format.of("letter.odt"));
         assertEquals("text/csv; charset=utf-8", Format.CSV.mediaType());
     }
 

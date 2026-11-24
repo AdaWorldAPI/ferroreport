@@ -1,8 +1,8 @@
 # ferroreport
 
 **Reports in milliseconds, from any language.** ferroreport is a report engine: give it a
-template and your data and it writes the PDF, the Excel workbook, the Word document, the CSV or
-a web preview. An invoice takes
+template and your data and it writes the PDF, the Excel workbook, the Word document, the
+OpenDocument spreadsheet or text, the CSV or a web preview. An invoice takes
 **2 ms**; a **million rows** take 14 seconds and **13 MB of memory**, because rows are read as
 they are needed and pages are written as they are finished. It is one small binary with no
 runtime to install, and templates **cannot run code** on your server.
@@ -37,10 +37,11 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
   out: a report of a million rows uses the memory of a report of ten.
 - **Identical output.** Every fixture is rendered by both engines and compared pixel by pixel,
   and its Excel and CSV exports cell by cell (see [how output is verified](#how-output-is-verified)).
-- **PDF, Excel, Word, CSV and HTML.** The same template gives a PDF (tagged for screen readers
-  if you want, PDF/UA-1), an `.xlsx` workbook laid out like JasperReports' (merged cells, fonts,
-  fills, borders, row heights, images, charts), a `.docx` laid out like Jasper's Word export, a
-  CSV, or a web page that looks like the PDF, for previews in a browser. Links, anchors and
+- **PDF, Excel, Word, OpenDocument, CSV and HTML.** The same template gives a PDF (tagged for
+  screen readers if you want, PDF/UA-1), an `.xlsx` workbook laid out like JasperReports' (merged
+  cells, fonts, fills, borders, row heights, images, charts), a `.docx` laid out like Jasper's
+  Word export, `.ods` and `.odt` files for LibreOffice laid out the same way, a CSV, or a web
+  page that looks like the PDF, for previews in a browser. Links, anchors and
   bookmarks work in all of them.
 - **PDFs to archive, send and protect.** PDF/A-2 and PDF/A-3 (levels a, b and u), checked with
   veraPDF on every push; files carried inside the PDF, such as the XML of an electronic
@@ -81,7 +82,7 @@ JRXML and accessible by default. Against JasperReports itself it is about **250Ã
 ```js
 import { render, convert } from "ferroreport";
 const pdf = render(jrxmlSource, rows, { CUSTOMER: "Distribuidora Caribe" }, { locale: "es_DO" });
-const xlsx = render(jrxmlSource, rows, params, { format: "xlsx" }); // or "docx", "csv"
+const xlsx = render(jrxmlSource, rows, params, { format: "xlsx" }); // or "docx", "ods", "odt", "csv"
 const ferro = convert(jrxmlSource, "ferro"); // the template in ferroreport's own format
 ```
 
@@ -115,8 +116,8 @@ curl -X POST localhost:8080/render/invoice -H 'Authorization: Bearer change-me' 
 ```
 
 `POST /render` also accepts the template itself (`{"template": "<jasperReport...", "data": ...,
-"resources": {"logo.png": "<base64>"}}`); add `"format": "xlsx"`, `"docx"`, `"csv"` or `"html"` (or
-`?format=xlsx`) for Excel, Word, CSV or a web preview. `POST /inspect` reports unsupported features, `GET /health` is there for
+"resources": {"logo.png": "<base64>"}}`); add `"format": "xlsx"`, `"docx"`, `"ods"`, `"odt"`, `"csv"` or
+`"html"` (or `?format=xlsx`) for Excel, Word, OpenDocument, CSV or a web preview. `POST /inspect` reports unsupported features, `GET /health` is there for
 load balancers and `GET /metrics` for Prometheus. The server will not listen beyond localhost
 without a token (`FERROREPORT_TOKEN`), unless you say the port is private
 (`FERROREPORT_ALLOW_ANONYMOUS=1`); `--rate-limit` caps the requests per minute of one client. Templates are parsed once and cached, and every render runs under a time limit (60 s
@@ -142,7 +143,7 @@ Language packages are published by the [release workflow](RELEASING.md).
 cargo install --path crates/ferroreport-cli
 
 ferroreport render invoice.jrxml --data rows.json --params params.json -o invoice.pdf
-ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .docx, .csv, .html)
+ferroreport render invoice.jrxml --data rows.json -o invoice.xlsx   # Excel (or .docx, .ods, .odt, .csv, .html)
 ferroreport doctor invoice.jrxml     # what in this template is (not yet) supported
 ferroreport migrate reports/ --report migration.md   # the same for a whole folder
 ferroreport migrate reports/ --jasper jasper/lib --strict   # and compared with JasperReports itself
@@ -172,7 +173,7 @@ let pdf = ferroreport::Renderer::new()
     .locale("es_DO")
     .render_json(&template, &rows, &serde_json::json!({ "CUSTOMER": "Distribuidora Caribe" }))?;
 std::fs::write("invoice.pdf", pdf)?;
-// Excel or CSV: render_json_as(&template, &rows, &params, ferroreport::Format::Xlsx)
+// Excel, Word, ODS, ODT or CSV: render_json_as(&template, &rows, &params, ferroreport::Format::Xlsx)
 ```
 
 For large reports, give it the rows as they come and somewhere to write, and nothing is held
@@ -300,6 +301,28 @@ spreadsheet made from a template looks the way it did with Jasper:
   `XlsxOptions { detect_cell_type: true }`) to write numbers as numbers with their format.
 - CSV has one row for every line where a text starts, and one field for every column where a
   text starts on that page.
+
+### OpenDocument (ODS and ODT)
+
+`-o report.ods` and `-o report.odt` (`Format::Ods`, `Format::Odt`, `format="ods"`...) write the
+files LibreOffice and other OpenDocument applications open, laid out the way JasperReports'
+ODS and ODT exporters lay a report out:
+
+- ODS is the XLSX grid: every page on one sheet, the same columns, rows, merged cells, fonts,
+  colors, borders, padding, alignment and rotation, images over their cells, charts and
+  barcodes as pictures. `--xlsx-numbers` (`XlsxOptions { detect_cell_type: true }`) writes
+  numbers as numbers here too, with a number style made from their pattern (decimals,
+  grouping, percent, scientific, text around them).
+- ODT is the DOCX layout: a table per page with its own columns, each element in the cells
+  it covers, pages after the first on a new page. Ellipses and slanted lines are drawn as
+  pictures; rectangles and straight lines become cell backgrounds and borders.
+- The page has the report's size and orientation; its margins are cells of the grid, as in
+  Jasper. Links, anchors and page anchors carry over.
+- Not yet: exporter properties (`net.sf.jasperreports.export.ods.*`, `.odt.*`), dates as date
+  cells, the per-mille sign in number styles (such values stay text), and upside-down text in
+  ODT (Writer's table cells have no such direction; it is written unrotated). The sheet or text
+  of a document is kept in memory until it is written (its styles come first in the file), so
+  a very large report takes more memory in these formats than in XLSX.
 
 ## Templates: JRXML or .ferro
 
@@ -433,14 +456,14 @@ another order). Every fixture renders to the same pixels from its JRXML, its JRX
 | Text | wrapping, stretch with overflow, padding, borders, left/center/right/justified alignment, all line-spacing modes, underline, strike-through, `isBlankWhenNull`, styled, HTML and RTF markup (bold, italic, underline, strike-through, fonts, sizes, colors, highlight, superscript, subscript, line breaks; HTML lists, bulleted and numbered, nested), also across page breaks; rotation (Left, Right, UpsideDown); cutting a text that does not fit at a character and with a suffix (`net.sf.jasperreports.text.truncate.*`) | |
 | Layout | `positionType` Float / FixRelativeToBottom, `stretchType`, `printWhenExpression`, `isRemoveLineWhenBlank`, `isPrintRepeatedValues` (with `isPrintInFirstWholeBand`, `printWhenGroupChanges`), `isPrintWhenDetailOverflows` | |
 | Styles | default style (also what styles without a parent inherit from), parent styles, element overrides, conditional styles (up to 4 per style), styles from style templates (a style defined again replaces the earlier one for what comes after, as in JasperReports) | |
-| Images | PNG, JPEG and GIF (its first frame, with its transparent color); SVG (drawn as vectors in PDF, as pictures in Excel and Word); scale modes RetainShape, FillFrame, Clip, RealHeight and RealSize (the element takes the picture's size, as in JasperReports); alignment; `onErrorType` | remote URLs (by design), other formats |
+| Images | PNG, JPEG and GIF (its first frame, with its transparent color); SVG (drawn as vectors in PDF, as pictures in Excel, Word and OpenDocument); scale modes RetainShape, FillFrame, Clip, RealHeight and RealSize (the element takes the picture's size, as in JasperReports); alignment; `onErrorType` | remote URLs (by design), other formats |
 | Charts | pie, 3D pie, bar, 3D bar, stacked bar (vertical and horizontal), line, area, stacked area, XY line, XY area, XY bar, scatter, bubble, time series, candlestick, high-low, Gantt, meter, thermometer, multi-axis; titles, legends, axis labels, series colors, range limits, tick formats, pie label formats; datasets by record, group, page or report, with `evaluationTime`, and from a subdataset | chart customizers and themes. Charts follow JFreeChart's default look closely but are not pixel-identical |
 | Subreports | data from nested JSON (`JRMapCollectionDataSource`, `JRBeanCollectionDataSource`, `subDataSource`, `JREmptyDataSource`), subreports that run their own SQL query on `$P{REPORT_CONNECTION}` (with `--db`), parameters, return values, splitting across pages with reprinted column headers | connections built in Java (`DriverManager.getConnection(...)` in an expression) |
 | Data | groups (start new page, reprint header, min height), variables: Sum, Count, DistinctCount, Average, Lowest, Highest, First, Nothing, System, StandardDeviation, Variance; reset by report/page/column/group or never (`resetType="None"`); `incrementType` (a count that moves once per group counts groups); group expressions that read variables; evaluation time Now/Report/Page/Column/Group and `Auto` for text (each variable read at its own moment: a group's share of the grand total in one expression) | queries in languages other than SQL (HQL, XPath, MDX...: pass the rows) |
 | Expressions | Java and Groovy subset: literals, `$F/$P/$V`, arithmetic with Java promotion rules (and Groovy's: `5 / 2` is a BigDecimal 2.5), string concat, comparisons, ternary, Elvis, casts, common String/Number/BigDecimal/Date/List methods, `Math` (rounding, powers, logarithms, trigonometry), `String.format`, `new SimpleDateFormat(..).format(..)`, `new DecimalFormat(..).format(..)`, `Base64` decoding, `msg(pattern, args...)` (`java.text.MessageFormat`), `$R{key}` and `str("key")` from the report's `resourceBundle` (`.properties` files next to the template or in a resource folder, picked by locale); JasperReports' function library as Jaspersoft Studio lists it (`IF`, `AND`, `SUM`, `MAX`, `ROUND_HALF_UP`, `LEFT`, `MID`, `FIND`, `SUBSTITUTE`, `PROPER`, `DATE`, `DATEFORMAT`, `EDATE`, `WORKDAY`, `NETWORKDAYS`, `WEEKNUM`, `TIME` and the rest: 78 functions, 265 cases checked against JasperReports); `DATERANGE("MONTH-1")` and fixed ranges, with `getStart()`/`getEnd()` and in `$X{}` clauses; Groovy lists, maps and ranges (`[1, 2]`, `[a: 1]`, `1..5`), closures given to `findAll`, `collect`, `sum`, `inject`, `sort`, `groupBy` and the rest, `"${...}"` strings, `?.`, `**`, `<=>`, `in`, `as`, indexing, and string helpers (`padLeft`, `tokenize`, `capitalize`...) | arbitrary Java classes (scriptlets, static methods of your own), Groovy statements (`def`, loops, `if` blocks), regular expressions beyond a literal or `\s+` |
 | Formatting | `DecimalFormat` patterns (HALF_EVEN), `SimpleDateFormat` patterns; locales en_US, es_DO, es_MX, es_ES | other locales |
 | Fonts | DejaVu Sans/Serif/Mono (the `jasperreports-fonts` families) bundled; extra TTF/OTF via `--font`; text in a font no one provides is written like JasperReports writes it, in the PDF standard font of its `pdfFontName` (Helvetica by default) | font extension jars |
-| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; PAdES B-B digital signatures (`--sign-key`); links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); HTML previews | ODS/ODT, XLS (old format), signatures with timestamps or long-term validation (PAdES B-T, B-LT), visible signature boxes, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
+| Output | PDF, optionally tagged for screen readers (`--tagged`, or the template's `net.sf.jasperreports.export.pdf.tagged` property; `.ferro` reports are tagged by default) and then PDF/UA-1, checked with veraPDF: texts as paragraphs or headings, pictures as figures with their tooltip as description, tables and crosstabs as tables with header cells and the columns and rows each cell spans, HTML lists as lists, links as links; PDF/A-2 and PDF/A-3 (a, b, u), checked with veraPDF; files attached inside the PDF; AES-256 encryption with passwords and permissions; PAdES B-B digital signatures (`--sign-key`); links, anchors and the bookmark outline; XLSX and CSV laid out like Jasper's exporters (default settings); DOCX laid out like Jasper's Word exporter (a table per page, the cells each element covers, its fonts, colors, borders and pictures); ODS and ODT laid out like XLSX and DOCX (as Jasper's ODS and ODT exporters do); HTML previews | PPTX, XLS (old format), signatures with timestamps or long-term validation (PAdES B-T, B-LT), visible signature boxes, exporter properties (`net.sf.jasperreports.export.*`) other than number detection, PDF form fields, the tagged PDF, PDF/A and PDF encryption ones |
 
 QR codes are encoded exactly like ZXing (same version, mask and modules) and are drawn the way
 JasperReports draws them, which makes them a good fit for printed electronic invoices (for
@@ -475,7 +498,9 @@ every push, and all 51 pass all four. The signatures are verified with poppler's
 with pyHanko. Encrypted PDFs are checked by opening them with qpdf and pikepdf: every
 fixture decrypts to the same pages and text as without encryption.
 Word documents follow JasperReports' DOCX exporter; every fixture's `.docx` opens in LibreOffice
-with as many pages as its PDF.
+with as many pages as its PDF. So do the `.ods` and `.odt` of the 50 fixtures not filled from a
+database (converted to PDF by LibreOffice, headless); about ten of them were also compared with
+the PDF by eye. Their XML is not compared with Jasper's.
 
 | Fixture | What it exercises | Result |
 |---|---|---|
@@ -661,7 +686,7 @@ depends on what you make.
 | Documents written by hand: papers, books, letters, math | **Typst** (or LaTeX) | Not its job. Typst sets text better (paragraph layout, hyphenation, math), has a real programming language, a package ecosystem and a company and community behind it |
 | JasperReports templates you already have, without a JVM | **ferroreport** | The same pages, pixel for pixel on every fixture; 3 to 6Ã— faster than a warm JVM, about 250Ã— from a cold start, a tenth of the memory or less |
 | Data reports: groups, running totals, "page X of Y", crosstabs, charts, a million rows | **ferroreport** or JasperReports | Bands, groups, variables and late values are what the format is made of; rows stream in and pages stream out (a million rows in 13 MB). In Typst you would program that yourself, and the document is laid out in memory |
-| One template to PDF, Excel, Word, CSV and HTML | **ferroreport**, JasperReports, Carbone | Typst writes PDF, PNG and SVG (HTML is experimental), not spreadsheets or Word |
+| One template to PDF, Excel, Word, OpenDocument, CSV and HTML | **ferroreport**, JasperReports, Carbone | Typst writes PDF, PNG and SVG (HTML is experimental), not spreadsheets or Word |
 | Templates that business users design in Word or LibreOffice | **Carbone** | Templates come from Jaspersoft Studio or are written as text; there is no designer of its own yet |
 | A visual designer, viewers, a report server, dashboards | **Telerik, DevExpress, Stimulsoft**, Jaspersoft Studio and Server | None of these yet |
 | Pages you already have in HTML and CSS | **Chromium** (Gotenberg, Puppeteer), WeasyPrint | A browser per render is heavy, and it knows nothing of page totals or bands |
@@ -691,14 +716,15 @@ change is listed in [CHANGELOG.md](CHANGELOG.md).
 ## Roadmap
 
 1.0 covers what JasperReports users need to switch: the same pages from the same templates,
-from JSON or SQL, in PDF (tagged, PDF/A, encrypted, signed), Excel, Word, CSV and HTML, with
+from JSON or SQL, in PDF (tagged, PDF/A, encrypted, signed), Excel, Word, CSV and HTML (and
+since then ODS and ODT), with
 the function library, Groovy expressions, every chart type, the barcodes, and a template format
 of its own. What comes next, in 1.x releases:
 
 - **A visual designer** in the browser, for `.ferro` and JRXML (Jaspersoft Studio works with
   ferroreport's templates meanwhile; for `.ferro`, the VS Code extension highlights it and
   `render --watch` renders it again on every save).
-- **More output:** ODS, ODT and PPTX, as JasperReports' exporters write them.
+- **More output:** PPTX, as JasperReports' exporter writes it (ODS and ODT are done).
 - **Text of every script:** right-to-left (Arabic, Hebrew), complex scripts (Devanagari, Thai)
   with their shaping, and hyphenation. Today text is set left to right without shaping.
 - **Charts pixel for pixel** like JFreeChart (today they follow its look closely).
