@@ -1,0 +1,11 @@
+report r margins=20
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+  title gap=4
+    h1 height=30 : Title
+    textField height=14 : "subtitle"
+  detail
+    row height=16 gap=5
+      textField 2fr : $F{a}
+      textField 100 : $F{b}
+      use money 1fr value=$F{c}

@@ -1,0 +1,7 @@
+// In a Groovy report, braces are closures: `({it})` is one, and must stay one.
+report "Groovy" language=groovy tagged=false
+  field lines List
+  field name String
+  detail 40
+    textField 0,0 200x20 : $F{lines}.collect({it}).size()
+    textField 0,20 200x20 : [{name}].size() + $F{name}

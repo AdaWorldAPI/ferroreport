@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="Empleados" pageWidth="595" pageHeight="842" topMargin="20" rightMargin="20" bottomMargin="20" leftMargin="20" columnWidth="555">
+	<property name="net.sf.jasperreports.export.pdf.tagged" value="true"/>
+	<property name="net.sf.jasperreports.export.pdf.tag.language" value="es"/>
+	<style name="Base" default="true" fontName="DejaVu Sans" fontSize="10"/>
+	<field name="nombre" class="java.lang.String"/>
+	<field name="salario" class="java.lang.Double"/>
+	<variable name="total" class="java.lang.Double" calculation="Sum">
+		<expression><![CDATA[$F{salario}]]></expression>
+	</variable>
+	<title height="40">
+		<element kind="staticText" x="0" y="0" width="555" height="30" fontSize="18">
+			<text><![CDATA[Empleados]]></text>
+			<property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/>
+		</element>
+	</title>
+	<columnHeader height="20">
+		<element kind="staticText" x="0" y="0" width="300" height="20" bold="true">
+			<text><![CDATA[Nombre]]></text>
+		</element>
+		<element kind="staticText" x="300" y="0" width="255" height="20" bold="true" hTextAlign="Right">
+			<text><![CDATA[Salario]]></text>
+		</element>
+	</columnHeader>
+	<detail>
+		<band height="20">
+			<element kind="textField" x="0" y="0" width="300" height="20">
+				<expression><![CDATA[$F{nombre}]]></expression>
+			</element>
+			<element kind="textField" x="300" y="0" width="255" height="20" pattern="#,##0.00" hTextAlign="Right">
+				<expression><![CDATA[$F{salario}]]></expression>
+			</element>
+		</band>
+	</detail>
+	<summary height="20">
+		<element kind="textField" x="300" y="0" width="255" height="20" bold="true" hTextAlign="Right">
+			<expression><![CDATA[$V{total}]]></expression>
+		</element>
+	</summary>
+</jasperReport>

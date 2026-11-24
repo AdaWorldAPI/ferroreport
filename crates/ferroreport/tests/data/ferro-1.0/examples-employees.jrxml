@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="Employees" pageWidth="595" pageHeight="842" topMargin="20" rightMargin="20" bottomMargin="20" leftMargin="20" columnWidth="555">
+	<property name="net.sf.jasperreports.export.pdf.tagged" value="true"/>
+	<property name="net.sf.jasperreports.export.pdf.tag.language" value="en"/>
+	<style name="Base" default="true" fontName="DejaVu Sans" fontSize="10"/>
+	<style name="Head" style="Base" bold="true" forecolor="#FFFFFF" backcolor="#2B4C7E" mode="Opaque"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="notes" class="java.lang.String"/>
+	<field name="salary" class="java.lang.Double"/>
+	<variable name="total" class="java.lang.Double" calculation="Sum">
+		<expression><![CDATA[$F{salary}]]></expression>
+	</variable>
+	<title height="50">
+		<element kind="staticText" height="30" fontSize="18" x="0" y="0" width="555">
+			<text><![CDATA[Employees]]></text>
+			<property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/>
+		</element>
+		<element kind="textField" height="14" forecolor="#666666" x="0" y="36" width="555" positionType="Float" textAdjust="StretchHeight">
+			<expression><![CDATA["Everyone on the payroll, with notes"]]></expression>
+		</element>
+	</title>
+	<columnHeader height="18">
+		<element kind="staticText" style="Head" height="18" vTextAlign="Middle" width="413" x="0" y="0">
+			<text><![CDATA[Name]]></text>
+			<box leftPadding="4" rightPadding="4"/>
+		</element>
+		<element kind="staticText" style="Head" height="18" vTextAlign="Middle" width="138" hTextAlign="Right" x="417" y="0">
+			<text><![CDATA[Salary]]></text>
+			<box leftPadding="4" rightPadding="4"/>
+		</element>
+	</columnHeader>
+	<detail>
+		<band height="30">
+			<element kind="textField" width="413" x="0" y="0" height="16" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{name}]]></expression>
+			</element>
+			<element kind="textField" pattern="#,##0.00" hTextAlign="Right" width="138" x="417" y="0" height="16" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{salary}]]></expression>
+			</element>
+			<element kind="textField" height="12" fontSize="8" italic="true" forecolor="#555555" x="0" y="18" width="555" positionType="Float" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{notes}]]></expression>
+			</element>
+		</band>
+	</detail>
+	<summary height="20">
+		<element kind="staticText" width="413" bold="true" x="0" y="0" height="20">
+			<text><![CDATA[Total]]></text>
+		</element>
+		<element kind="textField" pattern="#,##0.00" hTextAlign="Right" width="138" bold="true" x="417" y="0" height="20" textAdjust="StretchHeight">
+			<expression><![CDATA[$V{total}]]></expression>
+		</element>
+	</summary>
+</jasperReport>
