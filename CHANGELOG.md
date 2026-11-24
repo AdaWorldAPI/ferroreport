@@ -4,6 +4,24 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+- **A visual designer in the browser**, the first version: <https://cristianencarnacion.github.io/ferroreport/designer/>.
+  Paste or upload a sample of your data (JSON) and its fields are listed with their types; drag
+  them onto the report's bands, or add text, lines, rectangles, ellipses, images, the page
+  number and today's date. Select, move and resize with the mouse or the keyboard, on a grid;
+  change text, font, colors, alignment, borders and number or date format in a properties
+  panel; undo and redo. The PDF is made again beside the page as you edit, by the WebAssembly
+  engine, so nothing is uploaded. It opens `.ferro` and `.jrxml`, saves both, and downloads the
+  report as PDF, Excel or Word. Parts it cannot edit yet (charts, tables, crosstabs, subreports,
+  barcodes) are shown and kept as they are.
+- JavaScript: `toTree(template, options?)` gives any template (JRXML 6 or 7, or `.ferro`, with
+  the files it imports in `options.resources`) as a tree of its JRXML 7 form, and
+  `fromTree(tree, "jrxml" | "ferro")` writes one back. Rust: `ferroreport::design::to_tree` and
+  `from_tree`.
+- The website is assembled by `tools/assemble-site.sh`, for the Pages workflow and to try it
+  locally; `bindings/wasm/build.sh` honours `CARGO_TARGET_DIR`.
+
 ## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names
