@@ -36,30 +36,30 @@ write, which is what `fixtures/` holds (all pixel-identical). Use `ferroreport d
 | `book/reports/PieChartReport.jrxml` | no reference |  | JasperReports draws nothing for it without the sample's own program; ferroreport renders it |
 | `book/reports/TOCPart.jrxml` | same | 1/1 |  |
 | `chartcustomizers/reports/ChartCustomizersReport.jrxml` | no reference |  | needs Java classes that are not at hand (the sample's own, or libraries it adds); ferroreport renders it |
-| `charts/reports/AreaChartReport.jrxml` | differs | 13/13 | worst page differs in 3.5% of its ink |
-| `charts/reports/Bar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 7.4% of its ink |
-| `charts/reports/BarChartReport.jrxml` | differs | 13/13 | worst page differs in 8.5% of its ink: chart customizers (customizerClass) are ignored |
-| `charts/reports/BubbleChartReport.jrxml` | differs | 19/19 | worst page differs in 19.1% of its ink |
-| `charts/reports/CandlestickChartReport.jrxml` | differs | 18/18 | worst page differs in 6.7% of its ink |
-| `charts/reports/GanttChartReport.jrxml` | differs | 1/1 | worst page differs in 12.2% of its ink |
-| `charts/reports/HighLowChartReport.jrxml` | differs | 18/18 | worst page differs in 11.7% of its ink |
-| `charts/reports/LineChartReport.jrxml` | differs | 13/13 | worst page differs in 3.8% of its ink |
+| `charts/reports/AreaChartReport.jrxml` | differs | 13/13 | worst page differs in 2.9% of its ink |
+| `charts/reports/Bar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 9.0% of its ink |
+| `charts/reports/BarChartReport.jrxml` | differs | 13/13 | worst page differs in 7.8% of its ink: chart customizers (customizerClass) are ignored |
+| `charts/reports/BubbleChartReport.jrxml` | differs | 19/19 | worst page differs in 8.1% of its ink |
+| `charts/reports/CandlestickChartReport.jrxml` | differs | 18/18 | worst page differs in 3.7% of its ink |
+| `charts/reports/GanttChartReport.jrxml` | differs | 1/1 | worst page differs in 8.0% of its ink |
+| `charts/reports/HighLowChartReport.jrxml` | differs | 18/18 | worst page differs in 11.2% of its ink |
+| `charts/reports/LineChartReport.jrxml` | differs | 13/13 | worst page differs in 3.2% of its ink |
 | `charts/reports/MeterChartReport.jrxml` | differs | 16/16 | worst page differs in 21.3% of its ink |
-| `charts/reports/MultipleAxisChartReport.jrxml` | differs | 24/24 | worst page differs in 17.3% of its ink |
-| `charts/reports/Pie3DChartReport.jrxml` | differs | 13/13 | worst page differs in 11.0% of its ink |
-| `charts/reports/PieChartReport.jrxml` | differs | 13/13 | worst page differs in 9.6% of its ink |
-| `charts/reports/ScatterChartReport.jrxml` | differs | 19/19 | worst page differs in 16.8% of its ink |
-| `charts/reports/StackedAreaChartReport.jrxml` | differs | 13/13 | worst page differs in 18.4% of its ink |
-| `charts/reports/StackedBar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 6.9% of its ink |
-| `charts/reports/StackedBarChartReport.jrxml` | differs | 13/13 | worst page differs in 3.1% of its ink |
-| `charts/reports/SubDatasetChartReport.jrxml` | differs | 7/7 | worst page differs in 32.5% of its ink |
+| `charts/reports/MultipleAxisChartReport.jrxml` | differs | 24/24 | worst page differs in 9.2% of its ink |
+| `charts/reports/Pie3DChartReport.jrxml` | differs | 13/13 | worst page differs in 8.6% of its ink |
+| `charts/reports/PieChartReport.jrxml` | differs | 13/13 | worst page differs in 5.0% of its ink |
+| `charts/reports/ScatterChartReport.jrxml` | differs | 19/19 | worst page differs in 10.7% of its ink |
+| `charts/reports/StackedAreaChartReport.jrxml` | differs | 13/13 | worst page differs in 2.7% of its ink |
+| `charts/reports/StackedBar3DChartReport.jrxml` | differs | 13/13 | worst page differs in 7.3% of its ink |
+| `charts/reports/StackedBarChartReport.jrxml` | differs | 13/13 | worst page differs in 2.7% of its ink |
+| `charts/reports/SubDatasetChartReport.jrxml` | differs | 7/7 | worst page differs in 18.9% of its ink |
 | `charts/reports/ThermometerChartReport.jrxml` | differs | 16/16 | worst page differs in 9.2% of its ink |
-| `charts/reports/TimeSeriesChartReport.jrxml` | differs | 19/19 | worst page differs in 17.2% of its ink |
-| `charts/reports/XYAreaChartReport.jrxml` | differs | 19/19 | worst page differs in 17.8% of its ink |
-| `charts/reports/XYBarChartReport.jrxml` | differs | 19/19 | worst page differs in 11.2% of its ink |
-| `charts/reports/XYBarChartTimePeriodReport.jrxml` | differs | 19/19 | worst page differs in 13.0% of its ink |
-| `charts/reports/XYBarChartTimeSeriesReport.jrxml` | differs | 19/19 | worst page differs in 16.5% of its ink |
-| `charts/reports/XYLineChartReport.jrxml` | differs | 19/19 | worst page differs in 12.8% of its ink |
+| `charts/reports/TimeSeriesChartReport.jrxml` | differs | 19/19 | worst page differs in 11.8% of its ink |
+| `charts/reports/XYAreaChartReport.jrxml` | differs | 19/19 | worst page differs in 6.2% of its ink |
+| `charts/reports/XYBarChartReport.jrxml` | differs | 19/19 | worst page differs in 9.3% of its ink |
+| `charts/reports/XYBarChartTimePeriodReport.jrxml` | differs | 19/19 | worst page differs in 11.4% of its ink |
+| `charts/reports/XYBarChartTimeSeriesReport.jrxml` | differs | 19/19 | worst page differs in 11.3% of its ink |
+| `charts/reports/XYLineChartReport.jrxml` | differs | 19/19 | worst page differs in 10.8% of its ink |
 | `chartthemes/reports/AllChartsReport.jrxml` | differs | 10/10 | worst page differs in 91.0% of its ink |
 | `crosstabs/reports/LateOrdersReport.jrxml` | not rendered |  | error evaluating expression: NullPointerException: cannot call toString() on null |
 | `crosstabs/reports/OrdersReport.jrxml` | not rendered |  | error evaluating expression: variable `ROW_COUNT` is not a measure or group of the crosstab |
