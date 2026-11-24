@@ -64,6 +64,7 @@ const sorted = (n) => ({ ...n, attrs: [...n.attrs].sort(), children: n.children.
 assert.deepEqual(sorted(ferroreport.toTree(ferroText)), sorted(ferroreport.toTree(jrxml)));
 const rows = JSON.parse(readFileSync(new URL("invoices.json", examples), "utf8"));
 assert.equal(Buffer.from(ferroreport.render(jrxml, rows).subarray(0, 5)).toString(), "%PDF-");
+assert.equal(Buffer.from(ferroreport.render(jrxml, rows, {}, { format: "pptx" }).subarray(0, 2)).toString(), "PK");
 assert.deepEqual(ferroreport.toTree(template).attrs.find(([k]) => k === "name"), ["name", "orders"]);
 assert.throws(() => ferroreport.fromTree({ tag: "html", attrs: [], children: [] }));
 assert.throws(() => ferroreport.fromTree(tree, "pdf"));

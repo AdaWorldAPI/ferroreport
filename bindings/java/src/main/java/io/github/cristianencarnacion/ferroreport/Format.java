@@ -14,7 +14,9 @@ public enum Format {
     /** An OpenDocument spreadsheet (LibreOffice Calc), laid out like JasperReports' ODS exporter. */
     ODS("ods", "application/vnd.oasis.opendocument.spreadsheet"),
     /** An OpenDocument text document (LibreOffice Writer), laid out like JasperReports' ODT exporter. */
-    ODT("odt", "application/vnd.oasis.opendocument.text");
+    ODT("odt", "application/vnd.oasis.opendocument.text"),
+    /** A PowerPoint presentation, a slide per page, laid out like JasperReports' PPTX exporter. */
+    PPTX("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
 
     private final String id;
     private final String mediaType;
@@ -24,7 +26,7 @@ public enum Format {
         this.mediaType = mediaType;
     }
 
-    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}, {@code docx}, {@code ods}, {@code odt}. */
+    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}, {@code docx}, {@code ods}, {@code odt}, {@code pptx}. */
     public String id() {
         return id;
     }

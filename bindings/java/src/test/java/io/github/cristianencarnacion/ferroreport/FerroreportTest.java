@@ -159,6 +159,7 @@ public class FerroreportTest {
         assertEquals(Format.PDF, Format.of("invoice"));
         assertEquals(Format.ODS, Format.of("sales.ods"));
         assertEquals(Format.ODT, Format.of("letter.odt"));
+        assertEquals(Format.PPTX, Format.of("Board.PPTX"));
         assertEquals("text/csv; charset=utf-8", Format.CSV.mediaType());
     }
 
@@ -168,6 +169,7 @@ public class FerroreportTest {
         byte[] pdf = invoice(engine).render();
         assertEquals("%PDF-", new String(pdf, 0, 5, StandardCharsets.US_ASCII));
         assertEquals("PK", new String(invoice(engine).format(Format.XLSX).render(), 0, 2, StandardCharsets.US_ASCII));
+        assertEquals("PK", new String(invoice(engine).format(Format.PPTX).render(), 0, 2, StandardCharsets.US_ASCII));
         String csv = new String(invoice(engine).format(Format.CSV).render(), StandardCharsets.UTF_8);
         assertTrue(csv, csv.contains("FX-1000") && csv.contains("Distribuidora Caribe"));
         String html = new String(invoice(engine).format(Format.HTML).render(), StandardCharsets.UTF_8);

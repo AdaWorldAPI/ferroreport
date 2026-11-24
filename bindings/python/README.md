@@ -32,7 +32,8 @@ with open("invoice.pdf", "wb") as f:
 - Images and subreports are found next to the template; add `resource_dirs=[...]`, or pass
   them in memory with `resources={"logo.png": b"...", "lines.jrxml": "..."}`. A subreport
   named `lines.jasper` is read from `lines.jrxml`; compiled `.jasper` files are never loaded.
-- `format="xlsx"` returns an Excel workbook, `format="docx"` a Word document, `format="ods"` and
+- `format="xlsx"` returns an Excel workbook, `format="docx"` a Word document, `format="pptx"` a
+  PowerPoint presentation (a slide per page), `format="ods"` and
   `format="odt"` OpenDocument files (LibreOffice), and `format="csv"` CSV text (UTF-8 bytes), laid
   out like JasperReports' exporters; `format="html"` returns a web page that looks like the PDF,
   for previews in a browser.
@@ -40,7 +41,7 @@ with open("invoice.pdf", "wb") as f:
   at a time, so the rows are never all in memory.
 - `ferroreport.render_to_file(template, "out.pdf", data, params)` writes the file as it is made
   (PDF and CSV pages go to disk as they are finished); the format follows the extension
-  (`.pdf`, `.xlsx`, `.docx`, `.ods`, `.odt`, `.csv`, `.html`). It returns `{"pages": ..., "rows": ...}`.
+  (`.pdf`, `.xlsx`, `.docx`, `.pptx`, `.ods`, `.odt`, `.csv`, `.html`). It returns `{"pages": ..., "rows": ...}`.
 - For rows that do not fit in memory, give `data_file="rows.jsonl"` instead of `data`: a JSON
   array or one object per line, read as the report needs it. A million rows render in about
   13 MB.
