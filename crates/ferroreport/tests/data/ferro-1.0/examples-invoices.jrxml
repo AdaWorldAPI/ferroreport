@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="Invoices" pageWidth="595" pageHeight="842" topMargin="20" rightMargin="20" bottomMargin="20" leftMargin="20" columnWidth="555">
+	<property name="net.sf.jasperreports.export.pdf.tag.language" value="en"/>
+	<style name="Base" default="true" fontName="DejaVu Sans" fontSize="9"/>
+	<dataset name="each1">
+		<field name="product" class="java.lang.String"/>
+		<field name="qty" class="java.lang.Integer"/>
+		<field name="price" class="java.lang.Double"/>
+	</dataset>
+	<field name="number" class="java.lang.String"/>
+	<field name="customer" class="java.lang.String"/>
+	<field name="overdue" class="java.lang.Boolean"/>
+	<field name="lines" class="java.util.List"/>
+	<title height="26">
+		<element kind="staticText" height="26" fontSize="16" x="0" y="0" width="555">
+			<text><![CDATA[Invoices]]></text>
+			<property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/>
+		</element>
+	</title>
+	<detail>
+		<band height="62">
+			<element kind="textField" width="555" bold="true" x="0" y="0" height="18" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{number} + " · " + $F{customer}]]></expression>
+			</element>
+			<element kind="frame" removeLineWhenBlank="true" x="0" y="20" width="555" height="20" positionType="Float">
+				<printWhenExpression><![CDATA[$F{overdue}]]></printWhenExpression>
+				<element kind="staticText" height="14" forecolor="#B00020" x="0" y="0" width="555">
+					<text><![CDATA[Overdue: send a reminder]]></text>
+				</element>
+			</element>
+			<element kind="component" x="0" y="42" width="555" height="20" positionType="Float">
+				<component kind="list" printOrder="Vertical">
+					<datasetRun subDataset="each1">
+						<dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRMapCollectionDataSource($F{lines})]]></dataSourceExpression>
+					</datasetRun>
+					<contents width="555" height="14">
+						<element kind="textField" width="328" x="0" y="0" height="14" textAdjust="StretchHeight">
+							<expression><![CDATA[$F{product}]]></expression>
+						</element>
+						<element kind="textField" width="109" hTextAlign="Right" x="332" y="0" height="14" textAdjust="StretchHeight">
+							<expression><![CDATA[$F{qty}]]></expression>
+						</element>
+						<element kind="textField" pattern="#,##0.00" hTextAlign="Right" width="110" x="445" y="0" height="14" textAdjust="StretchHeight">
+							<expression><![CDATA[$F{qty} * $F{price}]]></expression>
+						</element>
+					</contents>
+				</component>
+			</element>
+		</band>
+	</detail>
+</jasperReport>

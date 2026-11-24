@@ -1,0 +1,16 @@
+report "Empleados" lang=es
+  style Base default fontName="DejaVu Sans" fontSize=10
+  field nombre String
+  field salario Double
+  variable total Double calculation=Sum : $F{salario}
+
+  title 40
+    h1 0,0 555x30 fontSize=18 : Empleados
+  columnHeader 20
+    staticText 0,0 300x20 bold : Nombre
+    staticText 300,0 255x20 bold hTextAlign=Right : Salario
+  detail 20
+    textField 0,0 300x20 : $F{nombre}
+    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salario}
+  summary 20
+    textField 300,0 255x20 bold hTextAlign=Right : $V{total}

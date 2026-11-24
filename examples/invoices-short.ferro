@@ -1,0 +1,23 @@
+// The same report as invoices.ferro, written with the short forms of 1.1: `text` with
+// {field} holes, `color=` and `align=`, and fields that need no declaration (number, customer
+// and product are read as the data gives them). Fields used in conditions and arithmetic are
+// still declared, so JasperReports 7 can compile the converted JRXML too.
+report "Invoices" lang=en tagged=false
+  import "parts.ferro"
+  field overdue Boolean
+  field lines List
+
+  title gap=6
+    h1 height=26 size=16 : Invoices
+  detail gap=2
+    row height=18
+      text 2fr bold : {number} · {customer}
+    if : {overdue}
+      text height=14 color=#B00020 : Overdue: send a reminder
+    each : {lines}
+      field qty Integer
+      field price Double
+      row height=14
+        text 3fr : {product}
+        text 1fr align=right : {qty}
+        use money 1fr value="{qty} * {price}"

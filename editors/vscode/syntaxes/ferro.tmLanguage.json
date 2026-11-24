@@ -32,6 +32,9 @@
           "include": "#text"
         },
         {
+          "include": "#known-attribute"
+        },
+        {
           "include": "#attribute"
         },
         {
@@ -68,7 +71,7 @@
           "name": "storage.type.ferro"
         },
         {
-          "match": "\\b(h[1-6]|staticText|textField|image|line|rectangle|ellipse|frame|subreport|break|chart|component|crosstab|genericElement)\\b",
+          "match": "\\b(h[1-6]|text|staticText|textField|image|line|rectangle|ellipse|frame|subreport|break|chart|component|crosstab|genericElement)\\b",
           "name": "entity.name.tag.ferro"
         },
         {
@@ -139,12 +142,20 @@
     "expression": {
       "patterns": [
         {
+          "match": "\\\\[{}$=\\\\]",
+          "name": "constant.character.escape.ferro"
+        },
+        {
           "match": "\\$([FPVR])(!?)\\{[^}]*\\}",
           "name": "variable.other.reference.ferro"
         },
         {
           "match": "\\{\\{\\w+\\}\\}",
           "name": "variable.parameter.placeholder.ferro"
+        },
+        {
+          "match": "(?<![\\w$!{\\\\])\\{[\\p{L}_][\\p{L}\\p{N}_]*(\\.[\\p{L}_][\\p{L}\\p{N}_]*)*\\}(?!\\})",
+          "name": "variable.other.reference.ferro"
         },
         {
           "match": "\"([^\"\\\\]|\\\\.)*\"",
@@ -173,6 +184,54 @@
         {
           "match": "==|!=|<=|>=|&&|\\|\\||\\?:|\\*\\*|<=>|->|[-+*/%<>!?:]",
           "name": "keyword.operator.ferro"
+        }
+      ]
+    },
+    "known-attribute": {
+      "match": "\\b(color|background|forecolor|backcolor|align|valign|hTextAlign|vTextAlign|hImageAlign|vImageAlign|size|fontSize)(=)(\"[^\"]*\"|\\S+)",
+      "captures": {
+        "1": {
+          "name": "entity.other.attribute-name.ferro"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.ferro"
+        },
+        "3": {
+          "patterns": [
+            {
+              "include": "#color"
+            },
+            {
+              "match": "\\b(?i:left|center|right|justify|justified|top|middle|bottom)\\b",
+              "name": "support.constant.alignment.ferro"
+            },
+            {
+              "match": "\\b\\d+(\\.\\d+)?\\b",
+              "name": "constant.numeric.ferro"
+            },
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#placeholder"
+            },
+            {
+              "match": ".+",
+              "name": "string.unquoted.ferro"
+            }
+          ]
+        }
+      }
+    },
+    "color": {
+      "patterns": [
+        {
+          "match": "#\\h{3,8}\\b",
+          "name": "constant.other.color.rgb-value.ferro"
+        },
+        {
+          "match": "\\b(?i:black|white|gray|grey|lightGray|darkGray|red|green|blue|yellow|orange|pink|cyan|magenta)\\b",
+          "name": "support.constant.color.ferro"
         }
       ]
     }

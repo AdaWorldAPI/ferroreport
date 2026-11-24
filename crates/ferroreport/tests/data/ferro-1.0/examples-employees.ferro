@@ -1,0 +1,32 @@
+// Employees, laid out without coordinates.
+report "Employees" lang=en
+  style Base default fontName="DejaVu Sans" fontSize=10
+  style Head style=Base bold forecolor=#FFFFFF backcolor=#2B4C7E mode=Opaque
+  field name String
+  field notes String
+  field salary Double
+  variable total Double calculation=Sum : $F{salary}
+
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+
+  def heading text
+    staticText style=Head height=18 vTextAlign=Middle : {{text}}
+      box leftPadding=4 rightPadding=4
+
+  title gap=6
+    h1 height=30 fontSize=18 : Employees
+    textField height=14 forecolor=#666666 : "Everyone on the payroll, with notes"
+  columnHeader
+    row
+      use heading 3fr text=Name
+      use heading 1fr text=Salary hTextAlign=Right
+  detail gap=2
+    row height=16
+      textField 3fr : $F{name}
+      use money 1fr value=$F{salary}
+    textField height=12 fontSize=8 italic forecolor=#555555 : $F{notes}
+  summary
+    row
+      staticText 3fr bold : Total
+      use money 1fr bold value=$V{total}

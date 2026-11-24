@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="r" pageWidth="595" pageHeight="842" topMargin="20" rightMargin="20" bottomMargin="20" leftMargin="20" columnWidth="555">
+	<property name="net.sf.jasperreports.export.pdf.tagged" value="true"/>
+	<title height="48">
+		<element kind="staticText" height="30" x="0" y="0" width="555">
+			<text><![CDATA[Title]]></text>
+			<property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/>
+		</element>
+		<element kind="textField" height="14" x="0" y="34" width="555" positionType="Float" textAdjust="StretchHeight">
+			<expression><![CDATA["subtitle"]]></expression>
+		</element>
+	</title>
+	<detail>
+		<band height="16">
+			<element kind="textField" width="296" x="0" y="0" height="16" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{a}]]></expression>
+			</element>
+			<element kind="textField" width="100" x="301" y="0" height="16" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{b}]]></expression>
+			</element>
+			<element kind="textField" pattern="#,##0.00" hTextAlign="Right" width="149" x="406" y="0" height="16" textAdjust="StretchHeight">
+				<expression><![CDATA[$F{c}]]></expression>
+			</element>
+		</band>
+	</detail>
+</jasperReport>

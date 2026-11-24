@@ -128,9 +128,100 @@ curl -X POST localhost:8080/render/invoice -H 'Content-Type: application/json' \
         XML. It is about half the size, a person can write it without a designer, and its reports are accessible by default.</p>
 <pre>// Employees, with their salaries and the total.
 report "Employees" lang=en
-  style Base default fontName="DejaVu Sans" fontSize=10
-  field name String
+  style Base default fontName="DejaVu Sans" size=10
   field salary Double
+  variable total Double calculation=Sum : {salary}
+
+  title 40
+    h1 0,0 555x30 size=18 : Employees
+  columnHeader 20
+    text 0,0 300x20 bold : Name
+    text 300,0 255x20 bold align=right : Salary
+  detail 20
+    text 0,0 300x20 : {name}
+    text 300,0 255x20 pattern=#,##0.00 align=right : {salary}
+    image 0,0 20x20 alt="Photo of the employee" : {photo}
+  summary 20
+    text 300,0 255x20 bold align=right : Total: $V{total}</pre>
+      <table>
+        <tr><th>Part of a line</th><th>Meaning</th></tr>
+        <tr><td>The first word</td><td>What the line is: <code>report</code>, <code>style</code>, <code>field</code>, a band
+          (<code>title</code>, <code>detail</code>, <code>pageFooter</code>...), a part (<code>text</code>, <code>image</code>,
+          <code>line</code>, <code>rectangle</code>, <code>frame</code>, <code>subreport</code>, <code>chart</code>,
+          <code>crosstab</code>, <code>component</code>...), or any other JRXML 7 element by its name (<code>box</code>,
+          <code>pen</code>, <code>property</code>...)</td></tr>
+        <tr><td>Indentation</td><td>A line indented under another is inside it</td></tr>
+        <tr><td><code>x,y</code> and <code>widthxheight</code></td><td>A part's position and size, in points</td></tr>
+        <tr><td>A number after a band</td><td>Its height. <code>detail 20</code> is a detail section with one band 20 points tall (the same for
+          <code>groupHeader</code> and <code>groupFooter</code>)</td></tr>
+        <tr><td><code>name=value</code></td><td>An attribute. Quote the value when it has spaces: <code>pattern="MMMM d, yyyy"</code>.
+          A name alone means <code>true</code>: <code>bold</code>. <code>color=</code>, <code>background=</code>,
+          <code>align=</code>, <code>valign=</code> and <code>size=</code> are short for the JRXML names (below); any other JRXML 7
+          attribute is written with its own name</td></tr>
+        <tr><td><code>: text</code></td><td>The text of a <code>text</code> part, or the expression of the line: an image's, a
+          variable's or group's expression, a parameter's default value, the condition of <code>if</code></td></tr>
+        <tr><td><code>{name}</code></td><td>The value of the field <code>name</code> of the current row, in a text or in any expression.
+          <code>$P{name}</code> is a parameter, <code>$V{name}</code> a variable (<code>$V{PAGE_NUMBER}</code>...)</td></tr>
+        <tr><td>Words after <code>field</code>, <code>parameter</code>, <code>variable</code></td><td>The name and the class:
+          <code>field amount BigDecimal</code>. <code>String</code>, <code>Integer</code>, <code>Long</code>, <code>Double</code>,
+          <code>BigDecimal</code>, <code>Boolean</code>, <code>Date</code>, <code>Timestamp</code>, <code>List</code>... need no package.
+          <code>style</code>, <code>group</code> and <code>property</code> take their name the same way</td></tr>
+        <tr><td>A line ending in <code> :</code></td><td>The text is on the lines below, one level further in, as written (for long
+          expressions and texts of several lines). <code>:= "..."</code> gives it as a JSON string</td></tr>
+        <tr><td><code>report</code> options</td><td><code>page=A4</code> (or <code>A3</code>, <code>A5</code>, <code>Letter</code>,
+          <code>Legal</code>, <code>612x792</code>), <code>landscape</code>, <code>margins=20</code> (or <code>20,30</code>, or four
+          numbers), <code>lang=es-DO</code>, <code>tagged=false</code>. Without them a report is A4, portrait, with 20-point margins</td></tr>
+        <tr><td><code>// ...</code></td><td>A comment</td></tr>
+      </table>
+      <h3 id="ferro-text">Texts and fields</h3>
+      <p>A <code>text</code> is printed as written, unless it has holes: <code>{name}</code> (a field), <code>$P{name}</code>,
+        <code>$V{name}</code> or <code>$R{key}</code> are filled in from the data.</p>
+      <table>
+        <tr><th>Write</th><th>And you get</th></tr>
+        <tr><td><code>text : Overdue</code></td><td>The text, as it is. Braces that are not a name stay too: <code>{0}</code>, <code>{a b}</code></td></tr>
+        <tr><td><code>text : Invoice {number} · {customer}</code></td><td>The text with the values in it</td></tr>
+        <tr><td><code>text pattern=#,##0.00 : {total}</code></td><td>The value alone, as a number (or date) that <code>pattern=</code> formats</td></tr>
+        <tr><td><code>text : ={qty} * {price}</code></td><td>A text that starts with <code>=</code> is an expression, as in a spreadsheet</td></tr>
+        <tr><td><code>text : \{not a hole\} costs \$5</code></td><td><code>\{</code>, <code>\}</code>, <code>\$</code>, <code>\=</code> and
+          <code>\\</code> print the character itself</td></tr>
+      </table>
+      <p><b>Fields need no declaration.</b> A field written as <code>{name}</code> that has no <code>field</code> line is declared
+        for you, in the report or in the <code>each</code> it is used in, with class <code>Object</code>: its values keep the type
+        the data gives them (text, number, true or false, a list). Declare a field to give it a class: dates, which arrive as text,
+        need <code>field due Date</code> before <code>pattern=</code> can format them, and JasperReports needs the class of a
+        field used in arithmetic or in a condition to compile the JRXML. <code>$F{name}</code> still needs its declaration.</p>
+      <h3 id="ferro-long">Long forms also work</h3>
+      <p>Every short form is written as the JRXML of its long form, JasperReports' own names, which also work and can be mixed with
+        them:</p>
+      <table>
+        <tr><th>Short form</th><th>Also works</th></tr>
+        <tr><td><code>text : Total</code></td><td><code>staticText : Total</code></td></tr>
+        <tr><td><code>text : Invoice {number}</code></td><td><code>textField : "Invoice " + $F{number}</code></td></tr>
+        <tr><td><code>text : {total}</code>, <code>text : ={qty} * {price}</code></td><td><code>textField : $F{total}</code>,
+          <code>textField : $F{qty} * $F{price}</code></td></tr>
+        <tr><td><code>{name}</code> in an expression</td><td><code>$F{name}</code></td></tr>
+        <tr><td>No <code>field</code> line for <code>{name}</code></td><td><code>field name Object</code></td></tr>
+        <tr><td><code>color=red</code></td><td><code>forecolor=#FF0000</code>. Colors by name are those JasperReports knows:
+          <code>black</code>, <code>white</code>, <code>gray</code> (or <code>grey</code>), <code>lightGray</code>,
+          <code>darkGray</code>, <code>red</code>, <code>green</code>, <code>blue</code>, <code>yellow</code>, <code>orange</code>,
+          <code>pink</code>, <code>cyan</code>, <code>magenta</code>; or <code>#RRGGBB</code></td></tr>
+        <tr><td><code>background=#EEEEEE</code></td><td><code>backcolor=#EEEEEE mode=Opaque</code> (a background shows only on an
+          opaque part; <code>mode=</code> on the line wins)</td></tr>
+        <tr><td><code>align=left</code>, <code>center</code>, <code>right</code>, <code>justify</code></td><td><code>hTextAlign=Left</code>,
+          <code>Center</code>, <code>Right</code>, <code>Justified</code> (on an image, <code>hImageAlign=</code>)</td></tr>
+        <tr><td><code>valign=top</code>, <code>middle</code>, <code>bottom</code></td><td><code>vTextAlign=Top</code>, <code>Middle</code>,
+          <code>Bottom</code> (on an image, <code>vImageAlign=</code>)</td></tr>
+        <tr><td><code>size=12</code> on a text or a style</td><td><code>fontSize=12</code></td></tr>
+      </table>
+      <p>When a line gives both names (<code>color=</code> and <code>forecolor=</code>), the JRXML one is used. In a report with
+        <code>language=groovy</code> (or <code>javascript</code>), braces in expressions belong to the language and are left alone:
+        write <code>$F{name}</code> there (the holes of a <code>text</code> still work). The first example in long forms gives the
+        same JRXML:</p>
+<pre>report "Employees" lang=en
+  style Base default fontName="DejaVu Sans" fontSize=10
+  field salary Double
+  field name Object
+  field photo Object
   variable total Double calculation=Sum : $F{salary}
 
   title 40
@@ -143,33 +234,7 @@ report "Employees" lang=en
     textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salary}
     image 0,0 20x20 alt="Photo of the employee" : $F{photo}
   summary 20
-    textField 300,0 255x20 bold hTextAlign=Right : $V{total}</pre>
-      <table>
-        <tr><th>Part of a line</th><th>Meaning</th></tr>
-        <tr><td>The first word</td><td>What the line is: <code>report</code>, <code>style</code>, <code>field</code>, a band
-          (<code>title</code>, <code>detail</code>, <code>pageFooter</code>...), an element (<code>staticText</code>,
-          <code>textField</code>, <code>image</code>, <code>line</code>, <code>rectangle</code>, <code>frame</code>,
-          <code>subreport</code>, <code>chart</code>, <code>crosstab</code>, <code>component</code>...), or any other JRXML 7 element
-          by its name (<code>box</code>, <code>pen</code>, <code>property</code>...)</td></tr>
-        <tr><td>Indentation</td><td>A line indented under another is inside it</td></tr>
-        <tr><td><code>x,y</code> and <code>widthxheight</code></td><td>An element's position and size, in points</td></tr>
-        <tr><td>A number after a band</td><td>Its height. <code>detail 20</code> is a detail section with one band 20 points tall (the same for
-          <code>groupHeader</code> and <code>groupFooter</code>)</td></tr>
-        <tr><td>Words after <code>field</code>, <code>parameter</code>, <code>variable</code></td><td>The name and the class:
-          <code>field amount BigDecimal</code>. <code>String</code>, <code>Integer</code>, <code>Long</code>, <code>Double</code>,
-          <code>BigDecimal</code>, <code>Boolean</code>, <code>Date</code>, <code>Timestamp</code>, <code>List</code>... need no package.
-          <code>style</code>, <code>group</code> and <code>property</code> take their name the same way</td></tr>
-        <tr><td><code>name=value</code></td><td>An attribute, with its JRXML 7 name. Quote the value when it has spaces:
-          <code>pattern="MMMM d, yyyy"</code>. A name alone means <code>true</code>: <code>bold</code></td></tr>
-        <tr><td><code>: text</code></td><td>The text or expression of the line: a static text's text, a text field's or image's expression,
-          a variable's or group's expression, a parameter's default value, a field's description</td></tr>
-        <tr><td>A line ending in <code> :</code></td><td>The text is on the lines below, one level further in, as written (for long
-          expressions and texts of several lines). <code>:= "..."</code> gives it as a JSON string</td></tr>
-        <tr><td><code>report</code> options</td><td><code>page=A4</code> (or <code>A3</code>, <code>A5</code>, <code>Letter</code>,
-          <code>Legal</code>, <code>612x792</code>), <code>landscape</code>, <code>margins=20</code> (or <code>20,30</code>, or four
-          numbers), <code>lang=es-DO</code>, <code>tagged=false</code>. Without them a report is A4, portrait, with 20-point margins</td></tr>
-        <tr><td><code>// ...</code></td><td>A comment</td></tr>
-      </table>
+    textField 300,0 255x20 bold hTextAlign=Right : "Total: " + $V{total}</pre>
       <p><b>Accessible by default.</b> A <code>.ferro</code> report gives a <a href="#tagged">tagged PDF</a>, the kind screen readers
         follow, unless it says <code>tagged=false</code>, in the language of <code>lang=</code> (or of the locale). <code>h1</code> to
         <code>h6</code> are headings (a static text tagged as one), <code>alt="..."</code> describes an image, and <code>tag=th</code>
@@ -177,19 +242,18 @@ report "Employees" lang=en
       <h3 id="ferro-layout">Without coordinates</h3>
       <p>Positions and sizes can be left out, and ferroreport works them out:</p>
 <pre>report "Employees" lang=en
-  field name String
   field salary Double
 
   def money value
-    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+    text pattern=#,##0.00 align=right : {{value}}
 
   title gap=6
-    h1 height=30 fontSize=18 : Employees
-    textField height=14 : "Everyone on the payroll"
+    h1 height=30 size=18 : Employees
+    text height=14 color=gray : Everyone on the payroll
   detail
     row height=16
-      textField 3fr : $F{name}
-      use money 1fr value=$F{salary}</pre>
+      text 3fr : {name}
+      use money 1fr value={salary}</pre>
       <table>
         <tr><th>Write</th><th>And you get</th></tr>
         <tr><td>Parts without <code>x,y</code></td><td>One under the other, as wide as the band (or frame); the band is as tall as they need unless it gives a height</td></tr>
@@ -198,8 +262,8 @@ report "Employees" lang=en
         <tr><td><code>gap=</code></td><td>On a band, frame, row or stack: the space between its parts, in points (4 unless you say)</td></tr>
         <tr><td><code>def name params...</code></td><td>A definition: the parts under it, with <code>{{param}}</code> where a value goes</td></tr>
         <tr><td><code>use name param=value</code></td><td>The definition's parts, with the values in place. A width (<code>1fr</code>) and other attributes on <code>use</code> go to its parts</td></tr>
-        <tr><td><code>if : condition</code></td><td>Its parts print only when the condition holds, and take no room when it does not (a frame with <code>printWhenExpression</code> and <code>removeLineWhenBlank</code>)</td></tr>
-        <tr><td><code>each : $F{lines}</code></td><td>Its parts repeat for every row of a nested list; <code>field</code> lines inside it declare the rows' fields (a list component over a subdataset)</td></tr>
+        <tr><td><code>if : {overdue}</code></td><td>Its parts print only when the condition holds, and take no room when it does not (a frame with <code>printWhenExpression</code> and <code>removeLineWhenBlank</code>)</td></tr>
+        <tr><td><code>each : {lines}</code></td><td>Its parts repeat for every row of a nested list; <code>field</code> lines inside it declare the rows' fields, when they need a class (a list component over a subdataset)</td></tr>
         <tr><td><code>import "parts.ferro"</code></td><td>Another file's definitions, styles and fields, from the template's folder or the resource folders</td></tr>
       </table>
       <p>A part placed this way floats (it moves down when the one above it grows) and a text field grows with its text, so nothing
