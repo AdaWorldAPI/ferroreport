@@ -4,6 +4,13 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## 1.0.1
+
+- The VS Code extension for `.ferro` is on the Visual Studio Marketplace
+  (`cristianencarnacion.ferroreport`), published from the release workflow without a token.
+- npm and PyPI packages are published through trusted publishing, without tokens.
+- No change to the engine: what 1.0.0 renders, 1.0.1 renders the same.
+
 ## 1.0.0
 
 The first stable release: the APIs, the command line, the HTTP API and the `.ferro` format are

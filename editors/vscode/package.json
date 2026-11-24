@@ -2,7 +2,7 @@
   "name": "ferroreport",
   "displayName": "ferroreport templates (.ferro)",
   "description": "Syntax highlighting, folding and snippets for ferroreport's .ferro report templates.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "cristianencarnacion",
   "license": "MIT OR Apache-2.0",
   "repository": { "type": "git", "url": "https://github.com/cristianEncarnacion/ferroreport" },
