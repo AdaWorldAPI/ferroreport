@@ -4,111 +4,152 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Report designer · ferroreport</title>
-<meta name="description" content="Design a report in your browser: drag the fields of your data onto the page, style them, and see the PDF as you go. Saves .ferro and JasperReports .jrxml templates. Nothing is uploaded.">
+<meta name="description" content="Design a report in your browser: drag the fields of your data onto the page, style them, and download it as PDF, Excel or Word. Saves .ferro and JasperReports .jrxml templates. Nothing is uploaded.">
 <link rel="canonical" href="https://cristianencarnacion.github.io/ferroreport/designer/">
 <link rel="preload" href="../fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="designer.css">
 </head>
 <body>
-<a class="skip" href="#canvas-stage">Skip to the page</a>
+<a class="skip" href="#canvas-stage" data-i18n="skip">Skip to the page</a>
 <header class="bar">
-  <a class="brand" href="../">ferro<span>report</span></a>
-  <span class="app-name">Designer</span>
+  <div class="bar-start">
+    <a class="brand" href="../">ferro<span>report</span></a>
+    <span class="app-name" data-i18n="app.name">Designer</span>
+    <div class="tools" role="toolbar" data-i18n-aria="bar.report" aria-label="Report">
+      <details class="menu" id="file-menu">
+        <summary class="btn" data-i18n="file">File</summary>
+        <div class="menu-list">
+          <p class="menu-head" data-i18n="file.new">Start a new report</p>
+          <button type="button" data-start="blank" data-i18n="file.blank">Blank report</button>
+          <button type="button" data-start="invoice" data-i18n="file.invoice">Invoice example</button>
+          <button type="button" data-start="employees" data-i18n="file.employees">Employee list example</button>
+          <hr>
+          <button type="button" id="open-btn" data-i18n="file.open">Open a file…</button>
+          <hr>
+          <button type="button" id="save-ferro" data-i18n="file.saveFerro">Save template (.ferro)</button>
+          <button type="button" id="save-jrxml" data-i18n="file.saveJrxml">Save for JasperReports (.jrxml)</button>
+        </div>
+      </details>
+      <input type="file" id="open-file" accept=".ferro,.jrxml,.xml,.json,.jrtx,.png,.jpg,.jpeg,.gif,.svg" multiple hidden>
+      <button type="button" class="icon-btn" id="undo" data-i18n-title="undo" data-i18n-aria="undo" title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a3.5 3.5 0 0 1 0 7H7"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="redo" data-i18n-title="redo" data-i18n-aria="redo" title="Redo (Ctrl+Y)" aria-label="Redo (Ctrl+Y)" aria-keyshortcuts="Control+Y">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.5 3 3 3-3 3"/><path d="M13.5 6h-7a3.5 3.5 0 0 0 0 7H9"/></svg>
+      </button>
+    </div>
+  </div>
 
-  <div class="tools" role="toolbar" aria-label="Report">
-    <details class="menu" id="new-menu">
-      <summary>New</summary>
+  <div class="views" id="views" role="tablist" data-i18n-aria="views" aria-label="View">
+    <button type="button" role="tab" id="tab-design" aria-selected="true" aria-controls="canvas-stage" data-i18n="view.design">Design</button>
+    <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="preview-pane" tabindex="-1"><span data-i18n="view.preview">Preview</span><span class="tab-alert" id="tab-alert" hidden data-i18n-title="tab.alert" title="The report has a problem">!</span></button>
+  </div>
+
+  <div class="bar-end">
+    <div class="zoom" role="group" data-i18n-aria="zoom" aria-label="Zoom">
+      <button type="button" class="icon-btn" id="zoom-out" data-i18n-aria="zoom.out" data-i18n-title="zoom.out" aria-label="Zoom out">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8"/></svg>
+      </button>
+      <button type="button" id="zoom-label" class="zoom-label" data-i18n-title="zoom.fit" title="Fit the page to the window">100%</button>
+      <button type="button" class="icon-btn" id="zoom-in" data-i18n-aria="zoom.in" data-i18n-title="zoom.in" aria-label="Zoom in">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M8 4v8"/></svg>
+      </button>
+    </div>
+    <details class="menu menu-right" id="help-menu">
+      <summary class="icon-btn round" data-i18n-aria="help.menu" data-i18n-title="help.menu" aria-label="Help and settings">?</summary>
       <div class="menu-list">
-        <button type="button" data-start="blank">Blank report</button>
-        <button type="button" data-start="invoice">Example: invoices</button>
-        <button type="button" data-start="employees">Example: employees</button>
-      </div>
-    </details>
-    <button type="button" id="open-btn">Open…</button>
-    <input type="file" id="open-file" accept=".ferro,.jrxml,.xml,.json,.jrtx,.png,.jpg,.jpeg,.gif,.svg" multiple hidden>
-    <details class="menu" id="save-menu">
-      <summary>Save</summary>
-      <div class="menu-list">
-        <button type="button" id="save-ferro">Template as .ferro</button>
-        <button type="button" id="save-jrxml">Template as .jrxml (JasperReports)</button>
+        <button type="button" id="guide-btn" data-i18n="help.guide">Getting started</button>
+        <button type="button" id="help-btn" aria-haspopup="dialog" data-i18n="help.shortcuts">Keyboard shortcuts</button>
         <hr>
-        <button type="button" data-export="pdf">Report as PDF</button>
-        <button type="button" data-export="xlsx">Report as Excel (.xlsx)</button>
-        <button type="button" data-export="docx">Report as Word (.docx)</button>
+        <label class="menu-check"><input type="checkbox" id="snap" checked> <span data-i18n="help.snap">Snap to grid</span></label>
       </div>
     </details>
-  </div>
-
-  <div class="tools" role="toolbar" aria-label="Edit">
-    <button type="button" id="undo" title="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z">Undo</button>
-    <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z">Redo</button>
-  </div>
-
-  <div class="tools" role="toolbar" aria-label="View">
-    <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
-    <button type="button" id="zoom-label" class="zoom-label" title="Fit the page to the window">100%</button>
-    <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
-    <label class="check"><input type="checkbox" id="snap" checked> Snap to grid</label>
-    <button type="button" id="toggle-preview" aria-pressed="true">Preview</button>
-    <button type="button" id="help-btn" aria-haspopup="dialog">Shortcuts</button>
+    <div class="lang" role="group" data-i18n-aria="lang" aria-label="Language">
+      <button type="button" data-lang="en" lang="en" aria-label="English">EN</button>
+      <button type="button" data-lang="es" lang="es" aria-label="Español">ES</button>
+    </div>
+    <div class="download">
+      <button type="button" class="primary" id="download-pdf">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>
+        <span data-i18n="download.pdf">Download PDF</span>
+      </button>
+      <details class="menu menu-right" id="download-menu">
+        <summary class="primary caret" data-i18n-aria="download.more" data-i18n-title="download.more" aria-label="Other formats">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>
+        </summary>
+        <div class="menu-list">
+          <p class="menu-head" data-i18n="download.as">Download the report as</p>
+          <button type="button" data-export="pdf" data-i18n="download.pdfItem">PDF</button>
+          <button type="button" data-export="xlsx" data-i18n="download.xlsx">Excel (.xlsx)</button>
+          <button type="button" data-export="docx" data-i18n="download.docx">Word (.docx)</button>
+        </div>
+      </details>
+    </div>
   </div>
 </header>
 
 <main class="work" id="work">
-  <aside class="side left" aria-label="Data and parts">
+  <aside class="side left" data-i18n-aria="data.title" aria-label="Your data">
     <section class="panel" aria-labelledby="data-h">
-      <h2 id="data-h">Your data</h2>
-      <p class="hint">Paste a sample of your data as JSON (a list of rows), or upload a file. Then drag a field onto the page.</p>
-      <textarea id="data" spellcheck="false" aria-label="Sample data (JSON)" rows="6"></textarea>
-      <div class="row-btns">
-        <button type="button" id="data-upload-btn">Upload JSON…</button>
+      <h2 id="data-h" data-i18n="data.title">Your data</h2>
+      <p class="hint" data-i18n="data.hint">Drag a field onto the page.</p>
+      <ul class="fields" id="fields" aria-labelledby="data-h"></ul>
+      <div class="data-tools">
+        <button type="button" class="btn small" id="data-upload-btn">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.5v-8M4.5 6 8 2.5 11.5 6M3 13.5h10"/></svg>
+          <span data-i18n="data.upload">Upload data file…</span>
+        </button>
         <input type="file" id="data-file" accept=".json,application/json" hidden>
-        <span id="data-msg" class="msg" role="status"></span>
+        <details class="sub" id="data-details">
+          <summary data-i18n="data.edit">Edit sample data</summary>
+          <p class="hint" data-i18n="data.editHint">A list of rows, written in JSON.</p>
+          <textarea id="data" spellcheck="false" data-i18n-aria="data.aria" aria-label="Sample data (JSON)" rows="9"></textarea>
+        </details>
+        <p id="data-msg" class="msg" role="status"></p>
       </div>
-      <h3 id="fields-h">Fields</h3>
-      <ul class="fields" id="fields" aria-labelledby="fields-h"></ul>
       <div id="params-section" hidden>
-        <h3 id="params-h">Parameters</h3>
-        <p class="hint">Values given to the whole report, such as a customer's name. Drag one onto the page to show it.</p>
+        <h3 id="params-h" data-i18n="params.title">Report values</h3>
+        <p class="hint" data-i18n="params.hint">Values given to the whole report.</p>
         <ul class="fields" id="param-list" aria-labelledby="params-h"></ul>
-        <label class="small-label" for="params">Values for the preview (JSON)</label>
-        <textarea id="params" spellcheck="false" rows="3"></textarea>
+        <details class="sub">
+          <summary data-i18n="params.edit">Values for the preview</summary>
+          <textarea id="params" spellcheck="false" rows="3" data-i18n-aria="params.edit" aria-label="Values for the preview"></textarea>
+        </details>
         <span id="params-msg" class="msg" role="status"></span>
       </div>
       <p id="files-note" class="hint files-note" hidden></p>
     </section>
     <section class="panel" aria-labelledby="parts-h">
-      <h2 id="parts-h">Add to the page</h2>
-      <p class="hint">Drag onto a band, or select a band and press the button.</p>
+      <h2 id="parts-h" data-i18n="parts.title">Add to the page</h2>
+      <p class="hint" data-i18n="parts.hint">Drag onto the page, or click to add to the selected area.</p>
       <div class="parts" id="parts">
-        <button type="button" draggable="true" data-part="staticText"><i class="ico ico-text" aria-hidden="true"></i>Text</button>
-        <button type="button" draggable="true" data-part="line"><i class="ico ico-line" aria-hidden="true"></i>Line</button>
-        <button type="button" draggable="true" data-part="rectangle"><i class="ico ico-rect" aria-hidden="true"></i>Rectangle</button>
-        <button type="button" draggable="true" data-part="ellipse"><i class="ico ico-ellipse" aria-hidden="true"></i>Ellipse</button>
-        <button type="button" draggable="true" data-part="image"><i class="ico ico-image" aria-hidden="true"></i>Image</button>
-        <button type="button" draggable="true" data-part="pageNumber"><i class="ico ico-num" aria-hidden="true"></i>Page number</button>
-        <button type="button" draggable="true" data-part="today"><i class="ico ico-date" aria-hidden="true"></i>Today's date</button>
+        <button type="button" draggable="true" data-part="staticText"><i class="ico ico-text" aria-hidden="true"></i><span data-i18n="part.staticText">Text</span></button>
+        <button type="button" draggable="true" data-part="field"><i class="ico ico-field" aria-hidden="true"></i><span data-i18n="part.field">Field</span></button>
+        <button type="button" draggable="true" data-part="line"><i class="ico ico-line" aria-hidden="true"></i><span data-i18n="part.line">Line</span></button>
+        <button type="button" draggable="true" data-part="rectangle"><i class="ico ico-rect" aria-hidden="true"></i><span data-i18n="part.rectangle">Box</span></button>
+        <button type="button" draggable="true" data-part="ellipse"><i class="ico ico-ellipse" aria-hidden="true"></i><span data-i18n="part.ellipse">Circle</span></button>
+        <button type="button" draggable="true" data-part="image"><i class="ico ico-image" aria-hidden="true"></i><span data-i18n="part.image">Image</span></button>
+        <button type="button" draggable="true" data-part="pageNumber" data-i18n-title="part.pageNumberFull"><i class="ico ico-num" aria-hidden="true"></i><span data-i18n="part.pageNumber">Page number</span></button>
+        <button type="button" draggable="true" data-part="today"><i class="ico ico-date" aria-hidden="true"></i><span data-i18n="part.today">Date</span></button>
       </div>
     </section>
   </aside>
 
-  <section class="center" aria-label="Page and preview">
-    <div class="stage" id="canvas-stage" tabindex="-1" aria-label="Page">
+  <section class="center" id="center">
+    <div class="stage" id="canvas-stage" role="tabpanel" aria-labelledby="tab-design" tabindex="-1">
       <div class="sheet" id="sheet"></div>
     </div>
-    <div class="preview" id="preview-pane">
-      <div class="preview-head">
-        <h2>Preview</h2>
-        <span id="preview-msg" class="msg" role="status" aria-live="polite">Loading the engine…</span>
-      </div>
-      <iframe id="preview" title="Preview of the report as a PDF"></iframe>
+    <div class="preview" id="preview-pane" role="tabpanel" aria-labelledby="tab-preview" hidden>
+      <p class="preview-head"><span id="preview-msg" class="msg" role="status" aria-live="polite" data-i18n="preview.loading">Loading the engine…</span></p>
       <pre id="preview-error" class="preview-error" hidden></pre>
+      <iframe id="preview" data-i18n-title="preview.frame" title="Preview of the report as a PDF"></iframe>
     </div>
   </section>
 
-  <aside class="side right" aria-label="Properties">
-    <section class="panel" aria-labelledby="props-h">
-      <h2 id="props-h">Properties</h2>
+  <aside class="side right" id="props-side" data-i18n-aria="props.label" aria-label="Properties">
+    <section class="panel props-panel" aria-labelledby="props-h">
+      <h2 id="props-h">Page</h2>
+      <p id="props-sub" class="hint" hidden></p>
       <form id="props" autocomplete="off" onsubmit="return false"></form>
     </section>
   </aside>
@@ -116,23 +157,41 @@
 
 <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
 
-<dialog id="help">
-  <h2>Shortcuts</h2>
+<dialog id="guide" aria-labelledby="guide-h">
+  <form method="dialog" class="dialog-close"><button class="icon-btn round" data-i18n-aria="guide.close" aria-label="Close">×</button></form>
+  <h2 id="guide-h" data-i18n="guide.title">Make a report in three steps</h2>
+  <ol class="steps">
+    <li><span class="step-n" aria-hidden="true">1</span><b data-i18n="guide.s1">Add your data</b><span data-i18n="guide.s1d"></span></li>
+    <li><span class="step-n" aria-hidden="true">2</span><b data-i18n="guide.s2">Drag fields onto the page</b><span data-i18n="guide.s2d"></span></li>
+    <li><span class="step-n" aria-hidden="true">3</span><b data-i18n="guide.s3">Download</b><span data-i18n="guide.s3d"></span></li>
+  </ol>
+  <p class="guide-how" data-i18n="guide.how">How do you want to start?</p>
+  <div class="guide-start">
+    <button type="button" class="primary" data-start="invoice" data-i18n="guide.invoice" autofocus>Start from the invoice example</button>
+    <button type="button" class="btn" data-start="blank" data-i18n="guide.blank">Start blank</button>
+    <button type="button" class="btn" id="guide-open" data-i18n="guide.open">Open a file…</button>
+  </div>
+  <p class="guide-note" data-i18n="guide.private">Nothing is uploaded: the report is made on your computer.</p>
+</dialog>
+
+<dialog id="help" aria-labelledby="help-h">
+  <h2 id="help-h" data-i18n="keys.title">Keyboard shortcuts</h2>
   <table>
-    <tr><th>Drag a field or part onto a band</th><td>Add it there</td></tr>
-    <tr><th><kbd>Enter</kbd> on a field or part</th><td>Add it to the selected band</td></tr>
-    <tr><th><kbd>Tab</kbd></th><td>Go from part to part on the page</td></tr>
-    <tr><th>Double-click a text</th><td>Edit what it says</td></tr>
-    <tr><th>Arrow keys</th><td>Move the selected part (by the grid when snapping)</td></tr>
-    <tr><th><kbd>Shift</kbd> + arrow keys</th><td>Make it wider, narrower, taller or shorter</td></tr>
-    <tr><th><kbd>Alt</kbd> + arrow keys</th><td>Move by one point</td></tr>
-    <tr><th><kbd>Delete</kbd> or <kbd>Backspace</kbd></th><td>Remove the selected part</td></tr>
-    <tr><th><kbd>Ctrl</kbd> + <kbd>D</kbd></th><td>Duplicate it</td></tr>
-    <tr><th><kbd>Ctrl</kbd> + <kbd>Z</kbd>, <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></th><td>Undo, redo</td></tr>
-    <tr><th><kbd>Esc</kbd></th><td>Select nothing (shows the page settings)</td></tr>
+    <tr><th data-i18n="keys.drag"></th><td data-i18n="keys.dragDo"></td></tr>
+    <tr><th data-i18n="keys.enter"></th><td data-i18n="keys.enterDo"></td></tr>
+    <tr><th data-i18n="keys.tab"></th><td data-i18n="keys.tabDo"></td></tr>
+    <tr><th data-i18n="keys.dbl"></th><td data-i18n="keys.dblDo"></td></tr>
+    <tr><th data-i18n="keys.brace"></th><td data-i18n="keys.braceDo"></td></tr>
+    <tr><th data-i18n="keys.arrows"></th><td data-i18n="keys.arrowsDo"></td></tr>
+    <tr><th data-i18n="keys.shift"></th><td data-i18n="keys.shiftDo"></td></tr>
+    <tr><th data-i18n="keys.alt"></th><td data-i18n="keys.altDo"></td></tr>
+    <tr><th data-i18n="keys.del"></th><td data-i18n="keys.delDo"></td></tr>
+    <tr><th data-i18n="keys.dup"></th><td data-i18n="keys.dupDo"></td></tr>
+    <tr><th data-i18n="keys.undo"></th><td data-i18n="keys.undoDo"></td></tr>
+    <tr><th data-i18n="keys.esc"></th><td data-i18n="keys.escDo"></td></tr>
   </table>
-  <p>Your work is kept in this browser until you start a new report. Nothing is uploaded: the report is made on your computer.</p>
-  <form method="dialog"><button class="primary">Close</button></form>
+  <p data-i18n="keys.note"></p>
+  <form method="dialog"><button class="primary" data-i18n="guide.close">Close</button></form>
 </dialog>
 
 <script type="module" src="app.js"></script>

@@ -332,8 +332,10 @@ the same reports, written as an indented outline instead of XML. It is about hal
 the JRXML, a person can write it without a designer, and its reports are accessible by default.
 
 To make a template without writing it, use the **[designer](https://cristianencarnacion.github.io/ferroreport/designer/)**: it runs in the
-browser (nothing is uploaded), lists the fields of a sample of your data, lets you drag them onto
-the bands and style them, shows the PDF as you go, and saves `.ferro` and `.jrxml`.
+browser (nothing is uploaded), in English or Spanish: it lists the fields of a sample of your
+data, lets you drag them onto the page and style them, writes text with fields as
+`Invoice {number}` instead of code, shows the PDF in its preview, downloads it as PDF, Excel or
+Word, and saves `.ferro` and `.jrxml`.
 
 ```text
 report "Employees" lang=en
