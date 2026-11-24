@@ -532,26 +532,164 @@ struct FaceUse {
     codes: Vec<u16>,
     /// The glyphs used and a character each stands for, in order of first use.
     chars: Vec<(u16, char)>,
+    /// Glyphs of shaped text that stand for something other than one character (ligatures,
+    /// conjuncts), and what they stand for.
+    strings: Vec<(u16, String)>,
     resource: String,
 }
 
 impl FaceUse {
     fn new(number: usize) -> FaceUse {
-        FaceUse { remapper: GlyphRemapper::new(), codes: Vec::new(), chars: Vec::new(), resource: format!("F{number}") }
+        FaceUse {
+            remapper: GlyphRemapper::new(),
+            codes: Vec::new(),
+            chars: Vec::new(),
+            strings: Vec::new(),
+            resource: format!("F{number}"),
+        }
     }
 
-    /// The code that draws `glyph` in the subset font.
-    fn code(&mut self, glyph: u16, ch: char) -> u16 {
+    /// The code that draws `glyph` in the subset font, and whether it is new.
+    #[inline]
+    fn remap(&mut self, glyph: u16) -> (u16, bool) {
         let i = glyph as usize;
         if i >= self.codes.len() {
             self.codes.resize(i + 1, 0);
         }
-        if self.codes[i] == 0 {
-            let new = self.remapper.remap(glyph);
-            self.codes[i] = new.wrapping_add(1);
+        let new = self.codes[i] == 0;
+        if new {
+            self.codes[i] = self.remapper.remap(glyph).wrapping_add(1);
+        }
+        (self.codes[i].wrapping_sub(1), new)
+    }
+
+    /// The code that draws `glyph` in the subset font.
+    fn code(&mut self, glyph: u16, ch: char) -> u16 {
+        let (code, new) = self.remap(glyph);
+        if new {
             self.chars.push((glyph, ch));
         }
-        self.codes[i].wrapping_sub(1)
+        code
+    }
+
+    /// The code that draws `glyph`, a glyph of shaped text standing for `text`.
+    fn code_for(&mut self, glyph: u16, text: &str) -> u16 {
+        let (code, new) = self.remap(glyph);
+        if new {
+            let mut chars = text.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) => self.chars.push((glyph, c)),
+                _ => self.strings.push((glyph, text.to_string())),
+            }
+        }
+        code
+    }
+}
+
+/// Writes one shaped line: its glyphs in visual order, each placed where shaping put it
+/// (the PDF advances by the font's own widths, adjusted to the shaped advances; marks raised
+/// with the text rise).
+///
+/// Copying gives the characters as written: a glyph maps to the characters of its cluster.
+/// Left-to-right runs whose glyphs are not one per character in reading order (Devanagari
+/// vowel signs drawn before their consonant, conjuncts, Thai marks) are also wrapped in a span
+/// whose actual text is the run as written. Right-to-left runs are left to the reader's own
+/// reordering, as for any PDF of right-to-left text, so a ligature there maps to its
+/// characters from left to right as drawn (lam-alef: alef, lam), which readers reverse.
+fn show_shaped(
+    c: &mut Content,
+    used: &mut FaceUse,
+    face: &crate::fonts::FaceData,
+    size: f32,
+    line: &crate::print::PrintLine,
+    shaped: &crate::shape::ShapedLine,
+    ph: f32,
+) {
+    enum Op {
+        Show(Vec<u8>),
+        Adjust(f32),
+    }
+    fn flush(c: &mut Content, ops: &mut Vec<Op>) {
+        if ops.is_empty() {
+            return;
+        }
+        let mut positioned = c.show_positioned();
+        let mut items = positioned.items();
+        for op in ops.drain(..) {
+            match op {
+                Op::Show(bytes) => {
+                    items.show(Str(&bytes));
+                }
+                Op::Adjust(a) => {
+                    items.adjust(a);
+                }
+            }
+        }
+    }
+    let k = size as f64 / 1000.0;
+    let millis = 1000.0 / face.units_per_em;
+    let clusters: Vec<(&str, &[crate::shape::Glyph])> = shaped.clusters(&line.text).collect();
+    let x0 = r2(line.x) as f64;
+    c.set_text_matrix([1.0, 0.0, 0.0, 1.0, x0 as f32, r2(ph - line.baseline)]);
+    let (mut pen, mut cur, mut rise) = (x0, x0, 0.0f32);
+    let mut ops: Vec<Op> = Vec::new();
+    // Runs of clusters of one direction.
+    for run in clusters.chunk_by(|a, b| a.1[0].rtl == b.1[0].rtl) {
+        let rtl = run[0].1[0].rtl;
+        let reordered = !rtl && run.iter().any(|(t, gs)| gs.len() > 1 || t.chars().nth(1).is_some());
+        if reordered {
+            flush(c, &mut ops);
+            let actual: String = run.iter().map(|(t, _)| *t).collect();
+            c.begin_marked_content_with_properties(Name(b"Span")).properties().actual_text(TextStr(&actual));
+        }
+        for &(text, glyphs) in run {
+            let mut left: Vec<char> = text.chars().collect();
+            let mut meaning: Vec<Option<String>> = glyphs
+                .iter()
+                .map(|g| {
+                    if glyphs.len() == 1 {
+                        return Some(if rtl { text.chars().rev().collect() } else { text.to_string() });
+                    }
+                    let i = left.iter().position(|&ch| face.glyph(ch) == g.id)?;
+                    Some(left.remove(i).to_string())
+                })
+                .collect();
+            for m in meaning.iter_mut().filter(|m| m.is_none()) {
+                *m = Some(if left.is_empty() { text.to_string() } else { left.drain(..).collect() });
+            }
+            for (g, m) in glyphs.iter().zip(meaning) {
+                let x = pen + g.dx as f64 * k;
+                pen += g.advance as f64 * k;
+                if text == " " {
+                    pen += line.word_spacing as f64;
+                }
+                let code = used.code_for(g.id, m.as_deref().unwrap_or(text));
+                let dy = r2((g.dy as f64 * k) as f32);
+                if dy != rise {
+                    flush(c, &mut ops);
+                    c.set_rise(dy);
+                    rise = dy;
+                }
+                let adjust = r2(((cur - x) * 1000.0 / size as f64) as f32);
+                if adjust != 0.0 {
+                    ops.push(Op::Adjust(adjust));
+                    cur -= adjust as f64 * size as f64 / 1000.0;
+                }
+                match ops.last_mut() {
+                    Some(Op::Show(bytes)) => bytes.extend_from_slice(&code.to_be_bytes()),
+                    _ => ops.push(Op::Show(code.to_be_bytes().to_vec())),
+                }
+                cur += (face.advance(g.id) * millis).trunc() as f64 * size as f64 / 1000.0;
+            }
+        }
+        if reordered {
+            flush(c, &mut ops);
+            c.end_marked_content();
+        }
+    }
+    flush(c, &mut ops);
+    if rise != 0.0 {
+        c.set_rise(0.0);
     }
 }
 
@@ -1325,6 +1463,10 @@ impl<W: std::io::Write> PdfStream<W> {
                         if line.text.is_empty() {
                             continue;
                         }
+                        if let Some(shaped) = &line.shaped {
+                            show_shaped(&mut c, used, face, t.size, line, shaped, ph);
+                            continue;
+                        }
                         let mut encode = |s: &str| -> Vec<u8> {
                             s.chars()
                                 .filter(|ch| !ch.is_control())
@@ -2019,7 +2161,8 @@ impl<W: std::io::Write> PdfStream<W> {
             let face = fonts.face(face_id);
             let subset =
                 subsetter::subset(&face.data, 0, &used.remapper).map_err(|e| Error::Font(format!("{}: {e}", face.family)))?;
-            let glyph_set: BTreeSet<u16> = used.chars.iter().map(|&(g, _)| g).collect();
+            let glyph_set: BTreeSet<u16> =
+                used.chars.iter().map(|&(g, _)| g).chain(used.strings.iter().map(|(g, _)| *g)).collect();
             let base_name = format!("{}+{}", subset_tag(face_id, &glyph_set), face.postscript_name);
 
             let type0 = self.next_id();
@@ -2083,9 +2226,19 @@ impl<W: std::io::Write> PdfStream<W> {
             let mut cmap = pdf_writer::types::UnicodeCmap::new(Name(b"Custom"), system_info);
             let mut pairs: Vec<(u16, char)> =
                 used.chars.iter().filter_map(|&(old, c)| used.remapper.get(old).map(|new| (new, c))).collect();
+            let mut multiple: Vec<(u16, &str)> =
+                used.strings.iter().filter_map(|(old, s)| used.remapper.get(*old).map(|new| (new, s.as_str()))).collect();
             pairs.sort_unstable();
+            multiple.sort_unstable();
+            let mut multiple = multiple.into_iter().peekable();
             for (new, c) in pairs {
+                while let Some((m, s)) = multiple.next_if(|&(m, _)| m < new) {
+                    cmap.pair_with_multiple(m, s.chars());
+                }
                 cmap.pair(new, c);
+            }
+            for (m, s) in multiple {
+                cmap.pair_with_multiple(m, s.chars());
             }
             let mut chunk = Chunk::new();
             chunk.cmap(cmap_ref, &cmap.finish());
@@ -2367,4 +2520,61 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
         crate::sign::apply(&mut bytes, signature)?;
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    /// The decompressed streams of a PDF, as text.
+    fn streams(pdf: &[u8]) -> String {
+        let mut out = String::new();
+        let mut rest = pdf;
+        while let Some(i) = rest.windows(7).position(|w| w == b"stream\n") {
+            let body = &rest[i + 7..];
+            let end = body.windows(9).position(|w| w == b"endstream").unwrap_or(body.len());
+            match miniz_oxide::inflate::decompress_to_vec_zlib(&body[..end]) {
+                Ok(data) => out.push_str(&String::from_utf8_lossy(&data)),
+                Err(_) => out.push_str(&String::from_utf8_lossy(&body[..end])),
+            }
+            rest = &body[end..];
+        }
+        out
+    }
+
+    fn render(text: &str, font: &str, fonts: &[(&str, Vec<u8>)]) -> String {
+        let template = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="t" whenNoDataType="AllSectionsNoDetail" pageWidth="300" pageHeight="100" columnWidth="280" leftMargin="10" rightMargin="10" topMargin="10" bottomMargin="10">
+<title><band height="40"><staticText><reportElement x="0" y="0" width="280" height="40"/><textElement><font fontName="{font}" size="12"/></textElement><text><![CDATA[{text}]]></text></staticText></band></title>
+</jasperReport>"#
+        );
+        let mut r = crate::Renderer::new();
+        for (family, data) in fonts {
+            r.register_font(family, false, false, data.clone()).unwrap();
+        }
+        let report = r.parse(&template).unwrap();
+        let doc = r.fill(&report, &[], Default::default()).unwrap();
+        streams(&r.to_pdf(&doc).unwrap())
+    }
+
+    #[test]
+    fn right_to_left_glyphs_map_back_to_their_characters() {
+        let s = render("لا سلام", "DejaVu Sans", &[]);
+        // Contextual forms map to the letters themselves; the lam-alef ligature to both
+        // letters, as drawn from left to right (alef, lam), which readers reverse.
+        assert!(s.contains("<0627 0644>") || s.contains("<06270644>"), "{s}");
+        assert!(s.contains("<0633>") && s.contains("<0645>"));
+        // Readers order right-to-left text themselves: no actual text for it.
+        assert!(!s.contains("ActualText"));
+    }
+
+    #[test]
+    fn reordered_clusters_carry_their_text() {
+        let Ok(font) = std::fs::read("/usr/share/fonts/truetype/freefont/FreeSerif.ttf") else {
+            eprintln!("FreeSerif is not installed: skipped");
+            return;
+        };
+        let s = render("हिन्दी", "FreeSerif", &[("FreeSerif", font)]);
+        // The vowel sign is drawn before its consonant: the span says what is written.
+        assert!(s.contains("/ActualText"), "{s}");
+    }
 }

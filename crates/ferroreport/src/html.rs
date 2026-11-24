@@ -295,10 +295,14 @@ impl Pages {
                             continue;
                         }
                         let spaces = text.matches(' ').count() as f32;
+                        // Shaped text: the browser shapes and orders it again; a right-to-left
+                        // line starts at its right edge.
+                        let rtl = line.shaped.as_ref().is_some_and(|s| s.rtl);
+                        let x = if rtl { line.x + line.width - lead as f32 * space } else { line.x + lead as f32 * space };
                         let _ = write!(
                             out,
                             "<text x=\"{}\" y=\"{}\" font-family=\"{}\" font-size=\"{}\" fill=\"{}\"",
-                            n(line.x + lead as f32 * space),
+                            n(x),
                             n(line.baseline),
                             css_family(&face.family),
                             n(t.size),
@@ -321,7 +325,13 @@ impl Pages {
                         }
                         // The width the PDF gives the line (the glyphs' own widths plus the extra
                         // after each space) keeps it in place whatever font draws it.
-                        let width = face.text_width(text, t.size) + line.word_spacing * spaces;
+                        if rtl {
+                            out.push_str(" direction=\"rtl\"");
+                        }
+                        let width = match line.shaped {
+                            Some(_) => line.width - lead as f32 * space,
+                            None => face.text_width(text, t.size) + line.word_spacing * spaces,
+                        };
                         if width > 0.0 && text.chars().count() > 1 {
                             let _ = write!(out, " textLength=\"{}\" lengthAdjust=\"spacing\"", n(width));
                         }

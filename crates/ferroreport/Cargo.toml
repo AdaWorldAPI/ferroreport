@@ -18,6 +18,14 @@ serde_json = "1"
 pdf-writer = "0.15"
 subsetter = "0.2"
 ttf-parser = "0.25"
+# Text shaping (Arabic joining, Indic clusters), the Unicode Bidirectional Algorithm and
+# line-break opportunities, for text in scripts that are not one glyph per character.
+rustybuzz = "0.20"
+unicode-bidi = "0.3"
+unicode-script = "0.5"
+unicode-linebreak = "0.1"
+# Keeps each font's shaping tables next to the font bytes they read, parsed once.
+self_cell = "1"
 miniz_oxide = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 rust_decimal = "1"

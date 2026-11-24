@@ -19,6 +19,10 @@ for dir in "$root"/fixtures/*/; do
   args=(-q --now 2024-01-15T10:30:00)
   [ -f "$dir/data.json" ] && args+=(-d "$dir/data.json")
   [ -f "$dir/params.json" ] && args+=(-p "$dir/params.json")
+  # Fonts a fixture needs (fonts.txt: Family=file.ttf[:bold][:italic]), when installed.
+  if [ -f "$dir/fonts.txt" ]; then
+    while IFS= read -r f; do p=${f#*=}; [ -n "$f" ] && [ -f "${p%%:*}" ] && args+=(--font "$f"); done < "$dir/fonts.txt"
+  fi
   attach="$dir/report.jrxml:text/xml"
   [ -f "$dir/data.json" ] && attach="$dir/data.json"
   "$bin" render "$dir/report.jrxml" "${args[@]}" --pdfa 2a -o "$out/2a/$name.pdf" 2>/dev/null || echo "$name: not rendered as PDF/A-2a"

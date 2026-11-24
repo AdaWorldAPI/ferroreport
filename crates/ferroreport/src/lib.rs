@@ -42,6 +42,7 @@ pub mod print;
 mod raster;
 pub mod rich;
 pub mod rtf;
+pub mod shape;
 pub mod sign;
 pub mod sql;
 pub mod standard;

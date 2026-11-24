@@ -513,7 +513,11 @@ impl Canvas<'_> {
     }
     fn width(&mut self, font: &FontSpec, text: &str) -> f32 {
         let id = self.face(font);
-        self.fonts.face(id).text_width(text, font.size)
+        let face = self.fonts.face(id);
+        match crate::shape::line(face, text, crate::shape::is_rtl(text), font.size) {
+            Some((_, width)) => width,
+            None => face.text_width(text, font.size),
+        }
     }
     /// Text with its line box top at `top`.
     fn text(&mut self, font: &FontSpec, color: Color, text: &str, x: f32, top: f32, anchor: Anchor) {
@@ -522,7 +526,8 @@ impl Canvas<'_> {
         }
         let id = self.face(font);
         let face = self.fonts.face(id);
-        let width = face.text_width(text, font.size);
+        let shaped = crate::shape::line(face, text, crate::shape::is_rtl(text), font.size);
+        let width = shaped.as_ref().map(|s| s.1).unwrap_or_else(|| face.text_width(text, font.size));
         let ascent = face.ascent(font.size);
         let x = match anchor {
             Anchor::Left => x,
@@ -535,7 +540,14 @@ impl Canvas<'_> {
             color,
             underline: false,
             strike: false,
-            lines: vec![PrintLine { text: text.to_string(), x, baseline: top + ascent, width, word_spacing: 0.0 }],
+            lines: vec![PrintLine {
+                text: text.to_string(),
+                x,
+                baseline: top + ascent,
+                width,
+                word_spacing: 0.0,
+                shaped: shaped.map(|s| s.0),
+            }],
             standard: None,
             halign: crate::model::HAlign::Left,
         }));

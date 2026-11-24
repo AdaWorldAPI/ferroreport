@@ -52,6 +52,11 @@ def compare(fx: Path, args) -> tuple:
             cmd += ["-d", str(data)]
         if params.exists():
             cmd += ["-p", str(params)]
+        # Fonts the fixture needs (fonts.txt: Family=file.ttf[:bold][:italic]), when installed.
+        if (fx / "fonts.txt").exists():
+            for spec in (fx / "fonts.txt").read_text().split():
+                if Path(spec.split("=", 1)[-1].split(":")[0]).exists():
+                    cmd += ["--font", spec]
         po = subprocess.run(cmd, capture_output=True, text=True)
         if not jasper.exists():
             if (fx / "ORACLE-SKIP").exists():

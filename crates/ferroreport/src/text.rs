@@ -58,13 +58,24 @@ fn measure(face: &FaceData, size: f32, mode: Measure, s: &str) -> f32 {
 ///
 /// Paragraphs are split on newlines. Within a paragraph, breaks happen after whitespace and
 /// hyphens; trailing whitespace hangs past the edge. A word longer than the line is broken
-/// between characters, keeping at least one character per line.
+/// between characters, keeping at least one character per line. A paragraph with
+/// right-to-left or complex-script text is shaped and broken by [`crate::shape`] instead.
 pub fn break_lines(text: &str, face: &FaceData, size: f32, max_width: f32, mode: Measure) -> Vec<Line> {
     let mut lines = Vec::new();
     let normalized = normalize(text);
     let mut base = 0;
+    // Right-to-left and complex scripts take their own path; the rest is decided once.
+    let complex = !matches!(mode, Measure::Standard(_)) && crate::shape::needs_shaping(&normalized);
     for paragraph in normalized.split('\n') {
-        break_paragraph(paragraph, base, face, size, max_width, mode, &mut lines);
+        if complex && crate::shape::needs_shaping(paragraph) {
+            // Right-to-left and complex scripts: shaped advances, Unicode break rules.
+            for (from, to, width) in crate::shape::break_paragraph(face, paragraph, size, max_width, mode == Measure::Fill) {
+                let text = paragraph[from..to].trim_end_matches(' ');
+                lines.push(Line { text: text.to_string(), width, start: base + from });
+            }
+        } else {
+            break_paragraph(paragraph, base, face, size, max_width, mode, &mut lines);
+        }
         base += paragraph.len() + 1;
     }
     lines

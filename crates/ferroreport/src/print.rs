@@ -17,6 +17,9 @@ pub struct PrintLine {
     pub width: f32,
     /// Extra space added after each space character (justified text).
     pub word_spacing: f32,
+    /// The line as shaped glyphs in visual order, for text that is right to left or in a
+    /// script that needs shaping (`None`: one glyph per character, left to right).
+    pub shaped: Option<Arc<crate::shape::ShapedLine>>,
 }
 
 #[derive(Debug, Clone)]
