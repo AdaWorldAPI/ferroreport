@@ -321,9 +321,16 @@ ODS and ODT exporters lay a report out:
   Jasper. Links, anchors and page anchors carry over.
 - Not yet: exporter properties (`net.sf.jasperreports.export.ods.*`, `.odt.*`), dates as date
   cells, the per-mille sign in number styles (such values stay text), and upside-down text in
-  ODT (Writer's table cells have no such direction; it is written unrotated). The sheet or text
-  of a document is kept in memory until it is written (its styles come first in the file), so
-  a very large report takes more memory in these formats than in XLSX.
+  ODT (Writer's table cells have no such direction; it is written unrotated).
+- Large reports are written as they are made, in about the memory of a small one. A
+  document's styles come before its body in the file, so a large report is filled once more
+  first to find them (a spreadsheet three times in all: its columns, its styles, its rows; a
+  text twice), and the rows are then compressed and written as they come: 100,000 rows take
+  68 MiB as ODS and 37 MiB as ODT, a million rows 37 MiB as ODT (1.1.0 kept the body in
+  memory: 253, 265 and 1,672 MiB). Like large workbooks, this needs rows that can be read
+  again: a file, or rows the command line, the server and Python put aside for you; in Rust,
+  `render_rows_to`. Rows that can only be read once still give the document, kept in memory
+  until it is written.
 
 ## Templates: JRXML or .ferro
 
@@ -691,6 +698,8 @@ about the same size at a million). Excel workbooks are written as they are made 
 columns of a sheet come from every page, so a large report is filled twice, once to find them
 and once to write the rows (100,000 rows: about 3 s and 58 MiB; 500,000: 17 s and 92 MiB). A
 report with more rows than a sheet holds (1,048,576) stops with an error that says so.
+OpenDocument files too, once more filled first to find their styles: 100,000 rows in 68 MiB as
+ODS and 37 MiB as ODT, a million rows in 37 MiB as ODT.
 
 ## How it compares
 

@@ -10,13 +10,24 @@ use tiny_skia::{FillRule, IntSize, LineCap, Paint, PathBuilder, Pixmap, PixmapPa
 /// Draws the items of an area of a page (`x, y, w, h` in points) at `scale` pixels per point
 /// and returns it as a PNG with a transparent background.
 pub(crate) fn render_png(items: &[PrintItem], fonts: &FontSet, area: [f32; 4], scale: f32) -> Option<Vec<u8>> {
-    let [x, y, w, h] = area;
-    let (pw, ph) = ((w * scale).round().max(1.0) as u32, (h * scale).round().max(1.0) as u32);
+    let [x, y, _, _] = area;
+    let (pw, ph) = pixels(area, scale);
     let mut pixmap = Pixmap::new(pw, ph)?;
     let base = Transform::from_row(scale, 0.0, 0.0, scale, -x * scale, -y * scale);
     let mut r = Raster { pixmap: &mut pixmap, fonts };
     r.items(items, base);
     encode(&pixmap)
+}
+
+/// Whether [`render_png`] can draw a picture of `area`: what it does without drawing it.
+pub(crate) fn fits(area: [f32; 4], scale: f32) -> bool {
+    let (pw, ph) = pixels(area, scale);
+    Pixmap::new(pw, ph).is_some()
+}
+
+fn pixels(area: [f32; 4], scale: f32) -> (u32, u32) {
+    let [_, _, w, h] = area;
+    ((w * scale).round().max(1.0) as u32, (h * scale).round().max(1.0) as u32)
 }
 
 struct Raster<'a> {

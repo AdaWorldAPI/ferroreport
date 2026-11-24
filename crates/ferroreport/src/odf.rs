@@ -4,6 +4,12 @@
 //!
 //! JasperReports' `JROdsExporter` and `JROdtExporter` lay a page out on the same grid as its
 //! XLSX and DOCX exporters; so do these, with the grid of [`crate::grid`].
+//!
+//! The automatic styles of `content.xml` come before its body, and are only all known once
+//! the last page has been laid out. A document is therefore written in one of three ways
+//! ([`Content`]): kept in memory and written whole at the end; measured, the body made and
+//! thrown away so that only its styles are kept; or streamed, its styles found by measuring
+//! it first, each page compressed and written as it comes.
 
 use crate::fonts::FontSet;
 use crate::image::{ImageData, Pixels};
@@ -47,6 +53,12 @@ pub(crate) struct Styles {
     counts: HashMap<&'static str, usize>,
     /// Font families used, for the font declarations.
     pub fonts: BTreeSet<String>,
+    /// Set once the styles have been written ahead of the body: a style first asked for
+    /// after that (the rows read the second time were not those read the first) can no
+    /// longer go in `content.xml`, and goes to `styles.xml` as a common style instead.
+    frozen: bool,
+    late_xml: String,
+    late_fonts: BTreeSet<String>,
 }
 
 impl Styles {
@@ -57,10 +69,9 @@ impl Styles {
             return n.clone();
         }
         let name = self.next(prefix);
-        let _ = writeln!(
-            self.xml,
-            "<style:style style:name=\"{name}\" style:family=\"{family}\"{attributes}>{properties}</style:style>"
-        );
+        let xml = if self.frozen { &mut self.late_xml } else { &mut self.xml };
+        let _ =
+            writeln!(xml, "<style:style style:name=\"{name}\" style:family=\"{family}\"{attributes}>{properties}</style:style>");
         self.names.insert(key, name.clone());
         name
     }
@@ -73,7 +84,8 @@ impl Styles {
             return n.clone();
         }
         let name = self.next("N");
-        let _ = writeln!(self.xml, "<number:{element} style:name=\"{name}\">{body}</number:{element}>");
+        let xml = if self.frozen { &mut self.late_xml } else { &mut self.xml };
+        let _ = writeln!(xml, "<number:{element} style:name=\"{name}\">{body}</number:{element}>");
         self.names.insert(key, name.clone());
         name
     }
@@ -92,7 +104,9 @@ impl Styles {
         back: Option<Color>,
         script: Script,
     ) -> String {
-        self.fonts.insert(font.name.clone());
+        if self.fonts.insert(font.name.clone()) && self.frozen {
+            self.late_fonts.insert(font.name.clone());
+        }
         let size = pt(font.size);
         let mut p = format!(
             "<style:text-properties style:font-name=\"{}\" fo:font-size=\"{size}\" style:font-size-asian=\"{size}\" style:font-size-complex=\"{size}\" fo:color=\"{}\"",
@@ -124,18 +138,38 @@ impl Styles {
 
     /// The `<office:font-face-decls>` and `<office:automatic-styles>` of `content.xml`.
     pub fn write(&self, out: &mut String) {
-        out.push_str("<office:font-face-decls>\n");
-        for f in &self.fonts {
-            let _ = writeln!(
-                out,
-                "<style:font-face style:name=\"{0}\" svg:font-family=\"&apos;{0}&apos;\"/>",
-                escape(&f.replace('\'', ""))
-            );
-        }
-        out.push_str("</office:font-face-decls>\n<office:automatic-styles>\n");
+        font_faces(out, &self.fonts);
+        out.push_str("<office:automatic-styles>\n");
         out.push_str(&self.xml);
         out.push_str("</office:automatic-styles>\n");
     }
+
+    /// From now on, new styles are late ones (see [`Styles::late`]).
+    pub fn freeze(&mut self) {
+        self.frozen = true;
+    }
+
+    /// The fonts and styles first asked for after [`Styles::freeze`], for `styles.xml`
+    /// (empty when the body asked for nothing new).
+    pub fn late(&self) -> (String, &str) {
+        let mut fonts = String::new();
+        if !self.late_fonts.is_empty() {
+            font_faces(&mut fonts, &self.late_fonts);
+        }
+        (fonts, &self.late_xml)
+    }
+}
+
+fn font_faces(out: &mut String, fonts: &BTreeSet<String>) {
+    out.push_str("<office:font-face-decls>\n");
+    for f in fonts {
+        let _ = writeln!(
+            out,
+            "<style:font-face style:name=\"{0}\" svg:font-family=\"&apos;{0}&apos;\"/>",
+            escape(&f.replace('\'', ""))
+        );
+    }
+    out.push_str("</office:font-face-decls>\n");
 }
 
 /// One side of a border (`fo:border-top="0.5pt solid #000000"`).
@@ -403,9 +437,27 @@ pub(crate) fn place(nw: f32, nh: f32, aw: f32, ah: f32, scale: ScaleImage, halig
 pub(crate) struct Pictures {
     pub files: Vec<(String, Vec<u8>)>,
     names: HashMap<usize, String>,
+    /// Pictures made so far.
+    count: usize,
+    /// Only measuring: whether a picture can be made is found out, but it is not kept, and
+    /// charts and barcodes are not drawn.
+    measure: bool,
 }
 
 impl Pictures {
+    pub fn measuring() -> Pictures {
+        Pictures { measure: true, ..Pictures::default() }
+    }
+
+    fn keep(&mut self, ext: &str, bytes: Vec<u8>) -> String {
+        let name = format!("Pictures/img_{}.{ext}", self.count);
+        self.count += 1;
+        if !self.measure {
+            self.files.push((name.clone(), bytes));
+        }
+        name
+    }
+
     /// The file of an image, written once however often it is used.
     pub fn image(&mut self, data: &ImageData) -> Option<String> {
         if let Some(n) = self.names.get(&data.id) {
@@ -421,18 +473,18 @@ impl Pictures {
                 ("png", crate::svg::png(&svg.tree, w, h)?)
             }
         };
-        let name = format!("Pictures/img_{}.{ext}", self.files.len());
-        self.files.push((name.clone(), bytes));
+        let name = self.keep(ext, bytes);
         self.names.insert(data.id, name.clone());
         Some(name)
     }
 
     /// A chart or a barcode, drawn into a picture of `area` (x, y, width, height).
     pub fn drawing(&mut self, drawn: &[PrintItem], fonts: &FontSet, area: [f32; 4]) -> Option<String> {
+        if self.measure {
+            return crate::raster::fits(area, PICTURE_SCALE).then(|| self.keep("png", Vec::new()));
+        }
         let png = crate::raster::render_png(drawn, fonts, area, PICTURE_SCALE)?;
-        let name = format!("Pictures/img_{}.png", self.files.len());
-        self.files.push((name.clone(), png));
-        Some(name)
+        Some(self.keep("png", png))
     }
 }
 
@@ -533,53 +585,155 @@ pub(crate) fn frame(out: &mut String, style: &str, n: usize, href: &str, placed:
 pub(crate) const NAMESPACES: &str = "xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\" xmlns:number=\"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" office:version=\"1.3\"";
 
 /// The page: its size, no margins (the report's margins are part of the grid, as in
-/// JasperReports), portrait or landscape. `extra` goes into the master page.
-pub(crate) fn styles_xml(page_width: f32, page_height: f32, landscape: bool, default_paragraph: &str) -> String {
+/// JasperReports), portrait or landscape. Styles the body asked for after its styles were
+/// written ([`Styles::late`]) are common styles here.
+pub(crate) fn styles_xml(page_width: f32, page_height: f32, landscape: bool, default_paragraph: &str, late: &Styles) -> String {
     let orientation = if landscape { "landscape" } else { "portrait" };
+    let (late_fonts, late_styles) = late.late();
     format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-styles {NAMESPACES}>\n<office:styles>\n<style:default-style style:family=\"paragraph\">{default_paragraph}</style:default-style>\n<style:style style:name=\"Graphics\" style:family=\"graphic\"/>\n</office:styles>\n<office:automatic-styles>\n<style:page-layout style:name=\"pm1\"><style:page-layout-properties fo:page-width=\"{}\" fo:page-height=\"{}\" style:print-orientation=\"{orientation}\" fo:margin-top=\"0pt\" fo:margin-bottom=\"0pt\" fo:margin-left=\"0pt\" fo:margin-right=\"0pt\"/></style:page-layout>\n</office:automatic-styles>\n<office:master-styles>\n<style:master-page style:name=\"Standard\" style:page-layout-name=\"pm1\"/>\n</office:master-styles>\n</office:document-styles>\n",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-styles {NAMESPACES}>\n{late_fonts}<office:styles>\n<style:default-style style:family=\"paragraph\">{default_paragraph}</style:default-style>\n<style:style style:name=\"Graphics\" style:family=\"graphic\"/>\n{late_styles}</office:styles>\n<office:automatic-styles>\n<style:page-layout style:name=\"pm1\"><style:page-layout-properties fo:page-width=\"{}\" fo:page-height=\"{}\" style:print-orientation=\"{orientation}\" fo:margin-top=\"0pt\" fo:margin-bottom=\"0pt\" fo:margin-left=\"0pt\" fo:margin-right=\"0pt\"/></style:page-layout>\n</office:automatic-styles>\n<office:master-styles>\n<style:master-page style:name=\"Standard\" style:page-layout-name=\"pm1\"/>\n</office:master-styles>\n</office:document-styles>\n",
         pt(page_width),
         pt(page_height),
     )
 }
 
+/// The start of `content.xml`, before its styles.
+fn content_head() -> String {
+    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content {NAMESPACES}>\n")
+}
+
+/// How hard a streamed `content.xml` is compressed. The compressor for pieces makes larger
+/// files than the one for whole files at the same level; at 6 it makes about the size a kept
+/// `content.xml` has, still in a small part of the time the pages take to lay out.
+const STREAMED_LEVEL: u8 = 6;
+
+/// Where the body of `content.xml` goes as it is made.
+pub(crate) enum Content<W: std::io::Write> {
+    /// Nothing is written until the end, when the styles are known: the body is kept until
+    /// then, or, when `body` is `None`, only measured (made and thrown away, for its styles).
+    Held { out: W, body: Option<String> },
+    /// The styles were known before the first page (a first pass measured them) and are
+    /// written: each piece of the body is compressed and written as it comes.
+    Streamed(Box<ZipStream<W>>),
+}
+
+impl<W: std::io::Write> Content<W> {
+    /// A body kept in memory until the end.
+    pub fn kept(out: W) -> Content<W> {
+        Content::Held { out, body: Some(String::new()) }
+    }
+
+    /// A body only measured.
+    pub fn measured(out: W) -> Content<W> {
+        Content::Held { out, body: None }
+    }
+
+    /// Starts the package and `content.xml` with all its styles, then `body_start`. Styles
+    /// asked for after this go to `styles.xml`.
+    pub fn streamed(out: W, mimetype: &str, styles: &mut Styles, body_start: &str) -> crate::Result<Content<W>> {
+        let mut zip = begin(out, mimetype)?;
+        let mut head = content_head();
+        styles.write(&mut head);
+        head.push_str(body_start);
+        styles.freeze();
+        zip.begin_at("content.xml", STREAMED_LEVEL).map_err(io)?;
+        zip.write(head.as_bytes()).map_err(io)?;
+        Ok(Content::Streamed(Box::new(zip)))
+    }
+
+    /// Whether the body is only measured.
+    pub fn measuring(&self) -> bool {
+        matches!(self, Content::Held { body: None, .. })
+    }
+
+    /// From here on, only measure the body: what was kept of it is dropped.
+    pub fn stop_keeping(&mut self) {
+        if let Content::Held { body, .. } = self {
+            *body = None;
+        }
+    }
+
+    /// The next piece of the body; `piece` is left empty.
+    pub fn push(&mut self, piece: &mut String) -> crate::Result<()> {
+        match self {
+            Content::Held { body: Some(body), .. } => body.push_str(piece),
+            Content::Held { body: None, .. } => {}
+            Content::Streamed(zip) => zip.write(piece.as_bytes()).map_err(io)?,
+        }
+        piece.clear();
+        Ok(())
+    }
+
+    /// The output, given back by a body that was only measured.
+    pub fn into_output(self) -> Option<W> {
+        match self {
+            Content::Held { out, body: None } => Some(out),
+            _ => None,
+        }
+    }
+
+    /// Ends `content.xml` with `body_end` and writes the rest of the package. A kept body is
+    /// written here, between its styles (with `body_start`) and `body_end`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn finish(
+        self,
+        mimetype: &str,
+        styles: &Styles,
+        body_start: &str,
+        body_end: &str,
+        styles_xml: &str,
+        title: &str,
+        pictures: &Pictures,
+    ) -> crate::Result<W> {
+        let mut zip = match self {
+            Content::Held { out, body: Some(body) } => {
+                let mut content = content_head();
+                styles.write(&mut content);
+                content.push_str(body_start);
+                content.push_str(&body);
+                drop(body);
+                content.push_str(body_end);
+                let mut zip = begin(out, mimetype)?;
+                zip.add("content.xml", content.as_bytes()).map_err(io)?;
+                zip
+            }
+            Content::Held { body: None, .. } => {
+                return Err(crate::Error::Io("a document that was only measured cannot be finished".into()))
+            }
+            Content::Streamed(mut zip) => {
+                zip.write(body_end.as_bytes()).map_err(io)?;
+                zip.end().map_err(io)?;
+                *zip
+            }
+        };
+        zip.add("styles.xml", styles_xml.as_bytes()).map_err(io)?;
+        for (name, bytes) in &pictures.files {
+            zip.add(name, bytes).map_err(io)?;
+        }
+        let meta = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" office:version=\"1.3\"><office:meta><meta:generator>ferroreport {}</meta:generator><dc:title>{}</dc:title></office:meta></office:document-meta>\n",
+            env!("CARGO_PKG_VERSION"),
+            escape(title)
+        );
+        zip.add("meta.xml", meta.as_bytes()).map_err(io)?;
+        let mut manifest = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.3\">\n <manifest:file-entry manifest:full-path=\"/\" manifest:version=\"1.3\" manifest:media-type=\"{mimetype}\"/>\n <manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/>\n <manifest:file-entry manifest:full-path=\"styles.xml\" manifest:media-type=\"text/xml\"/>\n <manifest:file-entry manifest:full-path=\"meta.xml\" manifest:media-type=\"text/xml\"/>\n"
+        );
+        for (name, _) in &pictures.files {
+            let media = if name.ends_with(".jpg") { "image/jpeg" } else { "image/png" };
+            let _ = writeln!(manifest, " <manifest:file-entry manifest:full-path=\"{name}\" manifest:media-type=\"{media}\"/>");
+        }
+        manifest.push_str("</manifest:manifest>\n");
+        zip.add("META-INF/manifest.xml", manifest.as_bytes()).map_err(io)?;
+        zip.finish().map_err(io)
+    }
+}
+
 /// Starts a package: the `mimetype` first and uncompressed, as readers look for it there.
-pub(crate) fn begin<W: std::io::Write>(out: W, mimetype: &str) -> crate::Result<ZipStream<W>> {
+fn begin<W: std::io::Write>(out: W, mimetype: &str) -> crate::Result<ZipStream<W>> {
     let mut zip = ZipStream::new(out);
     zip.add_stored("mimetype", mimetype.as_bytes()).map_err(io)?;
     Ok(zip)
-}
-
-/// Ends a package: `content.xml`, `styles.xml`, the pictures, `meta.xml` and the manifest.
-pub(crate) fn finish<W: std::io::Write>(
-    mut zip: ZipStream<W>,
-    mimetype: &str,
-    content: &str,
-    styles: &str,
-    title: &str,
-    pictures: &Pictures,
-) -> crate::Result<W> {
-    zip.add("content.xml", content.as_bytes()).map_err(io)?;
-    zip.add("styles.xml", styles.as_bytes()).map_err(io)?;
-    for (name, bytes) in &pictures.files {
-        zip.add(name, bytes).map_err(io)?;
-    }
-    let meta = format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" office:version=\"1.3\"><office:meta><meta:generator>ferroreport {}</meta:generator><dc:title>{}</dc:title></office:meta></office:document-meta>\n",
-        env!("CARGO_PKG_VERSION"),
-        escape(title)
-    );
-    zip.add("meta.xml", meta.as_bytes()).map_err(io)?;
-    let mut manifest = format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.3\">\n <manifest:file-entry manifest:full-path=\"/\" manifest:version=\"1.3\" manifest:media-type=\"{mimetype}\"/>\n <manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/>\n <manifest:file-entry manifest:full-path=\"styles.xml\" manifest:media-type=\"text/xml\"/>\n <manifest:file-entry manifest:full-path=\"meta.xml\" manifest:media-type=\"text/xml\"/>\n"
-    );
-    for (name, _) in &pictures.files {
-        let media = if name.ends_with(".jpg") { "image/jpeg" } else { "image/png" };
-        let _ = writeln!(manifest, " <manifest:file-entry manifest:full-path=\"{name}\" manifest:media-type=\"{media}\"/>");
-    }
-    manifest.push_str("</manifest:manifest>\n");
-    zip.add("META-INF/manifest.xml", manifest.as_bytes()).map_err(io)?;
-    zip.finish().map_err(io)
 }
 
 #[cfg(test)]
@@ -607,6 +761,68 @@ mod tests {
         assert_eq!(fit, Placed { x: 0.0, y: 12.5, w: 50.0, h: 25.0, clip: None });
         let clip = place(100.0, 20.0, 50.0, 40.0, ScaleImage::Clip, HAlign::Center, VAlign::Bottom);
         assert_eq!(clip, Placed { x: 0.0, y: 20.0, w: 50.0, h: 20.0, clip: Some([0.0, 25.0, 0.0, 25.0]) });
+    }
+
+    /// Measured first and then written as it is made, every fixture gives the files it
+    /// gives when it is kept in memory and written at the end.
+    #[test]
+    fn every_fixture_streams_to_the_same_files() {
+        use crate::fill::PageSink;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&root).unwrap() {
+            let dir = entry.unwrap().path();
+            if !dir.join("expected.json").exists() || dir.join("data.sql").exists() {
+                continue;
+            }
+            let read = |f: &str| std::fs::read_to_string(dir.join(f));
+            let mut r =
+                crate::Renderer::new().resource_dir(&dir).now(crate::data::parse_datetime("2026-01-15T10:30:00").unwrap());
+            let report = r.parse(&read("report.jrxml").unwrap()).unwrap();
+            let rows = read("data.json").map(|t| serde_json::from_str(&t).unwrap()).unwrap_or(serde_json::json!([]));
+            let params = read("params.json").map(|t| serde_json::from_str(&t).unwrap()).unwrap_or(serde_json::json!({}));
+            let records = crate::data::records_from_json(&report, &rows).unwrap();
+            let params = crate::params_from_json(&report, &params).unwrap();
+            let doc = r.fill(&report, &records, params).unwrap();
+            let name = dir.file_name().unwrap().to_string_lossy().to_string();
+            let page = (doc.page_width, doc.page_height, doc.landscape);
+            let files = |bytes: &[u8]| crate::zip::tests::read(bytes);
+
+            for numbers in [false, true] {
+                let options = crate::xlsx::XlsxOptions { detect_cell_type: numbers };
+                let kept = crate::ods::write_ods(&doc, &r.fonts, &options).unwrap();
+                let mut columns = crate::xlsx::XlsxColumns::new();
+                for p in &doc.pages {
+                    columns.add(&p.items);
+                }
+                let mut measure =
+                    crate::ods::OdsStream::measuring(Vec::new(), columns.clone(), &doc.name, page, options.clone()).unwrap();
+                for p in &doc.pages {
+                    measure.add(&p.items, &r.fonts).unwrap();
+                }
+                let (styles, out) = measure.into_styles().unwrap();
+                let mut sheet = crate::ods::OdsStream::streamed(out, columns, &doc.name, page, options, styles).unwrap();
+                for p in &doc.pages {
+                    sheet.add(&p.items, &r.fonts).unwrap();
+                }
+                assert!(files(&sheet.finish().unwrap()) == files(&kept), "{name}: ODS (numbers: {numbers})");
+            }
+
+            let kept = crate::odt::write_odt(&doc, &r.fonts).unwrap();
+            let mut measure = crate::odt::OdtStream::new(Vec::new(), &doc.name, page.0, page.1, page.2).unwrap();
+            measure.stop_keeping();
+            for p in &doc.pages {
+                measure.page(p.clone(), &r.fonts).unwrap();
+            }
+            let (styles, out) = measure.into_styles().unwrap();
+            let mut text = crate::odt::OdtStream::streamed(out, &doc.name, page, styles).unwrap();
+            for p in &doc.pages {
+                text.page(p.clone(), &r.fonts).unwrap();
+            }
+            assert!(files(&text.finish().unwrap()) == files(&kept), "{name}: ODT");
+            checked += 1;
+        }
+        assert!(checked >= 30, "only {checked} fixtures checked");
     }
 
     #[test]

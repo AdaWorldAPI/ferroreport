@@ -418,13 +418,17 @@ impl Renderer {
     /// Renders a report whose rows can be read again from the start: `rows` gives a new
     /// iterator over them each time it is called (open the file again, run the query again).
     ///
-    /// PDF, CSV, HTML, Word and ODT read them once, like [`Renderer::render_to`]. An Excel
+    /// PDF, CSV, HTML and Word read them once, like [`Renderer::render_to`]. An Excel
     /// workbook needs them twice when it is large: the columns of its sheet come from every
     /// page, so the report is filled once to find them and once more to write the rows, which
     /// are compressed and sent on as they are made. A workbook of a million rows then takes
-    /// about the memory of one of a thousand. Small workbooks are still filled once. An
-    /// OpenDocument spreadsheet is filled the same way, but its sheet is kept in memory until
-    /// the end (its styles come before it in the file).
+    /// about the memory of one of a thousand. Small workbooks are still filled once.
+    ///
+    /// OpenDocument puts the styles of a document before its body, and they are only all
+    /// known at its end. A large OpenDocument text is filled once to find them and once more
+    /// to write its pages as they are made; a large OpenDocument spreadsheet is filled three
+    /// times (its columns, its styles, its rows). Both then take about the memory of a small
+    /// one. Small ones are filled once.
     ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -445,19 +449,53 @@ impl Renderer {
         format: Format,
         out: W,
     ) -> Result<FillStats> {
+        // One environment for every pass: `new Date()` must say the same in each.
+        let env = self.env(report);
+        let page = (report.page_width, report.page_height, report.landscape);
+        if format == Format::Odt {
+            let stream = odt::OdtStream::new(out, &report.name, page.0, page.1, page.2)?;
+            let mut first = odt::FirstPass::new(stream);
+            let stats =
+                fill::fill_to(report, rows()?, params.clone(), &mut self.fonts, &mut self.images, &env, self.limits, &mut first)?;
+            if !first.stream.measuring() {
+                // Small enough to have been kept: written from this pass.
+                first.stream.finish()?;
+                return Ok(stats);
+            }
+            let (styles, out) = first.stream.into_styles()?;
+            let mut sink = odt::OdtStream::streamed(out, &report.name, page, styles)?;
+            let stats = fill::fill_to(report, rows()?, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+            sink.finish()?;
+            return Ok(stats);
+        }
         if format != Format::Xlsx && format != Format::Ods {
             return self.render_to(report, rows()?, params, format, out);
         }
-        // One environment for both passes: `new Date()` must say the same in each.
-        let env = self.env(report);
         let mut first = xlsx::FirstPass::new();
         let stats =
             fill::fill_to(report, rows()?, params.clone(), &mut self.fonts, &mut self.images, &env, self.limits, &mut first)?;
         let (columns, kept) = first.done();
-        let (w, h, landscape) = (report.page_width, report.page_height, report.landscape);
-        let mut sheet: Sheet<W> = match format {
-            Format::Ods => {
+        let (w, h, landscape) = page;
+        let mut sheet: Sheet<W> = match (format, &kept) {
+            (Format::Ods, Some(_)) => {
                 Sheet::Ods(Box::new(ods::OdsStream::new(out, columns, &report.name, w, h, landscape, self.xlsx.clone())?))
+            }
+            (Format::Ods, None) => {
+                // The styles of the sheet, from a pass that keeps nothing, so that its rows can
+                // be written as they are made in the next.
+                let mut measure = ods::OdsStream::measuring(out, columns.clone(), &report.name, page, self.xlsx.clone())?;
+                fill::fill_to(
+                    report,
+                    rows()?,
+                    params.clone(),
+                    &mut self.fonts,
+                    &mut self.images,
+                    &env,
+                    self.limits,
+                    &mut measure,
+                )?;
+                let (styles, out) = measure.into_styles()?;
+                Sheet::Ods(Box::new(ods::OdsStream::streamed(out, columns, &report.name, page, self.xlsx.clone(), styles)?))
             }
             _ => Sheet::Xlsx(Box::new(xlsx::XlsxStream::new(out, columns, &report.name, w, h, landscape, self.xlsx.clone())?)),
         };
@@ -562,8 +600,8 @@ impl Renderer {
         let records = data::records_from_json(report, rows)?;
         let params = params_from_json(report, params)?;
         let mut out = Vec::new();
-        if format == Format::Xlsx || format == Format::Ods {
-            // A workbook may read the rows twice.
+        if matches!(format, Format::Xlsx | Format::Ods | Format::Odt) {
+            // A workbook or an OpenDocument file may read the rows more than once.
             let mut rows = || -> Result<RowIter> { Ok(Box::new(records.iter().cloned().map(Ok))) };
             self.render_rows_to(report, &mut rows, params, format, &mut out)?;
         } else {

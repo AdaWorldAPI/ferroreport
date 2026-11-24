@@ -466,7 +466,7 @@ fn pasted_params(sql: &str) -> Vec<String> {
 
 impl Job {
     /// Renders the report into `out`. `rows` gives the rows from the start each time it is
-    /// called: once, or twice for a large workbook.
+    /// called: once, or more for a large workbook or OpenDocument file.
     fn run<'a, W: Write>(
         &self,
         rows: &mut dyn FnMut() -> ferroreport::Result<ferroreport::RowIter<'a>>,
@@ -500,7 +500,7 @@ impl Job {
 
     /// Whether the rows may be asked for a second time.
     fn reads_rows_twice(&self) -> bool {
-        matches!(self.format, ferroreport::Format::Xlsx | ferroreport::Format::Ods)
+        matches!(self.format, ferroreport::Format::Xlsx | ferroreport::Format::Ods | ferroreport::Format::Odt)
     }
 }
 
