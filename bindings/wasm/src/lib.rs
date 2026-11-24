@@ -26,6 +26,27 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
     }
 }
 
+/// `options.resources` as (path, bytes) pairs.
+fn resources(options: &JsValue) -> Vec<(String, Vec<u8>)> {
+    let resources = get(options, "resources");
+    if !resources.is_object() {
+        return Vec::new();
+    }
+    Object::entries(&Object::from(resources))
+        .iter()
+        .map(|entry| {
+            let pair = js_sys::Array::from(&entry);
+            let name = pair.get(0).as_string().unwrap_or_default();
+            let value = pair.get(1);
+            let bytes = match value.as_string() {
+                Some(s) => s.into_bytes(),
+                None => Uint8Array::new(&value).to_vec(),
+            };
+            (name, bytes)
+        })
+        .collect()
+}
+
 /// Renders a JRXML template to PDF (or to Excel or CSV with `options.format`).
 ///
 /// - `template`: the JRXML source.
@@ -110,18 +131,8 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
         .ok_or_else(|| JsError::new(&format!("options.now: cannot parse `{now}`")))?;
     r = r.now(now);
 
-    let resources = get(&options, "resources");
-    if resources.is_object() {
-        for entry in Object::entries(&Object::from(resources)).iter() {
-            let pair = js_sys::Array::from(&entry);
-            let name = pair.get(0).as_string().unwrap_or_default();
-            let value = pair.get(1);
-            let bytes = match value.as_string() {
-                Some(s) => s.into_bytes(),
-                None => Uint8Array::new(&value).to_vec(),
-            };
-            r.add_resource(&name, bytes);
-        }
+    for (name, bytes) in resources(&options) {
+        r.add_resource(&name, bytes);
     }
     let format = match get(&options, "format").as_string() {
         Some(f) => ferroreport::Format::parse(&f)
@@ -159,6 +170,32 @@ pub fn convert(template: &str, to: &str) -> Result<String, JsError> {
         (_, other) => return Err(JsError::new(&format!("to={other:?}: use \"ferro\" or \"jrxml\""))),
     };
     r.map_err(js_err)
+}
+
+/// Reads a template (JRXML 6 or 7, or `.ferro`) as a tree an editor can change: its JRXML 7
+/// form, one `{ tag, attrs, children, text? }` object per element, with `attrs` as
+/// `[name, value]` pairs in order. `options.resources` holds the files a `.ferro` template
+/// imports (`{ "parts.ferro": text }`).
+#[wasm_bindgen(js_name = toTree)]
+pub fn to_tree(template: &str, options: JsValue) -> Result<JsValue, JsError> {
+    let files = resources(&options);
+    let load = |name: &str| files.iter().find(|(n, _)| n == name).map(|(_, b)| b.clone());
+    let tree = ferroreport::design::to_tree(template, Some(&load)).map_err(js_err)?;
+    let ser = serde_wasm_bindgen::Serializer::json_compatible();
+    serde::Serialize::serialize(&tree, &ser).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Writes a tree from `toTree` (changed or not) as a template: `to` is "jrxml" (the default,
+/// as JasperReports 7 writes it) or "ferro".
+#[wasm_bindgen(js_name = fromTree)]
+pub fn from_tree(tree: JsValue, to: Option<String>) -> Result<String, JsError> {
+    let tree = to_json(&tree, serde_json::Value::Null)?;
+    let jrxml = ferroreport::design::from_tree(&tree).map_err(js_err)?;
+    match to.as_deref().unwrap_or("jrxml") {
+        "jrxml" => Ok(jrxml),
+        "ferro" => ferroreport::template::from_jrxml(&jrxml).map_err(js_err),
+        other => Err(JsError::new(&format!("to={other:?}: use \"ferro\" or \"jrxml\""))),
+    }
 }
 
 /// Version of the engine.
