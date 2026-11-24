@@ -4,6 +4,58 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+### Right-to-left and complex scripts
+
+- Arabic and Hebrew run right to left. Lines are ordered with the Unicode Bidirectional
+  Algorithm, so numbers, Latin words and parentheses inside them stay in reading order, and
+  Arabic letters join. A text whose paragraph starts with a right-to-left letter runs right to
+  left as a whole, as JasperReports decides it; Left, Right and Center stay where they are, and
+  the last line of a justified paragraph sits on the right. The two new fixtures (52-arabic,
+  53-hebrew-mixed, styled text included) match JasperReports 6.20.6 pixel for pixel, with the
+  same XLSX and CSV.
+- Devanagari, Thai and the other complex scripts are shaped with rustybuzz: conjuncts, reph,
+  vowel signs drawn before their consonant, stacked Thai marks, and the font's own mark
+  positioning. They need a font that has them (`--font`); the bundled DejaVu has Arabic and
+  Hebrew but not these. JasperReports 6.20's PDF exporter does not shape them, so their
+  fixtures (54-devanagari, 55-thai) are compared by page count.
+- Lines break at the Unicode line-break opportunities, measured with the shaped widths. Thai,
+  Lao, Khmer and Myanmar have no spaces between words and no dictionary here: lines break
+  before a leading vowel, after a syllable-final sign and at spaces, and never inside a cluster.
+- PDF: the glyphs used after shaping are embedded and subsetted, and copying gives the
+  characters as written: each glyph maps to the characters of its cluster (a ligature to all of
+  them), and left-to-right runs whose glyphs are reordered (Devanagari) carry their text as
+  `/ActualText`. `pdftotext` gives back the words of all four fixtures as written; in lines
+  that mix directions it orders numbers and punctuation itself, as it does for JasperReports'
+  PDFs.
+- HTML and the chart pictures in XLSX and DOCX draw the shaped lines; HTML marks right-to-left
+  lines `direction="rtl"`. Word documents mark right-to-left paragraphs `<w:bidi/>` (with Left
+  and Right kept on the same side) and give complex-script runs their bold, italic and size
+  (`bCs`, `iCs`, `szCs`); this goes beyond JasperReports' DOCX exporter, which writes neither.
+  XLSX and CSV hold the text as written, as before.
+- Chart titles, labels and legends with right-to-left or complex text are shaped too.
+- Text in Latin, Greek, Cyrillic and the other simple scripts takes the same path as before:
+  every existing fixture renders to the same bytes in every format.
+- Fixtures can name the fonts they need in `fonts.txt` (`Family=file.ttf[:bold]`, the syntax
+  of `--font`); `cargo test`, `tools/compare.py`, `tools/compare_sheets.py`, `tools/pdfua.sh`
+  and `tools/pdfa.sh` register those that are installed. The PDF/UA workflow installs
+  `fonts-freefont-ttf` for them.
+- New dependencies: rustybuzz, unicode-bidi, unicode-script, unicode-linebreak and self_cell
+  (which keeps each font's shaping tables next to its bytes, read once). The first three were
+  already in the build through resvg.
+- Speed: each font's shaping tables and shape plans are read once and kept, and a one-line
+  text is shaped once for filling, exporting and drawing. 20,000 rows of the Arabic fixture take about
+  0.6 s, of the Devanagari one about 0.7 s. Latin text pays one check per text for characters
+  that need shaping (09-large: 2% more instructions).
+- API: `print::PrintLine` has a new field, `shaped` (the line's glyphs when it is shaped).
+  Code that builds a `PrintLine` itself needs `shaped: None`; code that reads one is not
+  affected. The new `shape` module says whether a text needs shaping (`needs_shaping`), whether
+  it runs right to left (`is_rtl`), and shapes a line (`line`).
+- Still to do: hyphenation, fallback to another font for characters the chosen one lacks, and
+  Arabic and Hebrew vowel marks that the font moves up or sideways can come out of `pdftotext`
+  apart from their letter.
+
 ## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names
