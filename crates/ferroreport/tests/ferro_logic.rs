@@ -41,3 +41,26 @@ fn if_and_each_need_their_expression() {
         assert!(ferroreport::template::to_jrxml(bad).is_err(), "{bad}");
     }
 }
+
+/// examples/invoices-short.ferro is examples/invoices.ferro in the short forms of 1.1: it
+/// prints the same pages.
+#[test]
+fn short_forms_print_what_long_forms_print() {
+    let dir = examples();
+    let rows: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("invoices.json")).unwrap()).unwrap();
+    let render = |name: &str| {
+        let source = std::fs::read_to_string(dir.join(name)).unwrap();
+        let mut renderer = ferroreport::Renderer::new().resource_dir(&dir);
+        let report = renderer.parse(&source).unwrap();
+        let records = ferroreport::data::records_from_json(&report, &rows).unwrap();
+        let doc = renderer.fill(&report, &records, Default::default()).unwrap();
+        let csv = renderer.to_csv(&doc, &Default::default());
+        let pdf = renderer.to_pdf(&doc).unwrap();
+        (format!("{:?}", doc.pages), csv, pdf)
+    };
+    let (long_pages, long_csv, long_pdf) = render("invoices.ferro");
+    let (short_pages, short_csv, short_pdf) = render("invoices-short.ferro");
+    assert_eq!(short_csv, long_csv);
+    assert_eq!(short_pages, long_pages);
+    assert!(short_pdf == long_pdf, "the PDFs differ");
+}

@@ -39,6 +39,13 @@ fn described(source: &str, dir: &Path) -> String {
     }
 }
 
+/// The JRXML differences 1.1 makes on purpose, as (file, 1.0.2 wrote, 1.1 writes). Each one
+/// leaves what ferroreport renders as it was (checked below against the 1.0.2 JRXML).
+///
+/// - `size=` on a text element or a style: ferroreport has always read it as the font size,
+///   and 1.1 writes it as `fontSize=`, the attribute JasperReports reads too.
+const INTENDED: &[(&str, &str, &str)] = &[("edge-braces.ferro", r#" size="12">"#, r#" fontSize="12">"#)];
+
 /// FNV-1a, 64 bits: enough to tell two texts apart.
 fn hash(s: &str) -> String {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
@@ -69,7 +76,13 @@ fn templates_written_for_1_0_compile_as_they_did() {
             continue;
         }
         let expected = std::fs::read_to_string(&expected_path).unwrap();
-        assert_eq!(compiled, expected, "{} compiles differently from 1.0.2", path.display());
+        let file = path.file_name().unwrap().to_string_lossy();
+        let mut now = expected.clone();
+        for (_, old, new) in INTENDED.iter().filter(|(f, _, _)| *f == file) {
+            assert!(now.contains(old), "{file}: {old}");
+            now = now.replacen(old, new, 1);
+        }
+        assert_eq!(compiled, now, "{} compiles differently from 1.0.2", path.display());
         // And the renderer reads the template as it read the JRXML.
         if expected.contains("<jasperReport") {
             assert_eq!(described(&source, &dir), described(&expected, &dir), "{}", path.display());

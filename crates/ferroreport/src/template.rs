@@ -60,6 +60,29 @@
 //! part it makes. All of this happens when the template is read, so the result is ordinary
 //! JRXML that JasperReports renders the same way.
 //!
+//! Short forms, for people who do not come from JasperReports (each compiles to the JRXML of
+//! its long form, which still works):
+//!
+//! ```text
+//!   detail
+//!     text bold : Invoice {number} · {customer}
+//!     text align=right pattern=#,##0.00 : ={qty} * {price}
+//!     text color=red background=#FFEEEE size=8 : Overdue
+//! ```
+//!
+//! - `{name}` in an expression is `$F{name}` (not in strings or comments, nor where Java puts a
+//!   brace; in a Groovy or JavaScript report braces are left to the language).
+//! - `text` is a static text, or a text field when its text has holes: `{name}`, `$F{}`,
+//!   `$P{}`, `$V{}` or `$R{}`. `{total}` alone is the field itself (so `pattern=` formats it),
+//!   and a text that starts with `=` is an expression. `\{`, `\}`, `\$`, `\=` and `\\` are the
+//!   characters themselves.
+//! - On elements and styles: `color=` (forecolor), `background=` (backcolor, and
+//!   `mode=Opaque`), `align=` and `valign=` (text or image alignment), `size=` (font size), with
+//!   colors by name (`red`, `gray`...) as JasperReports names them, or in hex.
+//! - A field written as `{name}` need not be declared: it is declared where it is used (the
+//!   report, or the list or table it is in) with class `Object`, so its values keep the type the
+//!   data gives them.
+//!
 //! What makes it accessible by default: reports written in it produce tagged PDFs (for screen
 //! readers) unless the report says `tagged=false`, in the language of `lang=` (or the
 //! renderer's locale). `h1` to `h6` are headings (a static text tagged as one), `tag=th`
@@ -111,6 +134,7 @@ pub fn to_jrxml_with(source: &str, load: Option<crate::jrxml::Loader>) -> Result
         "styles" | "jasperTemplate" => {
             let mut out = desugar(&root, "", None)?;
             out.name = "jasperTemplate".into();
+            short_forms(&mut out, false);
             out
         }
         other => return Err(err(root.line, &format!("a template starts with `report`, not `{other}`"))),
@@ -442,6 +466,7 @@ fn main_text(name: &str, kind: Option<&str>, parent: &str) -> Option<&'static st
 fn report(root: &Item) -> Result<Node> {
     let mut out = desugar(root, "", None)?;
     out.name = "jasperReport".into();
+    short_forms(&mut out, true);
     // The page: page=A4 landscape margins=20, or the plain JRXML attributes.
     let mut page = PAGES[0];
     let mut landscape = false;
@@ -1075,10 +1100,30 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
     let mut heading = None;
     // What the node is.
     let in_component = parent == "element" && parent_kind == Some("component");
+    // `text`: a static text, or a text field when it refers to something. Under an element
+    // other than a frame, `text` is still the static text's own `<text>`, as in 1.0.
+    let short_text = head == "text" && !(parent == "element" && parent_kind != Some("frame"));
+    let mut text = item.text.clone();
+    let mut implied: Vec<String> = Vec::new();
     if let Some(level) = head.strip_prefix('h').and_then(|l| l.parse::<u8>().ok()).filter(|l| (1..=6).contains(l)) {
         out.name = "element".into();
         out.attrs.push(("kind".into(), "staticText".into()));
         heading = Some(level);
+    } else if short_text && !in_component {
+        out.name = "element".into();
+        let kind = match text.as_deref().map(text_part).transpose().map_err(|m| err(item.line, &m))? {
+            None => "staticText",
+            Some(TextPart::Static(s)) => {
+                text = Some(s);
+                "staticText"
+            }
+            Some(TextPart::Field(expression, names)) => {
+                text = Some(expression);
+                implied = names;
+                "textField"
+            }
+        };
+        out.attrs.push(("kind".into(), kind.into()));
     } else if in_component && !matches!(head, "property" | "propertyExpression" | "printWhenExpression") {
         out.name = "component".into();
         out.attrs.push(("kind".into(), head.into()));
@@ -1098,7 +1143,30 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
     let slots = if head == "report" || head == "jasperReport" { &["name"][..] } else { slots(&name, parent) };
     let mut slot = 0;
     let mut extra = Vec::new();
+    // Friendlier attribute names (`color=`, `align=`...), on elements and styles. The JRXML
+    // name wins when both are given: the short one is then left as it is, as in 1.0.
+    let target = match (name.as_str(), kind.as_deref()) {
+        ("style", _) => Some(AliasTarget::Text),
+        ("element", Some("staticText" | "textField")) => Some(AliasTarget::Text),
+        ("element", Some("image")) => Some(AliasTarget::Image),
+        ("element", _) => Some(AliasTarget::Other),
+        _ => None,
+    };
+    let given = |key: &str| item.tokens.iter().any(|t| matches!(t, Token::Pair(k, _) if k == key));
     for t in &item.tokens {
+        if let (Some(target), Token::Pair(k, v)) = (target, t) {
+            if let Some(pairs) = alias(k, v, target) {
+                if !given(pairs[0].0) {
+                    for (k, v) in pairs {
+                        // `background=` makes the element opaque, unless it says its mode.
+                        if !(k == "mode" && given("mode")) {
+                            out.attrs.push((k.to_string(), v));
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
         match t {
             Token::Pair(k, v) => match (is_element, k.as_str()) {
                 (true, "tag") => extra.push(property(TAG_PROPERTY, v)),
@@ -1147,10 +1215,17 @@ fn desugar(item: &Item, parent: &str, parent_kind: Option<&str>) -> Result<Node>
     }
 
     // The text.
-    if let Some(text) = &item.text {
+    if let Some(text) = &text {
         match main_text(&name, kind.as_deref(), parent) {
             Some("") => out.text = text.clone(),
-            Some(child) => kids.insert(0, Node { name: child.into(), text: text.clone(), ..Default::default() }),
+            Some(child) => {
+                let mut main = Node { name: child.into(), text: text.clone(), ..Default::default() };
+                if !implied.is_empty() {
+                    // Taken off again by `short_forms`, which declares these fields.
+                    main.attrs.push((IMPLIED.into(), implied.join(" ")));
+                }
+                kids.insert(0, main)
+            }
             None => return Err(err(item.line, &format!("`{head}` has no text after ` : `"))),
         }
     }
@@ -1251,6 +1326,308 @@ fn java_literal(s: &str) -> Option<String> {
         }
     }
     Some(out)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Short forms (1.1): `{name}` for `$F{name}`, `text` with holes, friendlier attribute names,
+// and fields that need no declaration. Each is written as the JRXML its long form gives, and
+// none of them changes what a 1.0 template means (tests/ferro_compat.rs).
+
+/// The attribute that carries, from `desugar` to `short_forms`, the fields a `text` part
+/// refers to as `{name}`. It never reaches the JRXML.
+const IMPLIED: &str = "\u{0}implied";
+
+/// What a `text` part makes.
+enum TextPart {
+    /// A static text, with the escapes taken out.
+    Static(String),
+    /// A text field: its expression, and the fields it names as `{name}`.
+    Field(String, Vec<String>),
+}
+
+/// `Invoice {number}` is `"Invoice " + $F{number}`; `{total}` alone is `$F{total}` (so a
+/// `pattern=` formats it); `$P{}`, `$V{}` and `$R{}` are holes too; `={qty} * {price}` is an
+/// expression; text without holes is static. `\{`, `\}`, `\$`, `\=` and `\\` are the
+/// characters themselves.
+fn text_part(text: &str) -> std::result::Result<TextPart, String> {
+    if let Some(formula) = text.strip_prefix('=') {
+        let formula = formula.trim_start();
+        if formula.trim().is_empty() {
+            return Err("after `=` an expression is expected: text : ={qty} * {price}".into());
+        }
+        return Ok(match short_refs(formula) {
+            Some((expression, names)) => TextPart::Field(expression, names),
+            None => TextPart::Field(formula.to_string(), Vec::new()),
+        });
+    }
+    enum Seg {
+        Lit(String),
+        Ref(String),
+    }
+    let cs: Vec<char> = text.chars().collect();
+    let mut segs: Vec<Seg> = Vec::new();
+    let mut names = Vec::new();
+    let mut lit = String::new();
+    let mut i = 0;
+    while i < cs.len() {
+        let c = cs[i];
+        if c == '\\' && matches!(cs.get(i + 1), Some('{' | '}' | '$' | '=' | '\\')) {
+            lit.push(cs[i + 1]);
+            i += 2;
+            continue;
+        }
+        let reference = if c == '$' && matches!(cs.get(i + 1), Some('F' | 'P' | 'V' | 'R')) && cs.get(i + 2) == Some(&'{') {
+            let close = cs[i + 3..].iter().position(|c| matches!(c, '}' | '{' | '\n')).map(|p| p + i + 3);
+            close.filter(|e| cs[*e] == '}' && *e > i + 3).map(|e| (cs[i..=e].iter().collect::<String>(), e + 1))
+        } else if c == '{' && (i == 0 || cs[i - 1] != '{') {
+            field_ref(&cs, i).map(|e| {
+                let name: String = cs[i + 1..e].iter().collect();
+                names.push(name.clone());
+                (format!("$F{{{name}}}"), e + 1)
+            })
+        } else {
+            None
+        };
+        match reference {
+            Some((r, next)) => {
+                if !lit.is_empty() {
+                    segs.push(Seg::Lit(std::mem::take(&mut lit)));
+                }
+                segs.push(Seg::Ref(r));
+                i = next;
+            }
+            None => {
+                lit.push(c);
+                i += 1;
+            }
+        }
+    }
+    if !segs.iter().any(|s| matches!(s, Seg::Ref(_))) {
+        return Ok(TextPart::Static(lit));
+    }
+    if !lit.is_empty() {
+        segs.push(Seg::Lit(lit));
+    }
+    let mut parts: Vec<String> = segs
+        .iter()
+        .map(|s| {
+            if let Seg::Ref(r) = s {
+                r.clone()
+            } else if let Seg::Lit(l) = s {
+                java_string(l)
+            } else {
+                unreachable!()
+            }
+        })
+        .collect();
+    // `{a}{b}` joins two texts, not two numbers.
+    if parts.len() > 1 && matches!((&segs[0], &segs[1]), (Seg::Ref(_), Seg::Ref(_))) {
+        parts.insert(0, "\"\"".into());
+    }
+    Ok(TextPart::Field(parts.join(" + "), names))
+}
+
+/// Where `{name}` starts at `i`: the index of its `}`. A name is letters, digits and `_`,
+/// not starting with a digit, in parts joined by `.` (a JSON path); `{{` and `}}` are not one.
+fn field_ref(cs: &[char], i: usize) -> Option<usize> {
+    let mut j = i + 1;
+    loop {
+        if !cs.get(j).is_some_and(|c| c.is_alphabetic() || *c == '_') {
+            return None;
+        }
+        while cs.get(j).is_some_and(|c| c.is_alphanumeric() || *c == '_') {
+            j += 1;
+        }
+        match cs.get(j) {
+            Some('.') => j += 1,
+            Some('}') if cs.get(j + 1) != Some(&'}') => return Some(j),
+            _ => return None,
+        }
+    }
+}
+
+/// `{name}` written as `$F{name}` in an expression, and the names; `None` when there is none.
+/// Not inside strings, characters or comments, and not where Java puts a brace: after a name,
+/// `)` or `]` (a method's or array's body, `$F{}` itself), `->`, another brace or `$P!`.
+fn short_refs(expr: &str) -> Option<(String, Vec<String>)> {
+    let cs: Vec<char> = expr.chars().collect();
+    let mut out = String::with_capacity(expr.len() + 8);
+    let mut names = Vec::new();
+    let mut i = 0;
+    while i < cs.len() {
+        let c = cs[i];
+        let skip_to = match c {
+            '"' | '\'' => {
+                let mut j = i + 1;
+                while j < cs.len() && cs[j] != c {
+                    j += if cs[j] == '\\' { 2 } else { 1 };
+                }
+                (j + 1).min(cs.len())
+            }
+            '/' if cs.get(i + 1) == Some(&'/') => cs[i..].iter().position(|c| *c == '\n').map_or(cs.len(), |p| i + p),
+            '/' if cs.get(i + 1) == Some(&'*') => {
+                (i + 2..cs.len().saturating_sub(1)).find(|j| cs[*j] == '*' && cs[*j + 1] == '/').map_or(cs.len(), |j| j + 2)
+            }
+            '{' => {
+                if let Some(end) = field_ref(&cs, i).filter(|_| brace_may_be_field(&cs[..i])) {
+                    let name: String = cs[i + 1..end].iter().collect();
+                    out.push_str("$F{");
+                    out.push_str(&name);
+                    out.push('}');
+                    names.push(name);
+                    i = end + 1;
+                    continue;
+                }
+                i + 1
+            }
+            _ => i + 1,
+        };
+        out.extend(&cs[i..skip_to]);
+        i = skip_to;
+    }
+    (!names.is_empty()).then_some((out, names))
+}
+
+fn brace_may_be_field(before: &[char]) -> bool {
+    let mut end = before.len();
+    while end > 0 && before[end - 1].is_whitespace() {
+        end -= 1;
+    }
+    let Some(&last) = end.checked_sub(1).map(|i| &before[i]) else { return true };
+    let word = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    match last {
+        c if word(c) => false,
+        ')' | ']' | '{' | '}' | '.' | '"' | '\'' => false,
+        '>' => !(end >= 2 && before[end - 2] == '-'),
+        '!' => !(end >= 2 && word(before[end - 2])),
+        _ => true,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AliasTarget {
+    /// Text elements and styles.
+    Text,
+    Image,
+    Other,
+}
+
+/// A friendlier attribute as the JRXML attributes it stands for (the first is the one it
+/// replaces); `None` when `key` is not one, or `value` is not one it knows (left as written).
+fn alias(key: &str, value: &str, target: AliasTarget) -> Option<Vec<(&'static str, String)>> {
+    let color = |v: &str| -> Option<String> {
+        let v = v.trim();
+        if v.starts_with('#') || v.starts_with("rgb(") || v.starts_with("rgba(") {
+            return Some(v.to_string());
+        }
+        convert::named_color(if v.eq_ignore_ascii_case("grey") { "gray" } else { v }).map(str::to_string)
+    };
+    let lower = value.trim().to_ascii_lowercase();
+    let one = |k: &'static str, v: &str| Some(vec![(k, v.to_string())]);
+    match (key, target) {
+        ("color", _) => one("forecolor", &color(value)?),
+        ("background", _) => Some(vec![("backcolor", color(value)?), ("mode", "Opaque".into())]),
+        ("align", AliasTarget::Text) => one(
+            "hTextAlign",
+            match lower.as_str() {
+                "left" => "Left",
+                "center" => "Center",
+                "right" => "Right",
+                "justify" | "justified" => "Justified",
+                _ => return None,
+            },
+        ),
+        ("valign", AliasTarget::Text) => one("vTextAlign", vertical(&lower)?),
+        ("align", AliasTarget::Image) => one(
+            "hImageAlign",
+            match lower.as_str() {
+                "left" => "Left",
+                "center" => "Center",
+                "right" => "Right",
+                _ => return None,
+            },
+        ),
+        ("valign", AliasTarget::Image) => one("vImageAlign", vertical(&lower)?),
+        ("size", AliasTarget::Text) if value.trim().parse::<f32>().is_ok_and(|s| s > 0.0) => one("fontSize", value.trim()),
+        _ => None,
+    }
+}
+
+fn vertical(v: &str) -> Option<&'static str> {
+    Some(match v {
+        "top" => "Top",
+        "middle" | "center" => "Middle",
+        "bottom" => "Bottom",
+        _ => return None,
+    })
+}
+
+/// `{name}` in the report's expressions as `$F{name}`, and a field (of class Object: its values
+/// keep the type the data gives them) for every name written so that is not declared where it
+/// is used: the report, or the dataset of the list (`each`) or table it is in. In a report in
+/// Groovy or JavaScript braces belong to the language, and only `text` parts read them.
+fn short_forms(root: &mut Node, report: bool) {
+    let java = root.attr("language").is_none_or(|l| l.trim().eq_ignore_ascii_case("java"));
+    let mut found: Vec<(Option<String>, String)> = Vec::new();
+    walk_expressions(root, None, report && java, &mut found);
+    if !report {
+        return;
+    }
+    for (scope, name) in found {
+        let holder = match &scope {
+            None => Some(&mut *root),
+            Some(ds) => root.children.iter_mut().find(|c| c.name == "dataset" && c.attr("name") == Some(ds.as_str())),
+        };
+        let Some(holder) = holder else { continue };
+        if holder.children.iter().any(|c| c.name == "field" && c.attr("name") == Some(name.as_str())) {
+            continue;
+        }
+        let field = Node {
+            name: "field".into(),
+            attrs: vec![("name".into(), name), ("class".into(), "java.lang.Object".into())],
+            ..Default::default()
+        };
+        // In a report the order is put right later; in a dataset, after its fields.
+        let at = match holder.children.iter().rposition(|c| c.name == "field") {
+            Some(i) => i + 1,
+            None if scope.is_none() => holder.children.len(),
+            None => holder
+                .children
+                .iter()
+                .position(|c| matches!(c.name.as_str(), "sortField" | "variable" | "filterExpression" | "group"))
+                .unwrap_or(holder.children.len()),
+        };
+        holder.children.insert(at, field);
+    }
+}
+
+fn walk_expressions(n: &mut Node, scope: Option<String>, rewrite: bool, found: &mut Vec<(Option<String>, String)>) {
+    if let Some(i) = n.attrs.iter().position(|(k, _)| k == IMPLIED) {
+        let (_, names) = n.attrs.remove(i);
+        found.extend(names.split(' ').map(|s| (scope.clone(), s.to_string())));
+    } else if rewrite && (n.name == "expression" || n.name.ends_with("Expression")) {
+        if let Some((text, names)) = short_refs(&n.text) {
+            n.text = text;
+            found.extend(names.into_iter().map(|s| (scope.clone(), s)));
+        }
+    }
+    // A list, table, chart or crosstab over a subdataset: what is inside it reads that
+    // dataset's fields, all but the run itself.
+    let run = |c: &Node| (c.name == "datasetRun").then(|| c.attr("subDataset").map(str::to_string)).flatten();
+    let inner = n.children.iter().find_map(|c| {
+        run(c).or_else(|| (c.name == "dataset" && c.attr("name").is_none()).then(|| c.children.iter().find_map(run)).flatten())
+    });
+    let top = n.name == "jasperReport";
+    for c in &mut n.children {
+        let s = if top && c.name == "dataset" && c.attr("name").is_some() {
+            c.attr("name").map(str::to_string)
+        } else if c.name == "datasetRun" || (c.name == "dataset" && c.attr("name").is_none()) {
+            scope.clone()
+        } else {
+            inner.clone().or_else(|| scope.clone())
+        };
+        walk_expressions(c, s, rewrite, found);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1657,6 +2034,197 @@ report r margins=20
         assert!(e.to_string().contains("no definition called `nothing`"), "{e}");
         let e = to_jrxml("report r\n  def loop\n    use loop\n  detail\n    use loop\n").unwrap_err();
         assert!(e.to_string().contains("deep"), "{e}");
+    }
+
+    /// A report with `body` as its detail (indented under it), compiled.
+    fn detail(fields: &str, body: &str) -> String {
+        let body: String = body.lines().map(|l| format!("    {l}\n")).collect();
+        to_jrxml(&format!("report r\n{fields}  detail 20\n{body}")).unwrap()
+    }
+
+    fn expressions(x: &str) -> Vec<&str> {
+        x.split("<expression><![CDATA[").skip(1).map(|s| s.split("]]>").next().unwrap()).collect()
+    }
+
+    #[test]
+    fn braces_name_fields_in_expressions() {
+        let x = detail(
+            "  field a Integer\n",
+            "textField 0,0 10x10 : {a} * 2 + {b.c}\n\
+             textField 0,0 10x10 : msg(\"{0} of {a}\", {a}) + '{' // {a}\n\
+             textField 0,0 10x10 : !{flag} ? $P{p} : $P!{q} + $R{k} + {{x}}\n\
+             textField 0,0 10x10 : new Object[]{a}.length + foo{a} + ( {a} ) /* {a} */",
+        );
+        assert_eq!(
+            expressions(&x),
+            [
+                "$F{a} * 2 + $F{b.c}",
+                "msg(\"{0} of {a}\", $F{a}) + '{' // {a}",
+                "!$F{flag} ? $P{p} : $P!{q} + $R{k} + {{x}}",
+                "new Object[]{a}.length + foo{a} + ( $F{a} ) /* {a} */",
+            ],
+            "{x}"
+        );
+        // Fields used without a declaration are declared, once, after those that are.
+        assert!(x.contains(
+            "<field name=\"a\" class=\"java.lang.Integer\"/>\n\t<field name=\"b.c\" class=\"java.lang.Object\"/>\n\t<field name=\"flag\" class=\"java.lang.Object\"/>\n\t<detail>"
+        ), "{x}");
+        assert_eq!(x.matches("<field name=\"a\"").count(), 1);
+        // Groovy and JavaScript have their own braces.
+        let g = to_jrxml("report r language=groovy\n  detail 20\n    textField 0,0 10x10 : [{a}].size()\n").unwrap();
+        assert_eq!(expressions(&g), ["[{a}].size()"]);
+        assert!(!g.contains("<field"), "{g}");
+        // Variables, groups, conditions and lists take them too.
+        let x = to_jrxml(
+            "report r\n  variable t Double calculation=Sum : {amount}\n  detail\n    if : {late}\n      textField : {n}\n",
+        )
+        .unwrap();
+        assert!(x.contains("<expression><![CDATA[$F{amount}]]></expression>"), "{x}");
+        assert!(x.contains("<printWhenExpression><![CDATA[$F{late}]]></printWhenExpression>"), "{x}");
+        for f in ["amount", "late", "n"] {
+            assert!(x.contains(&format!("<field name=\"{f}\" class=\"java.lang.Object\"/>")), "{f}: {x}");
+        }
+    }
+
+    #[test]
+    fn fields_used_in_a_list_are_declared_in_its_dataset() {
+        let x = to_jrxml(
+            "report r\n  field lines List\n  detail\n    text : {number}\n    each : {lines}\n      field qty Integer\n      text : {product} x {qty}\n",
+        )
+        .unwrap();
+        let (dataset, rest) = x.split_once("</dataset>").unwrap();
+        assert!(
+            dataset.contains(
+                "<field name=\"qty\" class=\"java.lang.Integer\"/>\n\t\t<field name=\"product\" class=\"java.lang.Object\"/>"
+            ),
+            "{x}"
+        );
+        assert!(!dataset.contains("\"number\""), "{x}");
+        assert!(rest.contains("<field name=\"number\" class=\"java.lang.Object\"/>"), "{x}");
+        assert!(!rest.contains("\"product\" class"), "{x}");
+        assert!(x.contains("JRMapCollectionDataSource($F{lines})"), "{x}");
+        // The report reads like any other.
+        let report = crate::jrxml::parse_report(&x).unwrap();
+        assert!(report.field("number").is_some());
+    }
+
+    #[test]
+    fn text_is_static_or_a_field_by_its_holes() {
+        let x = detail(
+            "",
+            "text 0,0 10x10 : Plain {not a field} {{x}} {0}\n\
+             text 0,0 10x10 : Invoice {number} · $P{who}\n\
+             text 0,0 10x10 pattern=#,##0.00 : {total}\n\
+             text 0,0 10x10 : {a}{b}\n\
+             text 0,0 10x10 : \\{a\\} costs \\$5 \\\\ {a}\n\
+             text 0,0 10x10 : ={qty} * {price}\n\
+             text 0,0 10x10 : \\=1\n\
+             text 0,0 10x10 :\n  Page $V{PAGE_NUMBER}\n  of \"{pages}\"",
+        );
+        assert!(x.contains("<text><![CDATA[Plain {not a field} {{x}} {0}]]></text>"), "{x}");
+        assert!(x.contains("<text><![CDATA[=1]]></text>"), "{x}");
+        assert_eq!(
+            expressions(&x),
+            [
+                "\"Invoice \" + $F{number} + \" · \" + $P{who}",
+                "$F{total}",
+                "\"\" + $F{a} + $F{b}",
+                "\"{a} costs $5 \\\\ \" + $F{a}",
+                "$F{qty} * $F{price}",
+                "\"Page \" + $V{PAGE_NUMBER} + \"\\nof \\\"\" + $F{pages} + \"\\\"\"",
+            ],
+            "{x}"
+        );
+        assert_eq!(x.matches("kind=\"staticText\"").count(), 2);
+        assert_eq!(x.matches("kind=\"textField\"").count(), 6);
+        assert!(x.contains(r##"kind="textField" x="0" y="0" width="10" height="10" pattern="#,##0.00""##), "{x}");
+        // Placed without coordinates, a text field grows with its text, as `textField` does.
+        let x = detail("", "text : {a}");
+        assert!(x.contains("textAdjust=\"StretchHeight\""), "{x}");
+        assert!(to_jrxml("report r\n  detail\n    text : =\n").unwrap_err().to_string().contains("line 3"));
+    }
+
+    #[test]
+    fn a_static_texts_own_text_stays_its_text() {
+        let src = "report r\n  title 20\n    staticText 0,0 10x10\n      box padding=2\n      text := \" {a} \"\n";
+        let x = to_jrxml(src).unwrap();
+        assert!(x.contains("<text><![CDATA[ {a} ]]></text>"), "{x}");
+        assert!(!x.contains("<field"), "{x}");
+        assert_eq!(x.matches("<element").count(), 1, "{x}");
+        // In a frame, `text` is a part.
+        let x = to_jrxml("report r\n  title\n    frame\n      text : {a}\n").unwrap();
+        assert_eq!(x.matches("kind=\"textField\"").count(), 1, "{x}");
+    }
+
+    #[test]
+    fn friendlier_attribute_names() {
+        let x = detail(
+            "",
+            "text 0,0 10x10 color=red background=grey align=center valign=middle size=12 : a\n\
+             text 0,0 10x10 color=#B00020 background=White mode=Transparent align=justify valign=bottom : b\n\
+             image 0,0 10x10 align=right valign=center : \"x.png\"\n\
+             rectangle 0,0 10x10 color=blue size=3 align=left\n\
+             text 0,0 10x10 color=purple align=middle size=big : c\n\
+             text 0,0 10x10 color=red forecolor=#000000 size=9 fontSize=10 : d",
+        );
+        for want in [
+            r##"forecolor="#FF0000" backcolor="#808080" mode="Opaque" hTextAlign="Center" vTextAlign="Middle" fontSize="12""##,
+            r##"forecolor="#B00020" backcolor="#FFFFFF" mode="Transparent" hTextAlign="Justified" vTextAlign="Bottom""##,
+            r##"hImageAlign="Right" vImageAlign="Middle""##,
+            // On a shape only the color means something; the rest is left as written.
+            r##"forecolor="#0000FF" size="3" align="left""##,
+            // Values it does not know are left as written, as are short names next to the
+            // JRXML ones.
+            r##"color="purple" align="middle" size="big""##,
+            r##"color="red" forecolor="#000000" size="9" fontSize="10""##,
+        ] {
+            assert!(x.contains(want), "{want}\n{x}");
+        }
+        let s = to_jrxml("styles\n  style Head color=white background=#2B4C7E align=right size=11\n").unwrap();
+        assert!(
+            s.contains(
+                r##"<style name="Head" forecolor="#FFFFFF" backcolor="#2B4C7E" mode="Opaque" hTextAlign="Right" fontSize="11"/>"##
+            ),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn short_and_long_forms_compile_the_same() {
+        let pairs = [
+            (
+                "  detail 20\n    text 0,0 100x20 : Invoice {number}\n",
+                "  field number Object\n  detail 20\n    textField 0,0 100x20 : \"Invoice \" + $F{number}\n",
+            ),
+            ("  field n String\n  detail\n    text : {n}\n", "  field n String\n  detail\n    textField : $F{n}\n"),
+            ("  title\n    text height=14 color=#B00020 : Overdue\n", "  title\n    staticText height=14 forecolor=#B00020 : Overdue\n"),
+            (
+                "  style S color=gray background=yellow size=8\n",
+                "  style S forecolor=#808080 backcolor=#FFFF00 mode=Opaque fontSize=8\n",
+            ),
+            (
+                "  field qty Integer\n  detail\n    text align=right valign=middle : ={qty} * 2\n",
+                "  field qty Integer\n  detail\n    textField hTextAlign=Right vTextAlign=Middle : $F{qty} * 2\n",
+            ),
+            (
+                "  field a Integer\n  variable t Integer calculation=Sum : {a}\n  detail\n    if : {a} > 0\n      textField : {a}\n",
+                "  field a Integer\n  variable t Integer calculation=Sum : $F{a}\n  detail\n    if : $F{a} > 0\n      textField : $F{a}\n",
+            ),
+            (
+                "  detail\n    each : {lines}\n      text : {product}\n",
+                "  field lines Object\n  detail\n    each : $F{lines}\n      field product Object\n      textField : $F{product}\n",
+            ),
+        ];
+        for (short, long) in pairs {
+            let a = to_jrxml(&format!("report r\n{short}")).unwrap();
+            let b = to_jrxml(&format!("report r\n{long}")).unwrap();
+            assert_eq!(a, b, "\n{short}\n{long}");
+            // Written back, it is the long form, which reads as the same report.
+            let back = from_jrxml(&a).unwrap();
+            assert!(!back.contains("\n    text ") && !back.contains(" color="), "{back}");
+            let read = |x: &str| format!("{:?}", crate::jrxml::parse_report(x).unwrap().detail);
+            assert_eq!(read(&to_jrxml(&back).unwrap()), read(&a), "{back}");
+        }
     }
 
     #[test]

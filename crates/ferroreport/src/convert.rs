@@ -136,7 +136,7 @@ fn plain_value(name: &str, v: &str) -> String {
 }
 
 /// The colors JRXML may name (those of `java.awt.Color`).
-fn named_color(v: &str) -> Option<&'static str> {
+pub(crate) fn named_color(v: &str) -> Option<&'static str> {
     Some(match v.to_ascii_lowercase().as_str() {
         "black" => "#000000",
         "blue" => "#0000FF",
