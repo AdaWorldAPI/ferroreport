@@ -1,2 +1,4 @@
 # Jasper's reference exports are compared byte for byte: keep their line endings.
 fixtures/**/jasper-xlsx/* -text
+# The frozen 1.0 templates and the JRXML 1.0.2 made of them are compared byte for byte too.
+crates/ferroreport/tests/data/ferro-1.0/* -text

@@ -1,0 +1,7 @@
+// Java that ferroreport does not evaluate but JasperReports does: braces after `]`, `)`, `->`.
+report "Java" tagged=false
+  field name String
+  detail 60
+    textField 0,0 200x20 : new Object[]{name}.length + new Object[] {$F{name}}.length
+    textField 0,20 200x20 : java.util.Optional.of($F{name}).map(n -> {return n;}).get()
+    textField 0,40 200x20 : new Object() {public String toString() {return "x";}}.toString()

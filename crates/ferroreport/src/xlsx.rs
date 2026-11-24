@@ -21,11 +21,11 @@ pub struct XlsxOptions {
     pub detect_cell_type: bool,
 }
 
-const NATURE: Nature = Nature { span: true, texts_only: false };
+pub(crate) const NATURE: Nature = Nature { span: true, texts_only: false };
 
 /// Most rows and columns a sheet holds.
-const MAX_ROWS: usize = 1_048_576;
-const MAX_COLUMNS: usize = 16_384;
+pub(crate) const MAX_ROWS: usize = 1_048_576;
+pub(crate) const MAX_COLUMNS: usize = 16_384;
 
 fn io(e: std::io::Error) -> crate::Error {
     crate::Error::Io(e.to_string())
@@ -36,7 +36,7 @@ fn io(e: std::io::Error) -> crate::Error {
 /// page goes through here first, then through [`XlsxStream`].
 #[derive(Debug, Clone)]
 pub struct XlsxColumns {
-    cuts: grid::Cuts,
+    pub(crate) cuts: grid::Cuts,
 }
 
 impl Default for XlsxColumns {
@@ -430,7 +430,7 @@ impl grid::PageGrid<'_> {
 
 /// The border a line becomes (`JRXlsxExporter.exportLine`): one side of its cells, or their
 /// diagonal for a line that is neither horizontal nor vertical.
-fn line_border(w: i32, h: i32, pen: Pen, top_down: bool) -> Border {
+pub(crate) fn line_border(w: i32, h: i32, pen: Pen, top_down: bool) -> Border {
     let mut b = [grid::NO_PEN; 4];
     let (top, left, bottom, right) = (0, 1, 2, 3);
     let side = if w as f32 / h as f32 > 1.0 {
@@ -457,7 +457,7 @@ fn line_border(w: i32, h: i32, pen: Pen, top_down: bool) -> Border {
 }
 
 /// The borders of a cell.
-enum Border {
+pub(crate) enum Border {
     Sides(Option<Sides>),
     Diagonal { up: bool, pen: Pen },
 }
@@ -478,7 +478,7 @@ fn itoa(mut n: usize) -> String {
 }
 
 /// Column letters: 0 → A, 25 → Z, 26 → AA.
-fn column_name(mut i: usize) -> String {
+pub(crate) fn column_name(mut i: usize) -> String {
     let mut s = Vec::new();
     loop {
         s.push(b'A' + (i % 26) as u8);
@@ -492,7 +492,7 @@ fn column_name(mut i: usize) -> String {
 }
 
 /// Excel sheet names: at most 31 characters, none of `[]:*?/\`.
-fn sheet_name(name: &str) -> String {
+pub(crate) fn sheet_name(name: &str) -> String {
     let clean: String = name.chars().map(|c| if "[]:*?/\\".contains(c) { '_' } else { c }).take(31).collect();
     if clean.trim().is_empty() {
         "Sheet1".to_string()

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="devanagari" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="FreeSerif" fontSize="13"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="city" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<title>
+		<band height="210">
+			<staticText>
+				<reportElement x="0" y="0" width="555" height="32"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle"><font size="20" isBold="true"/></textElement>
+				<text><![CDATA[मासिक बिक्री रिपोर्ट]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="36" width="555" height="20"/>
+				<text><![CDATA[संयुक्ताक्षर: क्ष त्र ज्ञ श्र द्ध प्र र्क — मात्राएँ: कि की कु कू के कै को कौ कं कः]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="60" width="270" height="110"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[यह रिपोर्ट महीने के दौरान सभी शाखाओं की बिक्री दिखाती है। सभी राशियाँ रुपये में हैं और इनमें 18% कर शामिल है। कुल योग नीचे दिया गया है।]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="285" y="60" width="270" height="110"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<text><![CDATA[Mixed text: हिन्दी और English एक साथ, संख्या १२३४ और 2024।
+दूसरा अनुच्छेद यहाँ से शुरू होता है।]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="176" width="555" height="22"/>
+				<textElement textAlignment="Right"><font isBold="true"/></textElement>
+				<text><![CDATA[धन्यवाद! — श्रीमान् शर्मा]]></text>
+			</staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="20">
+			<textField>
+				<reportElement x="0" y="0" width="250" height="20"/>
+				<textFieldExpression><![CDATA[$F{name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="250" y="0" width="180" height="20"/>
+				<textFieldExpression><![CDATA[$F{city}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="430" y="0" width="125" height="20"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

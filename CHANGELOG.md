@@ -4,6 +4,132 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## 1.1.0
+
+### Short forms in `.ferro`
+
+For people who do not come from JasperReports. Each one compiles to the same JRXML as its long
+form, the long forms keep working, and every 1.0 template compiles as it did (checked against
+the JRXML 1.0.2 made of the examples, the documentation and every fixture).
+
+- `text` is one part for both kinds of text: `text : Overdue` is a static text, and
+  `text : Invoice {number} · {customer}` is a text field that prints
+  `"Invoice " + $F{number} + " · " + $F{customer}`. `{total}` alone is the value itself, so
+  `pattern=` formats it, and a text that starts with `=` is an expression
+  (`text : ={qty} * {price}`). `\{`, `\}`, `\$`, `\=` and `\\` print the character itself.
+- `{name}` means `$F{name}` in any expression (`if : {overdue}`, `each : {lines}`,
+  `variable total Double calculation=Sum : {amount}`). Strings, comments and the places where
+  Java writes a brace are left alone, and so is every brace in a report with
+  `language=groovy` or `javascript`.
+- Fields written as `{name}` need no `field` line: they are declared where they are used (the
+  report, or the `each` they are in) with class `Object`, so their values keep the type the
+  data gives them. Declare a field to give it a class, such as `Date` for dates.
+- Attributes with plain names, on parts and styles: `color=` (forecolor), `background=`
+  (backcolor, and `mode=Opaque` so it shows), `align=left|center|right|justify` and
+  `valign=top|middle|bottom` (text alignment, or image alignment on an image), and `size=`
+  (font size). Colors may be named as JasperReports names them (`red`, `gray`, `orange`...)
+  or written in hex. When a line also gives the JRXML name, the JRXML name is used.
+- `size=` on a text or a style is now written to JRXML as `fontSize=`. ferroreport always read
+  it as the font size, so nothing it renders changes; JasperReports now reads it too.
+- `ferroreport convert` still writes the long forms.
+- `examples/invoices-short.ferro` is `examples/invoices.ferro` in the short forms, and prints
+  the same PDF.
+- VS Code extension: highlighting for `text`, `{name}`, escapes, color names and alignments,
+  and snippets for `text`, `text=` (an expression) and `field`; the other snippets use the
+  short forms.
+
+### OpenDocument: ODS and ODT
+
+- New output formats: OpenDocument spreadsheet (`.ods`) and text (`.odt`), for LibreOffice and
+  other OpenDocument applications. Pick them with the extension of `-o`, `--format ods|odt`,
+  `"format": "ods"` in the HTTP API, `Format::Ods` / `Format::Odt` in Rust, `format="ods"` in
+  Python, `{ format: "odt" }` in JavaScript and `Format.ODS` / `Format.ODT` in Java.
+- ODS is laid out like the XLSX export (and JasperReports' ODS exporter): every page on one
+  sheet, cells cut at element edges, merged cells, fonts, colors, borders, padding, alignment,
+  rotation, column widths and row heights, images over their cells, charts and barcodes as
+  pictures, anchors as named ranges. `--xlsx-numbers` (`XlsxOptions::detect_cell_type`) now
+  also writes ODS numbers as numbers, with a number style made from their Java pattern.
+- ODT is laid out like the DOCX export (and JasperReports' ODT exporter): a table per page,
+  a page break between pages, texts with their fonts and styled runs, cell borders and
+  backgrounds, pictures, links and bookmarks. Ellipses and slanted lines are drawn as
+  pictures.
+- Both are valid packages (`mimetype` stored first, manifest, `content.xml`, `styles.xml`) with
+  the report's page size. The 50 fixtures not filled from a database open in LibreOffice
+  with as many pages as their PDF.
+- Not yet: `net.sf.jasperreports.export.ods.*` / `.odt.*` properties, dates as date cells,
+  per-mille number styles, upside-down text in ODT. Both formats keep the document's body in
+  memory until it is written.
+- `tools/oracle` can also write JasperReports' own `.ods` and `.odt`, for comparison.
+
+### A visual designer
+
+- **A visual designer in the browser**, the first version: <https://cristianencarnacion.github.io/ferroreport/designer/>.
+  Paste or upload a sample of your data (JSON) and its fields are listed with their types; drag
+  them onto the report's bands, or add text, lines, rectangles, ellipses, images, the page
+  number and today's date. Select, move and resize with the mouse or the keyboard, on a grid;
+  change text, font, colors, alignment, borders and number or date format in a properties
+  panel; undo and redo. The PDF is made again beside the page as you edit, by the WebAssembly
+  engine, so nothing is uploaded. It opens `.ferro` and `.jrxml`, saves both, and downloads the
+  report as PDF, Excel or Word. Parts it cannot edit yet (charts, tables, crosstabs, subreports,
+  barcodes) are shown and kept as they are.
+- JavaScript: `toTree(template, options?)` gives any template (JRXML 6 or 7, or `.ferro`, with
+  the files it imports in `options.resources`) as a tree of its JRXML 7 form, and
+  `fromTree(tree, "jrxml" | "ferro")` writes one back. Rust: `ferroreport::design::to_tree` and
+  `from_tree`.
+- The website is assembled by `tools/assemble-site.sh`, for the Pages workflow and to try it
+  locally; `bindings/wasm/build.sh` honours `CARGO_TARGET_DIR`.
+
+### Right-to-left and complex scripts
+
+- Arabic and Hebrew run right to left. Lines are ordered with the Unicode Bidirectional
+  Algorithm, so numbers, Latin words and parentheses inside them stay in reading order, and
+  Arabic letters join. A text whose paragraph starts with a right-to-left letter runs right to
+  left as a whole, as JasperReports decides it; Left, Right and Center stay where they are, and
+  the last line of a justified paragraph sits on the right. The two new fixtures (52-arabic,
+  53-hebrew-mixed, styled text included) match JasperReports 6.20.6 pixel for pixel, with the
+  same XLSX and CSV.
+- Devanagari, Thai and the other complex scripts are shaped with rustybuzz: conjuncts, reph,
+  vowel signs drawn before their consonant, stacked Thai marks, and the font's own mark
+  positioning. They need a font that has them (`--font`); the bundled DejaVu has Arabic and
+  Hebrew but not these. JasperReports 6.20's PDF exporter does not shape them, so their
+  fixtures (54-devanagari, 55-thai) are compared by page count.
+- Lines break at the Unicode line-break opportunities, measured with the shaped widths. Thai,
+  Lao, Khmer and Myanmar have no spaces between words and no dictionary here: lines break
+  before a leading vowel, after a syllable-final sign and at spaces, and never inside a cluster.
+- PDF: the glyphs used after shaping are embedded and subsetted, and copying gives the
+  characters as written: each glyph maps to the characters of its cluster (a ligature to all of
+  them), and left-to-right runs whose glyphs are reordered (Devanagari) carry their text as
+  `/ActualText`. `pdftotext` gives back the words of all four fixtures as written; in lines
+  that mix directions it orders numbers and punctuation itself, as it does for JasperReports'
+  PDFs.
+- HTML and the chart pictures in XLSX and DOCX draw the shaped lines; HTML marks right-to-left
+  lines `direction="rtl"`. Word documents mark right-to-left paragraphs `<w:bidi/>` (with Left
+  and Right kept on the same side) and give complex-script runs their bold, italic and size
+  (`bCs`, `iCs`, `szCs`); this goes beyond JasperReports' DOCX exporter, which writes neither.
+  XLSX and CSV hold the text as written, as before.
+- Chart titles, labels and legends with right-to-left or complex text are shaped too.
+- Text in Latin, Greek, Cyrillic and the other simple scripts takes the same path as before:
+  every existing fixture renders to the same bytes in every format.
+- Fixtures can name the fonts they need in `fonts.txt` (`Family=file.ttf[:bold]`, the syntax
+  of `--font`); `cargo test`, `tools/compare.py`, `tools/compare_sheets.py`, `tools/pdfua.sh`
+  and `tools/pdfa.sh` register those that are installed. The PDF/UA workflow installs
+  `fonts-freefont-ttf` for them.
+- New dependencies: rustybuzz, unicode-bidi, unicode-script, unicode-linebreak and self_cell
+  (which keeps each font's shaping tables next to its bytes, read once). The first three were
+  already in the build through resvg.
+- Speed: each font's shaping tables and shape plans are read once and kept, and a one-line
+  text is shaped once for filling, exporting and drawing. 20,000 rows of the Arabic fixture take about
+  0.6 s, of the Devanagari one about 0.7 s. Latin text pays one check per text for characters
+  that need shaping (09-large: 2% more instructions).
+- API: `print::PrintLine` has a new field, `shaped` (the line's glyphs when it is shaped).
+  Code that builds a `PrintLine` itself no longer compiles; code that reads one is not
+  affected. This breaks the letter of the 1.x promise for a type that is only meant to be read,
+  so `PrintLine` is now `#[non_exhaustive]`: fields added later will not break anyone. The new `shape` module says whether a text needs shaping (`needs_shaping`), whether
+  it runs right to left (`is_rtl`), and shapes a line (`line`).
+- Still to do: hyphenation, fallback to another font for characters the chosen one lacks, and
+  Arabic and Hebrew vowel marks that the font moves up or sideways can come out of `pdftotext`
+  apart from their letter.
+
 ## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names

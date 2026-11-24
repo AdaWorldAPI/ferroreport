@@ -556,7 +556,31 @@ fn glyphs(st: &StyledText, fonts: &mut FontSet, mode: Measure) -> Glyphs {
     let mut prefix = Vec::with_capacity(st.text.len() + 1);
     prefix.push(0.0f32);
     let mut acc = 0.0f32;
+    let shaped = crate::shape::needs_shaping(&st.text);
+    let rtl = shaped && crate::shape::is_rtl(&st.text);
     for run in &st.runs {
+        if shaped && crate::shape::needs_shaping(&st.text[run.start..run.end]) {
+            // Shaped text: each cluster's advance on its first character.
+            let id = resolve(fonts, &run.style);
+            let face = fonts.face(id);
+            let k = run.style.draw_size() / 1000.0;
+            let mut at = vec![0f32; run.end - run.start + 1];
+            if let Some(shaper) = crate::shape::Shaper::new(face) {
+                let mut from = run.start;
+                for part in st.text[run.start..run.end].split('\n') {
+                    for g in shaper.shape_line(part, rtl).glyphs {
+                        at[from - run.start + g.cluster as usize] += if mode == Measure::Fill { g.exact } else { g.advance };
+                    }
+                    from += part.len() + 1;
+                }
+            }
+            for (i, _) in st.text[run.start..run.end].char_indices() {
+                offsets.push(run.start + i);
+                acc += at[i] * k;
+                prefix.push(acc);
+            }
+            continue;
+        }
         // Text written in a PDF standard font is measured with its widths when exporting.
         let standard = match mode {
             Measure::Fill => None,
@@ -868,6 +892,8 @@ pub fn layout(
     let mut items = Vec::new();
     let mut baseline = cy + voff;
     let g = glyphs(&shown, fonts, Measure::Render);
+    // Text that starts a paragraph right to left runs right to left (see `shape::is_rtl`).
+    let rtl = crate::shape::is_rtl(&shown.text);
     let mut prev_spacing = 0.0f32;
     // A text with lists is drawn a paragraph at a time, saying what each paragraph is.
     let listed = shown.paras.iter().any(|p| p.marker.is_some());
@@ -908,9 +934,10 @@ pub fn layout(
         let mut px = match te.style.halign {
             HAlign::Center => cx + (cw - l.width) / 2.0,
             HAlign::Right => cx + cw - l.width,
+            // The last line of a justified right-to-left paragraph sits on the right.
+            HAlign::Justified if rtl => cx + cw - line_width,
             _ => cx,
         };
-        let _ = line_width;
         // A list item's bullet or number, right-aligned a little before its text.
         if let Some(marker) = shown.para_at(l.start).and_then(|p| p.marker.as_ref()) {
             let st_ = shown.style_at(l.start).clone();
@@ -924,22 +951,24 @@ pub fn layout(
                 color: st_.color,
                 underline: false,
                 strike: false,
-                lines: vec![PrintLine { text: marker.clone(), x: mx, baseline, width: w, word_spacing: 0.0 }],
+                lines: vec![PrintLine { text: marker.clone(), x: mx, baseline, width: w, word_spacing: 0.0, shaped: None }],
                 standard: fonts.standard(&st_.font, marker),
                 halign: HAlign::Left,
             }));
         }
-        // One drawn segment per run on this line.
-        for r in &shown.runs {
-            let (a, b) = (r.start.max(l.start), r.end.min(l.end));
-            if a >= b {
-                continue;
-            }
+        // One drawn segment per run on this line, in the order they are seen: right-to-left
+        // and complex text is cut where the direction changes and shaped piece by piece.
+        let line_text = &shown.text[l.start..l.end];
+        let complex = rtl || crate::shape::needs_shaping(line_text);
+        let segments =
+            if complex { visual_segments(&shown, l.start, l.end, rtl) } else { logical_segments(&shown, l.start, l.end) };
+        for (r, a, b, seg_rtl) in segments {
             let seg = &shown.text[a..b];
             let seg_spaces = seg.matches(' ').count() as f32;
-            let width = g.width(a, b);
             let id = resolve(fonts, &r.style);
             let size = r.style.draw_size();
+            let shaped = if complex { crate::shape::line(fonts.face(id), seg, seg_rtl, size) } else { None };
+            let width = shaped.as_ref().map(|s| s.1).unwrap_or_else(|| g.width(a, b));
             let seg_w = width + word_spacing * seg_spaces;
             if let Some(back) = r.style.back {
                 let face = fonts.face(id);
@@ -968,8 +997,9 @@ pub fn layout(
                     baseline: baseline - r.style.rise(),
                     width: seg_w,
                     word_spacing,
+                    shaped: shaped.map(|s| s.0),
                 }],
-                standard: fonts.standard(&r.style.font, seg),
+                standard: if complex { None } else { fonts.standard(&r.style.font, seg) },
                 halign: HAlign::Left,
             }));
             px += seg_w;
@@ -994,6 +1024,39 @@ pub fn layout(
         return (PrintItem::Paragraphs(Arc::new(kinds), items), needed);
     }
     (PrintItem::Group(items), needed)
+}
+
+/// The pieces of runs on the line `start..end`, in reading order: `(run, from, to, rtl)`.
+fn logical_segments(st: &StyledText, start: usize, end: usize) -> Vec<(&Run, usize, usize, bool)> {
+    st.runs
+        .iter()
+        .filter_map(|r| {
+            let (a, b) = (r.start.max(start), r.end.min(end));
+            (a < b).then_some((r, a, b, false))
+        })
+        .collect()
+}
+
+/// The pieces of runs on the line `start..end` in visual order, left to right, each of one
+/// direction, as the Unicode Bidirectional Algorithm orders them with base direction `rtl`.
+fn visual_segments(st: &StyledText, start: usize, end: usize, rtl: bool) -> Vec<(&Run, usize, usize, bool)> {
+    let text = &st.text[start..end];
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let level = if rtl { unicode_bidi::Level::rtl() } else { unicode_bidi::Level::ltr() };
+    let bidi = unicode_bidi::ParagraphBidiInfo::new(text, Some(level));
+    let (levels, runs) = bidi.visual_runs(0..text.len());
+    let mut out = Vec::new();
+    for run in runs {
+        let run_rtl = levels[run.start].is_rtl();
+        let mut pieces = logical_segments(st, start + run.start, start + run.end);
+        if run_rtl {
+            pieces.reverse();
+        }
+        out.extend(pieces.into_iter().map(|(r, a, b, _)| (r, a, b, run_rtl)));
+    }
+    out
 }
 
 /// A font size from markup: a finite, sensible number of points (anything else is ignored,

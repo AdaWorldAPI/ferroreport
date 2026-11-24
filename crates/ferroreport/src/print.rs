@@ -7,7 +7,10 @@ use crate::image::ImageData;
 use crate::model::{Color, Pen};
 use std::sync::Arc;
 
+/// One line of a printed text. New fields may be added in minor versions, so build it inside
+/// the crate only; code outside reads it.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct PrintLine {
     pub text: String,
     /// Left edge of the line.
@@ -17,6 +20,9 @@ pub struct PrintLine {
     pub width: f32,
     /// Extra space added after each space character (justified text).
     pub word_spacing: f32,
+    /// The line as shaped glyphs in visual order, for text that is right to left or in a
+    /// script that needs shaping (`None`: one glyph per character, left to right).
+    pub shaped: Option<Arc<crate::shape::ShapedLine>>,
 }
 
 #[derive(Debug, Clone)]

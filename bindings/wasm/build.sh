@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=../..
 cargo build --release --target wasm32-unknown-unknown -p ferroreport-wasm --manifest-path "$ROOT/Cargo.toml"
-WASM="$ROOT/target/wasm32-unknown-unknown/release/ferroreport_wasm.wasm"
+WASM="${CARGO_TARGET_DIR:-$ROOT/target}/wasm32-unknown-unknown/release/ferroreport_wasm.wasm"
 rm -rf pkg
 wasm-bindgen --target nodejs --out-dir pkg/node --out-name ferroreport "$WASM"
 wasm-bindgen --target web --out-dir pkg/web --out-name ferroreport "$WASM"

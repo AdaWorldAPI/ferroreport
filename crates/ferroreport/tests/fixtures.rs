@@ -48,6 +48,22 @@ impl Connection for Sqlite {
     }
 }
 
+/// Registers the fonts a fixture names in `fonts.txt` (`Family=file.ttf[:bold][:italic]`, the
+/// syntax of the command line's `--font`), those that are installed: a fixture whose font is
+/// missing still renders, in the substitute font, with the same pages.
+fn register_fonts(renderer: &mut ferroreport::Renderer, dir: &std::path::Path) {
+    let Ok(list) = std::fs::read_to_string(dir.join("fonts.txt")) else { return };
+    for spec in list.split_whitespace() {
+        let Some((family, rest)) = spec.split_once('=') else { continue };
+        let mut parts = rest.split(':');
+        let path = parts.next().unwrap_or_default();
+        let flags: Vec<&str> = parts.collect();
+        if let Ok(bytes) = std::fs::read(path) {
+            renderer.register_font(family, flags.contains(&"bold"), flags.contains(&"italic"), bytes).unwrap();
+        }
+    }
+}
+
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
@@ -67,6 +83,7 @@ fn fixtures_render_with_expected_page_counts() {
             serde_json::from_str(&if p.exists() { std::fs::read_to_string(p).unwrap() } else { default.to_string() }).unwrap()
         };
         let mut renderer = ferroreport::Renderer::new().resource_dir(&dir);
+        register_fonts(&mut renderer, &dir);
         let report = renderer.parse(&template).unwrap();
         assert!(!report.warnings.iter().any(|w| w.contains("style template")), "{}: {:?}", dir.display(), report.warnings);
         let records = ferroreport::data::records_from_json(&report, &read("data.json", "[]")).unwrap();

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="hebrew_mixed" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="11"/>
+	<field name="sku" class="java.lang.String"/>
+	<field name="item" class="java.lang.String"/>
+	<field name="qty" class="java.lang.Integer"/>
+	<field name="price" class="java.lang.Double"/>
+	<title>
+		<band height="250">
+			<staticText>
+				<reportElement x="0" y="0" width="555" height="30"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font size="18" isBold="true"/></textElement>
+				<text><![CDATA[חשבונית מס מספר 2024-0457]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="34" width="555" height="18"/>
+				<text><![CDATA[תאריך: 15/01/2024 · לקוח: Acme Ltd. · טלפון: 03-1234567]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="56" width="555" height="18"/>
+				<textElement textAlignment="Center"/>
+				<text><![CDATA[המחיר: 1,234.50 ₪ (כולל מע"מ 17%)]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="78" width="270" height="90"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[המסמך הזה נוצר אוטומטית על ידי מערכת הדוחות. יש לשלם את הסכום תוך 30 יום מתאריך החשבונית, באמצעות העברה בנקאית או כרטיס אשראי.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="285" y="78" width="270" height="90"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<text><![CDATA[Version 3.2 of the system
+שורה שנייה בעברית עם מספר 42 ומילה English באמצע]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="174" width="555" height="18"/>
+				<text><![CDATA[Order #A-17 for קפה טורקי (2 kg) was shipped on 2024-01-12.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="196" width="555" height="18"/>
+				<textElement markup="styled"/>
+				<text><![CDATA[סטטוס: <style isBold="true" forecolor="#B00020">לא שולם</style> — יתרה <style isItalic="true">350.00 ₪</style> לתשלום]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="218" width="555" height="18"/>
+				<textElement textAlignment="Right"><font isBold="true"/></textElement>
+				<text><![CDATA[סה"כ לתשלום: 9,876.54 ₪ [כולל {משלוח}]]]></text>
+			</staticText>
+		</band>
+	</title>
+	<columnHeader>
+		<band height="22">
+			<staticText>
+				<reportElement mode="Opaque" x="455" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#1F4E79"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[מק"ט]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="215" y="0" width="240" height="20" forecolor="#FFFFFF" backcolor="#1F4E79"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[פריט]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="135" y="0" width="80" height="20" forecolor="#FFFFFF" backcolor="#1F4E79"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[כמות]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="0" y="0" width="135" height="20" forecolor="#FFFFFF" backcolor="#1F4E79"/>
+				<textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[מחיר (₪)]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="18">
+			<textField>
+				<reportElement x="455" y="0" width="100" height="18"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{sku}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="215" y="0" width="240" height="18"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{item}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="135" y="0" width="80" height="18"/>
+				<textElement textAlignment="Center"/>
+				<textFieldExpression><![CDATA[$F{qty}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="0" y="0" width="135" height="18"/>
+				<textFieldExpression><![CDATA[$F{price}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

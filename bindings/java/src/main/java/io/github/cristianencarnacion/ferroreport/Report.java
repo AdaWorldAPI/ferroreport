@@ -181,7 +181,7 @@ public final class Report {
         return this;
     }
 
-    /** In Excel, writes numbers as numbers instead of as the formatted text. */
+    /** In Excel and ODS, writes numbers as numbers instead of as the formatted text. */
     public Report xlsxNumbers(boolean on) {
         this.xlsxNumbers = on;
         return this;
@@ -196,7 +196,7 @@ public final class Report {
 
     /**
      * Renders the report to a file, page by page. The format follows the extension
-     * ({@code .pdf}, {@code .xlsx}, {@code .docx}, {@code .csv}, {@code .html}) unless {@link #format} was set. If
+     * ({@code .pdf}, {@code .xlsx}, {@code .docx}, {@code .ods}, {@code .odt}, {@code .csv}, {@code .html}) unless {@link #format} was set. If
      * rendering fails, no file is left behind.
      */
     public void renderTo(Path file) {

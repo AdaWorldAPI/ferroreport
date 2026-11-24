@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="arabic" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="DejaVu Sans" fontSize="11"/>
+	<field name="code" class="java.lang.String"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="city" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<variable name="total" class="java.lang.Double" calculation="Sum"><variableExpression><![CDATA[$F{amount}]]></variableExpression></variable>
+	<title>
+		<band height="200">
+			<staticText>
+				<reportElement x="0" y="0" width="555" height="30"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle"><font size="18" isBold="true"/></textElement>
+				<text><![CDATA[تقرير المبيعات الشهري]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="34" width="555" height="18"/>
+				<textElement textAlignment="Right"/>
+				<text><![CDATA[الفترة: من 1 يناير 2024 إلى 31 يناير 2024 (الإصدار 2.1)]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="56" width="270" height="80"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[يعرض هذا التقرير مبيعات الفروع خلال الشهر، مع الإجمالي في الأسفل. الأرقام بالريال وتشمل الضريبة بنسبة 15%.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="285" y="56" width="270" height="80"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<text><![CDATA[ملاحظة: تم إعداد التقرير بواسطة نظام PDF الآلي.
+السطر الثاني يبدأ هنا، والسطر الثالث يلتف تلقائيا عند نهاية العرض.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="142" width="555" height="18"/>
+				<text><![CDATA[Arabic inside English: العربية (Arabic) and 2024 stay in order.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="164" width="555" height="22"/>
+				<textElement textAlignment="Center"><font size="14" isBold="true"/></textElement>
+				<text><![CDATA[لا إله إلا الله — السلام عليكم]]></text>
+			</staticText>
+		</band>
+	</title>
+	<columnHeader>
+		<band height="22">
+			<staticText>
+				<reportElement mode="Opaque" x="455" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#2E6B4F"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[الرمز]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="255" y="0" width="200" height="20" forecolor="#FFFFFF" backcolor="#2E6B4F"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[الاسم]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="120" y="0" width="135" height="20" forecolor="#FFFFFF" backcolor="#2E6B4F"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[المدينة]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="0" y="0" width="120" height="20" forecolor="#FFFFFF" backcolor="#2E6B4F"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle"><font isBold="true"/></textElement>
+				<text><![CDATA[المبلغ (ر.س)]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="18">
+			<textField>
+				<reportElement x="455" y="0" width="100" height="18"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{code}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="255" y="0" width="200" height="18"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="120" y="0" width="135" height="18"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{city}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="0" y="0" width="120" height="18"/>
+				<textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<summary>
+		<band height="30">
+			<line><reportElement x="0" y="2" width="555" height="1"/></line>
+			<staticText>
+				<reportElement x="420" y="6" width="135" height="20"/>
+				<textElement textAlignment="Right"><font isBold="true"/></textElement>
+				<text><![CDATA[الإجمالي (ريال):]]></text>
+			</staticText>
+			<textField pattern="#,##0.00">
+				<reportElement x="0" y="6" width="120" height="20"/>
+				<textElement><font isBold="true"/></textElement>
+				<textFieldExpression><![CDATA[$V{total}]]></textFieldExpression>
+			</textField>
+		</band>
+	</summary>
+</jasperReport>

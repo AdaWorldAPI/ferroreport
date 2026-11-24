@@ -1,0 +1,20 @@
+// A list of employees.
+report "Employees" lang=en
+  style Base default fontName="DejaVu Sans" fontSize=10
+  field name String
+  field salary Double
+  variable total Double calculation=Sum : $F{salary}
+
+  title 40
+    h1 0,0 555x30 fontSize=18 : Employees
+  columnHeader 20
+    staticText 0,0 300x20 bold : Name
+    staticText 300,0 255x20 bold hTextAlign=Right : Salary
+  detail 20
+    textField 0,0 300x20 : $F{name}
+    textField 300,0 255x20 pattern=#,##0.00 hTextAlign=Right : $F{salary}
+    image 0,0 20x20 alt="A \"photo\"" :
+      $P{photos}
+        .get($F{name})
+  summary 20
+    textField 300,0 255x20 bold hTextAlign=Right : $V{total}

@@ -989,7 +989,16 @@ fn plain_text_item(
     let starts_paragraph = |n: &str, start: usize| start == 0 || n.as_bytes().get(start - 1) == Some(&b'\n');
     let mut prev_spacing = 0.0f32;
     let mut print_lines = Vec::with_capacity(lines.len());
-    for (k, l) in lines.into_iter().enumerate() {
+    // Text that starts a paragraph right to left runs right to left as a whole, as in
+    // JasperReports; alignment stays where the element puts it (left is left).
+    let complex = standard.is_none() && crate::shape::needs_shaping(&rendered_text);
+    let rtl = complex && crate::shape::is_rtl(&rendered_text);
+    for (k, mut l) in lines.into_iter().enumerate() {
+        let shaped = if complex { crate::shape::line(face_ref, &l.text, rtl, size) } else { None };
+        let shaped = shaped.map(|(glyphs, width)| {
+            l.width = width;
+            glyphs
+        });
         let mut word_spacing = 0.0;
         if te.style.halign == HAlign::Justified {
             let ends_paragraph = match print_lines_next_start(&normalized, k) {
@@ -998,7 +1007,7 @@ fn plain_text_item(
             };
             let spaces = l.text.matches(' ').count();
             // iText lets 40% of a trailing , . ; or : hang into the margin.
-            let hanging = match l.text.chars().last() {
+            let hanging = match l.text.chars().last().filter(|_| !rtl) {
                 Some(c @ (',' | '.' | ';' | ':')) => match render {
                     Measure::Standard(font) => 0.4 * crate::standard::width(font, c.encode_utf8(&mut [0; 4]), size),
                     _ => 0.4 * face_ref.char_width(c, size),
@@ -1014,18 +1023,22 @@ fn plain_text_item(
             };
             prev_spacing = word_spacing;
         }
+        let spaces = l.text.matches(' ').count() as f32;
+        let width = l.width + word_spacing * spaces;
         let lx = match te.style.halign {
             HAlign::Center => cx + (cw - l.width) / 2.0,
             HAlign::Right => cx + cw - l.width,
+            // The last line of a justified right-to-left paragraph sits on the right.
+            HAlign::Justified if rtl => cx + cw - width,
             _ => cx,
         };
-        let spaces = l.text.matches(' ').count() as f32;
         print_lines.push(PrintLine {
             x: lx,
             baseline: cy + voff + vm.ascent + advance * k as f32,
-            width: l.width + word_spacing * spaces,
+            width,
             word_spacing,
             text: l.text,
+            shaped,
         });
     }
     let f = &te.style.font;

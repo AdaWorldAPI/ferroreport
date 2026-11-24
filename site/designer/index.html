@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report designer · ferroreport</title>
+<meta name="description" content="Design a report in your browser: drag the fields of your data onto the page, style them, and see the PDF as you go. Saves .ferro and JasperReports .jrxml templates. Nothing is uploaded.">
+<link rel="canonical" href="https://cristianencarnacion.github.io/ferroreport/designer/">
+<link rel="preload" href="../fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="designer.css">
+</head>
+<body>
+<a class="skip" href="#canvas-stage">Skip to the page</a>
+<header class="bar">
+  <a class="brand" href="../">ferro<span>report</span></a>
+  <span class="app-name">Designer</span>
+
+  <div class="tools" role="toolbar" aria-label="Report">
+    <details class="menu" id="new-menu">
+      <summary>New</summary>
+      <div class="menu-list">
+        <button type="button" data-start="blank">Blank report</button>
+        <button type="button" data-start="invoice">Example: invoices</button>
+        <button type="button" data-start="employees">Example: employees</button>
+      </div>
+    </details>
+    <button type="button" id="open-btn">Open…</button>
+    <input type="file" id="open-file" accept=".ferro,.jrxml,.xml,.json,.jrtx,.png,.jpg,.jpeg,.gif,.svg" multiple hidden>
+    <details class="menu" id="save-menu">
+      <summary>Save</summary>
+      <div class="menu-list">
+        <button type="button" id="save-ferro">Template as .ferro</button>
+        <button type="button" id="save-jrxml">Template as .jrxml (JasperReports)</button>
+        <hr>
+        <button type="button" data-export="pdf">Report as PDF</button>
+        <button type="button" data-export="xlsx">Report as Excel (.xlsx)</button>
+        <button type="button" data-export="docx">Report as Word (.docx)</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="tools" role="toolbar" aria-label="Edit">
+    <button type="button" id="undo" title="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z">Undo</button>
+    <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z">Redo</button>
+  </div>
+
+  <div class="tools" role="toolbar" aria-label="View">
+    <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
+    <button type="button" id="zoom-label" class="zoom-label" title="Fit the page to the window">100%</button>
+    <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
+    <label class="check"><input type="checkbox" id="snap" checked> Snap to grid</label>
+    <button type="button" id="toggle-preview" aria-pressed="true">Preview</button>
+    <button type="button" id="help-btn" aria-haspopup="dialog">Shortcuts</button>
+  </div>
+</header>
+
+<main class="work" id="work">
+  <aside class="side left" aria-label="Data and parts">
+    <section class="panel" aria-labelledby="data-h">
+      <h2 id="data-h">Your data</h2>
+      <p class="hint">Paste a sample of your data as JSON (a list of rows), or upload a file. Then drag a field onto the page.</p>
+      <textarea id="data" spellcheck="false" aria-label="Sample data (JSON)" rows="6"></textarea>
+      <div class="row-btns">
+        <button type="button" id="data-upload-btn">Upload JSON…</button>
+        <input type="file" id="data-file" accept=".json,application/json" hidden>
+        <span id="data-msg" class="msg" role="status"></span>
+      </div>
+      <h3 id="fields-h">Fields</h3>
+      <ul class="fields" id="fields" aria-labelledby="fields-h"></ul>
+      <div id="params-section" hidden>
+        <h3 id="params-h">Parameters</h3>
+        <p class="hint">Values given to the whole report, such as a customer's name. Drag one onto the page to show it.</p>
+        <ul class="fields" id="param-list" aria-labelledby="params-h"></ul>
+        <label class="small-label" for="params">Values for the preview (JSON)</label>
+        <textarea id="params" spellcheck="false" rows="3"></textarea>
+        <span id="params-msg" class="msg" role="status"></span>
+      </div>
+      <p id="files-note" class="hint files-note" hidden></p>
+    </section>
+    <section class="panel" aria-labelledby="parts-h">
+      <h2 id="parts-h">Add to the page</h2>
+      <p class="hint">Drag onto a band, or select a band and press the button.</p>
+      <div class="parts" id="parts">
+        <button type="button" draggable="true" data-part="staticText"><i class="ico ico-text" aria-hidden="true"></i>Text</button>
+        <button type="button" draggable="true" data-part="line"><i class="ico ico-line" aria-hidden="true"></i>Line</button>
+        <button type="button" draggable="true" data-part="rectangle"><i class="ico ico-rect" aria-hidden="true"></i>Rectangle</button>
+        <button type="button" draggable="true" data-part="ellipse"><i class="ico ico-ellipse" aria-hidden="true"></i>Ellipse</button>
+        <button type="button" draggable="true" data-part="image"><i class="ico ico-image" aria-hidden="true"></i>Image</button>
+        <button type="button" draggable="true" data-part="pageNumber"><i class="ico ico-num" aria-hidden="true"></i>Page number</button>
+        <button type="button" draggable="true" data-part="today"><i class="ico ico-date" aria-hidden="true"></i>Today's date</button>
+      </div>
+    </section>
+  </aside>
+
+  <section class="center" aria-label="Page and preview">
+    <div class="stage" id="canvas-stage" tabindex="-1" aria-label="Page">
+      <div class="sheet" id="sheet"></div>
+    </div>
+    <div class="preview" id="preview-pane">
+      <div class="preview-head">
+        <h2>Preview</h2>
+        <span id="preview-msg" class="msg" role="status" aria-live="polite">Loading the engine…</span>
+      </div>
+      <iframe id="preview" title="Preview of the report as a PDF"></iframe>
+      <pre id="preview-error" class="preview-error" hidden></pre>
+    </div>
+  </section>
+
+  <aside class="side right" aria-label="Properties">
+    <section class="panel" aria-labelledby="props-h">
+      <h2 id="props-h">Properties</h2>
+      <form id="props" autocomplete="off" onsubmit="return false"></form>
+    </section>
+  </aside>
+</main>
+
+<p id="announce" class="sr-only" role="status" aria-live="polite"></p>
+
+<dialog id="help">
+  <h2>Shortcuts</h2>
+  <table>
+    <tr><th>Drag a field or part onto a band</th><td>Add it there</td></tr>
+    <tr><th><kbd>Enter</kbd> on a field or part</th><td>Add it to the selected band</td></tr>
+    <tr><th><kbd>Tab</kbd></th><td>Go from part to part on the page</td></tr>
+    <tr><th>Double-click a text</th><td>Edit what it says</td></tr>
+    <tr><th>Arrow keys</th><td>Move the selected part (by the grid when snapping)</td></tr>
+    <tr><th><kbd>Shift</kbd> + arrow keys</th><td>Make it wider, narrower, taller or shorter</td></tr>
+    <tr><th><kbd>Alt</kbd> + arrow keys</th><td>Move by one point</td></tr>
+    <tr><th><kbd>Delete</kbd> or <kbd>Backspace</kbd></th><td>Remove the selected part</td></tr>
+    <tr><th><kbd>Ctrl</kbd> + <kbd>D</kbd></th><td>Duplicate it</td></tr>
+    <tr><th><kbd>Ctrl</kbd> + <kbd>Z</kbd>, <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></th><td>Undo, redo</td></tr>
+    <tr><th><kbd>Esc</kbd></th><td>Select nothing (shows the page settings)</td></tr>
+  </table>
+  <p>Your work is kept in this browser until you start a new report. Nothing is uploaded: the report is made on your computer.</p>
+  <form method="dialog"><button class="primary">Close</button></form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="Edges" pageWidth="595" pageHeight="842" topMargin="20" rightMargin="20" bottomMargin="20" leftMargin="20" columnWidth="555">
+	<property name="net.sf.jasperreports.export.pdf.tagged" value="true"/>
+	<property name="net.sf.jasperreports.export.pdf.tag.language" value="en"/>
+	<property name="net.sf.jasperreports.custom" value="{value} stays"/>
+	<parameter name="title" class="java.lang.String">
+		<defaultValueExpression><![CDATA["{0} of {1}"]]></defaultValueExpression>
+	</parameter>
+	<parameter name="key" class="java.lang.String"/>
+	<query><![CDATA[SELECT * FROM people WHERE name = $P{key} AND {fn LCASE(name)} = $P!{key}]]></query>
+	<field name="name" class="java.lang.String">
+		<description><![CDATA[The {name} of the customer]]></description>
+	</field>
+	<field name="amount" class="java.lang.Double"/>
+	<field name="lines" class="java.util.List"/>
+	<variable name="count" class="java.lang.Integer" calculation="Count">
+		<expression><![CDATA[$F{name}]]></expression>
+	</variable>
+	<title height="40">
+		<element kind="staticText" x="0" y="0" width="555" height="20">
+			<text><![CDATA[Totals {name}]]></text>
+			<property name="net.sf.jasperreports.export.accessibility.tag" value="h1"/>
+		</element>
+		<element kind="staticText" x="0" y="20" width="200" height="20">
+			<text><![CDATA[Hello {name}, {{name}} and $F{name}]]></text>
+		</element>
+	</title>
+	<detail>
+		<band height="120">
+			<element kind="textField" x="0" y="0" width="200" height="20">
+				<expression><![CDATA[msg("{0} items for {1}", $V{count}, $F{name})]]></expression>
+			</element>
+			<element kind="textField" x="0" y="20" width="200" height="20">
+				<expression><![CDATA["{name} " + $F{name}.length()]]></expression>
+			</element>
+			<element kind="textField" x="0" y="40" width="200" height="20">
+				<expression><![CDATA[$R{greeting} + '{' + "}"]]></expression>
+			</element>
+			<element kind="textField" x="0" y="60" width="200" height="20">
+				<expression><![CDATA[$F{lines}.collect{it}.size()]]></expression>
+			</element>
+			<element kind="textField" x="0" y="80" width="200" height="20" forecolor="red" backcolor="#EEEEEE" mode="Opaque" size="12">
+				<expression><![CDATA[$F{name} /* {name} */]]></expression>
+			</element>
+			<element kind="textField" pattern="#,##0.00" hTextAlign="Right" x="200" y="100" width="100" height="20">
+				<expression><![CDATA[$F{amount}]]></expression>
+			</element>
+			<element kind="staticText" x="300" y="0" width="200" height="20">
+				<box padding="2"/>
+				<text><![CDATA[ padded {name} ]]></text>
+			</element>
+			<element kind="staticText" x="300" y="20" width="200" height="20">
+				<text><![CDATA[first {line}
+second line]]></text>
+			</element>
+			<element kind="textField" x="300" y="40" width="200" height="20">
+				<expression><![CDATA["{{literal}}"]]></expression>
+			</element>
+			<element kind="image" x="300" y="60" width="20" height="20">
+				<expression><![CDATA[$P{key}]]></expression>
+				<hyperlinkTooltipExpression><![CDATA["{name}"]]></hyperlinkTooltipExpression>
+			</element>
+		</band>
+	</detail>
+</jasperReport>

@@ -1,4 +1,4 @@
-//! A minimal ZIP writer (deflate), enough for Office Open XML packages.
+//! A minimal ZIP writer (deflate), enough for Office Open XML and OpenDocument packages.
 //!
 //! Small files are added whole. A large one (the sheet of a workbook) can be written a piece
 //! at a time: it is compressed and sent on as it comes, and its size and checksum, which are
@@ -37,7 +37,21 @@ fn too_large() -> io::Error {
     io::Error::other("the workbook is larger than 4 GB, more than its format holds")
 }
 
-fn header(sig: u32, flags: u16, crc: u32, packed: u32, size: u32, name: &[u8], central_offset: Option<u32>) -> Vec<u8> {
+/// Compression methods.
+const DEFLATE: u16 = 8;
+const STORED: u16 = 0;
+
+#[allow(clippy::too_many_arguments)]
+fn header(
+    sig: u32,
+    flags: u16,
+    method: u16,
+    crc: u32,
+    packed: u32,
+    size: u32,
+    name: &[u8],
+    central_offset: Option<u32>,
+) -> Vec<u8> {
     let mut h = Vec::with_capacity(46 + name.len());
     h.extend_from_slice(&sig.to_le_bytes());
     if central_offset.is_some() {
@@ -45,7 +59,7 @@ fn header(sig: u32, flags: u16, crc: u32, packed: u32, size: u32, name: &[u8], c
     }
     h.extend_from_slice(&20u16.to_le_bytes()); // needed to extract
     h.extend_from_slice(&flags.to_le_bytes());
-    h.extend_from_slice(&8u16.to_le_bytes()); // deflate
+    h.extend_from_slice(&method.to_le_bytes());
     h.extend_from_slice(&DOS_TIME.to_le_bytes());
     h.extend_from_slice(&DOS_DATE.to_le_bytes());
     h.extend_from_slice(&crc.to_le_bytes());
@@ -87,9 +101,24 @@ impl<W: Write> ZipStream<W> {
         let packed = miniz_oxide::deflate::compress_to_vec(data, LEVEL);
         let offset = self.offset32()?;
         let (packed_len, len) = (packed.len() as u32, data.len() as u32);
-        self.put(&header(0x0403_4b50, 0, crc.sum(), packed_len, len, name.as_bytes(), None))?;
+        self.put(&header(0x0403_4b50, 0, DEFLATE, crc.sum(), packed_len, len, name.as_bytes(), None))?;
         self.put(&packed)?;
-        self.central.extend(header(0x0201_4b50, 0, crc.sum(), packed_len, len, name.as_bytes(), Some(offset)));
+        self.central.extend(header(0x0201_4b50, 0, DEFLATE, crc.sum(), packed_len, len, name.as_bytes(), Some(offset)));
+        self.count += 1;
+        Ok(())
+    }
+
+    /// Adds a whole file as it is, uncompressed (an OpenDocument package's `mimetype`, which
+    /// must be readable at a fixed place at the start of the file).
+    pub fn add_stored(&mut self, name: &str, data: &[u8]) -> io::Result<()> {
+        debug_assert!(self.open.is_none());
+        let mut crc = Crc::default();
+        crc.update(data);
+        let offset = self.offset32()?;
+        let len = u32::try_from(data.len()).map_err(|_| too_large())?;
+        self.put(&header(0x0403_4b50, 0, STORED, crc.sum(), len, len, name.as_bytes(), None))?;
+        self.put(data)?;
+        self.central.extend(header(0x0201_4b50, 0, STORED, crc.sum(), len, len, name.as_bytes(), Some(offset)));
         self.count += 1;
         Ok(())
     }
@@ -99,7 +128,7 @@ impl<W: Write> ZipStream<W> {
         debug_assert!(self.open.is_none());
         let offset = self.offset;
         self.offset32()?;
-        self.put(&header(0x0403_4b50, DESCRIPTOR, 0, 0, 0, name.as_bytes(), None))?;
+        self.put(&header(0x0403_4b50, DESCRIPTOR, DEFLATE, 0, 0, 0, name.as_bytes(), None))?;
         self.open =
             Some(Open { name: name.as_bytes().to_vec(), offset, crc: Crc::default(), size: 0, packed: 0, packer: Packer::new() });
         Ok(())
@@ -139,7 +168,7 @@ impl<W: Write> ZipStream<W> {
         descriptor.extend_from_slice(&packed.to_le_bytes());
         descriptor.extend_from_slice(&size.to_le_bytes());
         self.put(&descriptor)?;
-        self.central.extend(header(0x0201_4b50, DESCRIPTOR, open.crc.sum(), packed, size, &open.name, Some(start)));
+        self.central.extend(header(0x0201_4b50, DESCRIPTOR, DEFLATE, open.crc.sum(), packed, size, &open.name, Some(start)));
         self.count += 1;
         Ok(())
     }
@@ -313,12 +342,15 @@ pub(crate) mod tests {
         let mut files = Vec::new();
         for _ in 0..count {
             assert_eq!(u32_at(at), 0x0201_4b50);
-            let (crc, packed, size, name_len, local) =
-                (u32_at(at + 16), u32_at(at + 20), u32_at(at + 24), u16_at(at + 28), u32_at(at + 42));
+            let (method, crc, packed, size, name_len, local) =
+                (u16_at(at + 10), u32_at(at + 16), u32_at(at + 20), u32_at(at + 24), u16_at(at + 28), u32_at(at + 42));
             let name = String::from_utf8(zip[at + 46..at + 46 + name_len].to_vec()).unwrap();
             assert_eq!(u32_at(local), 0x0403_4b50);
             let data = local + 30 + u16_at(local + 26) + u16_at(local + 28);
-            let content = miniz_oxide::inflate::decompress_to_vec(&zip[data..data + packed]).unwrap();
+            let content = match method as u16 {
+                STORED => zip[data..data + packed].to_vec(),
+                _ => miniz_oxide::inflate::decompress_to_vec(&zip[data..data + packed]).unwrap(),
+            };
             assert_eq!(content.len(), size);
             let mut sum = Crc::default();
             sum.update(&content);
@@ -340,8 +372,13 @@ pub(crate) mod tests {
         }
         zip.end().unwrap();
         zip.add("last.xml", b"").unwrap();
-        let files = read(&zip.finish().unwrap());
-        assert_eq!(files.len(), 3);
+        zip.add_stored("plain", b"as it is").unwrap();
+        let bytes = zip.finish().unwrap();
+        // Stored: the bytes themselves are in the archive.
+        assert!(bytes.windows(8).any(|w| w == b"as it is"));
+        let files = read(&bytes);
+        assert_eq!(files.len(), 4);
+        assert_eq!(files[3], ("plain".to_string(), b"as it is".to_vec()));
         assert_eq!(files[0], ("first.xml".to_string(), b"<a/>".to_vec()));
         assert_eq!(files[1].0, "sheet.xml");
         assert!(files[1].1 == big);

@@ -52,14 +52,21 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   - `options.resources`: `{ [path]: Uint8Array | string }` images (PNG, JPEG) and subreport
     templates (a subreport named `lines.jasper` is read from `lines.jrxml`).
   - `options.now`: value of `new Date()` in expressions (`Date` or ISO string).
-  - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook), `"docx"` (Word document), `"csv"` (UTF-8 text) or
+  - `options.format`: `"pdf"` (default), `"xlsx"` (Excel workbook), `"docx"` (Word document), `"ods"` (OpenDocument
+    spreadsheet), `"odt"` (OpenDocument text), `"csv"` (UTF-8 text) or
     `"html"` (a web page that looks like the PDF, for previews: UTF-8 text).
   - `options.maxPages`: stop with an error if the report grows past this many pages (set it
     when templates or data come from other people).
   - `options.csvSafe`: in CSV, put an apostrophe before values a spreadsheet would run as a
-    formula. `options.xlsxNumbers`: in Excel, write numbers as numbers.
+    formula. `options.xlsxNumbers`: in Excel and ODS, write numbers as numbers.
 - `inspect(template) => { name, parameters, fields, warnings }`: `warnings` lists what the
   engine does not support in that template yet.
+- `toTree(template, options?) => { tag, attrs, children, text? }`: any template (JRXML 6 or 7,
+  or `.ferro`) as a tree of its JRXML 7 form, for editors; `attrs` are `[name, value]` pairs.
+  `options.resources` holds the files a `.ferro` template imports. The
+  [designer](https://cristianencarnacion.github.io/ferroreport/designer/) is built on it.
+- `fromTree(tree, to?) => string`: the tree written back as a template, `"jrxml"` (default)
+  or `"ferro"`.
 - `version() => string`
 
 Throws an `Error` with the reason when a template cannot be rendered.

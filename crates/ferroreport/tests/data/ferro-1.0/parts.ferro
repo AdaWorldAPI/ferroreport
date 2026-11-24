@@ -1,0 +1,4 @@
+styles
+  style Base default fontName="DejaVu Sans" fontSize=9
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}

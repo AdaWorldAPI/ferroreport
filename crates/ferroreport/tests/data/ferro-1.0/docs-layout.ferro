@@ -1,0 +1,14 @@
+report "Employees" lang=en
+  field name String
+  field salary Double
+
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+
+  title gap=6
+    h1 height=30 fontSize=18 : Employees
+    textField height=14 : "Everyone on the payroll"
+  detail
+    row height=16
+      textField 3fr : $F{name}
+      use money 1fr value=$F{salary}

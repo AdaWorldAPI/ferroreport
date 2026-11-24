@@ -13,7 +13,7 @@ mod signing;
 mod spool;
 
 const USAGE: &str = "\
-ferroreport — report engine: PDF, Excel, Word, CSV and HTML from JasperReports JRXML templates
+ferroreport — report engine: PDF, Excel, Word, OpenDocument, CSV and HTML from JasperReports JRXML templates
 or .ferro templates, no JVM required
 
 USAGE:
@@ -29,12 +29,13 @@ RENDER OPTIONS:
                                 as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
-                                extension picks the format: .pdf, .xlsx, .docx, .csv or .html
-    -f, --format <pdf|xlsx|docx|csv|html>
+                                extension picks the format: .pdf, .xlsx, .docx, .ods, .odt,
+                                .csv or .html
+    -f, --format <pdf|xlsx|docx|ods|odt|csv|html>
                                 Output format, when the file name does not say it. html is a
                                 web page that looks like the PDF, for previews
-        --xlsx-numbers          In XLSX, write numbers as numbers (default: as formatted text,
-                                like JasperReports)
+        --xlsx-numbers          In XLSX and ODS, write numbers as numbers (default: as formatted
+                                text, like JasperReports)
         --csv-safe              In CSV, put an apostrophe before values a spreadsheet would
                                 run as a formula (use it when the data comes from other people)
         --pdfa <2b|2u|2a|3b|3u|3a>
@@ -101,7 +102,8 @@ CONVERT:
     Templates are rendered the same in either format.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
-add format xlsx, docx, csv or html to the request for Excel, Word, CSV or a web preview):
+add format xlsx, docx, ods, odt, csv or html to the request for Excel, Word, OpenDocument,
+CSV or a web preview):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
@@ -749,6 +751,7 @@ fn guess_mime(path: &str) -> &'static str {
         Some("png") => "image/png",
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Some("ods") => "application/vnd.oasis.opendocument.spreadsheet",
         _ => "application/octet-stream",
     }
 }
@@ -866,7 +869,8 @@ fn render(args: &[String]) -> CliResult {
     }
     let template = template.ok_or("missing template path")?;
     let format = match format {
-        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, csv or html)"))?,
+        Some(f) => ferroreport::Format::parse(&f)
+            .ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, ods, odt, csv or html)"))?,
         None => output
             .as_deref()
             .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))
@@ -945,7 +949,7 @@ fn render(args: &[String]) -> CliResult {
     // standard input are put in a file first for that format.
     let mut kept = None;
     let data = match data.as_deref() {
-        Some("-") if format == ferroreport::Format::Xlsx => {
+        Some("-") if matches!(format, ferroreport::Format::Xlsx | ferroreport::Format::Ods) => {
             let path = std::env::temp_dir().join(format!("ferroreport-rows-{}.json", std::process::id()));
             let keep = RemoveOnDrop(path.clone());
             let mut file = std::fs::File::create(&path).map_err(|e| format!("{}: {e}", path.display()))?;

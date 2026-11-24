@@ -36,9 +36,14 @@ pub struct FaceData {
     /// Glyph ids beyond the BMP.
     cmap: HashMap<char, u16>,
     advances: Vec<u16>,
+    shaping: crate::shape::ShapingCache,
 }
 
 impl FaceData {
+    pub(crate) fn shaping_cache(&self) -> &crate::shape::ShapingCache {
+        &self.shaping
+    }
+
     pub fn parse(family: &str, data: Arc<[u8]>, bold: bool, italic: bool) -> Result<FaceData> {
         let face = ttf_parser::Face::parse(&data, 0).map_err(|e| Error::Font(format!("{family}: {e}")))?;
         let mut cmap = HashMap::new();
@@ -97,12 +102,21 @@ impl FaceData {
             cmap,
             advances,
             data,
+            shaping: Default::default(),
         })
     }
 
     /// Appends the outline of `c` at `size` units per em, with its origin at `(x, y)` and y
     /// growing downwards.
     pub fn glyph_outline(&self, c: char, size: f64, x: f64, y: f64, out: &mut Vec<crate::print::PathOp>) {
+        if c.is_control() {
+            return;
+        }
+        self.glyph_id_outline(self.glyph(c), size, x, y, out);
+    }
+
+    /// Appends the outline of glyph `glyph`, like [`FaceData::glyph_outline`].
+    pub fn glyph_id_outline(&self, glyph: u16, size: f64, x: f64, y: f64, out: &mut Vec<crate::print::PathOp>) {
         use crate::print::PathOp;
         struct Builder<'a> {
             out: &'a mut Vec<PathOp>,
@@ -139,12 +153,9 @@ impl FaceData {
                 self.out.push(PathOp::Close);
             }
         }
-        if c.is_control() {
-            return;
-        }
         let Ok(face) = ttf_parser::Face::parse(&self.data, 0) else { return };
         let mut b = Builder { out, k: size / self.units_per_em as f64, x, y };
-        face.outline_glyph(ttf_parser::GlyphId(self.glyph(c)), &mut b);
+        face.outline_glyph(ttf_parser::GlyphId(glyph), &mut b);
     }
 
     /// Right edge of the outline of `c`'s glyph, in font units (0 for empty glyphs).

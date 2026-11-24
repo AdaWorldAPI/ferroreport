@@ -10,7 +10,7 @@ import java.util.*;
 /**
  * Reference renderer: compiles a JRXML with JasperReports, fills it with rows from a JSON
  * array (field values converted to each field's declared class) and exports a PDF.
- * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf|out.xlsx|out.docx|out.csv|out.jrpxml> [params.json]
+ * Usage: Oracle <report.jrxml> <data.json|-> <out.pdf|out.xlsx|out.docx|out.ods|out.odt|out.csv|out.jrpxml> [params.json]
  */
 public class Oracle {
     public static void main(String[] args) throws Exception {
@@ -55,6 +55,16 @@ public class Oracle {
             x.exportReport();
         } else if (args[2].endsWith(".docx")) {
             net.sf.jasperreports.engine.export.ooxml.JRDocxExporter x = new net.sf.jasperreports.engine.export.ooxml.JRDocxExporter();
+            x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
+            x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
+            x.exportReport();
+        } else if (args[2].endsWith(".ods")) {
+            net.sf.jasperreports.engine.export.oasis.JROdsExporter x = new net.sf.jasperreports.engine.export.oasis.JROdsExporter();
+            x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
+            x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
+            x.exportReport();
+        } else if (args[2].endsWith(".odt")) {
+            net.sf.jasperreports.engine.export.oasis.JROdtExporter x = new net.sf.jasperreports.engine.export.oasis.JROdtExporter();
             x.setExporterInput(new net.sf.jasperreports.export.SimpleExporterInput(print));
             x.setExporterOutput(new net.sf.jasperreports.export.SimpleOutputStreamExporterOutput(args[2]));
             x.exportReport();

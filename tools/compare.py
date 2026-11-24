@@ -112,6 +112,11 @@ def main() -> int:
             cmd += ["--db", f"sqlite:{db}"]
         if params.exists():
             cmd += ["-p", str(params)]
+        # Fonts the fixture needs (fonts.txt: Family=file.ttf[:bold][:italic]), when installed.
+        if (fx / "fonts.txt").exists():
+            for spec in (fx / "fonts.txt").read_text().split():
+                if Path(spec.split("=", 1)[-1].split(":")[0]).exists():
+                    cmd += ["--font", spec]
         po, to = run(cmd)
 
         row = {"fixture": fx.name, "jasper_s": round(tj, 3), "ferroreport_s": round(to, 4)}

@@ -1,7 +1,7 @@
 //! # ferroreport
 //!
 //! Renders JasperReports JRXML templates (and templates in its own format, see [`template`]) to
-//! PDF, Excel (XLSX), Word (DOCX), CSV and HTML without a JVM.
+//! PDF, Excel (XLSX), Word (DOCX), OpenDocument (ODS, ODT), CSV and HTML without a JVM.
 //!
 //! ```no_run
 //! let template = std::fs::read_to_string("invoice.jrxml")?;
@@ -22,6 +22,7 @@ pub mod crosstab;
 pub mod crypt;
 pub mod csv;
 pub mod data;
+pub mod design;
 pub mod docx;
 pub mod error;
 pub mod expr;
@@ -33,11 +34,15 @@ pub mod html;
 pub mod image;
 pub mod jrxml;
 pub mod model;
+mod odf;
+pub mod ods;
+pub mod odt;
 pub mod pdf;
 pub mod print;
 mod raster;
 pub mod rich;
 pub mod rtf;
+pub mod shape;
 pub mod sign;
 pub mod sql;
 pub mod standard;
@@ -82,10 +87,15 @@ pub enum Format {
     Html,
     /// Word document, laid out like JasperReports' DOCX exporter.
     Docx,
+    /// OpenDocument spreadsheet (LibreOffice Calc), laid out like JasperReports' ODS exporter.
+    Ods,
+    /// OpenDocument text document (LibreOffice Writer), laid out like JasperReports' ODT
+    /// exporter.
+    Odt,
 }
 
 impl Format {
-    /// `pdf`, `xlsx`, `csv`, `html` or `docx` (any case).
+    /// `pdf`, `xlsx`, `csv`, `html`, `docx`, `ods` or `odt` (any case).
     pub fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
@@ -93,6 +103,8 @@ impl Format {
             "csv" => Some(Format::Csv),
             "html" | "htm" => Some(Format::Html),
             "docx" | "word" => Some(Format::Docx),
+            "ods" => Some(Format::Ods),
+            "odt" => Some(Format::Odt),
             _ => None,
         }
     }
@@ -104,6 +116,8 @@ impl Format {
             Format::Csv => "csv",
             Format::Html => "html",
             Format::Docx => "docx",
+            Format::Ods => "ods",
+            Format::Odt => "odt",
         }
     }
 
@@ -114,6 +128,8 @@ impl Format {
             Format::Csv => "text/csv; charset=utf-8",
             Format::Html => "text/html; charset=utf-8",
             Format::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            Format::Ods => ods::MIMETYPE,
+            Format::Odt => odt::MIMETYPE,
         }
     }
 }
@@ -364,11 +380,17 @@ impl Renderer {
                 sink.finish()?;
                 Ok(stats)
             }
-            Format::Xlsx => {
+            Format::Odt => {
+                let mut sink = odt::OdtStream::new(out, &report.name, report.page_width, report.page_height, report.landscape)?;
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish()?;
+                Ok(stats)
+            }
+            Format::Xlsx | Format::Ods => {
                 let mut count = 0;
                 let rows = rows.inspect(|_| count += 1);
                 let doc = fill::fill_rows(report, Box::new(rows), params, &mut self.fonts, &mut self.images, &env, self.limits)?;
-                let bytes = self.to_xlsx(&doc, &self.xlsx)?;
+                let bytes = self.export(&doc, format)?;
                 out.write_all(&bytes).and_then(|_| out.flush()).map_err(|e| Error::Io(e.to_string()))?;
                 Ok(FillStats { pages: doc.pages.len(), rows: count })
             }
@@ -386,14 +408,23 @@ impl Renderer {
         xlsx::write_xlsx(doc, &self.fonts, options)
     }
 
+    /// Exports a filled document to an OpenDocument spreadsheet (ODS), laid out like
+    /// JasperReports' ODS exporter. Numbers are written as numbers when `options` asks for it
+    /// ([`xlsx::XlsxOptions::detect_cell_type`]), as in a workbook.
+    pub fn to_ods(&self, doc: &PrintDocument, options: &xlsx::XlsxOptions) -> Result<Vec<u8>> {
+        ods::write_ods(doc, &self.fonts, options)
+    }
+
     /// Renders a report whose rows can be read again from the start: `rows` gives a new
     /// iterator over them each time it is called (open the file again, run the query again).
     ///
-    /// PDF, CSV and HTML read them once, like [`Renderer::render_to`]. An Excel workbook
-    /// needs them twice when it is large: the columns of its sheet come from every page, so
-    /// the report is filled once to find them and once more to write the rows, which are
-    /// compressed and sent on as they are made. A workbook of a million rows then takes
-    /// about the memory of one of a thousand. Small workbooks are still filled once.
+    /// PDF, CSV, HTML, Word and ODT read them once, like [`Renderer::render_to`]. An Excel
+    /// workbook needs them twice when it is large: the columns of its sheet come from every
+    /// page, so the report is filled once to find them and once more to write the rows, which
+    /// are compressed and sent on as they are made. A workbook of a million rows then takes
+    /// about the memory of one of a thousand. Small workbooks are still filled once. An
+    /// OpenDocument spreadsheet is filled the same way, but its sheet is kept in memory until
+    /// the end (its styles come before it in the file).
     ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -414,7 +445,7 @@ impl Renderer {
         format: Format,
         out: W,
     ) -> Result<FillStats> {
-        if format != Format::Xlsx {
+        if format != Format::Xlsx && format != Format::Ods {
             return self.render_to(report, rows()?, params, format, out);
         }
         // One environment for both passes: `new Date()` must say the same in each.
@@ -423,15 +454,13 @@ impl Renderer {
         let stats =
             fill::fill_to(report, rows()?, params.clone(), &mut self.fonts, &mut self.images, &env, self.limits, &mut first)?;
         let (columns, kept) = first.done();
-        let mut sheet = xlsx::XlsxStream::new(
-            out,
-            columns,
-            &report.name,
-            report.page_width,
-            report.page_height,
-            report.landscape,
-            self.xlsx.clone(),
-        )?;
+        let (w, h, landscape) = (report.page_width, report.page_height, report.landscape);
+        let mut sheet: Sheet<W> = match format {
+            Format::Ods => {
+                Sheet::Ods(Box::new(ods::OdsStream::new(out, columns, &report.name, w, h, landscape, self.xlsx.clone())?))
+            }
+            _ => Sheet::Xlsx(Box::new(xlsx::XlsxStream::new(out, columns, &report.name, w, h, landscape, self.xlsx.clone())?)),
+        };
         let stats = match kept {
             // A report that fits in memory is written from the pages of the first pass.
             Some(pages) => {
@@ -499,6 +528,8 @@ impl Renderer {
             Format::Csv => self.to_csv(doc, &self.csv).into_bytes(),
             Format::Html => html::write_html(doc, &self.fonts, &self.html)?.into_bytes(),
             Format::Docx => docx::write_docx(doc, &self.fonts)?,
+            Format::Ods => self.to_ods(doc, &self.xlsx)?,
+            Format::Odt => odt::write_odt(doc, &self.fonts)?,
         })
     }
 
@@ -531,7 +562,7 @@ impl Renderer {
         let records = data::records_from_json(report, rows)?;
         let params = params_from_json(report, params)?;
         let mut out = Vec::new();
-        if format == Format::Xlsx {
+        if format == Format::Xlsx || format == Format::Ods {
             // A workbook may read the rows twice.
             let mut rows = || -> Result<RowIter> { Ok(Box::new(records.iter().cloned().map(Ok))) };
             self.render_rows_to(report, &mut rows, params, format, &mut out)?;
@@ -544,6 +575,34 @@ impl Renderer {
     /// Font families that were substituted during the last fills.
     pub fn font_substitutions(&self) -> &[(String, String)] {
         &self.fonts.substitutions
+    }
+}
+
+/// The second pass of a workbook: an Excel or an OpenDocument sheet.
+enum Sheet<W: std::io::Write> {
+    Xlsx(Box<xlsx::XlsxStream<W>>),
+    Ods(Box<ods::OdsStream<W>>),
+}
+
+impl<W: std::io::Write> Sheet<W> {
+    fn add(&mut self, items: &[print::PrintItem], fonts: &FontSet) -> Result<()> {
+        match self {
+            Sheet::Xlsx(s) => s.add(items, fonts),
+            Sheet::Ods(s) => s.add(items, fonts),
+        }
+    }
+
+    fn finish(self) -> Result<W> {
+        match self {
+            Sheet::Xlsx(s) => s.finish(),
+            Sheet::Ods(s) => s.finish(),
+        }
+    }
+}
+
+impl<W: std::io::Write> PageSink for Sheet<W> {
+    fn page(&mut self, page: print::PrintPage, fonts: &FontSet) -> Result<()> {
+        self.add(&page.items, fonts)
     }
 }
 

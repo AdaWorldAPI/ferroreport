@@ -9,14 +9,18 @@ save.
 ## What you get
 
 - **Highlighting** for every part of a template: sections (`title`, `detail`, `row`...),
-  parts (`textField`, `staticText`, `image`...), declarations (`field`, `parameter`,
-  `variable`), sizes like `2fr`, attributes, and the expression after ` : `, with its
+  parts (`text`, `textField`, `staticText`, `image`...), declarations (`field`, `parameter`,
+  `variable`), sizes like `2fr`, attributes (with colors such as `red` or `#B00020` and
+  alignments such as `right`), and the text or expression after ` : `, with its `{field}`,
   `$F{}`, `$P{}` and `$V{}` references, strings and numbers.
 - **Snippets** that type the structure for you:
 
   | Type | You get |
   |---|---|
-  | `report` | A new report with a style, a field, a title and a detail |
+  | `report` | A new report with a style, a title and a detail |
+  | `text` | A text with a `{field}` in it |
+  | `text=` | A text whose value is an expression: `={qty} * {price}` |
+  | `field` | A field and its class |
   | `row` | Parts side by side |
   | `if` | Parts printed only when a condition holds |
   | `each` | Parts repeated for every row of a nested list |
@@ -36,7 +40,7 @@ written again every time you save the template or the data.
 ferroreport render invoices.ferro -d invoices.json -o invoices.pdf --watch
 ```
 
-Change the extension of `-o` to get `.xlsx`, `.docx`, `.csv` or `.html` from the same
+Change the extension of `-o` to get `.xlsx`, `.docx`, `.ods`, `.odt`, `.csv` or `.html` from the same
 template. To get the command, download it from
 [Releases](https://github.com/cristianEncarnacion/ferroreport/releases) or run
 `cargo install ferroreport-cli`.

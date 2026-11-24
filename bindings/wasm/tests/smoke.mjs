@@ -43,6 +43,31 @@ const csv = Buffer.from(ferroreport.render(template, data, {}, {
 })).toString();
 assert.ok(csv.startsWith("Orders with line items,"), csv.slice(0, 200));
 
+// Templates as a tree, for editors: read, change, write back as JRXML or .ferro.
+const examples = new URL("../../../examples/", import.meta.url);
+const invoices = readFileSync(new URL("invoices.ferro", examples), "utf8");
+assert.throws(() => ferroreport.toTree(invoices)); // it imports parts.ferro
+const tree = ferroreport.toTree(invoices, { resources: { "parts.ferro": readFileSync(new URL("parts.ferro", examples), "utf8") } });
+assert.equal(tree.tag, "jasperReport");
+assert.deepEqual(tree.attrs[0], ["name", "Invoices"]);
+const title = tree.children.find((c) => c.tag === "title");
+const h1 = title.children[0];
+assert.equal(h1.children.find((c) => c.tag === "text").text, "Invoices");
+h1.children.find((c) => c.tag === "text").text = "Facturas";
+h1.attrs.push(["bold", "true"]);
+const jrxml = ferroreport.fromTree(tree);
+assert.ok(jrxml.includes("<![CDATA[Facturas]]>") && jrxml.includes('bold="true"'), jrxml.slice(0, 600));
+const ferroText = ferroreport.fromTree(tree, "ferro");
+assert.ok(ferroText.startsWith('report Invoices') && ferroText.includes("Facturas"), ferroText.slice(0, 300));
+// The .ferro form may list attributes in another order; the report is the same.
+const sorted = (n) => ({ ...n, attrs: [...n.attrs].sort(), children: n.children.map(sorted) });
+assert.deepEqual(sorted(ferroreport.toTree(ferroText)), sorted(ferroreport.toTree(jrxml)));
+const rows = JSON.parse(readFileSync(new URL("invoices.json", examples), "utf8"));
+assert.equal(Buffer.from(ferroreport.render(jrxml, rows).subarray(0, 5)).toString(), "%PDF-");
+assert.deepEqual(ferroreport.toTree(template).attrs.find(([k]) => k === "name"), ["name", "orders"]);
+assert.throws(() => ferroreport.fromTree({ tag: "html", attrs: [], children: [] }));
+assert.throws(() => ferroreport.fromTree(tree, "pdf"));
+
 assert.throws(() => ferroreport.render("<jasperReport", [], {}, {}));
 assert.throws(() => ferroreport.render(template, data, {}, { format: "docx" }));
 console.log(`ok: ${pdf.length} bytes, engine ${ferroreport.version()}`);

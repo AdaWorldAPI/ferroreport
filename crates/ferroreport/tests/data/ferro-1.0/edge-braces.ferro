@@ -1,0 +1,33 @@
+// 1.0 syntax that sits close to the 1.1 short forms: braces, `text` lines and attribute names
+// that the short forms also use. Compiled by 1.0.2 into edge-braces.jrxml; must stay the same.
+report "Edges" lang=en
+  property net.sf.jasperreports.custom "{value} stays"
+  parameter title String : "{0} of {1}"
+  parameter key String
+  field name String : The {name} of the customer
+  field amount Double
+  field lines List
+  variable count Integer calculation=Count : $F{name}
+  query : SELECT * FROM people WHERE name = $P{key} AND {fn LCASE(name)} = $P!{key}
+
+  def money value
+    textField pattern=#,##0.00 hTextAlign=Right : {{value}}
+
+  title 40
+    h1 0,0 555x20 : Totals {name}
+    staticText 0,20 200x20 : Hello {name}, {{name}} and $F{name}
+  detail 120
+    textField 0,0 200x20 : msg("{0} items for {1}", $V{count}, $F{name})
+    textField 0,20 200x20 : "{name} " + $F{name}.length()
+    textField 0,40 200x20 : $R{greeting} + '{' + "}"
+    textField 0,60 200x20 : $F{lines}.collect{it}.size()
+    textField 0,80 200x20 forecolor=red backcolor=#EEEEEE mode=Opaque size=12 : $F{name} /* {name} */
+    use money 200,100 100x20 value=$F{amount}
+    staticText 300,0 200x20
+      box padding=2
+      text := " padded {name} "
+    staticText 300,20 200x20 :
+      first {line}
+      second line
+    textField 300,40 200x20 : "{{literal}}"
+    image 300,60 20x20 alt="{name}" : $P{key}
