@@ -4,6 +4,40 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+### Short forms in `.ferro`
+
+For people who do not come from JasperReports. Each one compiles to the same JRXML as its long
+form, the long forms keep working, and every 1.0 template compiles as it did (checked against
+the JRXML 1.0.2 made of the examples, the documentation and every fixture).
+
+- `text` is one part for both kinds of text: `text : Overdue` is a static text, and
+  `text : Invoice {number} · {customer}` is a text field that prints
+  `"Invoice " + $F{number} + " · " + $F{customer}`. `{total}` alone is the value itself, so
+  `pattern=` formats it, and a text that starts with `=` is an expression
+  (`text : ={qty} * {price}`). `\{`, `\}`, `\$`, `\=` and `\\` print the character itself.
+- `{name}` means `$F{name}` in any expression (`if : {overdue}`, `each : {lines}`,
+  `variable total Double calculation=Sum : {amount}`). Strings, comments and the places where
+  Java writes a brace are left alone, and so is every brace in a report with
+  `language=groovy` or `javascript`.
+- Fields written as `{name}` need no `field` line: they are declared where they are used (the
+  report, or the `each` they are in) with class `Object`, so their values keep the type the
+  data gives them. Declare a field to give it a class, such as `Date` for dates.
+- Attributes with plain names, on parts and styles: `color=` (forecolor), `background=`
+  (backcolor, and `mode=Opaque` so it shows), `align=left|center|right|justify` and
+  `valign=top|middle|bottom` (text alignment, or image alignment on an image), and `size=`
+  (font size). Colors may be named as JasperReports names them (`red`, `gray`, `orange`...)
+  or written in hex. When a line also gives the JRXML name, the JRXML name is used.
+- `size=` on a text or a style is now written to JRXML as `fontSize=`. ferroreport always read
+  it as the font size, so nothing it renders changes; JasperReports now reads it too.
+- `ferroreport convert` still writes the long forms.
+- `examples/invoices-short.ferro` is `examples/invoices.ferro` in the short forms, and prints
+  the same PDF.
+- VS Code extension: highlighting for `text`, `{name}`, escapes, color names and alignments,
+  and snippets for `text`, `text=` (an expression) and `field`; the other snippets use the
+  short forms.
+
 ## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names
