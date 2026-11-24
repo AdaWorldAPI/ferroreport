@@ -75,6 +75,8 @@ fn every_fixture_streams_to_the_same_document() {
         assert!(pdf.ends_with(b"%%EOF"), "{name}");
         assert_eq!(f.streamed(Format::Csv).0, f.in_memory(Format::Csv), "{name}: CSV");
         assert_eq!(f.streamed(Format::Xlsx).0, f.in_memory(Format::Xlsx), "{name}: XLSX");
+        assert!(f.streamed(Format::Ods).0 == f.in_memory(Format::Ods), "{name}: ODS");
+        assert!(f.streamed(Format::Odt).0 == f.in_memory(Format::Odt), "{name}: ODT");
         let html = String::from_utf8(f.streamed(Format::Html).0).unwrap();
         assert_eq!(html.matches("<svg class=\"page\"").count(), stats.pages, "{name}: HTML pages");
         assert_eq!(
@@ -222,6 +224,16 @@ fn a_large_workbook_is_written_in_two_passes_and_is_the_same() {
     assert_eq!(asked.get(), 2, "a report this size reads its rows twice");
     assert_eq!(stats.rows, 40_000);
     assert!(streamed == kept, "the workbook written in two passes differs from the one written from memory");
+
+    // An OpenDocument spreadsheet is made the same way.
+    let doc = r.fill(&large.report, &records, Default::default()).unwrap();
+    let kept = r.to_ods(&doc, &Default::default()).unwrap();
+    drop(doc);
+    asked.set(0);
+    let mut streamed = Vec::new();
+    large.renderer().render_rows_to(&large.report, &mut again, Default::default(), Format::Ods, &mut streamed).unwrap();
+    assert_eq!(asked.get(), 2, "a spreadsheet this size reads its rows twice");
+    assert!(streamed == kept, "the spreadsheet written in two passes differs from the one written from memory");
 
     // A small one is filled once, and other formats always are.
     for (format, rows) in [(Format::Xlsx, &lines[..2_000]), (Format::Csv, &lines[..])] {
