@@ -492,8 +492,8 @@ códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 
   izquierda y el devanagari, el tailandés y las demás escrituras complejas ya se componen con su
   forma (ver Text en la tabla de compatibilidad del README en inglés); falta la separación
   silábica, usar otra fuente para los caracteres que le faltan a la elegida y un diccionario
-  para cortar líneas en tailandés, lao, jemer y birmano. El motor de composición, rustybuzz, ya no
-  se mantiene: se pasará a su sucesor, harfrust.
+  para cortar líneas en tailandés, lao, jemer y birmano. El motor de composición es harfrust, el
+  port a Rust que mantiene el proyecto HarfBuzz (reemplazó a rustybuzz, que ya no se mantiene).
 - **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
 - **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con
   recuadro visible.

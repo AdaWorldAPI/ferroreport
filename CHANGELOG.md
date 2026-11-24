@@ -4,6 +4,23 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+- Right-to-left and complex text (Arabic, Hebrew, Devanagari, Thai...) is shaped with harfrust
+  0.16, the HarfBuzz project's maintained Rust port, instead of rustybuzz, which is no longer
+  maintained (RUSTSEC-2026-0206). Output is unchanged: every fixture renders to the same bytes
+  in every format, and the text `pdftotext` extracts is the same. Each font's shaping tables
+  are still read once and kept with the font, and shape plans are still made once per
+  direction and script.
+- Speed: shaping takes fewer instructions (2,000 rows of the Arabic fixture: 11% fewer, of the
+  Devanagari one: 18% fewer, of the Thai one: 2% more). harfrust reads a font's old-style
+  `kern` table the first time it shapes with it, even with kerning off: for FreeSerif (the
+  Thai and Devanagari fixtures) that is about 10 million instructions, a few milliseconds,
+  once per process. Latin text is not shaped and takes the same time as before (09-large).
+- Dependencies: harfrust (MIT), with read-fonts and font-types (MIT or Apache-2.0), replaces
+  rustybuzz and self_cell. resvg still uses rustybuzz to lay out text in SVG images, so it stays
+  in the build; `deny.toml` no longer needs to ignore its advisory.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`
