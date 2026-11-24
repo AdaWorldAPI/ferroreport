@@ -996,6 +996,27 @@ ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)</pre>
       <p>Either way the text is measured, broken into lines and embedded in the PDF with the font that draws each run. A plain text drawn
         in more than one font is laid out like styled text, as in JasperReports, and stays plain text in Excel, Word and CSV.</p>
 
+      <h2 id="hyphenation">Hyphenation</h2>
+      <p>JasperReports does not hyphenate: a word that does not fit at the end of a line goes to the next one, and a word longer than
+        the line is cut between letters. ferroreport does the same unless the template asks for hyphenation with its own property,
+        <code>ferroreport.text.hyphenate</code>, which JasperReports ignores:</p>
+<pre>&lt;!-- every text of the report, in the language of the render's locale (--locale) --&gt;
+&lt;property name="ferroreport.text.hyphenate" value="true"/&gt;
+
+&lt;!-- one text, in Spanish (inside its reportElement); "false" turns it off --&gt;
+&lt;reportElement x="0" y="0" width="120" height="80"&gt;
+  &lt;property name="ferroreport.text.hyphenate" value="es"/&gt;
+&lt;/reportElement&gt;</pre>
+      <p>In <code>.ferro</code>: <code>property ferroreport.text.hyphenate value=true</code> under <code>report</code>, or indented
+        under a text. A word that does not fit is cut after the last of its syllables that fits with a hyphen, and the hyphen is
+        drawn; the rest of the word starts the next line. Only words made of letters are hyphenated, never inside numbers or codes,
+        with at least two letters before the hyphen and two or three after it, as each language's patterns say. The height of a
+        stretching text and where a text is cut across pages follow the hyphenated lines. Styled and HTML text, right-to-left and
+        complex-script text are not hyphenated.</p>
+      <p>The patterns of English, Spanish, French, Italian, Portuguese and Catalan are built in (about 60 KB). Rust users who need
+        more build with the <code>hyphenation-all</code> feature (the 48 languages of <code>hypher</code>, about 1.1 MB more), or without
+        default features to leave hyphenation out. A language without patterns is not hyphenated.</p>
+
       <h2 id="locale">Locale and dates</h2>
       <p>The locale decides how patterns such as <code>#,##0.00</code> and <code>dd MMMM yyyy</code> are written: decimal and grouping
         separators, month and day names. Supported: <code>en_US</code>, <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code>.</p>

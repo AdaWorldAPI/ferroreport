@@ -1966,6 +1966,15 @@ impl Parser {
                         },
                     }))
                 });
+                // ferroreport's own: JasperReports does not hyphenate.
+                let hyphenate = property("ferroreport.text.hyphenate").map(|v| v.trim().to_string()).and_then(|v| {
+                    match v.to_ascii_lowercase().as_str() {
+                        "" | "false" | "no" => None,
+                        // The language of the render's locale.
+                        "true" | "yes" => Some(String::new()),
+                        _ => Some(v),
+                    }
+                });
                 ElementKind::Text(TextElement {
                     content,
                     style,
@@ -1974,6 +1983,7 @@ impl Parser {
                     markup,
                     truncate,
                     field,
+                    hyphenate,
                 })
             }
             "line" => ElementKind::Line {

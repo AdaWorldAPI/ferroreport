@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="hyphenation" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="40" bottomMargin="40">
+	<!-- ferroreport's own property (JasperReports does not hyphenate): "true" hyphenates in the
+	     language of the render's locale, a language code (es, en_US) in that language, "false"
+	     not at all. An element's property overrides the report's. -->
+	<property name="ferroreport.text.hyphenate" value="true"/>
+	<style name="Base" isDefault="true" fontName="DejaVu Serif" fontSize="10"/>
+	<field name="item" class="java.lang.String"/>
+	<field name="detail" class="java.lang.String"/>
+	<title>
+		<band height="330">
+			<staticText>
+				<reportElement x="0" y="0" width="515" height="24"/>
+				<textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
+				<text><![CDATA[Hyphenation of long words at line ends]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="34" width="120" height="180"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[Internationalization of documentation requires extraordinary responsibility: incomprehensibility is unacceptable, and characterization of the interoperability requirements comes first.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="132" y="34" width="120" height="180">
+					<property name="ferroreport.text.hyphenate" value="es"/>
+				</reportElement>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[La responsabilidad administrativa de la internacionalización exige documentación extraordinariamente cuidadosa y comprensible.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="264" y="34" width="120" height="180">
+					<property name="ferroreport.text.hyphenate" value="false"/>
+				</reportElement>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Justified"/>
+				<text><![CDATA[Not hyphenated (false): internationalization of documentation requires extraordinary responsibility, as in JasperReports.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="396" y="34" width="119" height="80"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Right"><font fontName="DejaVu Sans" size="9"/></textElement>
+				<text><![CDATA[Right aligned: telecommunications and microelectronics.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="396" y="124" width="119" height="90"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Center"><font fontName="DejaVu Sans Mono" size="9"/></textElement>
+				<text><![CDATA[Centered, mono: a word too long for one line, Donaudampfschifffahrtsgesellschaftskapitän, and short words.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="226" width="515" height="40"/>
+				<text><![CDATA[Words that fit are never hyphenated: this line is wide enough for every one of them, so it breaks at spaces only, exactly as without the property.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="290" width="515" height="22"/>
+				<box><bottomPen lineWidth="1"/></box>
+				<textElement><font isBold="true"/></textElement>
+				<text><![CDATA[Item                                         Detail]]></text>
+			</staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="22">
+			<textField isStretchWithOverflow="true">
+				<reportElement x="0" y="3" width="150" height="16"/>
+				<textElement><font fontName="DejaVu Sans" size="11"/></textElement>
+				<textFieldExpression><![CDATA[$F{item}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement x="200" y="3" width="160" height="16"/>
+				<textElement textAlignment="Justified"/>
+				<textFieldExpression><![CDATA[$F{detail}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

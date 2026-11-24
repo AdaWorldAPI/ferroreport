@@ -46,6 +46,71 @@ pub fn text_before_line(text: &str, lines: &[Line], k: usize) -> String {
     }
 }
 
+/// Hyphenation of words that do not fit at the end of a line, in one language. JasperReports
+/// does not hyphenate; ferroreport does when a text asks for it (`ferroreport.text.hyphenate`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Hyphenator {
+    #[cfg(feature = "hyphenation")]
+    lang: hypher::Lang,
+}
+
+impl Hyphenator {
+    /// The hyphenator of a language, from its code or a locale (`es`, `en_US`, `pt-BR`), if
+    /// its patterns are built in.
+    pub fn for_language(code: &str) -> Option<Hyphenator> {
+        #[cfg(feature = "hyphenation")]
+        {
+            let code = code.trim().as_bytes();
+            let iso = [code.first()?.to_ascii_lowercase(), code.get(1)?.to_ascii_lowercase()];
+            if code.get(2).is_some_and(|c| c.is_ascii_alphabetic()) {
+                return None;
+            }
+            hypher::Lang::from_iso(iso).map(|lang| Hyphenator { lang })
+        }
+        #[cfg(not(feature = "hyphenation"))]
+        {
+            let _ = code;
+            None
+        }
+    }
+
+    /// Where `unit` (a break unit: a word, maybe with punctuation and trailing spaces) may be
+    /// hyphenated, as byte offsets into it. Only a word made of letters is: anything with
+    /// digits or other signs inside is left whole, and so is a word shorter than the
+    /// language's minimum (two letters before the hyphen, two or three after it).
+    pub fn breaks(&self, unit: &str) -> Vec<usize> {
+        let word = unit.trim_end_matches([' ', '\t']);
+        let start = word.find(char::is_alphabetic).unwrap_or(word.len());
+        let end = word.rfind(char::is_alphabetic).map(|i| i + word[i..].chars().next().map_or(1, char::len_utf8));
+        let Some(end) = end.filter(|&e| e > start) else { return Vec::new() };
+        let core = &word[start..end];
+        if !core.chars().all(char::is_alphabetic)
+            || !word[..start].chars().chain(word[end..].chars()).all(|c| !c.is_alphanumeric())
+        {
+            return Vec::new();
+        }
+        self.syllables(core).into_iter().map(|b| start + b).collect()
+    }
+
+    #[cfg(feature = "hyphenation")]
+    fn syllables(&self, word: &str) -> Vec<usize> {
+        let mut at = 0;
+        let mut out = Vec::new();
+        for s in hypher::hyphenate(word, self.lang) {
+            at += s.len();
+            if at < word.len() {
+                out.push(at);
+            }
+        }
+        out
+    }
+
+    #[cfg(not(feature = "hyphenation"))]
+    fn syllables(&self, _word: &str) -> Vec<usize> {
+        Vec::new()
+    }
+}
+
 fn measure(face: &FaceData, size: f32, mode: Measure, s: &str) -> f32 {
     match mode {
         Measure::Fill => face.fill_width(s, size),
@@ -61,6 +126,21 @@ fn measure(face: &FaceData, size: f32, mode: Measure, s: &str) -> f32 {
 /// between characters, keeping at least one character per line. A paragraph with
 /// right-to-left or complex-script text is shaped and broken by [`crate::shape`] instead.
 pub fn break_lines(text: &str, face: &FaceData, size: f32, max_width: f32, mode: Measure) -> Vec<Line> {
+    break_lines_hyphenated(text, face, size, max_width, mode, None)
+}
+
+/// [`break_lines`], hyphenating words that do not fit at the end of a line when `hyphenator`
+/// is given: a word that does not fit is cut after the last of its syllables that fits with a
+/// hyphen, and the line ends there with the hyphen drawn. Right-to-left and complex-script
+/// paragraphs are not hyphenated.
+pub fn break_lines_hyphenated(
+    text: &str,
+    face: &FaceData,
+    size: f32,
+    max_width: f32,
+    mode: Measure,
+    hyphenator: Option<Hyphenator>,
+) -> Vec<Line> {
     let mut lines = Vec::new();
     let normalized = normalize(text);
     let mut base = 0;
@@ -74,7 +154,7 @@ pub fn break_lines(text: &str, face: &FaceData, size: f32, max_width: f32, mode:
                 lines.push(Line { text: text.to_string(), width, start: base + from });
             }
         } else {
-            break_paragraph(paragraph, base, face, size, max_width, mode, &mut lines);
+            break_paragraph(paragraph, base, face, size, max_width, mode, hyphenator, &mut lines);
         }
         base += paragraph.len() + 1;
     }
@@ -185,6 +265,7 @@ pub(crate) fn java_units(paragraph: &str) -> Vec<&str> {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn break_paragraph(
     paragraph: &str,
     base: usize,
@@ -192,6 +273,7 @@ fn break_paragraph(
     size: f32,
     max_width: f32,
     mode: Measure,
+    hyphenator: Option<Hyphenator>,
     lines: &mut Vec<Line>,
 ) {
     let fits = |s: &str| measure(face, size, mode, s.trim_end_matches(' ')) <= max_width + 1e-3;
@@ -202,6 +284,31 @@ fn break_paragraph(
             _ => face.text_width(text, size),
         };
         lines.push(Line { text: text.to_string(), width, start: base + from });
+    };
+    // A line that ends inside a word, at one of its syllables, with a hyphen.
+    let hyphenated = |from: usize, to: usize| format!("{}-", &paragraph[from..to]);
+    let push_hyphenated = |lines: &mut Vec<Line>, from: usize, to: usize| {
+        let text = hyphenated(from, to);
+        let width = match mode {
+            Measure::Standard(font) => crate::standard::width(font, &text, size),
+            _ => face.text_width(&text, size),
+        };
+        lines.push(Line { text, width, start: base + from });
+    };
+    // Cuts the unit `unit_start..unit_end` at the last of its syllables that fits on the line
+    // from `line_start` with a hyphen, again on the next line while the rest does not fit.
+    let hyphenate = |lines: &mut Vec<Line>, line_start: &mut usize, unit_start: usize, unit_end: usize| {
+        let Some(h) = hyphenator else { return };
+        let breaks: Vec<usize> = h.breaks(&paragraph[unit_start..unit_end]).into_iter().map(|b| unit_start + b).collect();
+        while !fits(&paragraph[*line_start..unit_end]) {
+            let fit = breaks
+                .iter()
+                .rev()
+                .find(|&&b| b > *line_start && measure(face, size, mode, &hyphenated(*line_start, b)) <= max_width + 1e-3);
+            let Some(&b) = fit else { break };
+            push_hyphenated(lines, *line_start, b);
+            *line_start = b;
+        }
     };
     // Most texts are one line that fits: widths only grow with length, so when the whole
     // paragraph fits there is nothing to break.
@@ -219,9 +326,18 @@ fn break_paragraph(
             pos = unit_end;
             continue;
         }
-        if pos > line_start {
+        // Hyphenation: as much of the word as fits stays on this line.
+        hyphenate(lines, &mut line_start, pos, unit_end);
+        if line_start > pos {
+            if fits(&paragraph[line_start..unit_end]) {
+                pos = unit_end;
+                continue;
+            }
+        } else if pos > line_start {
             push(lines, line_start, pos);
             line_start = pos;
+            // The word alone on its new line may need hyphenating too.
+            hyphenate(lines, &mut line_start, pos, unit_end);
         }
         // The unit alone may still be too wide: break it between characters.
         while !fits(&paragraph[line_start..unit_end]) {
@@ -369,6 +485,36 @@ mod tests {
         assert_eq!(lines.len(), 3);
         let lines = break_lines("a\n\nb", f, 10.0, 100.0, Measure::Render);
         assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn hyphenates_words_that_do_not_fit() {
+        let (fonts, id) = face();
+        let f = fonts.face(id);
+        let text = "Internationalization requires responsibility";
+        let width = f.text_width("Internationaliza-", 10.0).max(f.fill_width("Internationaliza-", 10.0)) + 0.1;
+        // Without hyphenation, the long word is cut between characters.
+        let plain = break_lines(text, f, 10.0, width, Measure::Render);
+        assert!(!plain.iter().any(|l| l.text.ends_with('-')));
+        let en = Hyphenator::for_language("en_US");
+        assert!(en.is_some());
+        for mode in [Measure::Fill, Measure::Render] {
+            let lines = break_lines_hyphenated(text, f, 10.0, width, mode, en);
+            let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+            assert_eq!(texts, ["Internationaliza-", "tion requires re-", "sponsibility"], "{mode:?}");
+            // Each line starts where its text starts in the source.
+            assert_eq!(&text[lines[1].start..lines[1].start + 4], "tion");
+            assert!(lines[0].width <= width);
+        }
+        // Words with digits or other signs inside, and short words, are left whole.
+        let h = en.unwrap();
+        assert!(h.breaks("abc123def").is_empty());
+        assert!(h.breaks("e-mail").is_empty());
+        assert!(h.breaks("cat").is_empty());
+        assert_eq!(h.breaks("(hyphenation), "), [3, 7]);
+        assert!(Hyphenator::for_language("es").unwrap().breaks("responsabilidad").contains(&"responsabi".len()));
+        assert!(Hyphenator::for_language("xx").is_none());
+        assert!(Hyphenator::for_language("eng").is_none());
     }
 
     #[test]

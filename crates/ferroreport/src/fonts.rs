@@ -310,6 +310,8 @@ pub struct FontSet {
     sets: HashMap<String, Vec<String>>,
     /// Whether every font falls back to the other fonts for characters it lacks.
     fallback: bool,
+    /// The language of the render's locale (`en`), for texts hyphenated in it.
+    language: String,
 }
 
 /// Characters every font "has", as Java's `Font.canDisplay` sees them: controls and the
@@ -355,6 +357,17 @@ impl FontSet {
         }
         self.sets.insert(name.trim().to_ascii_lowercase(), families.iter().map(|f| f.trim().to_string()).collect());
         Ok(())
+    }
+
+    /// Sets the language texts are hyphenated in when they do not name one (the locale's).
+    pub(crate) fn set_language(&mut self, locale: &str) {
+        self.language = locale.to_string();
+    }
+
+    /// How a text asking for hyphenation in `language` (empty: the locale's) is hyphenated.
+    pub(crate) fn hyphenator(&self, language: Option<&str>) -> Option<crate::text::Hyphenator> {
+        let language = language?;
+        crate::text::Hyphenator::for_language(if language.is_empty() { &self.language } else { language })
     }
 
     /// Whether some texts may be drawn in more than one font (font sets or fallback).

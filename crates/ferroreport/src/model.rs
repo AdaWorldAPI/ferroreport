@@ -275,6 +275,10 @@ pub struct TextElement {
     pub truncate: Truncate,
     /// Written as a PDF form field instead of text (`net.sf.jasperreports.export.pdf.field.*`).
     pub field: Option<Box<FormField>>,
+    /// Hyphenate words that do not fit at the end of a line, in this language (`es`, `en_US`;
+    /// empty: the language of the render's locale). From the element's or the report's
+    /// `ferroreport.text.hyphenate` property; JasperReports does not hyphenate.
+    pub hyphenate: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

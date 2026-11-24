@@ -15,7 +15,7 @@ use crate::format::format_value;
 use crate::image::{ImageData, ImageStore};
 use crate::model::*;
 use crate::print::*;
-use crate::text::{break_lines, text_after_lines, text_before_line, vertical_metrics, Measure};
+use crate::text::{break_lines_hyphenated, text_after_lines, text_before_line, vertical_metrics, Measure};
 use crate::value::{JavaType, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -809,11 +809,12 @@ fn printed_text(
         }
     };
     let te = &*te;
+    let hyphenator = fonts.hyphenator(te.hyphenate.as_deref());
     let face_id = fonts.resolve(&te.style.font);
     let face = fonts.face(face_id);
     let size = te.style.font.size;
     let vm = vertical_metrics(face, size, te.style.line_spacing);
-    let lines = break_lines(text, face, size, cw, Measure::Fill);
+    let lines = break_lines_hyphenated(text, face, size, cw, Measure::Fill, hyphenator);
     let fit = vm.lines_that_fit(ch).min(lines.len());
     if te.truncate.keep_full {
         return (text.to_string(), Vec::new());
@@ -1004,7 +1005,8 @@ fn plain_text_item(
     // Like JasperReports: the fill-time measurement decides the height and where the text is
     // cut; the export-time measurement decides the drawn line breaks.
     let vm = vertical_metrics(face, size, te.style.line_spacing);
-    let fill_lines = break_lines(text, face, size, cw, Measure::Fill);
+    let hyphenator = fonts.hyphenator(te.hyphenate.as_deref());
+    let fill_lines = break_lines_hyphenated(text, face, size, cw, Measure::Fill, hyphenator);
     let needed = p.top + p.bottom + vm.block_height(fill_lines.len());
     let fit = if clip { vm.lines_that_fit(ch).min(fill_lines.len()) } else { fill_lines.len() };
     let rendered_text = if fit < fill_lines.len() {
@@ -1019,7 +1021,7 @@ fn plain_text_item(
         Some(st) => Measure::Standard(st.font),
         None => Measure::Render,
     };
-    let mut lines = break_lines(&rendered_text, face, size, cw, render);
+    let mut lines = break_lines_hyphenated(&rendered_text, face, size, cw, render, hyphenator);
     if clip {
         lines.truncate(vm.lines_that_fit(ch));
     }
@@ -1600,9 +1602,10 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                                 (k, cont)
                             }
                             TextForm::Plain(te) => {
+                                let hyphenator = le.fonts.hyphenator(te.hyphenate.as_deref());
                                 let face = le.fonts.resolve(&te.style.font);
                                 let f = le.fonts.face(face);
-                                let lines = break_lines(&text, f, te.style.font.size, cw, Measure::Fill);
+                                let lines = break_lines_hyphenated(&text, f, te.style.font.size, cw, Measure::Fill, hyphenator);
                                 let vm = vertical_metrics(f, te.style.font.size, te.style.line_spacing);
                                 let k = vm.lines_that_fit(room);
                                 let cont = match k {
@@ -4350,6 +4353,7 @@ fn new_filler<'a>(
     images: &'a mut ImageStore,
     env: &'a EvalEnv<'a>,
 ) -> Result<Filler<'a>> {
+    fonts.set_language(env.locale.tag);
     // Built-in variables, in the order Jasper declares them.
     let count_var = |name: String, reset: ResetType| VarDef {
         name,

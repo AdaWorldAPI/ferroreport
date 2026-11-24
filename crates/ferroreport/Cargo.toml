@@ -26,6 +26,10 @@ unicode-script = "0.5"
 unicode-linebreak = "0.1"
 # Keeps each font's shaping tables next to the font bytes they read, parsed once.
 self_cell = "1"
+# Hyphenation of long words at line ends (`ferroreport.text.hyphenate`), with the patterns of
+# English, Spanish, French, Italian, Portuguese and Catalan embedded (about 60 KB);
+# feature `hyphenation-all` embeds every language hypher has (about 1.1 MB more).
+hypher = { version = "0.1.8", default-features = false, features = ["alloc", "english", "spanish", "french", "italian", "portuguese", "catalan"], optional = true }
 miniz_oxide = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 rust_decimal = "1"
@@ -47,6 +51,11 @@ getrandom = { version = "0.2", features = ["js"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
+
+[features]
+default = ["hyphenation"]
+hyphenation = ["dep:hypher"]
+hyphenation-all = ["hyphenation", "hypher/full"]
 
 [dev-dependencies]
 rusqlite = { version = "0.43", features = ["bundled"] }
