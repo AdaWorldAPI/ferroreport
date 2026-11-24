@@ -315,7 +315,6 @@ pub enum Edge {
 }
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ChartElement {
     /// Unique within its report: identifies the chart's dataset while filling.
     pub id: usize,
@@ -364,15 +363,66 @@ pub struct ChartElement {
     /// Pie charts: how sections and legend items are labeled (`{0} {2}`).
     pub label_format: Option<String>,
     pub legend_label_format: Option<String>,
+}
+
+/// Settings of a chart that its public struct has no field for (adding one would break code
+/// that builds a `ChartElement` with a struct literal): the parser records them here, keyed by
+/// what the chart is, and drawing looks them up. A copy of a chart has the same key; a chart
+/// changed after parsing gets its settings with [`copy_settings`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Settings {
+    /// Drawn as SVG (`net.sf.jasperreports.chart.render.type=svg`) rather than straight on the
+    /// page: JFreeChart then measures text glyph by glyph in whole points, and otherwise rounds
+    /// a whole text's width.
+    pub svg: bool,
+    /// How opaque what the plot draws is (`foregroundAlpha`, 1 by default).
+    pub foreground_alpha: f32,
     /// High-low charts: draw the open and close ticks (`showOpenTicks`, `showCloseTicks`).
     pub show_open_ticks: bool,
     pub show_close_ticks: bool,
-    /// How opaque what the plot draws is (`foregroundAlpha`, 1 by default).
-    pub foreground_alpha: f32,
-    /// Drawn as SVG (`net.sf.jasperreports.chart.render.type=svg`) rather than straight on the
-    /// page: JFreeChart then measures text glyph by glyph in whole points, and otherwise
-    /// rounds a whole text's width.
-    pub svg: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Settings {
+        Settings { svg: false, foreground_alpha: 1.0, show_open_ticks: false, show_close_ticks: false }
+    }
+}
+
+/// Charts with other settings than the defaults, by [`settings_key`].
+fn settings_table() -> &'static std::sync::Mutex<HashMap<u64, Settings>> {
+    static TABLE: std::sync::OnceLock<std::sync::Mutex<HashMap<u64, Settings>>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(Default::default)
+}
+
+/// What identifies a chart: a hash of everything in it. Two charts alike in every public field
+/// share their settings (the last one parsed gives them).
+fn settings_key(ch: &ChartElement) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{ch:?}").hash(&mut h);
+    h.finish()
+}
+
+/// Records `s` as the settings of `ch`.
+pub(crate) fn set_settings(ch: &ChartElement, s: Settings) {
+    let key = settings_key(ch);
+    let mut table = settings_table().lock().unwrap_or_else(|e| e.into_inner());
+    if s == Settings::default() {
+        table.remove(&key);
+    } else {
+        table.insert(key, s);
+    }
+}
+
+/// The settings of `ch` (the defaults for a chart the parser did not make).
+pub(crate) fn settings(ch: &ChartElement) -> Settings {
+    let key = settings_key(ch);
+    settings_table().lock().unwrap_or_else(|e| e.into_inner()).get(&key).copied().unwrap_or_default()
+}
+
+/// Gives `to`, a changed copy of `from`, the settings of `from`.
+pub(crate) fn copy_settings(from: &ChartElement, to: &ChartElement) {
+    set_settings(to, settings(from));
 }
 
 /// Values collected for one chart.
@@ -786,7 +836,7 @@ pub fn render(
 ) -> Vec<PrintItem> {
     let empty = DataState::default();
     let data = all.get(&ch.id).unwrap_or(&empty);
-    let mut cv = Canvas { fonts, items: Vec::new(), svg: ch.svg, origin: (0.0, 0.0) };
+    let mut cv = Canvas { fonts, items: Vec::new(), svg: settings(ch).svg, origin: (0.0, 0.0) };
     let p = ch.boxed.padding;
     let (x, y, w, h) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), (h - p.top - p.bottom).max(0.0));
     cv.origin = (x as f64, y as f64);

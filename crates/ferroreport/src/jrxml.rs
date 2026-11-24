@@ -1542,13 +1542,7 @@ impl Parser {
             None => Ok(None),
         };
         self.chart_count += 1;
-        Ok(ChartElement {
-            dial,
-            axes,
-            axis_color,
-            time_format,
-            x_format,
-            show_volume: flag(plot_node, &["isShowVolume", "showVolume"], true),
+        let settings = crate::chart::Settings {
             show_open_ticks: flag(plot_node, &["isShowOpenTicks", "showOpenTicks"], false),
             show_close_ticks: flag(plot_node, &["isShowCloseTicks", "showCloseTicks"], false),
             foreground_alpha: plot.and_then(|p| p.attr("foregroundAlpha")).and_then(number::<f32>).unwrap_or(1.0),
@@ -1558,6 +1552,14 @@ impl Parser {
                 .or_else(|| self.chart_render_type.clone())
                 .as_deref()
                 == Some("svg"),
+        };
+        let element = ChartElement {
+            dial,
+            axes,
+            axis_color,
+            time_format,
+            x_format,
+            show_volume: flag(plot_node, &["isShowVolume", "showVolume"], true),
             label_format: plot_node.and_then(|p| p.attr("labelFormat")).map(str::to_string),
             legend_label_format: plot_node.and_then(|p| p.attr("legendLabelFormat")).map(str::to_string),
             id: self.chart_count,
@@ -1616,7 +1618,9 @@ impl Parser {
             plot_backcolor: color(plot, "backcolor"),
             value_format,
             boxed,
-        })
+        };
+        crate::chart::set_settings(&element, settings);
+        Ok(element)
     }
 
     /// The plot of a meter or thermometer (`<meterPlot>`, `<thermometerPlot>`).

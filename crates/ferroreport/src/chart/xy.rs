@@ -313,7 +313,7 @@ pub(crate) fn draw(
                             // opaque bitmap of a pixel a point.
                             let h = (volume.trunc() / volume_max) * data_area.h;
                             let r = Rect::new(xx - volume_w / 2.0, data_area.max_y() - h, volume_w, h);
-                            if ch.svg {
+                            if cv.svg {
                                 // Java2D clips the bitmap's pixels to the data area.
                                 let (x0, y0) = (r.x.max(data_area.x), r.y.max(data_area.y));
                                 let (x1, y1) = (r.max_x().min(data_area.max_x()), r.max_y().min(data_area.max_y()));
@@ -340,6 +340,7 @@ pub(crate) fn draw(
                 }
             }
             ChartKind::HighLow => {
+                let st = super::settings(ch);
                 for &s in &order {
                     for it in &data.ohlc[s].1 {
                         let [t, high, low, open, close, _] = *it;
@@ -348,10 +349,10 @@ pub(crate) fn draw(
                         if high.is_finite() && low.is_finite() {
                             cv.line_square(xx, ypos(low), xx, ypos(high), color, 1.0);
                         }
-                        if ch.show_open_ticks && open.is_finite() {
+                        if st.show_open_ticks && open.is_finite() {
                             cv.line_square(xx - 2.0, ypos(open), xx, ypos(open), color, 1.0);
                         }
-                        if ch.show_close_ticks && close.is_finite() {
+                        if st.show_close_ticks && close.is_finite() {
                             cv.line_square(xx, ypos(close), xx + 2.0, ypos(close), color, 1.0);
                         }
                     }

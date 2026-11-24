@@ -147,8 +147,9 @@ pub(crate) fn draw(
     // Sections clockwise from twelve o'clock: their shadows first, then the sections.
     // Drawing SVG, Batik paints translucent groups as opaque bitmaps of a pixel a point, where
     // a thin outline is a point wide.
-    let bitmaps = ch.svg && ch.foreground_alpha < 1.0;
-    let alpha = if ch.svg { 1.0 } else { ch.foreground_alpha.clamp(0.0, 1.0) };
+    let st = super::settings(ch);
+    let bitmaps = st.svg && st.foreground_alpha < 1.0;
+    let alpha = if st.svg { 1.0 } else { st.foreground_alpha.clamp(0.0, 1.0) };
     let opaque = alpha >= 1.0;
     let back = ch.plot_backcolor.or(ch.backcolor).unwrap_or(Color::WHITE);
     let shadow = blend(SHADOW, alpha, back);
