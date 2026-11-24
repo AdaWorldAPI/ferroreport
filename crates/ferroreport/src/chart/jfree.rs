@@ -718,6 +718,8 @@ pub(crate) struct NumberAxis {
     pub line_color: Color,
     pub tick_marks: bool,
     pub tick_labels: bool,
+    /// Where the last `draw` left the cursor (past the tick labels and the label).
+    pub end_cursor: f64,
     pub inverted: bool,
 }
 
@@ -737,6 +739,7 @@ impl NumberAxis {
             line_color: Color::BLACK,
             tick_marks: true,
             tick_labels: true,
+            end_cursor: 0.0,
             inverted: false,
         }
     }
@@ -899,7 +902,7 @@ impl NumberAxis {
             label_color: self.label_color,
         };
         let positions: Vec<f64> = ticks.iter().map(|(v, _)| self.java2d(*v, data, side)).collect();
-        draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
+        self.end_cursor = draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
         ticks
     }
 }
@@ -1494,7 +1497,7 @@ impl ValueAxis {
                     label_color: a.label_color,
                 };
                 let positions: Vec<f64> = ticks.iter().map(|(v, _)| a.java2d(*v, data, side)).collect();
-                draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
+                let _ = draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
                 ticks
             }
         }
@@ -1534,7 +1537,7 @@ pub(crate) fn draw_value_axis(
     cursor: f64,
     data: Rect,
     side: Side,
-) {
+) -> f64 {
     match side {
         Side::Left | Side::Right => cv.line_square(cursor, data.y, cursor, data.max_y(), s.line_color, 0.5),
         Side::Top | Side::Bottom => cv.line_square(data.x, cursor, data.max_x(), cursor, s.line_color, 0.5),
@@ -1564,7 +1567,12 @@ pub(crate) fn draw_value_axis(
         Side::Left | Side::Top => cursor - used,
         Side::Right | Side::Bottom => cursor + used,
     };
+    let enclosure = label_enclosure(cv, s.label.as_deref(), &s.label_font);
     if let Some(l) = s.label.clone().filter(|l| !l.is_empty()) {
         draw_axis_label(cv, &l, &s.label_font, s.label_color, cursor, data, side);
+    }
+    match side {
+        Side::Left | Side::Top => cursor - enclosure,
+        Side::Right | Side::Bottom => cursor + enclosure,
     }
 }

@@ -136,7 +136,7 @@ pub(crate) fn draw(
             let p = vaxis.java2d(*v, data_area, rng_side);
             grid_line(cv, data_area, p, !horizontal);
         }
-        items(cv, ch, data, &caxis, &vaxis, data_area, dom_side, rng_side, color_of);
+        items(cv, ch, data, &caxis, &vaxis, data_area, dom_side, rng_side, color_of, 0);
     });
 }
 
@@ -152,6 +152,7 @@ fn items(
     dom_side: Side,
     rng_side: Side,
     color_of: &dyn Fn(usize) -> Color,
+    shape_base: usize,
 ) {
     let horizontal = ch.horizontal;
     let ncat = data.categories.len();
@@ -235,7 +236,7 @@ fn items(
                     for s in 0..nser {
                         let Some(v) = value(s, c) else { continue };
                         let (x, y) = point(c, v);
-                        let (ops, _) = series_shape(s);
+                        let (ops, _) = series_shape(shape_base + s);
                         let ops = super::jfree::translate(&ops, x, y);
                         cv.path(ops.clone(), Some(color_of(s)), None, None);
                         cv.stroke_closed(ops, color_of(s), 1.0);
@@ -435,6 +436,180 @@ pub(crate) fn draw_gantt(
                     }
                 }
             }
+        }
+    });
+}
+
+/// The value range of a category dataset as `kind`'s renderer finds it.
+fn value_range(kind: ChartKind, data: &DataState) -> (f64, f64) {
+    let (mut vmin, mut vmax) = (f64::INFINITY, f64::NEG_INFINITY);
+    if matches!(kind, ChartKind::StackedBar | ChartKind::StackedBar3D | ChartKind::StackedArea) {
+        for c in 0..data.categories.len() {
+            let (mut pos, mut neg) = (0.0f64, 0.0f64);
+            for s in 0..data.series.len() {
+                if let Some(&v) = data.values.get(&(s, c)) {
+                    if v > 0.0 {
+                        pos += v;
+                    } else {
+                        neg += v;
+                    }
+                }
+            }
+            vmin = vmin.min(neg);
+            vmax = vmax.max(pos);
+        }
+    } else {
+        for v in data.values.values() {
+            vmin = vmin.min(*v);
+            vmax = vmax.max(*v);
+        }
+        if matches!(kind, ChartKind::Bar | ChartKind::Bar3D) && vmin.is_finite() {
+            vmin = vmin.min(0.0);
+            vmax = vmax.max(0.0);
+        }
+    }
+    (vmin, vmax)
+}
+
+/// One chart of a multiple axis chart: its element, data and texts.
+pub(crate) struct AxisPart<'a> {
+    pub chart: &'a ChartElement,
+    pub data: &'a DataState,
+    pub texts: Option<&'a ChartTexts>,
+    /// On the right (`rightOrBottom`) rather than the left.
+    pub right: bool,
+}
+
+/// Where the shapes and default colors of each part start: JFreeChart's drawing supplier hands
+/// them out in the order the legend asks for them, chart after chart (bars take no shape).
+pub(crate) fn part_bases(parts: &[AxisPart]) -> Vec<(usize, usize)> {
+    let (mut shapes, mut colors) = (0, 0);
+    parts
+        .iter()
+        .map(|p| {
+            let b = (shapes, colors);
+            let n = p.data.series.len();
+            if !matches!(p.chart.kind, ChartKind::Bar | ChartKind::Bar3D | ChartKind::StackedBar | ChartKind::StackedBar3D) {
+                shapes += n;
+            }
+            colors += n;
+            b
+        })
+        .collect()
+}
+
+/// The legend graphic of series `s` of a part whose shapes start at `shape_base`.
+pub(crate) fn part_legend_graphic(ch: &ChartElement, s: usize, shape_base: usize, color: Color) -> LegendGraphic {
+    match ch.kind {
+        ChartKind::Line => {
+            let shape = ch.show_shapes.then(|| {
+                let (ops, bounds) = series_shape(shape_base + s);
+                (ops, bounds, Some((color, 1.0)))
+            });
+            LegendGraphic { shape, line: ch.show_lines.then_some(1.0), color }
+        }
+        _ => legend_graphic(ch, s, color),
+    }
+}
+
+/// The color of series `s` of a part whose default colors start at `color_base`.
+pub(crate) fn part_color(ch: &ChartElement, s: usize, color_base: usize) -> Color {
+    if ch.series_colors.is_empty() {
+        super::series_color(&[], color_base + s)
+    } else {
+        super::series_color(&ch.series_colors, s)
+    }
+}
+
+/// Draws a multiple axis chart in `area`: JasperReports puts every chart's dataset, renderer
+/// and value axis into the first chart's CategoryPlot. The axes take their room edge by edge in
+/// order, the grid lines follow the first value axis, and the last chart is drawn first.
+pub(crate) fn draw_multi(cv: &mut Canvas, ch: &ChartElement, parts: &[AxisPart], locale: &Locale, area: Rect) {
+    let Some(first) = parts.first() else { return };
+    let font = ch.font.clone();
+    let mut categories: Vec<String> = Vec::new();
+    for p in parts {
+        for c in &p.data.categories {
+            if !categories.contains(c) {
+                categories.push(c.clone());
+            }
+        }
+    }
+    // Each part's data on the shared categories.
+    let datas: Vec<DataState> = parts
+        .iter()
+        .map(|p| {
+            let mut d = DataState { series: p.data.series.clone(), categories: categories.clone(), ..Default::default() };
+            for (&(s, c), &v) in &p.data.values {
+                if let Some(k) = p.data.categories.get(c).and_then(|name| categories.iter().position(|n| n == name)) {
+                    d.values.insert((s, k), v);
+                }
+            }
+            d
+        })
+        .collect();
+    let mut vaxes: Vec<(NumberAxis, Side)> = parts
+        .iter()
+        .map(|p| {
+            let (vmin, vmax) = value_range(p.chart.kind, p.data);
+            let (lo, hi) = NumberAxis::auto_range(vmin, vmax, true);
+            let mut a = NumberAxis::new(lo, hi, p.chart.font.clone());
+            if let Some(t) = p.texts {
+                a.fix(t.value_min, t.value_max);
+                a.label = t.value_label.clone();
+            }
+            a.format = p.chart.value_format.clone();
+            if let Some(c) = p.chart.axis_color {
+                (a.line_color, a.tick_label_color, a.label_color) = (c, c, c);
+            }
+            (a, if p.right { Side::Right } else { Side::Left })
+        })
+        .collect();
+    let mut caxis = CategoryAxis::new(categories.clone(), font.clone());
+    caxis.label = first.texts.and_then(|t| t.category_label.clone());
+
+    let plot = area.trim(4.0, 8.0, 4.0, 8.0);
+    let dom_space = caxis.reserve(cv, plot, Side::Bottom);
+    let (mut left, mut right) = (0.0, 0.0);
+    for (a, side) in vaxes.iter_mut() {
+        let r = a.reserve(cv, plot, *side, locale);
+        if *side == Side::Right {
+            right += r;
+        } else {
+            left += r;
+        }
+    }
+    let data_area = plot.trim(0.0, left, dom_space, right).integerise();
+    if data_area.w <= 0.0 || data_area.h <= 0.0 {
+        return;
+    }
+    if let Some(bg) = ch.plot_backcolor {
+        cv.fill_rect(data_area, bg);
+    }
+    caxis.draw(cv, data_area.max_y(), plot, data_area, Side::Bottom);
+    let (mut at_left, mut at_right) = (data_area.x, data_area.max_x());
+    let mut grid = Vec::new();
+    for (i, (a, side)) in vaxes.iter_mut().enumerate() {
+        let cursor = if *side == Side::Right { at_right } else { at_left };
+        let ticks = a.draw(cv, cursor, plot, data_area, *side, locale);
+        if *side == Side::Right {
+            at_right = a.end_cursor;
+        } else {
+            at_left = a.end_cursor;
+        }
+        if i == 0 {
+            grid = ticks;
+        }
+    }
+    let bases = part_bases(parts);
+    cv.clipped(data_area, |cv| {
+        for (v, _) in &grid {
+            grid_line(cv, data_area, vaxes[0].0.java2d(*v, data_area, vaxes[0].1), true);
+        }
+        for (i, p) in parts.iter().enumerate().rev() {
+            let (shape_base, color_base) = bases[i];
+            let color_of = |s: usize| part_color(p.chart, s, color_base);
+            items(cv, p.chart, &datas[i], &caxis, &vaxes[i].0, data_area, Side::Bottom, vaxes[i].1, &color_of, shape_base);
         }
     });
 }

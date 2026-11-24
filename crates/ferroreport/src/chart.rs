@@ -815,6 +815,43 @@ pub fn render(
         category::draw(&mut cv, ch, data, texts, locale, area, &color_of);
         return clip_to(cv.items, x, y, w, h);
     }
+    if ch.kind == ChartKind::MultiAxis
+        && !ch.axes.is_empty()
+        && ch.axes.iter().all(|(_, a)| {
+            a.dataset.kind == DataKind::Category
+                && matches!(
+                    a.kind,
+                    ChartKind::Bar | ChartKind::Bar3D | ChartKind::StackedBar | ChartKind::StackedBar3D | ChartKind::Line
+                )
+        })
+    {
+        let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
+        let parts: Vec<category::AxisPart> = ch
+            .axes
+            .iter()
+            .enumerate()
+            .map(|(i, (right, a))| category::AxisPart {
+                chart: a,
+                data: all.get(&a.id).unwrap_or(&empty),
+                texts: texts.axes.get(i),
+                right: *right,
+            })
+            .collect();
+        let bases = category::part_bases(&parts);
+        let mut items = Vec::new();
+        for (p, &(shape_base, color_base)) in parts.iter().zip(&bases) {
+            for (s, label) in p.data.series.iter().enumerate() {
+                let color = category::part_color(p.chart, s, color_base);
+                items.push(jfree::LegendItem {
+                    label: label.clone(),
+                    graphic: category::part_legend_graphic(p.chart, s, shape_base, color),
+                });
+            }
+        }
+        titles_and_legend(&mut cv, ch, texts, &mut area, items);
+        category::draw_multi(&mut cv, ch, &parts, locale, area);
+        return clip_to(cv.items, x, y, w, h);
+    }
     if ch.kind == ChartKind::Gantt && ch.dataset.kind == DataKind::Gantt {
         let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
         let items = data

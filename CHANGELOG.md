@@ -30,6 +30,10 @@ the charts of JasperReports' own samples, instead of an approximation of its loo
 - Gantt charts come out the same as JasperReports draws them: tasks down the left, the date
   axis on top with JFreeChart's date ticks, bars placed as BarRenderer places them, and the
   done and not-done parts of each task or subtask as a band through its middle.
+- Multiple axis charts made of bar and line charts come out the same as JasperReports draws
+  them: every chart's value axis beside the plot in the order given, each in its own color and
+  format, the grid lines of the first one, the last chart drawn first, and shapes handed out
+  chart after chart.
 - Where a chart drawn as SVG is translucent (3D pie sections with a `foregroundAlpha` below 1,
   candlestick volume bars), the PDF gets the same opaque bitmaps JasperReports writes there,
   pixel for pixel, instead of translucent vector shapes.
