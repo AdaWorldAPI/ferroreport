@@ -466,7 +466,7 @@ const DIFF = {
   "18-barcodes": "Same result: checked pixel by pixel at 100 dpi, 0 pixels differ, QR codes included.",
   "26-barcodes-1d": "Same result: checked pixel by pixel at 100 dpi, 0 pixels differ, every bar included.",
   "21-markup": "Same result: 7 pixels differ at 100 dpi, where the edges of a few letters are smoothed differently.",
-  "dashboard": "Same data, layout and colors. The charts are drawn after JFreeChart's look but not pixel for pixel, so lines and labels differ slightly.",
+  "dashboard": "Same data, layout and colors. The charts are drawn as JasperReports 7 draws them; JasperReports 6.20's JFreeChart frames the legend and places some labels differently, so lines and labels differ slightly.",
 };
 let engine, example = "02-invoice", ferroUrl, edited = false, lastMs = 0, coldMs = null, anim;
 try {

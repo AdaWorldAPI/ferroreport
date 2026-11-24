@@ -1,9 +1,11 @@
 //! Charts (`<pieChart>`, `<barChart>`, `<lineChart>`, ...): datasets collected while filling
-//! and vector drawing that follows JFreeChart's default look as used by JasperReports
-//! (palette, margins, tick-unit choice, legend and pie labels).
+//! and drawing that follows JFreeChart 1.5's rules as JasperReports 7 uses them (plots, axes,
+//! tick units, legends, renderers), checked pixel by pixel against JasperReports' own chart
+//! samples (`category`, `pie`, `xy` and the shared pieces in `jfree`).
 //!
-//! Charts are drawn as vector graphics with real, selectable text. They reproduce Jasper's
-//! layout closely but are not pixel-identical to JFreeChart.
+//! Chart text is written as glyph outlines, as JasperReports writes it. Meter and
+//! thermometer charts, and multiple axis charts of XY charts, still follow JFreeChart's look
+//! without being pixel-identical.
 
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 

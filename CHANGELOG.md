@@ -10,6 +10,11 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 Charts follow JFreeChart 1.5's layout rules as JasperReports 7.1 uses them, measured against
 the charts of JasperReports' own samples, instead of an approximation of its look.
+Of JasperReports 7.1.1's 24 chart samples, 20 now come out pixel for pixel the same (none did
+before), which takes the 7.1.1 samples that match from 47 to 67 of 101. Still different: the
+bar chart sample with a chart customizer, meter and thermometer charts, and one page of the
+time period bar chart. JasperReports 6.20 draws charts with JFreeChart 1.0.19 (framed legend,
+3D charts in 3D), so its chart samples still differ.
 
 - Bar, stacked bar, line, area and stacked area charts (and their 3D variants, which
   JasperReports 7 draws flat) come out the same as JasperReports draws them: plot insets, the

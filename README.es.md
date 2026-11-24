@@ -24,8 +24,9 @@ mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperRe
 > Estado: **estable, versión 1.0.** Las 48 plantillas comparables de la batería de pruebas salen
 > píxel por píxel igual que en JasperReports 6.20, incluyendo bandas divididas entre páginas,
 > imágenes (también SVG), subreportes, tablas, listas, crosstabs, códigos QR, PDF417, Barbecue
-> y de barras, enlaces, texto con formato y varias columnas; los gráficos siguen de cerca el
-> estilo de JFreeChart. Las 49 que ambos motores pueden exportar dan el mismo Excel y CSV, las
+> y de barras, enlaces, texto con formato y varias columnas; los gráficos se dibujan como los
+> dibuja JasperReports 7 (20 de sus 24 muestras de gráficos salen iguales). Las 49 que ambos
+> motores pueden exportar dan el mismo Excel y CSV, las
 > 51 pasan las pruebas PDF/UA-1, PDF/A-2a, PDF/A-3b y PDF/A-2b (firmado) de veraPDF, y las
 > muestras del propio JasperReports se comparan contra 6.20.6 y 7.1.1. `ferroreport doctor` te
 > dice si todo lo de tu plantilla está soportado; lo que aún falta está en
@@ -316,7 +317,11 @@ lista), así que el JRXML convertido funciona también en JasperReports:
 - Gráficos: pastel (también 3D), barras (también 3D y apiladas), líneas, áreas, XY, dispersión,
   burbujas, series de tiempo, velas (candlestick), máximo-mínimo, Gantt, medidor, termómetro y
   de varios ejes, con títulos, leyendas y datasets por registro, grupo o reporte, también desde un
-  subdataset. Siguen el estilo de JFreeChart, aunque no son idénticos píxel por píxel.
+  subdataset. Se dibujan como los dibuja JasperReports 7.1 con JFreeChart 1.5, píxel por píxel en
+  sus propias muestras, salvo el medidor, el termómetro y los de varios ejes hechos de gráficos
+  XY, que siguen el estilo de JFreeChart sin ser iguales. JasperReports 6 (JFreeChart 1.0.19)
+  enmarca la leyenda y dibuja en 3D los gráficos 3D; ferroreport no. El texto de los gráficos va
+  como contornos, igual que en JasperReports, así que no se puede seleccionar.
 - Tablas (`jr:table`) como las crea el asistente de Jaspersoft Studio: grupos de columnas, encabezados
   y pies de tabla, de columna y de grupo, columnas ocultas, celda sin datos, y encabezados que se
   repiten en cada página.
@@ -494,7 +499,8 @@ códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 
   silábica, usar otra fuente para los caracteres que le faltan a la elegida y un diccionario
   para cortar líneas en tailandés, lao, jemer y birmano. El motor de composición, rustybuzz, ya no
   se mantiene: se pasará a su sucesor, harfrust.
-- **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
+- **Los últimos gráficos píxel por píxel:** medidor y termómetro, y el estilo de JFreeChart de
+  JasperReports 6 (leyenda enmarcada, gráficos 3D) junto al de la 7.
 - **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con
   recuadro visible.
 
