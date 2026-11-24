@@ -2,7 +2,7 @@
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="hyphenation" pageWidth="595" pageHeight="842" columnWidth="515" leftMargin="40" rightMargin="40" topMargin="40" bottomMargin="40">
 	<!-- ferroreport's own property (JasperReports does not hyphenate): "true" hyphenates in the
 	     language of the render's locale, a language code (es, en_US) in that language, "false"
-	     not at all. An element's property overrides the report's. -->
+	     not at all. It is set on a report; the two subreports have their own (es, false). -->
 	<property name="ferroreport.text.hyphenate" value="true"/>
 	<style name="Base" isDefault="true" fontName="DejaVu Serif" fontSize="10"/>
 	<field name="item" class="java.lang.String"/>
@@ -20,22 +20,14 @@
 				<textElement textAlignment="Justified"/>
 				<text><![CDATA[Internationalization of documentation requires extraordinary responsibility: incomprehensibility is unacceptable, and characterization of the interoperability requirements comes first.]]></text>
 			</staticText>
-			<staticText>
-				<reportElement x="132" y="34" width="120" height="180">
-					<property name="ferroreport.text.hyphenate" value="es"/>
-				</reportElement>
-				<box padding="4"><pen lineWidth="0.5"/></box>
-				<textElement textAlignment="Justified"/>
-				<text><![CDATA[La responsabilidad administrativa de la internacionalización exige documentación extraordinariamente cuidadosa y comprensible.]]></text>
-			</staticText>
-			<staticText>
-				<reportElement x="264" y="34" width="120" height="180">
-					<property name="ferroreport.text.hyphenate" value="false"/>
-				</reportElement>
-				<box padding="4"><pen lineWidth="0.5"/></box>
-				<textElement textAlignment="Justified"/>
-				<text><![CDATA[Not hyphenated (false): internationalization of documentation requires extraordinary responsibility, as in JasperReports.]]></text>
-			</staticText>
+			<subreport>
+				<reportElement x="132" y="34" width="120" height="180"/>
+				<subreportExpression><![CDATA["spanish.jasper"]]></subreportExpression>
+			</subreport>
+			<subreport>
+				<reportElement x="264" y="34" width="120" height="180"/>
+				<subreportExpression><![CDATA["plain.jasper"]]></subreportExpression>
+			</subreport>
 			<staticText>
 				<reportElement x="396" y="34" width="119" height="80"/>
 				<box padding="4"><pen lineWidth="0.5"/></box>

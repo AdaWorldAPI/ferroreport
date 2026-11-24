@@ -571,7 +571,7 @@ the PDF by eye. Their XML is not compared with Jasper's.
 | 54-devanagari | Devanagari: conjuncts, reph, vowel signs drawn before their consonant, justified and wrapped text (GNU FreeSerif, from `fonts.txt`) | page count³ |
 | 55-thai | Thai: stacked vowels and tone marks, line breaks in text without spaces (GNU FreeSerif) | page count³ |
 | 56-font-fallback | Font sets (`fontsets.txt`; the reference run gets the same sets from a font extension in `jasper-extension/`): stars, check marks and circled digits DejaVu Serif lacks drawn in DejaVu Sans, three fonts on one line, bold, italic, justified, right-aligned and styled text, stretching fields; characters no font has, left out as JasperReports leaves them out | identical |
-| 57-hyphenation | `ferroreport.text.hyphenate` on the report (the locale's language) and on elements (Spanish, off): justified, right-aligned and centered text, a word longer than its line, stretching fields | page count⁴ |
+| 57-hyphenation | `ferroreport.text.hyphenate` on the report (the locale's language) and on two subreports (Spanish, off): justified, right-aligned and centered text, a word longer than its line, stretching fields | page count⁴ |
 
 ¹ The reference bundle's Groovy 4.0.8 cannot run on Java 21: set `ORACLE_JAVA_GROOVY` to a
 Java 17 runtime and `tools/compare.py` uses it for Groovy templates (the others stay on Java 21,

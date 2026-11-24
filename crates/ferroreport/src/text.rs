@@ -46,8 +46,12 @@ pub fn text_before_line(text: &str, lines: &[Line], k: usize) -> String {
     }
 }
 
+/// ferroreport's own report property (and parameter) that turns hyphenation on: `true` for the
+/// language of the render's locale, a language code (`es`, `en_US`), or `false`.
+pub const HYPHENATE: &str = "ferroreport.text.hyphenate";
+
 /// Hyphenation of words that do not fit at the end of a line, in one language. JasperReports
-/// does not hyphenate; ferroreport does when a text asks for it (`ferroreport.text.hyphenate`).
+/// does not hyphenate; ferroreport does when a report asks for it ([`HYPHENATE`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Hyphenator {
     #[cfg(feature = "hyphenation")]

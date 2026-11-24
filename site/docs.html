@@ -1003,12 +1003,12 @@ ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)</pre>
 <pre>&lt;!-- every text of the report, in the language of the render's locale (--locale) --&gt;
 &lt;property name="ferroreport.text.hyphenate" value="true"/&gt;
 
-&lt;!-- one text, in Spanish (inside its reportElement); "false" turns it off --&gt;
-&lt;reportElement x="0" y="0" width="120" height="80"&gt;
-  &lt;property name="ferroreport.text.hyphenate" value="es"/&gt;
-&lt;/reportElement&gt;</pre>
-      <p>In <code>.ferro</code>: <code>property ferroreport.text.hyphenate value=true</code> under <code>report</code>, or indented
-        under a text. A word that does not fit is cut after the last of its syllables that fits with a hyphen, and the hyphen is
+&lt;!-- or in a language of its own; "false" turns it off --&gt;
+&lt;property name="ferroreport.text.hyphenate" value="es"/&gt;</pre>
+      <p>In <code>.ferro</code>: <code>property ferroreport.text.hyphenate value=true</code> under <code>report</code>. The setting is the
+        report's: tables, lists and subreports follow it unless they have their own, and on an element it is not read (the template
+        loads with a warning; a text in another language can go in a subreport). It is also a parameter of the same name, so a render
+        can turn it on without changing the template: <code>{"ferroreport.text.hyphenate": "es"}</code> in the parameters. A word that does not fit is cut after the last of its syllables that fits with a hyphen, and the hyphen is
         drawn; the rest of the word starts the next line. Only words made of letters are hyphenated, never inside numbers or codes,
         with at least two letters before the hyphen and two or three after it, as each language's patterns say. The height of a
         stretching text and where a text is cut across pages follow the hyphenated lines. Styled and HTML text, right-to-left and

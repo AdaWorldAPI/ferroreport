@@ -1301,7 +1301,8 @@ fn doctor(args: &[String]) -> CliResult {
     );
     println!(
         "  {} parameters, {} fields, {} variables, {} groups",
-        report.parameters.len(),
+        // The template's own parameters, not the one its hyphenation property stands for.
+        report.parameters.iter().filter(|p| p.name != ferroreport::text::HYPHENATE).count(),
         report.fields.len(),
         report.variables.len(),
         report.groups.len()

@@ -809,7 +809,7 @@ fn printed_text(
         }
     };
     let te = &*te;
-    let hyphenator = fonts.hyphenator(te.hyphenate.as_deref());
+    let hyphenator = fonts.hyphenator();
     let face_id = fonts.resolve(&te.style.font);
     let face = fonts.face(face_id);
     let size = te.style.font.size;
@@ -1005,7 +1005,7 @@ fn plain_text_item(
     // Like JasperReports: the fill-time measurement decides the height and where the text is
     // cut; the export-time measurement decides the drawn line breaks.
     let vm = vertical_metrics(face, size, te.style.line_spacing);
-    let hyphenator = fonts.hyphenator(te.hyphenate.as_deref());
+    let hyphenator = fonts.hyphenator();
     let fill_lines = break_lines_hyphenated(text, face, size, cw, Measure::Fill, hyphenator);
     let needed = p.top + p.bottom + vm.block_height(fill_lines.len());
     let fit = if clip { vm.lines_that_fit(ch).min(fill_lines.len()) } else { fill_lines.len() };
@@ -1602,7 +1602,7 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
                                 (k, cont)
                             }
                             TextForm::Plain(te) => {
-                                let hyphenator = le.fonts.hyphenator(te.hyphenate.as_deref());
+                                let hyphenator = le.fonts.hyphenator();
                                 let face = le.fonts.resolve(&te.style.font);
                                 let f = le.fonts.face(face);
                                 let lines = break_lines_hyphenated(&text, f, te.style.font.size, cw, Measure::Fill, hyphenator);
@@ -2276,6 +2276,7 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
         params.insert(name.clone(), eval(e, le.scope, le.env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
+    inherit_hyphenation(&mut params, &report, le.scope);
 
     let connection = le.images.connection.clone();
     let records = match (&sr.data_source, sr.connection, connection, &report.query) {
@@ -2881,6 +2882,7 @@ fn run_inputs(
         params.insert(name.clone(), eval(e, scope, env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| scope.param("REPORT_LOCALE").unwrap_or_default());
+    inherit_hyphenation(&mut params, report, scope);
     if let Ok(bundle) = scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
         params.entry(crate::expr::eval::RESOURCE_BUNDLE.into()).or_insert(bundle);
     }
@@ -2898,6 +2900,17 @@ fn run_inputs(
     };
     let records = crate::data::records_from_json(report, &rows)?;
     Ok((params, records))
+}
+
+/// A subreport, table or list without a hyphenation setting of its own hyphenates as the
+/// report it is in does, unless it is handed one.
+fn inherit_hyphenation(params: &mut HashMap<String, Value>, report: &Report, outer: &dyn Scope) {
+    let own = report.parameters.iter().any(|p| p.name == crate::text::HYPHENATE);
+    if let (false, Ok(v)) = (own, outer.param(crate::text::HYPHENATE)) {
+        if !v.is_null() {
+            params.entry(crate::text::HYPHENATE.into()).or_insert(v);
+        }
+    }
 }
 
 /// The parameters a report fills with: those given, the built-in ones, then the defaults of
@@ -4282,6 +4295,21 @@ fn fill_flow(
 ) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
     // A horizontal list is filled twice: once to learn how tall each row ends, since every
     // cell of a row is as tall as its tallest, and once to lay the cells out at that height.
+    // A nested report's hyphenation lasts while it is filled.
+    let outer = fonts.set_hyphenation(None);
+    let filled = fill_flow_inner(report, records, params, fonts, images, env);
+    fonts.restore_hyphenation(outer);
+    filled
+}
+
+fn fill_flow_inner(
+    report: &Report,
+    records: &[Record],
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
     let mut row_heights = Vec::new();
     if report.horizontal {
         let mut first = new_filler(report, Rows::from_slice(records, report), params.clone(), fonts, images, env)?;
@@ -4428,6 +4456,7 @@ fn new_filler<'a>(
         };
         params.insert(p.name.clone(), v);
     }
+    fonts.set_hyphenation(params.get(crate::text::HYPHENATE));
 
     let committed = vec![VarState::default(); defs.len()];
     Ok(Filler {

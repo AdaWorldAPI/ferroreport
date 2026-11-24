@@ -579,7 +579,19 @@ impl Parser {
             let dataset = self.dataset(d)?;
             self.datasets.insert(dataset.name.clone(), dataset);
         }
-        let Dataset { parameters, fields, variables, groups, query, .. } = self.dataset(root)?;
+        let Dataset { mut parameters, fields, variables, groups, query, .. } = self.dataset(root)?;
+        // ferroreport's own hyphenation (JasperReports does not hyphenate): the report's
+        // property becomes the default of a parameter of the same name, which a render can
+        // also set, and which tables, lists and subreports without their own setting inherit.
+        if let Some(value) = self.report_properties.iter().find(|(k, _)| k == crate::text::HYPHENATE).map(|(_, v)| v.clone()) {
+            if !parameters.iter().any(|p| p.name == crate::text::HYPHENATE) {
+                parameters.push(Parameter {
+                    name: crate::text::HYPHENATE.to_string(),
+                    class: JavaType::String,
+                    default: Some(Expr::Lit(crate::value::Value::str(value.as_str()))),
+                });
+            }
+        }
         if root.child("scriptlet").is_some() {
             self.warnings.push("<scriptlet> is not supported yet".into());
         }
@@ -1966,15 +1978,14 @@ impl Parser {
                         },
                     }))
                 });
-                // ferroreport's own: JasperReports does not hyphenate.
-                let hyphenate = property("ferroreport.text.hyphenate").map(|v| v.trim().to_string()).and_then(|v| {
-                    match v.to_ascii_lowercase().as_str() {
-                        "" | "false" | "no" => None,
-                        // The language of the render's locale.
-                        "true" | "yes" => Some(String::new()),
-                        _ => Some(v),
+                // Hyphenation is set for a whole report (see `Parser::report`), not per element.
+                let holder = n.child("reportElement").unwrap_or(n);
+                if holder.children_named("property").any(|p| p.attr("name") == Some(crate::text::HYPHENATE)) {
+                    let warning = format!("{} is read on the report only, not on an element", crate::text::HYPHENATE);
+                    if !self.warnings.contains(&warning) {
+                        self.warnings.push(warning);
                     }
-                });
+                }
                 ElementKind::Text(TextElement {
                     content,
                     style,
@@ -1983,7 +1994,6 @@ impl Parser {
                     markup,
                     truncate,
                     field,
-                    hyphenate,
                 })
             }
             "line" => ElementKind::Line {

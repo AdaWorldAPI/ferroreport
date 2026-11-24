@@ -7,17 +7,18 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 ## Unreleased
 
 - Hyphenation of long words at line ends, when the template asks for it with ferroreport's own
-  property `ferroreport.text.hyphenate` (JasperReports does not hyphenate, and ignores it): on
-  the report for every text, or on an element; `true` hyphenates in the language of the
-  render's locale, `es`, `en_US`... in that language, `false` not at all. A word that does not
+  report property `ferroreport.text.hyphenate` (JasperReports does not hyphenate, and ignores
+  it): `true` hyphenates every plain text of the report in the language of the render's locale,
+  `es`, `en_US`... in that language, `false` not at all. Tables, lists and subreports without a
+  setting of their own follow the report they are in. The property is also a parameter of the
+  same name, so a render can set it (`-p params.json`, the packages, the HTTP API) without
+  touching the template. On an element it is not read (a warning says so). A word that does not
   fit is cut after the last syllable that fits with a hyphen, which is drawn. Plain text only;
   the height of stretching texts and page splits follow the hyphenated lines. Patterns for
   English, Spanish, French, Italian, Portuguese and Catalan are built in (hypher, MIT or
   Apache-2.0, no dependencies; the command line grows by about 60 KB); the Cargo feature
   `hyphenation-all` builds in all 48 languages of hypher, and `default-features = false`
   leaves hyphenation out. Templates without the property render as before.
-- API: `model::TextElement` has a new field, `hyphenate`; `text::break_lines_hyphenated` and
-  `text::Hyphenator` are new.
 - PDF: a character the text's font does not have is left out, as JasperReports leaves it out,
   instead of being drawn as the font's missing-glyph box. It takes no width when the lines are
   drawn and aligned, and still counts as wide as that box for the text's height and where it is

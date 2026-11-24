@@ -312,6 +312,9 @@ pub struct FontSet {
     fallback: bool,
     /// The language of the render's locale (`en`), for texts hyphenated in it.
     language: String,
+    /// The hyphenation the report being filled asks for: `None` off, `Some("")` in the
+    /// locale's language, `Some("es")` in that language.
+    hyphenation: Option<String>,
 }
 
 /// Characters every font "has", as Java's `Font.canDisplay` sees them: controls and the
@@ -364,9 +367,29 @@ impl FontSet {
         self.language = locale.to_string();
     }
 
-    /// How a text asking for hyphenation in `language` (empty: the locale's) is hyphenated.
-    pub(crate) fn hyphenator(&self, language: Option<&str>) -> Option<crate::text::Hyphenator> {
-        let language = language?;
+    /// Sets the hyphenation of the report being filled from the value of its
+    /// [`crate::text::HYPHENATE`] parameter (`true`, `false`, a language), returning the one
+    /// it replaces.
+    pub(crate) fn set_hyphenation(&mut self, value: Option<&crate::value::Value>) -> Option<String> {
+        let setting = value.filter(|v| !v.is_null()).map(|v| v.to_java_string()).and_then(|v| {
+            let v = v.trim();
+            match v.to_ascii_lowercase().as_str() {
+                "" | "false" | "no" => None,
+                "true" | "yes" => Some(String::new()),
+                _ => Some(v.to_string()),
+            }
+        });
+        std::mem::replace(&mut self.hyphenation, setting)
+    }
+
+    /// Puts back a hyphenation [`FontSet::set_hyphenation`] replaced.
+    pub(crate) fn restore_hyphenation(&mut self, setting: Option<String>) {
+        self.hyphenation = setting;
+    }
+
+    /// How the plain texts of the report being filled are hyphenated, if at all.
+    pub(crate) fn hyphenator(&self) -> Option<crate::text::Hyphenator> {
+        let language = self.hyphenation.as_deref()?;
         crate::text::Hyphenator::for_language(if language.is_empty() { &self.language } else { language })
     }
 

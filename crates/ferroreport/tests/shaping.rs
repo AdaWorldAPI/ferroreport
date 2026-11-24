@@ -163,3 +163,43 @@ fn missing_characters_fall_back_to_another_font() {
     assert_eq!(runs[1..].concat(), "★ star, عربي");
     assert!(has(&pdf(&mut fallback), b"DejaVuSans"));
 }
+
+/// Hyphenation is ferroreport's own and is set for a report: by its `ferroreport.text.hyphenate`
+/// property, or by the parameter of the same name when rendering.
+#[test]
+fn reports_ask_for_hyphenation() {
+    let body = text(0, 70, "Left", "Internationalization requires responsibility");
+    let hyphens = |template: &str, params: serde_json::Value| -> (usize, Vec<String>) {
+        let mut r = Renderer::new();
+        let report = r.parse(template).unwrap();
+        let params = ferroreport::params_from_json(&report, &params).unwrap();
+        let doc = r.fill(&report, &[], params).unwrap();
+        let mut n = 0;
+        fn walk(items: &[PrintItem], n: &mut usize) {
+            for item in items {
+                match item {
+                    PrintItem::Text(t) => *n += t.lines.iter().filter(|l| l.text.ends_with('-')).count(),
+                    PrintItem::Cell(_, inner) => walk(std::slice::from_ref(inner), n),
+                    PrintItem::Group(items) => walk(items, n),
+                    _ => {}
+                }
+            }
+        }
+        walk(&doc.pages[0].items, &mut n);
+        (n, report.warnings.clone())
+    };
+    let plain = report(&body, "DejaVu Sans");
+    assert_eq!(hyphens(&plain, serde_json::json!({})).0, 0);
+    // Asked for by the template...
+    let asked = plain.replace("<style ", r#"<property name="ferroreport.text.hyphenate" value="true"/><style "#);
+    assert!(hyphens(&asked, serde_json::json!({})).0 > 0);
+    // ...or by the render, which can also turn it off.
+    assert!(hyphens(&plain, serde_json::json!({"ferroreport.text.hyphenate": "en"})).0 > 0);
+    assert_eq!(hyphens(&asked, serde_json::json!({"ferroreport.text.hyphenate": "false"})).0, 0);
+    // On an element it is not read, and the template says so.
+    let on_element = plain
+        .replace(r#"height="60"/>"#, r#"height="60"><property name="ferroreport.text.hyphenate" value="true"/></reportElement>"#);
+    let (n, warnings) = hyphens(&on_element, serde_json::json!({}));
+    assert_eq!(n, 0);
+    assert!(warnings.iter().any(|w| w.contains("ferroreport.text.hyphenate")), "{warnings:?}");
+}
