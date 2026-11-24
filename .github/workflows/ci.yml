@@ -143,6 +143,7 @@ jobs:
           node-version: 22
       - run: bindings/wasm/build.sh
       - run: node bindings/wasm/tests/smoke.mjs
+      - run: node bindings/wasm/tests/designer.mjs
 
   # What the server promises about large reports (tools/http_check.py says what).
   http:
