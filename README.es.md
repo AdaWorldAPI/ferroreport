@@ -444,6 +444,16 @@ que la respuesta honesta a "¿cuál uso?" depende de lo que hagas.
 Lo que haría de ferroreport la primera opción en más filas está en el roadmap: un diseñador
 que haga más, más componentes de JasperReports y tiempo en producción.
 
+## Contribuir
+
+Se agradecen reportes que salen mal, plantillas para probar, arreglos y funciones nuevas, y para
+casi todo no hace falta saber Rust. Empieza por [CONTRIBUTING.md](CONTRIBUTING.md) (en inglés),
+los issues con la etiqueta
+[`good first issue`](https://github.com/cristianEncarnacion/ferroreport/labels/good%20first%20issue)
+o [`help wanted`](https://github.com/cristianEncarnacion/ferroreport/labels/help%20wanted), o
+pregunta en [Discussions](https://github.com/cristianEncarnacion/ferroreport/discussions). Se
+puede escribir en español.
+
 ## Estabilidad
 
 Desde la 1.0, ferroreport sigue el [versionado semántico](https://semver.org). Dentro de la 1.x

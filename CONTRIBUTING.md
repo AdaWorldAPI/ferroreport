@@ -1,13 +1,32 @@
 # Contributing
 
-Thanks for helping! The most valuable contribution is a **fixture**: a JRXML template plus
-sample data that ferroreport renders differently from JasperReports (or cannot render).
+Thanks for helping! You don't need to know Rust to make a difference here.
+
+## Where to start
+
+- **A report that comes out wrong.** The most valuable contribution is a **fixture**: a JRXML
+  template plus sample data that ferroreport renders differently from JasperReports (or cannot
+  render). [Open an issue](https://github.com/cristianEncarnacion/ferroreport/issues/new/choose)
+  with the template and a screenshot of both outputs; remove anything private from the data.
+- **A first pull request.** Issues labelled
+  [`good first issue`](https://github.com/cristianEncarnacion/ferroreport/labels/good%20first%20issue)
+  are small and self-contained, with a pointer to the code to change. Comment on one to take it.
+- **Something bigger.** Issues labelled
+  [`help wanted`](https://github.com/cristianEncarnacion/ferroreport/labels/help%20wanted) are
+  the roadmap. Say in the issue how you plan to do it before writing a lot of code, so we can
+  agree on the approach first.
+- **A question or an idea.** Use [Discussions](https://github.com/cristianEncarnacion/ferroreport/discussions).
 
 ## Layout
 
 ```
 crates/ferroreport/      library: parser, expression interpreter, filler, PDF writer
-crates/ferroreport-cli/  `ferroreport` command
+crates/ferroreport-cli/  `ferroreport` command and HTTP server
+bindings/wasm/           JavaScript package (npm), WebAssembly
+bindings/python/         Python package (PyPI)
+bindings/java/           Java package (Maven Central)
+editors/vscode/          VS Code extension for `.ferro`
+site/                    website, documentation and the visual designer (site/designer/)
 fixtures/<name>/         report.jrxml, data.json, params.json (optional), expected.json
 tools/compare.py         pixel comparison against JasperReports
 tools/compare_sheets.py  cell comparison of the Excel and CSV exports
@@ -55,3 +74,20 @@ Results and diff images (red: only in Jasper, blue: only in ferroreport) are wri
   and write down the rule you derived (see `text.rs` for an example).
 - The expression interpreter must stay an allow-list. Never add reflection, class loading,
   file or network access.
+
+## Pull requests
+
+- Keep them small: one fix or one feature each. A failing fixture or test that the change
+  makes pass is the best description.
+- Before pushing: `cargo fmt`, `cargo clippy --all-targets -- -D warnings` and `cargo test`.
+  CI also runs the bindings, the minimum Rust version and the PDF/UA and PDF/A checks.
+- Add a line under `## Unreleased` at the top of `CHANGELOG.md` saying what changes for people
+  who use ferroreport.
+- Existing templates must keep rendering as they do: within 1.x, changes are additive (see
+  Stability in the README).
+- By contributing you agree that your work is released under the project's licenses, MIT or
+  Apache-2.0, at the user's option.
+
+## Conduct
+
+Be kind and assume good faith; see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

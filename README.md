@@ -713,6 +713,15 @@ depends on what you make.
 What would make ferroreport the first choice in more of these rows is on the roadmap below: a
 designer that does more, more of JasperReports' components, and time in production.
 
+## Contributing
+
+Reports that come out wrong, templates we can test with, fixes and new features are all
+welcome, and you don't need to know Rust for most of them. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md), the issues labelled
+[`good first issue`](https://github.com/cristianEncarnacion/ferroreport/labels/good%20first%20issue)
+or [`help wanted`](https://github.com/cristianEncarnacion/ferroreport/labels/help%20wanted), or
+ask in [Discussions](https://github.com/cristianEncarnacion/ferroreport/discussions).
+
 ## Stability
 
 From 1.0, ferroreport follows [semantic versioning](https://semver.org). Within 1.x, these do
