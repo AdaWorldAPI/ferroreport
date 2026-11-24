@@ -4,6 +4,28 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+### Charts as JasperReports 7 draws them
+
+Charts follow JFreeChart 1.5's layout rules as JasperReports 7.1 uses them, measured against
+the charts of JasperReports' own samples, instead of an approximation of its look.
+
+- Bar, stacked bar, line, area and stacked area charts (and their 3D variants, which
+  JasperReports 7 draws flat) come out the same as JasperReports draws them: plot insets, the
+  room the axes take, tick units and tick labels, category labels shortened with `...` the way
+  JFreeChart shortens them, legend items and spacing (no frame around the legend), series
+  colors, shapes and grid lines.
+- Text in charts is measured as JFreeChart measures it (AWT's whole-point font metrics) and
+  written as glyph outlines, as JasperReports writes it: chart text is no longer selectable
+  in the PDF.
+- `net.sf.jasperreports.chart.render.type=svg` (on the chart, in the report's properties or
+  in a `jasperreports.properties` among the resource folders) measures text the way
+  JasperReports does when it draws charts as SVG.
+- What a chart draws inside its plot is clipped to the plot, as in JasperReports.
+- The value axis of horizontal bar charts is above the plot, and a series color given alone
+  replaces only the first default color, as in JasperReports.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`

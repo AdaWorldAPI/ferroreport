@@ -166,7 +166,9 @@ pub enum PrintItem {
     Cell(Arc<CellInfo>, Box<PrintItem>),
     /// Where a non-text element starts, for exporters other than PDF. Draws nothing.
     Element(Arc<ElementInfo>),
-    /// A path in page coordinates (charts), filled with the nonzero rule and/or stroked.
+    /// A path in page coordinates (charts), filled with the nonzero rule and/or stroked. A path
+    /// that neither fills nor strokes clips the items after it inside the same `Transform`
+    /// (charts clip their data to the plot); elsewhere it draws nothing.
     Path {
         ops: Arc<Vec<PathOp>>,
         fill: Option<Color>,

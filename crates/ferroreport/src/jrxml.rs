@@ -441,6 +441,17 @@ struct Parser {
     page_height: f32,
     /// The report's `<property>` values, defaults for element properties.
     report_properties: Vec<(String, String)>,
+    /// How charts are drawn (`net.sf.jasperreports.chart.render.type`), from the report's
+    /// properties or a `jasperreports.properties` among the resources.
+    chart_render_type: Option<String>,
+}
+
+/// The value of `key` in a Java properties file.
+fn java_property(text: &str, key: &str) -> Option<String> {
+    text.lines().map(str::trim).filter(|l| !l.starts_with('#') && !l.starts_with('!')).find_map(|l| {
+        let at = l.find(['=', ':']).unwrap_or(l.len());
+        (l[..at].trim() == key).then(|| l.get(at + 1..).unwrap_or("").trim().to_string())
+    })
 }
 
 /// Most conditional styles one element may combine (variants are precomputed per subset).
@@ -527,7 +538,13 @@ impl Parser {
                     p.attr("name").map(|n| (n.to_string(), value))
                 })
                 .collect(),
+            chart_render_type: None,
         };
+        const RENDER_TYPE: &str = "net.sf.jasperreports.chart.render.type";
+        parser.chart_render_type =
+            parser.report_properties.iter().find(|(k, _)| k == RENDER_TYPE).map(|(_, v)| v.clone()).or_else(|| {
+                load("jasperreports.properties").and_then(|b| java_property(&String::from_utf8_lossy(&b), RENDER_TYPE))
+            });
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
                 parser.conditionals.entry(name).or_default().push((e, props));
@@ -1532,6 +1549,12 @@ impl Parser {
             time_format,
             x_format,
             show_volume: flag(plot_node, &["isShowVolume", "showVolume"], true),
+            svg: chart
+                .and_then(|c| c.attr("renderType"))
+                .map(str::to_string)
+                .or_else(|| self.chart_render_type.clone())
+                .as_deref()
+                == Some("svg"),
             label_format: plot_node.and_then(|p| p.attr("labelFormat")).map(str::to_string),
             legend_label_format: plot_node.and_then(|p| p.attr("legendLabelFormat")).map(str::to_string),
             id: self.chart_count,

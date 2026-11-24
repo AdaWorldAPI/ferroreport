@@ -1293,7 +1293,10 @@ impl<W: std::io::Write> PdfStream<W> {
                 | PrintItem::Link(_)
                 | PrintItem::Element(_) => {}
                 PrintItem::Path { ops, fill, stroke, dash } => {
-                    if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
+                    // A path that neither fills nor strokes clips what follows it (up to the
+                    // end of the coordinate system it is in, charts' data areas).
+                    let clip = fill.is_none() && stroke.is_none();
+                    if ops.is_empty() || (clip && depth == 0) {
                         continue;
                     }
                     let y = |v: f64| ph - v as f32;
@@ -1341,7 +1344,8 @@ impl<W: std::io::Write> PdfStream<W> {
                     match (fill.is_some(), stroke.is_some()) {
                         (true, true) => c.fill_nonzero_and_stroke(),
                         (true, false) => c.fill_nonzero(),
-                        _ => c.stroke(),
+                        (false, true) => c.stroke(),
+                        (false, false) => c.clip_nonzero().end_path(),
                     };
                 }
                 PrintItem::Rect { x, y, w, h, fill, stroke, radius, path } => {

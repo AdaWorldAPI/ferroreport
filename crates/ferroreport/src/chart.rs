@@ -17,6 +17,9 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
+mod category;
+mod jfree;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartKind {
     Pie,
@@ -307,6 +310,7 @@ pub enum Edge {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ChartElement {
     /// Unique within its report: identifies the chart's dataset while filling.
     pub id: usize,
@@ -355,6 +359,10 @@ pub struct ChartElement {
     /// Pie charts: how sections and legend items are labeled (`{0} {2}`).
     pub label_format: Option<String>,
     pub legend_label_format: Option<String>,
+    /// Drawn as SVG (`net.sf.jasperreports.chart.render.type=svg`) rather than straight on the
+    /// page: JFreeChart then measures text glyph by glyph in whole points, and otherwise
+    /// rounds a whole text's width.
+    pub svg: bool,
 }
 
 /// Values collected for one chart.
@@ -474,11 +482,22 @@ pub struct ChartTexts {
     pub axes: Vec<ChartTexts>,
 }
 
-/// JFreeChart's default series colors.
-const PALETTE: [u32; 16] = [
+/// JFreeChart's default series colors (`ChartColor.createDefaultPaintArray`).
+const PALETTE: [u32; 34] = [
     0xFF5555, 0x5555FF, 0x55FF55, 0xFFFF55, 0xFF55FF, 0x55FFFF, 0xFFAFAF, 0x808080, 0xC00000, 0x0000C0, 0x00C000, 0xC0C000,
-    0xC000C0, 0x00C0C0, 0x404040, 0xFF4040,
+    0xC000C0, 0x00C0C0, 0x404040, 0xFF4040, 0x4040FF, 0x40FF40, 0xFFFF40, 0xFF40FF, 0x40FFFF, 0xC0C0C0, 0x800000, 0x000080,
+    0x008000, 0x808000, 0x800080, 0x008080, 0xFF8080, 0x8080FF, 0x80FF80, 0xFFFF80, 0xFF80FF, 0x80FFFF,
 ];
+
+/// The color of series `i`: JasperReports gives JFreeChart the template's series colors as
+/// its whole palette, or, with a single one, in place of the first default color.
+fn series_color(colors: &[Color], i: usize) -> Color {
+    match colors.len() {
+        0 => rgb(PALETTE[i % PALETTE.len()]),
+        1 if i > 0 => rgb(PALETTE[i % PALETTE.len()]),
+        n => colors[i % n],
+    }
+}
 
 fn rgb(n: u32) -> Color {
     Color { r: (n >> 16) as u8, g: (n >> 8) as u8, b: n as u8 }
@@ -494,6 +513,8 @@ const OUTLINE: Color = Color { r: 0x80, g: 0x80, b: 0x80 };
 struct Canvas<'a> {
     fonts: &'a mut FontSet,
     items: Vec<PrintItem>,
+    /// Text is measured as JFreeChart measures it drawing SVG (see [`ChartElement::svg`]).
+    svg: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -551,6 +572,52 @@ impl Canvas<'_> {
             standard: None,
             halign: crate::model::HAlign::Left,
         }));
+    }
+    /// Text with its baseline at `baseline`, as JasperReports puts JFreeChart's text on the
+    /// page: the glyphs' outlines, each at its exact advance.
+    fn text_baseline(&mut self, font: &FontSpec, color: Color, text: &str, x: f32, baseline: f32) {
+        if text.is_empty() {
+            return;
+        }
+        let id = self.face(font);
+        let face = self.fonts.face(id);
+        // JasperReports draws chart text as glyph outlines (its PDF graphics write shapes).
+        let k = font.size as f64 / face.units_per_em as f64;
+        let mut ops = Vec::new();
+        match crate::shape::line(face, text, crate::shape::is_rtl(text), font.size) {
+            Some((shaped, _)) => {
+                let m = font.size as f64 / 1000.0;
+                let mut pen = x as f64;
+                for g in &shaped.glyphs {
+                    face.glyph_id_outline(
+                        g.id,
+                        font.size as f64,
+                        pen + g.dx as f64 * m,
+                        baseline as f64 - g.dy as f64 * m,
+                        &mut ops,
+                    );
+                    pen += g.exact as f64 * m;
+                }
+            }
+            None => {
+                let mut pen = x as f64;
+                for c in text.chars().filter(|c| !c.is_control()) {
+                    face.glyph_outline(c, font.size as f64, pen, baseline as f64, &mut ops);
+                    pen += face.advance(face.glyph(c)) as f64 * k;
+                }
+            }
+        }
+        if !ops.is_empty() {
+            self.items.push(PrintItem::Path { ops: Arc::new(ops), fill: Some(color), stroke: None, dash: None });
+        }
+    }
+    /// What `draw` draws, clipped to `r`.
+    fn clipped(&mut self, r: jfree::Rect, draw: impl FnOnce(&mut Canvas)) {
+        let mut inner = Canvas { fonts: &mut *self.fonts, items: Vec::new(), svg: self.svg };
+        inner.path(jfree::rect_ops(r.x, r.y, r.w, r.h), None, None, None);
+        draw(&mut inner);
+        let items = inner.items;
+        self.items.push(PrintItem::Transform([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], items));
     }
     fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, fill: Option<Color>, stroke: Option<Pen>) {
         self.items.push(PrintItem::Rect { x, y, w, h, fill, stroke, radius: 0.0, path: false });
@@ -684,13 +751,30 @@ pub fn render(
 ) -> Vec<PrintItem> {
     let empty = DataState::default();
     let data = all.get(&ch.id).unwrap_or(&empty);
-    let mut cv = Canvas { fonts, items: Vec::new() };
+    let mut cv = Canvas { fonts, items: Vec::new(), svg: ch.svg };
     let p = ch.boxed.padding;
     let (x, y, w, h) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), (h - p.top - p.bottom).max(0.0));
     if let Some(bg) = ch.backcolor {
         cv.rect(x, y, w, h, Some(bg), None);
     }
-    let color_of = |i: usize| ch.series_colors.get(i).copied().unwrap_or_else(|| rgb(PALETTE[i % PALETTE.len()]));
+    let color_of = |i: usize| series_color(&ch.series_colors, i);
+
+    if matches!(
+        ch.kind,
+        ChartKind::Bar
+            | ChartKind::Bar3D
+            | ChartKind::StackedBar
+            | ChartKind::StackedBar3D
+            | ChartKind::Line
+            | ChartKind::Area
+            | ChartKind::StackedArea
+    ) && ch.dataset.kind == DataKind::Category
+    {
+        let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
+        titles_and_legend(&mut cv, ch, data, texts, &mut area, &|i| category::legend_graphic(ch, i, color_of(i)));
+        category::draw(&mut cv, ch, data, texts, locale, area, &color_of);
+        return cv.items;
+    }
 
     // Title and subtitle on top.
     let mut top = y;
@@ -802,6 +886,103 @@ pub fn render(
         _ => xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
     }
     cv.items
+}
+
+/// JFreeChart's titles around the chart: the title, then the legend, then the subtitle, each
+/// taking its room from `area`.
+fn titles_and_legend(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    area: &mut jfree::Rect,
+    graphic: &dyn Fn(usize) -> jfree::LegendGraphic,
+) {
+    if let Some(t) = texts.title.as_deref() {
+        jfree::text_title(cv, area, t, &ch.title_font, ch.title_color, jfree::Side::Top);
+    }
+    if ch.show_legend {
+        let names: Vec<String> = match ch.dataset.kind {
+            DataKind::Pie => data.pie.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Xy => data.xy.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::TimeSeries | DataKind::TimePeriod => data.periods.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Xyz => data.xyz.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::HighLow => data.ohlc.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Gantt => data.gantt.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Value => Vec::new(),
+            DataKind::Category => data.series.clone(),
+        };
+        let items: Vec<jfree::LegendItem> =
+            names.into_iter().enumerate().map(|(i, label)| jfree::LegendItem { label, graphic: graphic(i) }).collect();
+        let side = match ch.legend_position {
+            Edge::Top => jfree::Side::Top,
+            Edge::Left => jfree::Side::Left,
+            Edge::Right => jfree::Side::Right,
+            Edge::Bottom => jfree::Side::Bottom,
+        };
+        jfree::legend(cv, area, &items, &ch.legend_font, ch.legend_color, ch.legend_back, side);
+    }
+    if let Some(t) = texts.subtitle.as_deref() {
+        jfree::text_title(cv, area, t, &ch.subtitle_font, ch.subtitle_color, jfree::Side::Top);
+    }
+}
+
+/// The shape JFreeChart's default drawing supplier gives series `series` (size 6), around
+/// the origin, with its bounds.
+fn series_shape(series: usize) -> (Vec<PathOp>, (f64, f64, f64, f64)) {
+    let mut ops = Vec::new();
+    let poly = |pts: &[(f64, f64)], ops: &mut Vec<PathOp>| {
+        ops.push(PathOp::Move(pts[0].0, pts[0].1));
+        for p in &pts[1..] {
+            ops.push(PathOp::Line(p.0, p.1));
+        }
+        ops.push(PathOp::Close);
+    };
+    let bounds = match series % 10 {
+        0 => {
+            ops = jfree::rect_ops(-3.0, -3.0, 6.0, 6.0);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        1 => {
+            arc(&mut ops, 0.0, 0.0, 3.0, 3.0, 0.0, 2.0 * PI, true);
+            ops.push(PathOp::Close);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        2 => {
+            poly(&[(0.0, -3.0), (3.0, 3.0), (-3.0, 3.0)], &mut ops);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        3 => {
+            poly(&[(0.0, -3.0), (3.0, 0.0), (0.0, 3.0), (-3.0, 0.0)], &mut ops);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        4 => {
+            ops = jfree::rect_ops(-3.0, -1.5, 6.0, 3.0);
+            (-3.0, -1.5, 6.0, 3.0)
+        }
+        5 => {
+            poly(&[(-3.0, -3.0), (3.0, -3.0), (0.0, 3.0)], &mut ops);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        6 => {
+            arc(&mut ops, 0.0, 0.0, 3.0, 1.5, 0.0, 2.0 * PI, true);
+            ops.push(PathOp::Close);
+            (-3.0, -1.5, 6.0, 3.0)
+        }
+        7 => {
+            poly(&[(-3.0, -3.0), (3.0, 0.0), (-3.0, 3.0)], &mut ops);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+        8 => {
+            ops = jfree::rect_ops(-1.5, -3.0, 3.0, 6.0);
+            (-1.5, -3.0, 3.0, 6.0)
+        }
+        _ => {
+            poly(&[(-3.0, 0.0), (3.0, -3.0), (3.0, 3.0)], &mut ops);
+            (-3.0, -3.0, 6.0, 6.0)
+        }
+    };
+    (ops, bounds)
 }
 
 /// A pie section's label from a `labelFormat` such as `{0} {2}`: `{0}` the key, `{1}` the
@@ -1278,7 +1459,7 @@ fn bar(cv: &mut Canvas, horizontal: bool, a: f32, width: f32, p0: f32, p1: f32, 
 
 fn rotated_label(cv: &mut Canvas, font: &FontSpec, text: &str, left: f32, center_y: f32) {
     let w = cv.width(font, text);
-    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new() };
+    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new(), svg: cv.svg };
     inner.text(font, Color::BLACK, text, 0.0, 0.0, Anchor::Left);
     let items = inner.items;
     // Turn 90° counter-clockwise: local (u, v) lands at (left + v, center_y + w/2 - u).
