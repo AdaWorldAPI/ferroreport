@@ -1422,6 +1422,12 @@ function wire() {
     const lbl = e.target.closest("[data-select-band]");
     if (lbl && e.detail === 0) select({ type: "band", key: lbl.dataset.selectBand }, { focus: true }); // keyboard
   });
+  // Double-click a text to edit what it says.
+  stage.addEventListener("dblclick", (e) => {
+    if (!e.target.closest(".el")) return;
+    const box = $("prop-text") || $("prop-expr");
+    if (box) { box.focus(); box.select(); }
+  });
   document.addEventListener("keydown", onKey);
   stage.addEventListener("wheel", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
