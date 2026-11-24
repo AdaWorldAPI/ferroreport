@@ -1,0 +1,1 @@
+Devanagari and Thai need a font with those scripts (GNU FreeSerif here, from fonts.txt). JasperReports has no font extension for it in the reference run, so its PDF shows no text: only the page count is compared.

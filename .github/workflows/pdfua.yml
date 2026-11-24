@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release -p ferroreport-cli
+      # The Devanagari and Thai fixtures are set in GNU FreeSerif (fixtures/*/fonts.txt).
+      - run: sudo apt-get install -y -q fonts-freefont-ttf > /dev/null
       - run: tools/pdfua.sh
       - if: always()
         run: tools/pdfa.sh

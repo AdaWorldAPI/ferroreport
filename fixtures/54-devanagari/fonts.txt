@@ -1,0 +1,2 @@
+FreeSerif=/usr/share/fonts/truetype/freefont/FreeSerif.ttf
+FreeSerif=/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf:bold

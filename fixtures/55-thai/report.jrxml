@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" name="thai" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+	<style name="Base" isDefault="true" fontName="FreeSerif" fontSize="14"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="province" class="java.lang.String"/>
+	<field name="amount" class="java.lang.Double"/>
+	<title>
+		<band height="230">
+			<staticText>
+				<reportElement x="0" y="0" width="555" height="34"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle"><font size="20" isBold="true"/></textElement>
+				<text><![CDATA[รายงานยอดขายประจำเดือน]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="38" width="555" height="22"/>
+				<text><![CDATA[วรรณยุกต์และสระ: ก่ ก้ ก๊ ก๋ กิ่ กี้ กื่ กุ้ น้ำ ที่นี่ ปู่ ผู้ใหญ่ ฤๅษี]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="64" width="200" height="140"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<text><![CDATA[รายงานนี้แสดงยอดขายของทุกสาขาในเดือนมกราคมโดยรวมภาษีมูลค่าเพิ่มเจ็ดเปอร์เซ็นต์แล้วและยอดรวมอยู่ด้านล่าง]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="215" y="64" width="340" height="140"/>
+				<box padding="4"><pen lineWidth="0.5"/></box>
+				<text><![CDATA[ภาษาไทยกับ English ปนกัน ราคา 1,250 บาท (ลด 10%)
+ย่อหน้าที่สอง: เราไปโรงเรียนด้วยกันทุกวันจันทร์ถึงศุกร์]]></text>
+			</staticText>
+		</band>
+	</title>
+	<detail>
+		<band height="22">
+			<textField>
+				<reportElement x="0" y="0" width="250" height="22"/>
+				<textFieldExpression><![CDATA[$F{name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="250" y="0" width="180" height="22"/>
+				<textFieldExpression><![CDATA[$F{province}]]></textFieldExpression>
+			</textField>
+			<textField pattern="#,##0.00">
+				<reportElement x="430" y="0" width="125" height="22"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

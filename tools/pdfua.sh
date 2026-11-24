@@ -16,6 +16,10 @@ for dir in "$root"/fixtures/*/; do
   args=("$dir/report.jrxml" --tagged -q -o "$out/$name.pdf" --now 2024-01-15T10:30:00)
   [ -f "$dir/data.json" ] && args+=(-d "$dir/data.json")
   [ -f "$dir/params.json" ] && args+=(-p "$dir/params.json")
+  # Fonts a fixture needs (fonts.txt: Family=file.ttf[:bold][:italic]), when installed.
+  if [ -f "$dir/fonts.txt" ]; then
+    while IFS= read -r f; do p=${f#*=}; [ -n "$f" ] && [ -f "${p%%:*}" ] && args+=(--font "$f"); done < "$dir/fonts.txt"
+  fi
   "$bin" render "${args[@]}" 2>/dev/null || echo "$name: not rendered"
 done
 docker run --rm -v "$out":/data verapdf/cli:latest --flavour ua1 --format xml --maxfailuresdisplayed 3 /data > "$out/report.xml" 2>/dev/null
