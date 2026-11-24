@@ -4,6 +4,29 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+- New output formats: OpenDocument spreadsheet (`.ods`) and text (`.odt`), for LibreOffice and
+  other OpenDocument applications. Pick them with the extension of `-o`, `--format ods|odt`,
+  `"format": "ods"` in the HTTP API, `Format::Ods` / `Format::Odt` in Rust, `format="ods"` in
+  Python, `{ format: "odt" }` in JavaScript and `Format.ODS` / `Format.ODT` in Java.
+- ODS is laid out like the XLSX export (and JasperReports' ODS exporter): every page on one
+  sheet, cells cut at element edges, merged cells, fonts, colors, borders, padding, alignment,
+  rotation, column widths and row heights, images over their cells, charts and barcodes as
+  pictures, anchors as named ranges. `--xlsx-numbers` (`XlsxOptions::detect_cell_type`) now
+  also writes ODS numbers as numbers, with a number style made from their Java pattern.
+- ODT is laid out like the DOCX export (and JasperReports' ODT exporter): a table per page,
+  a page break between pages, texts with their fonts and styled runs, cell borders and
+  backgrounds, pictures, links and bookmarks. Ellipses and slanted lines are drawn as
+  pictures.
+- Both are valid packages (`mimetype` stored first, manifest, `content.xml`, `styles.xml`) with
+  the report's page size. The 50 fixtures not filled from a database open in LibreOffice
+  with as many pages as their PDF.
+- Not yet: `net.sf.jasperreports.export.ods.*` / `.odt.*` properties, dates as date cells,
+  per-mille number styles, upside-down text in ODT. Both formats keep the document's body in
+  memory until it is written.
+- `tools/oracle` can also write JasperReports' own `.ods` and `.odt`, for comparison.
+
 ## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names
