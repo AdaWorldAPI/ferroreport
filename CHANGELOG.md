@@ -16,6 +16,10 @@ the charts of JasperReports' own samples, instead of an approximation of its loo
   room the axes take, tick units and tick labels, category labels shortened with `...` the way
   JFreeChart shortens them, legend items and spacing (no frame around the legend), series
   colors, shapes and grid lines.
+- Pie charts come out the same as JasperReports draws them: the pie's size and place, its
+  shadow, section outlines, the labels' boxes, shadows and link lines, and how labels are
+  moved apart when they would overlap. 3D pie charts are drawn flat with their
+  `foregroundAlpha`, as JasperReports 7 draws them.
 - Text in charts is measured as JFreeChart measures it (AWT's whole-point font metrics) and
   written as glyph outlines, as JasperReports writes it: chart text is no longer selectable
   in the PDF.

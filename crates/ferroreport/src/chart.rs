@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 mod category;
 mod jfree;
+mod pie;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartKind {
@@ -359,6 +360,8 @@ pub struct ChartElement {
     /// Pie charts: how sections and legend items are labeled (`{0} {2}`).
     pub label_format: Option<String>,
     pub legend_label_format: Option<String>,
+    /// How opaque what the plot draws is (`foregroundAlpha`, 1 by default).
+    pub foreground_alpha: f32,
     /// Drawn as SVG (`net.sf.jasperreports.chart.render.type=svg`) rather than straight on the
     /// page: JFreeChart then measures text glyph by glyph in whole points, and otherwise
     /// rounds a whole text's width.
@@ -613,8 +616,12 @@ impl Canvas<'_> {
     }
     /// What `draw` draws, clipped to `r`.
     fn clipped(&mut self, r: jfree::Rect, draw: impl FnOnce(&mut Canvas)) {
+        self.clipped_path(jfree::rect_ops(r.x, r.y, r.w, r.h), draw);
+    }
+    /// What `draw` draws, clipped to the inside of `clip`.
+    fn clipped_path(&mut self, clip: Vec<PathOp>, draw: impl FnOnce(&mut Canvas)) {
         let mut inner = Canvas { fonts: &mut *self.fonts, items: Vec::new(), svg: self.svg };
-        inner.path(jfree::rect_ops(r.x, r.y, r.w, r.h), None, None, None);
+        inner.path(clip, None, None, None);
         draw(&mut inner);
         let items = inner.items;
         self.items.push(PrintItem::Transform([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], items));
@@ -771,8 +778,33 @@ pub fn render(
     ) && ch.dataset.kind == DataKind::Category
     {
         let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
-        titles_and_legend(&mut cv, ch, data, texts, &mut area, &|i| category::legend_graphic(ch, i, color_of(i)));
+        let items = data
+            .series
+            .iter()
+            .enumerate()
+            .map(|(i, label)| jfree::LegendItem { label: label.clone(), graphic: category::legend_graphic(ch, i, color_of(i)) })
+            .collect();
+        titles_and_legend(&mut cv, ch, texts, &mut area, items);
         category::draw(&mut cv, ch, data, texts, locale, area, &color_of);
+        return cv.items;
+    }
+    if ch.kind.is_pie() && ch.dataset.kind == DataKind::Pie {
+        let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
+        let section_color = |i: usize| color_of(pie::color_index(ch, data, i));
+        let total: f64 = data.pie.iter().map(|(_, v)| v.max(0.0)).sum();
+        let items = pie::legend_sections(data)
+            .into_iter()
+            .map(|i| {
+                let (key, v) = &data.pie[i];
+                let label = match &ch.legend_label_format {
+                    Some(f) => pie_label(f, key, *v, total, locale),
+                    None => key.clone(),
+                };
+                jfree::LegendItem { label, graphic: pie::legend_graphic(section_color(i)) }
+            })
+            .collect();
+        titles_and_legend(&mut cv, ch, texts, &mut area, items);
+        pie::draw(&mut cv, ch, data, locale, area, &section_color);
         return cv.items;
     }
 
@@ -893,27 +925,14 @@ pub fn render(
 fn titles_and_legend(
     cv: &mut Canvas,
     ch: &ChartElement,
-    data: &DataState,
     texts: &ChartTexts,
     area: &mut jfree::Rect,
-    graphic: &dyn Fn(usize) -> jfree::LegendGraphic,
+    items: Vec<jfree::LegendItem>,
 ) {
     if let Some(t) = texts.title.as_deref() {
         jfree::text_title(cv, area, t, &ch.title_font, ch.title_color, jfree::Side::Top);
     }
     if ch.show_legend {
-        let names: Vec<String> = match ch.dataset.kind {
-            DataKind::Pie => data.pie.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::Xy => data.xy.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::TimeSeries | DataKind::TimePeriod => data.periods.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::Xyz => data.xyz.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::HighLow => data.ohlc.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::Gantt => data.gantt.iter().map(|(k, _)| k.clone()).collect(),
-            DataKind::Value => Vec::new(),
-            DataKind::Category => data.series.clone(),
-        };
-        let items: Vec<jfree::LegendItem> =
-            names.into_iter().enumerate().map(|(i, label)| jfree::LegendItem { label, graphic: graphic(i) }).collect();
         let side = match ch.legend_position {
             Edge::Top => jfree::Side::Top,
             Edge::Left => jfree::Side::Left,
