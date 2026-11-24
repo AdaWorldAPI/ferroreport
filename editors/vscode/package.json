@@ -1,27 +1,63 @@
 {
   "name": "ferroreport",
   "displayName": "ferroreport templates (.ferro)",
-  "description": "Syntax highlighting, folding and snippets for ferroreport's .ferro report templates.",
+  "description": "Syntax highlighting, snippets and folding for ferroreport's .ferro report templates (PDF, Excel and Word reports).",
   "version": "1.0.1",
   "publisher": "cristianencarnacion",
   "license": "MIT OR Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/cristianEncarnacion/ferroreport" },
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#17110d",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cristianEncarnacion/ferroreport"
+  },
   "homepage": "https://cristianencarnacion.github.io/ferroreport/docs.html#ferro",
-  "engines": { "vscode": "^1.80.0" },
-  "categories": ["Programming Languages", "Snippets"],
-  "keywords": ["ferroreport", "jasperreports", "jrxml", "report", "pdf"],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "ferroreport",
+    "report",
+    "pdf",
+    "excel",
+    "invoice",
+    "template",
+    "jasperreports",
+    "jrxml"
+  ],
   "contributes": {
     "languages": [
       {
         "id": "ferro",
-        "aliases": ["ferroreport template", "ferro"],
-        "extensions": [".ferro"],
+        "aliases": [
+          "ferroreport template",
+          "ferro"
+        ],
+        "extensions": [
+          ".ferro"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
-      { "language": "ferro", "scopeName": "source.ferro", "path": "./syntaxes/ferro.tmLanguage.json" }
+      {
+        "language": "ferro",
+        "scopeName": "source.ferro",
+        "path": "./syntaxes/ferro.tmLanguage.json"
+      }
     ],
-    "snippets": [{ "language": "ferro", "path": "./snippets/ferro.json" }]
+    "snippets": [
+      {
+        "language": "ferro",
+        "path": "./snippets/ferro.json"
+      }
+    ]
   }
 }

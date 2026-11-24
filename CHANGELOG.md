@@ -4,6 +4,11 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+- VS Code extension: an icon, a README with an animation and a screenshot, and section names
+  (`title`, `detail`, `row`...) now colored by every theme.
+
 ## 1.0.1
 
 - The VS Code extension for `.ferro` is on the Visual Studio Marketplace

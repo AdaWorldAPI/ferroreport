@@ -61,7 +61,7 @@
         },
         {
           "match": "\\b(title|pageHeader|columnHeader|detail|columnFooter|pageFooter|lastPageFooter|summary|noData|background|group|groupHeader|groupFooter|band|row|stack)\\b",
-          "name": "entity.name.section.ferro"
+          "name": "entity.name.type.section.ferro"
         },
         {
           "match": "\\b(field|parameter|variable|dataset|sortField|style|template|property|query)\\b",
