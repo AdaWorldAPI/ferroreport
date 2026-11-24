@@ -458,8 +458,6 @@ códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 
 - **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
 - **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con
   recuadro visible.
-- **Paquetes:** la librería de Java en Maven Central y la de Python en PyPI (la publicación solo
-  espera las cuentas; JitPack y las versiones de GitHub ya las tienen).
 
 Lo que trajo cada versión está en [CHANGELOG.md](CHANGELOG.md).
 

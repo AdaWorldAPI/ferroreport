@@ -704,8 +704,6 @@ of its own. What comes next, in 1.x releases:
 - **Charts pixel for pixel** like JFreeChart (today they follow its look closely).
 - **Maps** and the remaining custom components; PAdES signatures with timestamps (B-T, B-LT)
   and a visible signature box.
-- **Packages:** the Java library on Maven Central and the Python one on PyPI (publishing waits
-  only for the accounts; JitPack and the GitHub releases have them already).
 
 What each release brought is in [CHANGELOG.md](CHANGELOG.md).
 

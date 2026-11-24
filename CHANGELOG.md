@@ -4,10 +4,11 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
-## Unreleased
+## 1.0.2
 
 - VS Code extension: an icon, a README with an animation and a screenshot, and section names
   (`title`, `detail`, `row`...) now colored by every theme.
+- No change to the engine: what 1.0.1 renders, 1.0.2 renders the same.
 
 ## 1.0.1
 

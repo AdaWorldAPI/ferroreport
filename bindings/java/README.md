@@ -39,14 +39,14 @@ Until the library is on Maven Central, it is built from this repository's releas
 <dependency>
   <groupId>com.github.cristianEncarnacion</groupId>
   <artifactId>ferroreport</artifactId>
-  <version>v1.0.1</version>
+  <version>v1.0.2</version>
 </dependency>
 ```
 
 ```kotlin
 // Gradle
 repositories { maven("https://jitpack.io") }
-dependencies { implementation("com.github.cristianEncarnacion:ferroreport:v1.0.1") }
+dependencies { implementation("com.github.cristianEncarnacion:ferroreport:v1.0.2") }
 ```
 
 Java 11 or newer.
