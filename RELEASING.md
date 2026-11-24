@@ -34,7 +34,7 @@ Current state:
 | crates.io | configured for `ferroreport` and `ferroreport-cli` (environment `crates-io`) | the `CARGO_REGISTRY_TOKEN` secret is only a fallback and can be deleted |
 | npm | configured (environment `npm`, may publish) | npm validates it with the first release that uses it; then the `NPM_TOKEN` secret can be deleted |
 | PyPI | configured (environment `pypi`) | 1.0.0 was published through it |
-| Maven Central | no trusted publishing there: a user token and a signing key, as secrets of the environment `maven-central` | namespace `io.github.cristianencarnacion` verified; the secrets are still to add (below), then set the repository variable `PUBLISH_MAVEN` to `true` |
+| Maven Central | no trusted publishing there: a user token and a signing key, as secrets of the environment `maven-central` | configured; 1.0.1 was published through it. Signing key `E43D097BF9C5E3407DF285CB2347362558F83FA0`, public half on keyserver.ubuntu.com and keys.openpgp.org |
 | Visual Studio Marketplace | configured: publisher `cristianencarnacion`, policy for `release.yml` in the environment `vscode-marketplace` | the job runs `vsce publish --oidc`; the first publish activates the policy |
 
 How each one was set up, for reference:
