@@ -272,7 +272,9 @@ def main():
         classes = sample_classes(sample, args.lib, out_root)
         classpath = os.pathsep.join([str(oracle), f"{args.lib}/*", *([str(classes)] if classes else []), str(sample / "src"), str(template.parent), str(sample)])
         # ORACLE_JAVA: a Java 17 runtime lets JasperReports 6.20.6 compile Groovy expressions.
-        jcode, jtext, jsec = run([os.environ.get("ORACLE_JAVA", "java"), "-Djava.awt.headless=true", f"-Duser.home={out_root / '.java-home'}", "-cp", classpath, "Oracle", str(template),
+        # The rows' dates are UTC, and so is the Java runtime's own time zone, which methods such
+        # as Date.getMonth() use, whatever the machine's is.
+        jcode, jtext, jsec = run([os.environ.get("ORACLE_JAVA", "java"), "-Djava.awt.headless=true", "-Duser.timezone=UTC", f"-Duser.home={out_root / '.java-home'}", "-cp", classpath, "Oracle", str(template),
                                   str(data_file) if rows is not None else "-", str(jasper_pdf), str(params_file)], cwd=sample)
         cmd = [args.bin, "render", str(template), "-o", str(ours_pdf), "-q", "-p", str(params_file), "--timeout", "120"]
         for r in resources:

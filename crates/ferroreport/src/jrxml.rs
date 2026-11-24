@@ -1549,6 +1549,8 @@ impl Parser {
             time_format,
             x_format,
             show_volume: flag(plot_node, &["isShowVolume", "showVolume"], true),
+            show_open_ticks: flag(plot_node, &["isShowOpenTicks", "showOpenTicks"], false),
+            show_close_ticks: flag(plot_node, &["isShowCloseTicks", "showCloseTicks"], false),
             foreground_alpha: plot.and_then(|p| p.attr("foregroundAlpha")).and_then(number::<f32>).unwrap_or(1.0),
             svg: chart
                 .and_then(|c| c.attr("renderType"))

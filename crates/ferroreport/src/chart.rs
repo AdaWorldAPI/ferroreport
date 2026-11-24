@@ -17,9 +17,11 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
+mod bitmap;
 mod category;
 mod jfree;
 mod pie;
+mod xy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartKind {
@@ -360,6 +362,9 @@ pub struct ChartElement {
     /// Pie charts: how sections and legend items are labeled (`{0} {2}`).
     pub label_format: Option<String>,
     pub legend_label_format: Option<String>,
+    /// High-low charts: draw the open and close ticks (`showOpenTicks`, `showCloseTicks`).
+    pub show_open_ticks: bool,
+    pub show_close_ticks: bool,
     /// How opaque what the plot draws is (`foregroundAlpha`, 1 by default).
     pub foreground_alpha: f32,
     /// Drawn as SVG (`net.sf.jasperreports.chart.render.type=svg`) rather than straight on the
@@ -518,6 +523,8 @@ struct Canvas<'a> {
     items: Vec<PrintItem>,
     /// Text is measured as JFreeChart measures it drawing SVG (see [`ChartElement::svg`]).
     svg: bool,
+    /// The chart's top left corner: the origin of the bitmaps of SVG charts.
+    origin: (f64, f64),
 }
 
 #[derive(Clone, Copy)]
@@ -611,6 +618,25 @@ impl Canvas<'_> {
             }
         }
         if !ops.is_empty() {
+            // JasperReports' PDF graphics (iText's PdfGraphics2D) write a glyph's quadratic
+            // segments as cubic ones whose first control point is the current point (`v`).
+            let mut cur = (0.0, 0.0);
+            let mut start = (0.0, 0.0);
+            for op in ops.iter_mut() {
+                match *op {
+                    PathOp::Move(a, b) => {
+                        cur = (a, b);
+                        start = cur;
+                    }
+                    PathOp::Line(a, b) => cur = (a, b),
+                    PathOp::Quad(qx, qy, ex, ey) => {
+                        *op = PathOp::Cubic(cur.0, cur.1, qx, qy, ex, ey);
+                        cur = (ex, ey);
+                    }
+                    PathOp::Cubic(_, _, _, _, ex, ey) => cur = (ex, ey),
+                    PathOp::Close => cur = start,
+                }
+            }
             self.items.push(PrintItem::Path { ops: Arc::new(ops), fill: Some(color), stroke: None, dash: None });
         }
     }
@@ -620,7 +646,7 @@ impl Canvas<'_> {
     }
     /// What `draw` draws, clipped to the inside of `clip`.
     fn clipped_path(&mut self, clip: Vec<PathOp>, draw: impl FnOnce(&mut Canvas)) {
-        let mut inner = Canvas { fonts: &mut *self.fonts, items: Vec::new(), svg: self.svg };
+        let mut inner = Canvas { fonts: &mut *self.fonts, items: Vec::new(), svg: self.svg, origin: self.origin };
         inner.path(clip, None, None, None);
         draw(&mut inner);
         let items = inner.items;
@@ -758,9 +784,10 @@ pub fn render(
 ) -> Vec<PrintItem> {
     let empty = DataState::default();
     let data = all.get(&ch.id).unwrap_or(&empty);
-    let mut cv = Canvas { fonts, items: Vec::new(), svg: ch.svg };
+    let mut cv = Canvas { fonts, items: Vec::new(), svg: ch.svg, origin: (0.0, 0.0) };
     let p = ch.boxed.padding;
     let (x, y, w, h) = (x + p.left, y + p.top, (w - p.left - p.right).max(0.0), (h - p.top - p.bottom).max(0.0));
+    cv.origin = (x as f64, y as f64);
     if let Some(bg) = ch.backcolor {
         cv.rect(x, y, w, h, Some(bg), None);
     }
@@ -786,7 +813,37 @@ pub fn render(
             .collect();
         titles_and_legend(&mut cv, ch, texts, &mut area, items);
         category::draw(&mut cv, ch, data, texts, locale, area, &color_of);
-        return cv.items;
+        return clip_to(cv.items, x, y, w, h);
+    }
+    if matches!(
+        ch.kind,
+        ChartKind::XyLine
+            | ChartKind::XyArea
+            | ChartKind::Scatter
+            | ChartKind::TimeSeries
+            | ChartKind::XyBar
+            | ChartKind::Bubble
+            | ChartKind::Candlestick
+            | ChartKind::HighLow
+    ) && matches!(
+        ch.dataset.kind,
+        DataKind::Xy | DataKind::TimeSeries | DataKind::TimePeriod | DataKind::Xyz | DataKind::HighLow
+    ) {
+        let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
+        let names: Vec<String> = match ch.dataset.kind {
+            DataKind::Xy => data.xy.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::Xyz => data.xyz.iter().map(|(k, _)| k.clone()).collect(),
+            DataKind::HighLow => data.ohlc.iter().map(|(k, _)| k.clone()).collect(),
+            _ => data.periods.iter().map(|(k, _)| k.clone()).collect(),
+        };
+        let items = names
+            .into_iter()
+            .enumerate()
+            .map(|(i, label)| jfree::LegendItem { label, graphic: xy::legend_graphic(ch, i, color_of(i)) })
+            .collect();
+        titles_and_legend(&mut cv, ch, texts, &mut area, items);
+        xy::draw(&mut cv, ch, data, texts, locale, area, &color_of);
+        return clip_to(cv.items, x, y, w, h);
     }
     if ch.kind.is_pie() && ch.dataset.kind == DataKind::Pie {
         let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
@@ -805,7 +862,7 @@ pub fn render(
             .collect();
         titles_and_legend(&mut cv, ch, texts, &mut area, items);
         pie::draw(&mut cv, ch, data, locale, area, &section_color);
-        return cv.items;
+        return clip_to(cv.items, x, y, w, h);
     }
 
     // Title and subtitle on top.
@@ -918,6 +975,18 @@ pub fn render(
         _ => xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
     }
     cv.items
+}
+
+/// `items` clipped to the chart's box, as JasperReports clips what JFreeChart draws.
+fn clip_to(items: Vec<PrintItem>, x: f32, y: f32, w: f32, h: f32) -> Vec<PrintItem> {
+    let mut all = vec![PrintItem::Path {
+        ops: Arc::new(jfree::rect_ops(x as f64, y as f64, w as f64, h as f64)),
+        fill: None,
+        stroke: None,
+        dash: None,
+    }];
+    all.extend(items);
+    vec![PrintItem::Transform([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], all)]
 }
 
 /// JFreeChart's titles around the chart: the title, then the legend, then the subtitle, each
@@ -1478,7 +1547,7 @@ fn bar(cv: &mut Canvas, horizontal: bool, a: f32, width: f32, p0: f32, p1: f32, 
 
 fn rotated_label(cv: &mut Canvas, font: &FontSpec, text: &str, left: f32, center_y: f32) {
     let w = cv.width(font, text);
-    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new(), svg: cv.svg };
+    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new(), svg: cv.svg, origin: cv.origin };
     inner.text(font, Color::BLACK, text, 0.0, 0.0, Anchor::Left);
     let items = inner.items;
     // Turn 90° counter-clockwise: local (u, v) lands at (left + v, center_y + w/2 - u).

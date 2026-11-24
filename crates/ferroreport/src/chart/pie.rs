@@ -149,7 +149,6 @@ pub(crate) fn draw(
     // a thin outline is a point wide.
     let bitmaps = ch.svg && ch.foreground_alpha < 1.0;
     let alpha = if ch.svg { 1.0 } else { ch.foreground_alpha.clamp(0.0, 1.0) };
-    let outline_width = if bitmaps { 1.0 } else { 0.5 };
     let opaque = alpha >= 1.0;
     let back = ch.plot_backcolor.or(ch.backcolor).unwrap_or(Color::WHITE);
     let shadow = blend(SHADOW, alpha, back);
@@ -164,10 +163,21 @@ pub(crate) fn draw(
             angle = a2;
         }
     }
-    for &(_, a1, a2) in &sections {
+    if bitmaps {
+        // Batik paints each translucent shape as an opaque bitmap.
+        for &(_, a1, a2) in &sections {
+            super::bitmap::fill_bitmap(cv, &wedge(cx + 4.0, cy + 4.0, r, a1, a2), SHADOW);
+        }
+        for &(i, a1, a2) in &sections {
+            let ops = wedge(cx, cy, r, a1, a2);
+            super::bitmap::fill_bitmap(cv, &ops, color_of(i));
+            super::bitmap::stroke_bitmap(cv, &ops, OUTLINE, 0.5);
+        }
+    }
+    for &(_, a1, a2) in sections.iter().filter(|_| !bitmaps) {
         cv.path(wedge(cx + 4.0, cy + 4.0, r, a1, a2), Some(shadow), None, None);
     }
-    for &(i, a1, a2) in &sections {
+    for &(i, a1, a2) in sections.iter().filter(|_| !bitmaps) {
         let color = color_of(i);
         let ops = wedge(cx, cy, r, a1, a2);
         let fill = blend(color, alpha, back);
@@ -177,7 +187,7 @@ pub(crate) fn draw(
             let over = blend(color, alpha, shadow);
             cv.clipped_path(circle(cx + 4.0, cy + 4.0, r), |cv| cv.path(ops.clone(), Some(over), None, None));
         }
-        cv.stroke_closed(ops, blend(OUTLINE, alpha, fill), outline_width);
+        cv.stroke_closed(ops, blend(OUTLINE, alpha, fill), 0.5);
     }
 
     if !labels {

@@ -249,7 +249,7 @@ pub(crate) fn draw_string_rotated(
     py: f64,
 ) {
     let (s, c) = angle.sin_cos();
-    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new(), svg: cv.svg };
+    let mut inner = Canvas { fonts: cv.fonts, items: Vec::new(), svg: cv.svg, origin: cv.origin };
     inner.draw_string(font, color, text, 0.0, 0.0);
     let items = std::mem::take(&mut inner.items);
     // The point (x, y) turned about (px, py) is where local (0, 0) lands.
@@ -867,23 +867,12 @@ impl NumberAxis {
         out
     }
 
-    /// `findMaximumTickLabelWidth` / `Height`, insets included: the widest label, or the
-    /// font's line height (`LineMetrics`, not rounded).
-    fn max_label_extent(&self, cv: &mut Canvas, ticks: &[(f64, String)], side: Side) -> f64 {
-        if side.vertical() {
-            ticks.iter().map(|(_, l)| cv.awt_width(&self.font, l) + 8.0).fold(0.0, f64::max)
-        } else {
-            let m = cv.metrics(&self.font);
-            (m.ascent + m.descent + m.leading) as f32 as f64 + 4.0
-        }
-    }
-
     /// `ValueAxis.reserveSpace`: room the axis takes beside `plot`.
     pub fn reserve(&mut self, cv: &mut Canvas, plot: Rect, side: Side, locale: &crate::format::Locale) -> f64 {
         let mut space = 0.0;
         if self.tick_labels {
             let ticks = self.ticks(cv, plot, side, locale);
-            space += self.max_label_extent(cv, &ticks, side);
+            space += max_label_extent(cv, &self.font, &ticks, side);
         }
         space + label_enclosure(cv, self.label.as_deref(), &self.label_font)
     }
@@ -898,40 +887,19 @@ impl NumberAxis {
         side: Side,
         locale: &crate::format::Locale,
     ) -> Vec<(f64, String)> {
-        // drawAxisLine
-        match side {
-            Side::Left | Side::Right => cv.line_square(cursor, data.y, cursor, data.max_y(), self.line_color, 0.5),
-            Side::Top | Side::Bottom => cv.line_square(data.x, cursor, data.max_x(), cursor, self.line_color, 0.5),
-        }
         let ticks = self.ticks(cv, data, side, locale);
-        for (v, label) in &ticks {
-            let p = self.java2d(*v, data, side) as f32 as f64;
-            if self.tick_labels {
-                let (x, y, anchor) = match side {
-                    Side::Left => (cursor - 4.0 - 2.0, p, CENTER_RIGHT),
-                    Side::Right => (cursor + 4.0 + 2.0, p, CENTER_LEFT),
-                    Side::Top => (p, cursor - 2.0 - 2.0, BOTTOM_CENTER),
-                    Side::Bottom => (p, cursor + 2.0 + 2.0, TOP_CENTER),
-                };
-                draw_aligned(cv, &self.font, self.tick_label_color, label, x as f32 as f64, y as f32 as f64, anchor);
-            }
-            if self.tick_marks {
-                match side {
-                    Side::Left => cv.line_square(cursor - 2.0, p, cursor, p, self.line_color, 0.5),
-                    Side::Right => cv.line_square(cursor + 2.0, p, cursor, p, self.line_color, 0.5),
-                    Side::Top => cv.line_square(p, cursor - 2.0, p, cursor, self.line_color, 0.5),
-                    Side::Bottom => cv.line_square(p, cursor + 2.0, p, cursor, self.line_color, 0.5),
-                }
-            }
-        }
-        let used = if self.tick_labels { self.max_label_extent(cv, &ticks, side) } else { 0.0 };
-        let cursor = match side {
-            Side::Left | Side::Top => cursor - used,
-            Side::Right | Side::Bottom => cursor + used,
+        let style = AxisStyle {
+            font: self.font.clone(),
+            line_color: self.line_color,
+            tick_label_color: self.tick_label_color,
+            tick_marks: self.tick_marks,
+            tick_labels: self.tick_labels,
+            label: self.label.clone(),
+            label_font: self.label_font.clone(),
+            label_color: self.label_color,
         };
-        if let Some(l) = self.label.clone().filter(|l| !l.is_empty()) {
-            draw_axis_label(cv, &l, &self.label_font, self.label_color, cursor, data, side);
-        }
+        let positions: Vec<f64> = ticks.iter().map(|(v, _)| self.java2d(*v, data, side)).collect();
+        draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
         ticks
     }
 }
@@ -1177,4 +1145,426 @@ struct LabelPosition {
     /// Labels as wide as a share of the plot (`CategoryLabelWidthType.RANGE`), or of a category.
     range: bool,
     ratio: f32,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Date axes.
+
+/// A calendar field of a date tick unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DateField {
+    Milli,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Month,
+    Year,
+}
+
+impl DateField {
+    /// `DateTickUnit.getMillisecondCount` of one: months are 31 days, years 365.
+    fn millis(self) -> f64 {
+        match self {
+            DateField::Milli => 1.0,
+            DateField::Second => 1_000.0,
+            DateField::Minute => 60_000.0,
+            DateField::Hour => 3_600_000.0,
+            DateField::Day => 86_400_000.0,
+            DateField::Month => 2_678_400_000.0,
+            DateField::Year => 31_536_000_000.0,
+        }
+    }
+}
+
+/// `DateAxis.createStandardDateTickUnits`: the field, how many of it, the label pattern.
+const DATE_UNITS: &[(DateField, i64, &str)] = &[
+    (DateField::Milli, 1, "HH:mm:ss.SSS"),
+    (DateField::Milli, 5, "HH:mm:ss.SSS"),
+    (DateField::Milli, 10, "HH:mm:ss.SSS"),
+    (DateField::Milli, 25, "HH:mm:ss.SSS"),
+    (DateField::Milli, 50, "HH:mm:ss.SSS"),
+    (DateField::Milli, 100, "HH:mm:ss.SSS"),
+    (DateField::Milli, 250, "HH:mm:ss.SSS"),
+    (DateField::Milli, 500, "HH:mm:ss.SSS"),
+    (DateField::Second, 1, "HH:mm:ss"),
+    (DateField::Second, 5, "HH:mm:ss"),
+    (DateField::Second, 10, "HH:mm:ss"),
+    (DateField::Second, 30, "HH:mm:ss"),
+    (DateField::Minute, 1, "HH:mm"),
+    (DateField::Minute, 2, "HH:mm"),
+    (DateField::Minute, 5, "HH:mm"),
+    (DateField::Minute, 10, "HH:mm"),
+    (DateField::Minute, 15, "HH:mm"),
+    (DateField::Minute, 20, "HH:mm"),
+    (DateField::Minute, 30, "HH:mm"),
+    (DateField::Hour, 1, "HH:mm"),
+    (DateField::Hour, 2, "HH:mm"),
+    (DateField::Hour, 4, "HH:mm"),
+    (DateField::Hour, 6, "HH:mm"),
+    (DateField::Hour, 12, "d-MMM, HH:mm"),
+    (DateField::Day, 1, "d-MMM"),
+    (DateField::Day, 2, "d-MMM"),
+    (DateField::Day, 7, "d-MMM"),
+    (DateField::Day, 15, "d-MMM"),
+    (DateField::Month, 1, "MMM-yyyy"),
+    (DateField::Month, 2, "MMM-yyyy"),
+    (DateField::Month, 3, "MMM-yyyy"),
+    (DateField::Month, 4, "MMM-yyyy"),
+    (DateField::Month, 6, "MMM-yyyy"),
+    (DateField::Year, 1, "yyyy"),
+    (DateField::Year, 2, "yyyy"),
+    (DateField::Year, 5, "yyyy"),
+    (DateField::Year, 10, "yyyy"),
+    (DateField::Year, 25, "yyyy"),
+    (DateField::Year, 50, "yyyy"),
+    (DateField::Year, 100, "yyyy"),
+];
+
+fn date_unit_size(i: usize) -> f64 {
+    let (f, n, _) = DATE_UNITS[i];
+    f.millis() * n as f64
+}
+
+fn date_ceiling_unit(size: f64) -> usize {
+    (0..DATE_UNITS.len()).find(|&i| date_unit_size(i) >= size).unwrap_or(DATE_UNITS.len() - 1)
+}
+
+pub(crate) fn to_date(ms: f64) -> chrono::NaiveDateTime {
+    chrono::DateTime::from_timestamp_millis(ms as i64).map(|d| d.naive_utc()).unwrap_or_default()
+}
+
+fn date_millis(t: chrono::NaiveDateTime) -> f64 {
+    t.and_utc().timestamp_millis() as f64
+}
+
+/// Java's lenient `Calendar.set(year, month, day, hour, minute, second)` (months and days
+/// may be out of range).
+fn calendar(year: i32, month: i64, day: i64, hour: i64, minute: i64, second: i64, milli: i64) -> chrono::NaiveDateTime {
+    let y = year as i64 + month.div_euclid(12);
+    let m = month.rem_euclid(12) as u32 + 1;
+    let first = chrono::NaiveDate::from_ymd_opt(y as i32, m, 1).unwrap_or_default();
+    first.and_hms_opt(0, 0, 0).unwrap_or_default()
+        + chrono::Duration::days(day - 1)
+        + chrono::Duration::hours(hour)
+        + chrono::Duration::minutes(minute)
+        + chrono::Duration::seconds(second)
+        + chrono::Duration::milliseconds(milli)
+}
+
+/// `DateTickUnit.addToDate`: `count` of the field later.
+fn add_unit(t: chrono::NaiveDateTime, field: DateField, count: i64) -> chrono::NaiveDateTime {
+    use chrono::{Datelike, Timelike};
+    match field {
+        DateField::Milli => t + chrono::Duration::milliseconds(count),
+        DateField::Second => t + chrono::Duration::seconds(count),
+        DateField::Minute => t + chrono::Duration::minutes(count),
+        DateField::Hour => t + chrono::Duration::hours(count),
+        DateField::Day => t + chrono::Duration::days(count),
+        DateField::Month | DateField::Year => {
+            let months = if field == DateField::Month { count } else { count * 12 };
+            let m = t.month0() as i64 + months;
+            let y = t.year() + m.div_euclid(12) as i32;
+            let m = m.rem_euclid(12) as u32 + 1;
+            // Calendar.add keeps the day, or the month's last when it has fewer.
+            let mut d = t.day();
+            let date = loop {
+                if let Some(date) = chrono::NaiveDate::from_ymd_opt(y, m, d) {
+                    break date;
+                }
+                d -= 1;
+            };
+            date.and_hms_milli_opt(t.hour(), t.minute(), t.second(), t.nanosecond() / 1_000_000).unwrap_or(t)
+        }
+    }
+}
+
+/// `DateAxis.previousStandardDate` with ticks at the start of periods (JFreeChart 1.5).
+fn previous_standard_date(t: chrono::NaiveDateTime, field: DateField, count: i64) -> chrono::NaiveDateTime {
+    use chrono::{Datelike, Timelike};
+    let (y, mo, d) = (t.year(), t.month0() as i64, t.day() as i64);
+    let (h, mi, s) = (t.hour() as i64, t.minute() as i64, t.second() as i64);
+    let current = match field {
+        DateField::Milli => (t.nanosecond() / 1_000_000) as i64,
+        DateField::Second => s,
+        DateField::Minute => mi,
+        DateField::Hour => h,
+        DateField::Day => d,
+        DateField::Month => mo,
+        DateField::Year => y as i64,
+    };
+    let value = count * (current / count);
+    let pick = |a: chrono::NaiveDateTime, b: chrono::NaiveDateTime| if a >= t { b } else { a };
+    match field {
+        DateField::Milli => pick(calendar(y, mo, d, h, mi, s, value), calendar(y, mo, d, h, mi, s, value - count)),
+        DateField::Second => pick(calendar(y, mo, d, h, mi, value, 0), calendar(y, mo, d, h, mi, value - count, 0)),
+        DateField::Minute => pick(calendar(y, mo, d, h, value, 0, 0), calendar(y, mo, d, h, value - count, 0, 0)),
+        DateField::Hour => pick(calendar(y, mo, d, value, 0, 0, 0), calendar(y, mo, d, value - count, 0, 0, 0)),
+        DateField::Day => pick(calendar(y, mo, value, 0, 0, 0, 0), calendar(y, mo, value - count, 0, 0, 0, 0)),
+        DateField::Month => {
+            let value = count * ((current + 1) / count) - 1;
+            let start = calendar(y, value, 1, 0, 0, 0, 0);
+            if start >= t {
+                calendar(y, value - count, 1, 0, 0, 0, 0)
+            } else {
+                start
+            }
+        }
+        DateField::Year => pick(calendar(value as i32, 0, 1, 0, 0, 0, 0), calendar((value - count) as i32, 0, 1, 0, 0, 0, 0)),
+    }
+}
+
+/// A date axis (`DateAxis`), in milliseconds.
+#[derive(Debug, Clone)]
+pub(crate) struct DateAxis {
+    pub lower: f64,
+    pub upper: f64,
+    /// The current tick unit: an index into the standard units, `None` before the first choice.
+    unit: Option<usize>,
+    /// A pattern for every label (`timeAxisTickLabelMask`).
+    pub format: Option<String>,
+    pub font: FontSpec,
+    pub label: Option<String>,
+    pub label_font: FontSpec,
+    pub label_color: Color,
+    pub tick_label_color: Color,
+    pub line_color: Color,
+    pub tick_marks: bool,
+    pub tick_labels: bool,
+}
+
+impl DateAxis {
+    pub fn new(lower: f64, upper: f64, font: FontSpec) -> DateAxis {
+        DateAxis {
+            lower,
+            upper,
+            unit: None,
+            format: None,
+            label_font: font.clone(),
+            font,
+            label: None,
+            label_color: Color::BLACK,
+            tick_label_color: Color::BLACK,
+            line_color: Color::BLACK,
+            tick_marks: true,
+            tick_labels: true,
+        }
+    }
+
+    /// `DateAxis.autoAdjustRange` with `margin` on each side (at least 2 ms wide).
+    pub fn auto_range(min: f64, max: f64, margin: f64) -> (f64, f64) {
+        if !min.is_finite() || !max.is_finite() {
+            return (0.0, 1.0);
+        }
+        let (mut lower, mut upper) = (min, max);
+        let range = upper - lower;
+        if range < 2.0 {
+            let expand = (2.0 - range) / 2.0;
+            upper += expand;
+            lower -= expand;
+        }
+        (lower - margin * range, upper + margin * range)
+    }
+
+    pub fn java2d(&self, v: f64, area: Rect, side: Side) -> f64 {
+        let (min, max) = if side.vertical() { (area.max_y(), area.y) } else { (area.x, area.max_x()) };
+        min + (v - self.lower) / (self.upper - self.lower) * (max - min)
+    }
+
+    fn label_of(&self, t: f64, pattern: &str, locale: &crate::format::Locale) -> String {
+        let value = crate::value::Value::Date(to_date(t));
+        crate::format::format_value(&value, Some(self.format.as_deref().unwrap_or(pattern)), locale)
+    }
+
+    /// `estimateMaximumTickLabelWidth` with a unit (`None`: the axis' first unit, whose labels
+    /// are in the short date and time format).
+    fn estimate_width(&self, cv: &mut Canvas, unit: Option<usize>, locale: &crate::format::Locale) -> f64 {
+        let label = |t: f64| match (unit, &self.format) {
+            (_, Some(f)) => crate::format::format_value(&crate::value::Value::Date(to_date(t)), Some(f), locale),
+            (Some(i), None) => self.label_of(t, DATE_UNITS[i].2, locale),
+            (None, None) => {
+                crate::format::format_value(&crate::value::Value::Date(to_date(t)), None, &crate::format::locale::EN_US)
+            }
+        };
+        let (a, b) = (label(self.lower.trunc()), label(self.upper.trunc()));
+        8.0 + cv.awt_width(&self.font, &a).max(cv.awt_width(&self.font, &b))
+    }
+
+    fn select_unit(&mut self, cv: &mut Canvas, area: Rect, side: Side, locale: &crate::format::Locale) {
+        let zero = self.java2d(0.0, area, side);
+        let length = |s: &DateAxis, size: f64| (s.java2d(size, area, side) - zero).abs();
+        if !side.vertical() {
+            let w = self.estimate_width(cv, self.unit, locale);
+            // The first unit is a day.
+            let current = self.unit.map(date_unit_size).unwrap_or(86_400_000.0);
+            let i1 = date_ceiling_unit(current);
+            let guess = w / length(self, date_unit_size(i1)) * date_unit_size(i1);
+            let mut i2 = date_ceiling_unit(guess);
+            let w2 = self.estimate_width(cv, Some(i2), locale);
+            if w2 > length(self, date_unit_size(i2)) {
+                i2 = (i2 + 1).min(DATE_UNITS.len() - 1);
+            }
+            self.unit = Some(i2);
+        } else {
+            let m = cv.metrics(&self.font);
+            let label_h = 4.0 + (m.ascent + m.descent + m.leading) as f32 as f64;
+            let i1 = date_ceiling_unit((self.upper - self.lower) / 10.0);
+            let guess = label_h / length(self, date_unit_size(i1)) * date_unit_size(i1);
+            let i2 = date_ceiling_unit(guess);
+            let i = if label_h < length(self, date_unit_size(i2)) { i2 } else { (i2 + 1).min(DATE_UNITS.len() - 1) };
+            self.unit = Some(i);
+        }
+    }
+
+    /// `refreshTicks`: dates from the first standard date after the lower bound, while before
+    /// the upper bound.
+    pub fn ticks(&mut self, cv: &mut Canvas, area: Rect, side: Side, locale: &crate::format::Locale) -> Vec<(f64, String)> {
+        self.select_unit(cv, area, side, locale);
+        let i = self.unit.unwrap_or(0);
+        let (field, count, pattern) = DATE_UNITS[i];
+        let mut tick = add_unit(previous_standard_date(to_date(self.lower), field, count), field, count);
+        let upper = to_date(self.upper);
+        let mut out = Vec::new();
+        while tick < upper && out.len() < 1000 {
+            let ms = date_millis(tick);
+            out.push((ms, self.label_of(ms, pattern, locale)));
+            tick = add_unit(tick, field, count);
+        }
+        out
+    }
+}
+
+/// A value axis: numbers or dates.
+#[derive(Debug, Clone)]
+pub(crate) enum ValueAxis {
+    Number(NumberAxis),
+    Date(DateAxis),
+}
+
+impl ValueAxis {
+    pub fn java2d(&self, v: f64, area: Rect, side: Side) -> f64 {
+        match self {
+            ValueAxis::Number(a) => a.java2d(v, area, side),
+            ValueAxis::Date(a) => a.java2d(v, area, side),
+        }
+    }
+
+    pub fn bounds(&self) -> (f64, f64) {
+        match self {
+            ValueAxis::Number(a) => (a.lower, a.upper),
+            ValueAxis::Date(a) => (a.lower, a.upper),
+        }
+    }
+
+    pub fn reserve(&mut self, cv: &mut Canvas, plot: Rect, side: Side, locale: &crate::format::Locale) -> f64 {
+        match self {
+            ValueAxis::Number(a) => a.reserve(cv, plot, side, locale),
+            ValueAxis::Date(a) => {
+                let mut space = 0.0;
+                if a.tick_labels {
+                    let ticks = a.ticks(cv, plot, side, locale);
+                    space += max_label_extent(cv, &a.font, &ticks, side);
+                }
+                space + label_enclosure(cv, a.label.as_deref(), &a.label_font)
+            }
+        }
+    }
+
+    pub fn draw(
+        &mut self,
+        cv: &mut Canvas,
+        cursor: f64,
+        plot: Rect,
+        data: Rect,
+        side: Side,
+        locale: &crate::format::Locale,
+    ) -> Vec<(f64, String)> {
+        match self {
+            ValueAxis::Number(a) => a.draw(cv, cursor, plot, data, side, locale),
+            ValueAxis::Date(a) => {
+                let ticks = a.ticks(cv, data, side, locale);
+                let style = AxisStyle {
+                    font: a.font.clone(),
+                    line_color: a.line_color,
+                    tick_label_color: a.tick_label_color,
+                    tick_marks: a.tick_marks,
+                    tick_labels: a.tick_labels,
+                    label: a.label.clone(),
+                    label_font: a.label_font.clone(),
+                    label_color: a.label_color,
+                };
+                let positions: Vec<f64> = ticks.iter().map(|(v, _)| a.java2d(*v, data, side)).collect();
+                draw_value_axis(cv, &style, &ticks, &positions, cursor, data, side);
+                ticks
+            }
+        }
+    }
+}
+
+/// What a value axis looks like.
+pub(crate) struct AxisStyle {
+    pub font: FontSpec,
+    pub line_color: Color,
+    pub tick_label_color: Color,
+    pub tick_marks: bool,
+    pub tick_labels: bool,
+    pub label: Option<String>,
+    pub label_font: FontSpec,
+    pub label_color: Color,
+}
+
+/// `findMaximumTickLabelWidth` / `Height`, insets included: the widest label, or the font's
+/// line height (`LineMetrics`, not rounded).
+pub(crate) fn max_label_extent(cv: &mut Canvas, font: &FontSpec, ticks: &[(f64, String)], side: Side) -> f64 {
+    if side.vertical() {
+        ticks.iter().map(|(_, l)| cv.awt_width(font, l) + 8.0).fold(0.0, f64::max)
+    } else {
+        let m = cv.metrics(font);
+        (m.ascent + m.descent + m.leading) as f32 as f64 + 4.0
+    }
+}
+
+/// `ValueAxis.drawTickMarksAndLabels` and the axis label: the axis line, each tick's label
+/// then its mark, at `positions`.
+pub(crate) fn draw_value_axis(
+    cv: &mut Canvas,
+    s: &AxisStyle,
+    ticks: &[(f64, String)],
+    positions: &[f64],
+    cursor: f64,
+    data: Rect,
+    side: Side,
+) {
+    match side {
+        Side::Left | Side::Right => cv.line_square(cursor, data.y, cursor, data.max_y(), s.line_color, 0.5),
+        Side::Top | Side::Bottom => cv.line_square(data.x, cursor, data.max_x(), cursor, s.line_color, 0.5),
+    }
+    for ((_, label), &p) in ticks.iter().zip(positions) {
+        let p = p as f32 as f64;
+        if s.tick_labels {
+            let (x, y, anchor) = match side {
+                Side::Left => (cursor - 4.0 - 2.0, p, CENTER_RIGHT),
+                Side::Right => (cursor + 4.0 + 2.0, p, CENTER_LEFT),
+                Side::Top => (p, cursor - 2.0 - 2.0, BOTTOM_CENTER),
+                Side::Bottom => (p, cursor + 2.0 + 2.0, TOP_CENTER),
+            };
+            draw_aligned(cv, &s.font, s.tick_label_color, label, x as f32 as f64, y as f32 as f64, anchor);
+        }
+        if s.tick_marks {
+            match side {
+                Side::Left => cv.line_square(cursor - 2.0, p, cursor, p, s.line_color, 0.5),
+                Side::Right => cv.line_square(cursor + 2.0, p, cursor, p, s.line_color, 0.5),
+                Side::Top => cv.line_square(p, cursor - 2.0, p, cursor, s.line_color, 0.5),
+                Side::Bottom => cv.line_square(p, cursor + 2.0, p, cursor, s.line_color, 0.5),
+            }
+        }
+    }
+    let used = if s.tick_labels { max_label_extent(cv, &s.font, ticks, side) } else { 0.0 };
+    let cursor = match side {
+        Side::Left | Side::Top => cursor - used,
+        Side::Right | Side::Bottom => cursor + used,
+    };
+    if let Some(l) = s.label.clone().filter(|l| !l.is_empty()) {
+        draw_axis_label(cv, &l, &s.label_font, s.label_color, cursor, data, side);
+    }
 }

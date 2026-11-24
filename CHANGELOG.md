@@ -20,6 +20,16 @@ the charts of JasperReports' own samples, instead of an approximation of its loo
   shadow, section outlines, the labels' boxes, shadows and link lines, and how labels are
   moved apart when they would overlap. 3D pie charts are drawn flat with their
   `foregroundAlpha`, as JasperReports 7 draws them.
+- XY line, XY area, scatter, time series, XY bar, bubble, candlestick and high-low charts come
+  out the same as JasperReports draws them: number and date axes (JFreeChart's date tick
+  units, from milliseconds to years, and their formats), the room the range axis takes
+  decided before the domain axis's, series drawn last to first, shapes, bars, bubbles sized on
+  the range axis, candlestick bodies, wicks and volume bars. High-low charts draw open and
+  close ticks only when `isShowOpenTicks` and `isShowCloseTicks` ask for them, as in
+  JasperReports.
+- Where a chart drawn as SVG is translucent (3D pie sections with a `foregroundAlpha` below 1,
+  candlestick volume bars), the PDF gets the same opaque bitmaps JasperReports writes there,
+  pixel for pixel, instead of translucent vector shapes.
 - Text in charts is measured as JFreeChart measures it (AWT's whole-point font metrics) and
   written as glyph outlines, as JasperReports writes it: chart text is no longer selectable
   in the PDF.
@@ -29,6 +39,9 @@ the charts of JasperReports' own samples, instead of an approximation of its loo
 - What a chart draws inside its plot is clipped to the plot, as in JasperReports.
 - The value axis of horizontal bar charts is above the plot, and a series color given alone
   replaces only the first default color, as in JasperReports.
+- `tools/samples.py` runs JasperReports in the UTC time zone, like the rows' dates, so samples
+  that read a date's month or day (the time series ones) group their rows the same on any
+  machine.
 
 ## 1.1.0
 

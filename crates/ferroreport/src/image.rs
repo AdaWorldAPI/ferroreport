@@ -22,6 +22,11 @@ pub enum Pixels {
     Svg(Arc<crate::svg::SvgImage>),
 }
 
+/// Image ids from here up belong to the bitmaps of charts drawn as SVG
+/// (`chart::bitmap`): the PDF masks their transparent pixels, which are black, with a color
+/// key, as JasperReports' PDFs do, rather than with a soft mask.
+pub(crate) const KEYED_IDS: usize = usize::MAX / 2;
+
 #[derive(Debug)]
 pub struct ImageData {
     /// Stable identifier within a render (used to share one PDF object between uses).
