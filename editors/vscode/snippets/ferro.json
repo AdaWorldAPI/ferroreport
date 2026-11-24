@@ -3,30 +3,44 @@
     "prefix": "report",
     "body": [
       "report \"${1:Title}\" lang=${2:en}",
-      "  style Base default fontName=\"DejaVu Sans\" fontSize=10",
-      "  field ${3:name} ${4:String}",
+      "  style Base default fontName=\"DejaVu Sans\" size=10",
       "",
       "  title gap=6",
-      "    h1 height=26 fontSize=16 : ${1:Title}",
+      "    h1 height=26 size=16 : ${1:Title}",
       "  detail",
-      "    textField : \\$F{${3:name}}",
+      "    text : {${3:name}}",
       "$0"
     ],
     "description": "A new report"
   },
+  "Text": {
+    "prefix": "text",
+    "body": ["text ${1:1fr} : ${2:Label} {${3:field}}$0"],
+    "description": "A text: static, or with {field} holes filled from the data"
+  },
+  "Formula": {
+    "prefix": "text=",
+    "body": ["text ${1:1fr} align=right pattern=${2:#,##0.00} : ={${3:qty}} * {${4:price}}$0"],
+    "description": "A text whose value is an expression"
+  },
+  "Field": {
+    "prefix": "field",
+    "body": ["field ${1:name} ${2|String,Integer,Long,Double,BigDecimal,Boolean,Date,List|}$0"],
+    "description": "A field and its class (for numbers, dates and conditions; other fields need no declaration)"
+  },
   "Row": {
     "prefix": "row",
-    "body": ["row height=${1:16}", "  textField ${2:1fr} : $3", "  textField ${4:1fr} : $0"],
+    "body": ["row height=${1:16}", "  text ${2:1fr} : $3", "  text ${4:1fr} align=right : $0"],
     "description": "Parts side by side"
   },
   "If": {
     "prefix": "if",
-    "body": ["if : ${1:\\$F{field} != null}", "  $0"],
+    "body": ["if : ${1:{field\\} != null}", "  $0"],
     "description": "Parts printed only when the condition holds"
   },
   "Each": {
     "prefix": "each",
-    "body": ["each : \\$F{${1:lines}}", "  field ${2:name} ${3:String}", "  textField : \\$F{${2:name}}$0"],
+    "body": ["each : {${1:lines}}", "  text : {${2:name}}$0"],
     "description": "Parts repeated for every row of a nested list"
   },
   "Definition": {
@@ -36,7 +50,7 @@
   },
   "Use": {
     "prefix": "use",
-    "body": ["use ${1:money} ${2:1fr} ${3:value}=${4:\\$F{amount}}$0"],
+    "body": ["use ${1:money} ${2:1fr} ${3:value}=${4:{amount\\}}$0"],
     "description": "Use a definition"
   },
   "Import": {
