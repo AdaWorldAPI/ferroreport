@@ -2090,7 +2090,12 @@ async function boot() {
     } catch { /* fall through to the example */ }
   }
   if (!restored) await startWith(["blank", "invoice", "employees"].includes(start) ? start : "invoice");
-  if (firstTime) openGuide();
+  // Remember the guide as soon as it is shown: the dialog's close event comes a moment later,
+  // and a reload in between would show it again.
+  if (firstTime) {
+    openGuide();
+    store.set(WELCOMED, "yes");
+  }
 }
 
 // For the browser console and automated tests: the template being designed.
