@@ -208,11 +208,15 @@ impl FaceData {
 
     /// Glyph advance in thousandths of an em, truncated.
     fn advance_millis(&self, c: char) -> i64 {
-        // Control characters (U+0000-001F, U+007F-009F) are neither drawn nor measured, as in Java.
-        if c.is_control() {
+        // Control characters (U+0000-001F, U+007F-009F) are neither drawn nor measured, as in
+        // Java; nor, when exporting, are characters the font lacks: JasperReports' PDF exporter
+        // (iText) gives them no width and leaves them out, though filling (AWT) measured them
+        // with the font's missing-glyph box.
+        let glyph = self.glyph(c);
+        if c.is_control() || glyph == 0 {
             return 0;
         }
-        (self.advance(self.glyph(c)) as f64 * 1000.0 / self.units_per_em as f64) as i64
+        (self.advance(glyph) as f64 * 1000.0 / self.units_per_em as f64) as i64
     }
 
     /// Distance from the top of a line to its baseline.
@@ -606,6 +610,16 @@ mod tests {
 
     fn families(runs: Option<Vec<(usize, usize, String)>>, text: &str) -> Vec<(String, String)> {
         runs.unwrap_or_default().into_iter().map(|(a, b, f)| (text[a..b].to_string(), f)).collect()
+    }
+
+    #[test]
+    fn missing_characters_are_measured_like_jasperreports() {
+        let mut fonts = FontSet::new();
+        let id = fonts.resolve(&spec("DejaVu Serif", false, false));
+        let f = fonts.face(id);
+        // Filling (AWT) counts the missing-glyph box; exporting (iText) gives it no width.
+        assert!(f.fill_width("★", 10.0) > 5.0);
+        assert_eq!(f.text_width("a★b", 10.0), f.text_width("ab", 10.0));
     }
 
     #[test]

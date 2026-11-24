@@ -43,8 +43,20 @@ and a second paragraph ✓]]></text>
 			<staticText>
 				<reportElement x="265" y="190" width="250" height="20"/>
 				<textElement><font fontName="DejaVu Serif"/></textElement>
-				<text><![CDATA[Plain DejaVu Serif, not a set: ok.]]></text>
+				<text><![CDATA[Plain DejaVu Serif, not a set: ★ ✓ left out.]]></text>
 			</staticText>
+			<textField isStretchWithOverflow="true">
+				<reportElement x="265" y="215" width="60" height="14"/>
+				<box><pen lineWidth="0.5"/></box>
+				<textElement><font fontName="DejaVu Serif"/></textElement>
+				<textFieldExpression><![CDATA["x★★★★★★★★★★ y"]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement x="340" y="215" width="175" height="14"/>
+				<box><pen lineWidth="0.5"/></box>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA["No family has 漢字: primary"]]></textFieldExpression>
+			</textField>
 			<staticText>
 				<reportElement x="0" y="270" width="515" height="22"/>
 				<box><bottomPen lineWidth="1"/></box>

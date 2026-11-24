@@ -6,6 +6,11 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+- PDF: a character the text's font does not have is left out, as JasperReports leaves it out,
+  instead of being drawn as the font's missing-glyph box. It takes no width when the lines are
+  drawn and aligned, and still counts as wide as that box for the text's height and where it is
+  cut, as in JasperReports (checked against 6.20.6, identical pages). Text shaped with
+  rustybuzz (right to left, complex scripts) still shows the box.
 - Font sets, as the `<fontSet>` of a JasperReports font extension defines them:
   `--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"` (or `Renderer::register_font_set`)
   makes a text whose font name is `Serif Fallback` draw the characters DejaVu Serif lacks in
