@@ -70,9 +70,14 @@ def test_excel_and_csv(tmp_path):
     ferroreport.render_to_file(fx / "report.jrxml", tmp_path / "invoice.csv", rows, params)
     assert (tmp_path / "invoice.csv").read_text().startswith(",Ferro")
     with pytest.raises(ferroreport.FerroreportError):
-        ferroreport.render(fx / "report.jrxml", rows, params, format="odt")
+        ferroreport.render(fx / "report.jrxml", rows, params, format="pptx")
     docx = ferroreport.render(fx / "report.jrxml", rows, params, format="docx")
     assert "word/document.xml" in zipfile.ZipFile(__import__("io").BytesIO(docx)).namelist()
+    for fmt in ("ods", "odt"):
+        odf = zipfile.ZipFile(__import__("io").BytesIO(ferroreport.render(fx / "report.jrxml", rows, params, format=fmt)))
+        assert odf.namelist()[0] == "mimetype"
+        assert odf.read("mimetype").decode().endswith(fmt.replace("ods", "spreadsheet").replace("odt", "text"))
+        assert "content.xml" in odf.namelist()
 
 
 def test_streams_a_data_file_to_a_file(tmp_path):

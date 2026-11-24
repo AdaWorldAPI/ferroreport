@@ -59,9 +59,8 @@ fn render(
         None
     };
     let format = match format {
-        Some(f) => {
-            ferroreport::Format::parse(&f).ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx, docx, csv or html)")))?
-        }
+        Some(f) => ferroreport::Format::parse(&f)
+            .ok_or_else(|| err(format!("unknown format `{f}` (pdf, xlsx, docx, ods, odt, csv or html)")))?,
         None => ferroreport::Format::Pdf,
     };
     let (bytes, stats) = py

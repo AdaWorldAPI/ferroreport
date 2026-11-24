@@ -4,7 +4,7 @@
 //! POST /render             {"template": "<jasperReport ...>" | "templateName": "invoice.jrxml",
 //!                           "data": [...], "params": {...}, "locale": "es_DO",
 //!                           "resources": {"logo.png": "<base64>"},
-//!                           "format": "pdf" | "xlsx" | "csv",
+//!                           "format": "pdf" | "xlsx" | "docx" | "ods" | "odt" | "csv" | "html",
 //!                           "csvSafe": true, "xlsxNumbers": true, "tagged": true} -> the file
 //! POST /render/<name>      {"data": [...], "params": {...}}  (template from --templates)
 //! POST /inspect            {"template": "..."}                          -> JSON
@@ -500,7 +500,7 @@ impl Job {
 
     /// Whether the rows may be asked for a second time.
     fn reads_rows_twice(&self) -> bool {
-        self.format == ferroreport::Format::Xlsx
+        matches!(self.format, ferroreport::Format::Xlsx | ferroreport::Format::Ods)
     }
 }
 
@@ -891,7 +891,7 @@ fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) 
                 None => ferroreport::Format::Pdf,
                 Some(f) => match ferroreport::Format::parse(&f) {
                     Some(f) => f,
-                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, docx, csv or html)")),
+                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, docx, ods, odt, csv or html)")),
                 },
             };
             let m = &state.metrics;

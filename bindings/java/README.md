@@ -22,7 +22,7 @@ try (ResultSet sales = statement.executeQuery("select * from sales order by regi
     reports.template(Path.of("reports/sales.jrxml"))
         .rows(sales)
         .maxPages(50_000).timeout(Duration.ofMinutes(2))
-        .renderTo(Path.of("sales.pdf"));          // .xlsx, .csv and .html work the same way
+        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .ods, .odt, .csv and .html work the same way
 }
 ```
 
@@ -88,7 +88,7 @@ byte[] pdf = reports.named("invoice").rows(lines).param("CUSTOMER", "Caribe").re
 | `.locale("es_DO")`, `.now(LocalDateTime)` | Number and date formatting; the value of `new Date()` in expressions |
 | `.format(Format.PDF \| XLSX \| CSV \| HTML)` | The output format (`renderTo(Path)` goes by the extension) |
 | `.maxPages(n)`, `.timeout(Duration)` | Stop a report that grows past what you expect (local engine; a server has its own limits) |
-| `.csvSafe(true)`, `.xlsxNumbers(true)` | Guard CSV against spreadsheet formulas in the data; numbers as numbers in Excel |
+| `.csvSafe(true)`, `.xlsxNumbers(true)` | Guard CSV against spreadsheet formulas in the data; numbers as numbers in Excel and ODS |
 | `.tagged(true)` | A tagged PDF, for screen readers: texts as paragraphs, pictures as figures |
 | `.resources(Path)` | An extra directory for images and subreports |
 | `.render()` | The document's bytes |

@@ -1,5 +1,5 @@
-//! WebAssembly bindings: `render(template, data, params, options)` returning the PDF (or XLSX or
-//! CSV) bytes.
+//! WebAssembly bindings: `render(template, data, params, options)` returning the PDF (or XLSX,
+//! DOCX, ODS, ODT, CSV or HTML) bytes.
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
@@ -32,7 +32,7 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
-///   format?: "pdf" | "xlsx" | "docx" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
+///   format?: "pdf" | "xlsx" | "docx" | "ods" | "odt" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
 ///   tagged?: boolean, pdfa?: "2b" | "2u" | "2a" | "3b" | "3u" | "3a",
 ///   attachments?: { name: string, data: Uint8Array | string, mime?: string }[],
 ///   password?: string, ownerPassword?: string, permissions?: string | string[] }`
@@ -42,7 +42,7 @@ fn get(obj: &JsValue, key: &str) -> JsValue {
 ///   "accessibility", "assemble", "all" — encrypt the PDF with AES-256).
 ///   `maxPages` stops a report that grows past that many pages; `csvSafe` puts an apostrophe
 ///   before CSV values a spreadsheet would run as a formula; `xlsxNumbers` writes numbers as
-///   numbers in Excel instead of formatted text.
+///   numbers in Excel and ODS instead of formatted text.
 #[wasm_bindgen]
 pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) -> Result<Vec<u8>, JsError> {
     let rows = to_json(&data, serde_json::Value::Array(Vec::new()))?;
@@ -124,8 +124,9 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
         }
     }
     let format = match get(&options, "format").as_string() {
-        Some(f) => ferroreport::Format::parse(&f)
-            .ok_or_else(|| JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, docx, csv or html)")))?,
+        Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| {
+            JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, docx, ods, odt, csv or html)"))
+        })?,
         None => ferroreport::Format::Pdf,
     };
     r.render_json_as(template, &rows, &params, format).map_err(js_err)

@@ -10,7 +10,11 @@ public enum Format {
     /** A web page that looks like the PDF, for previews. */
     HTML("html", "text/html; charset=utf-8"),
     /** A Word document, laid out like JasperReports' DOCX exporter. */
-    DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    /** An OpenDocument spreadsheet (LibreOffice Calc), laid out like JasperReports' ODS exporter. */
+    ODS("ods", "application/vnd.oasis.opendocument.spreadsheet"),
+    /** An OpenDocument text document (LibreOffice Writer), laid out like JasperReports' ODT exporter. */
+    ODT("odt", "application/vnd.oasis.opendocument.text");
 
     private final String id;
     private final String mediaType;
@@ -20,7 +24,7 @@ public enum Format {
         this.mediaType = mediaType;
     }
 
-    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}, {@code docx}. */
+    /** The name the engine knows the format by: {@code pdf}, {@code xlsx}, {@code csv}, {@code html}, {@code docx}, {@code ods}, {@code odt}. */
     public String id() {
         return id;
     }
