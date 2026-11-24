@@ -4,7 +4,7 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
-## Unreleased
+## 1.1.0
 
 ### Short forms in `.ferro`
 

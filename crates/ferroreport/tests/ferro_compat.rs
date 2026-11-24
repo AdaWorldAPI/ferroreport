@@ -109,9 +109,13 @@ fn fixtures_in_ferro_compile_as_they_did() {
         std::fs::write(&expected_path, &lines).unwrap();
         return;
     }
+    // Fixtures added after 1.0.2 are not in the frozen list; every one that is must still be
+    // written and compiled the same.
     let expected = std::fs::read_to_string(&expected_path).unwrap();
-    for (got, want) in lines.lines().zip(expected.lines()) {
-        assert_eq!(got, want, "fixture written or compiled differently from 1.0.2");
+    let got: std::collections::HashMap<&str, &str> = lines.lines().map(|l| (l.split(' ').next().unwrap(), l)).collect();
+    for want in expected.lines() {
+        let name = want.split(' ').next().unwrap();
+        let got = got.get(name).unwrap_or_else(|| panic!("fixture {name} from 1.0.2 is missing"));
+        assert_eq!(*got, want, "fixture written or compiled differently from 1.0.2");
     }
-    assert_eq!(lines.lines().count(), expected.lines().count());
 }
