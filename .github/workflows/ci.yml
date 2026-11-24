@@ -100,7 +100,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: cargo clippy -p ferroreport-python -- -D warnings
@@ -144,6 +144,23 @@ jobs:
       - run: bindings/wasm/build.sh
       - run: node bindings/wasm/tests/smoke.mjs
       - run: node bindings/wasm/tests/designer.mjs
+      - run: node bindings/wasm/tests/designer-text.mjs
+      # The designer in a real browser (headless Chromium), on the site as GitHub Pages serves it.
+      - run: tools/assemble-site.sh _site
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright and its Chromium
+        run: |
+          python -m pip install playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - run: python bindings/wasm/tests/designer_e2e.py _site --shots designer-shots
+        timeout-minutes: 5
+      - if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: designer-shots
+          path: designer-shots
 
   # What the server promises about large reports (tools/http_check.py says what).
   http:
