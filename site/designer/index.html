@@ -56,7 +56,7 @@
       </button>
     </div>
     <details class="menu menu-right" id="help-menu">
-      <summary class="icon-btn round" data-i18n-aria="help.menu" data-i18n-title="help.menu" aria-label="Help and settings">?</summary>
+      <summary class="btn" data-i18n-title="help.menu" title="Help and settings"><span data-i18n="help.short">Help</span></summary>
       <div class="menu-list">
         <button type="button" id="guide-btn" data-i18n="help.guide">Getting started</button>
         <button type="button" id="help-btn" aria-haspopup="dialog" data-i18n="help.shortcuts">Keyboard shortcuts</button>
@@ -90,10 +90,22 @@
 
 <main class="work" id="work">
   <aside class="side left" data-i18n-aria="data.title" aria-label="Your data">
-    <section class="panel" aria-labelledby="data-h">
+    <section class="panel data-panel" aria-labelledby="data-h">
       <h2 id="data-h" data-i18n="data.title">Your data</h2>
       <p class="hint" data-i18n="data.hint">Drag a field onto the page.</p>
-      <ul class="fields" id="fields" aria-labelledby="data-h"></ul>
+      <div class="data-scroll">
+        <ul class="fields" id="fields" aria-labelledby="data-h"></ul>
+        <div id="params-section" hidden>
+          <h3 id="params-h" data-i18n="params.title">Report values</h3>
+          <p class="hint" data-i18n="params.hint">Values given to the whole report.</p>
+          <ul class="fields" id="param-list" aria-labelledby="params-h"></ul>
+          <details class="sub">
+            <summary data-i18n="params.edit">Values for the preview</summary>
+            <textarea id="params" spellcheck="false" rows="3" data-i18n-aria="params.edit" aria-label="Values for the preview"></textarea>
+          </details>
+          <div id="params-msg" class="msg" role="status"></div>
+        </div>
+      </div>
       <div class="data-tools">
         <button type="button" class="btn small" id="data-upload-btn">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.5v-8M4.5 6 8 2.5 11.5 6M3 13.5h10"/></svg>
@@ -103,25 +115,15 @@
         <details class="sub" id="data-details">
           <summary data-i18n="data.edit">Edit sample data</summary>
           <p class="hint" data-i18n="data.editHint">A list of rows, written in JSON.</p>
-          <textarea id="data" spellcheck="false" data-i18n-aria="data.aria" aria-label="Sample data (JSON)" rows="9"></textarea>
+          <textarea id="data" spellcheck="false" data-i18n-aria="data.aria" aria-label="Sample data (JSON)" rows="8"></textarea>
         </details>
-        <p id="data-msg" class="msg" role="status"></p>
+        <div id="data-msg" class="msg" role="status"></div>
+        <p id="files-note" class="hint files-note" hidden></p>
       </div>
-      <div id="params-section" hidden>
-        <h3 id="params-h" data-i18n="params.title">Report values</h3>
-        <p class="hint" data-i18n="params.hint">Values given to the whole report.</p>
-        <ul class="fields" id="param-list" aria-labelledby="params-h"></ul>
-        <details class="sub">
-          <summary data-i18n="params.edit">Values for the preview</summary>
-          <textarea id="params" spellcheck="false" rows="3" data-i18n-aria="params.edit" aria-label="Values for the preview"></textarea>
-        </details>
-        <span id="params-msg" class="msg" role="status"></span>
-      </div>
-      <p id="files-note" class="hint files-note" hidden></p>
     </section>
-    <section class="panel" aria-labelledby="parts-h">
+    <section class="panel parts-panel" aria-labelledby="parts-h">
       <h2 id="parts-h" data-i18n="parts.title">Add to the page</h2>
-      <p class="hint" data-i18n="parts.hint">Drag onto the page, or click to add to the selected area.</p>
+      <p class="hint" data-i18n="parts.hint" data-i18n-title="parts.hintLong">Drag onto the page, or click.</p>
       <div class="parts" id="parts">
         <button type="button" draggable="true" data-part="staticText"><i class="ico ico-text" aria-hidden="true"></i><span data-i18n="part.staticText">Text</span></button>
         <button type="button" draggable="true" data-part="field"><i class="ico ico-field" aria-hidden="true"></i><span data-i18n="part.field">Field</span></button>
@@ -136,12 +138,13 @@
   </aside>
 
   <section class="center" id="center">
+    <div id="stage-problem" class="stage-problem" hidden aria-live="polite"></div>
     <div class="stage" id="canvas-stage" role="tabpanel" aria-labelledby="tab-design" tabindex="-1">
       <div class="sheet" id="sheet"></div>
     </div>
     <div class="preview" id="preview-pane" role="tabpanel" aria-labelledby="tab-preview" hidden>
       <p class="preview-head"><span id="preview-msg" class="msg" role="status" aria-live="polite" data-i18n="preview.loading">Loading the engine…</span></p>
-      <pre id="preview-error" class="preview-error" hidden></pre>
+      <div id="preview-error" class="preview-error" hidden></div>
       <iframe id="preview" data-i18n-title="preview.frame" title="Preview of the report as a PDF"></iframe>
     </div>
   </section>

@@ -11,8 +11,9 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   pills, formulas stay under Advanced untouched; the bands have plain names ("Each row of your
   data") and empty ones are slim strips to drop on; the page fills the width, with the PDF in a
   Preview tab and Download PDF (or Excel, Word) as the main button; the properties are in
-  sections; a three-step guide on the first visit; English and Spanish. Its browser tests run in
-  CI.
+  sections; problems are said in plain words, with the engine's message under "Technical
+  details"; a three-step guide on the first visit; English and Spanish. Its browser tests run
+  in CI.
 
 ## 1.1.0
 

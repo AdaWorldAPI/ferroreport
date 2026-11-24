@@ -249,7 +249,7 @@ with sync_playwright() as p:
     # The preview tab shows the PDF.
     pg.get_by_role("tab", name="Preview").click()
     ok(pg.locator("#preview").is_visible() and not pg.locator("#canvas-stage").is_visible(), "the Preview tab shows the PDF in place of the page")
-    ok("Up to date" in pg.inner_text("#preview-msg"), "and says it is up to date")
+    ok("up to date" in pg.inner_text("#preview-msg"), "and says it is up to date")
     pg.get_by_role("tab", name="Design").click()
 
     # 8. Formulas: shown under Advanced, saved as they were.
@@ -295,9 +295,30 @@ with sync_playwright() as p:
     ok('pattern="$#,##0.00"' in tpl(), "a number format chosen by its example")
     if pg.locator('details[data-sec="adv"]').get_attribute("open") is None:
         pg.locator('details[data-sec="adv"] > summary').click()
+    c0 = count()
     pg.get_by_label("Show only when").select_option("$F{active}")
-    pg.wait_for_timeout(300)
-    ok("<printWhenExpression><![CDATA[$F{active}]]></printWhenExpression>" in tpl(), "Show only when “active” is yes")
+    wait_preview(c0)
+    jr = tpl()
+    ok("<printWhenExpression><![CDATA[$F{active}]]></printWhenExpression>" in jr and '<field name="active" class="java.lang.Boolean"/>' in jr, "Show only when “active” is yes (and active is declared)")
+    ok(not pg.locator("#stage-problem").is_visible(), "and the report is made")
+
+    # Problems are said in plain words, with the engine's own words folded away.
+    c0 = count()
+    pg.locator("#prop-expr").fill("$F{amount} *")
+    pg.wait_for_timeout(900)
+    banner = pg.locator("#stage-problem")
+    ok(banner.is_visible() and "A formula is not written correctly" in banner.locator(".problem-title").inner_text(), "a broken formula is explained in plain words: " + banner.inner_text().split("\n")[0])
+    ok(not banner.locator("pre").is_visible() and "cannot parse expression" in banner.locator("pre").text_content(), "the engine's message is under Technical details")
+    banner.locator("summary").click()
+    ok(banner.locator("pre").is_visible(), "which opens")
+    ok(pg.locator("#tab-alert").is_visible(), "the Preview tab is marked")
+    shot(pg, "problem")
+    pg.get_by_role("button", name="Undo (Ctrl+Z)").click()
+    wait_preview(c0)
+    ok(not banner.is_visible(), "undoing it takes the message away")
+    pg.locator("#data").fill('[{"name": "Ana",}]')
+    pg.wait_for_timeout(700)
+    ok("mistake near line 1" in pg.inner_text("#data-msg"), "a mistake in the sample data says where: " + pg.inner_text("#data-msg").split("\n")[0])
     pg.context.close()
 
     # 10. 1366 × 768, and Spanish.
@@ -309,8 +330,29 @@ with sync_playwright() as p:
     zoom = int(pg.inner_text("#zoom-label").rstrip("%"))
     ok(zoom >= 75, f"at 1366 × 768 the page fits the width ({zoom}%)")
     shot(pg, "en-1366")
+    side = pg.locator(".side.left").bounding_box()
+    bottoms = [b.bounding_box()["y"] + b.bounding_box()["height"] for b in pg.locator("#parts button").all()]
+    ok(len(bottoms) == 8 and max(bottoms) <= side["y"] + side["height"] and pg.evaluate("document.querySelector('.side.left').scrollTop") == 0, "every part to add is in sight without scrolling")
+    ok(pg.locator("#data-upload-btn").is_visible() and pg.locator("#data-details > summary").is_visible(), "and so are Upload data file and Edit sample data")
+
+    # Tab goes from a band's name to the parts on it, from the top of the page down.
+    pg.locator('[data-select-band="title"]').focus()
+    pg.keyboard.press("Tab")
+    ok(pg.evaluate("document.activeElement.closest('[data-band-key]')?.dataset.bandKey") == "title" and pg.evaluate("document.activeElement.classList.contains('el')"), "Tab from the title's name goes to the title's text")
+    pg.keyboard.press("Tab")
+    ok(pg.evaluate("document.activeElement.dataset.selectBand") == "pageHeader", "then to the next band, Top of every page")
+    pg.keyboard.press("Tab")
+    pg.keyboard.press("Tab")
+    pg.keyboard.press("Tab")
+    ok(pg.evaluate("document.activeElement.closest('[data-band-key]')?.dataset.bandKey") == "detail:0", "then Column titles, the rows' name, and the parts of the rows")
+    pg.keyboard.press("Escape")
+    pg.locator("#file-menu > summary").click()
+    pg.get_by_role("button", name="Invoice example").click()
+    pg.wait_for_timeout(300)
+    ok(pg.locator(".toast.show").count() == 1, "a message is on screen")
     pg.get_by_role("button", name="Español").click()
     pg.wait_for_timeout(300)
+    ok(pg.locator(".toast.show").count() == 0, "switching the language takes it away")
     ok(pg.get_by_role("tab", name="Diseño").is_visible() and pg.locator(".band-label b, .band-strip b").all_inner_texts()[3] == "Cada fila de tus datos", "the interface is in Spanish")
     ok(pg.get_by_role("button", name="Descargar PDF").is_visible() and pg.inner_text("#data-h") == "Tus datos", "every part of it")
     shot(pg, "es-1366")

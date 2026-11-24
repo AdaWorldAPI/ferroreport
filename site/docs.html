@@ -306,7 +306,9 @@ ferroreport convert old.jrxml --to jrxml -o new.jrxml   # JRXML 6 -&gt; JRXML 7<
           fit, blank when there is no value, show only when, the formula). Number formats are chosen by an example (1,234.56,
           $1,234.56, 12%, 2026-11-24). <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes; the arrow keys move.</li>
         <li>Download PDF (the main button), or Excel or Word from its menu; the Preview tab shows the PDF, made again a moment
-          after every change. File saves the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7).</li>
+          after every change. File saves the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7). When the report
+          cannot be made, a message over the page says why in plain words and what to do, with the engine's own message under
+          Technical details.</li>
       </ol>
       <p>Parts it cannot edit yet (charts, tables, crosstabs, subreports, barcodes) are shown as boxes and saved as they were.
         Images are kept inside the template as <code>data:</code> URIs, which ferroreport reads and JasperReports does not: give

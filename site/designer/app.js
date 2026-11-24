@@ -315,6 +315,8 @@ function renderCanvas() {
   pageEl.append(h("div", { class: "margin-guide", style: { left: `${page.margins.left}px`, top: `${page.margins.top}px`, width: `${page.columnWidth}px`, height: `${pageH - page.margins.top - page.margins.bottom}px` } }));
   sheet.append(pageEl);
 
+  // Each band is drawn over the page at its scale, after its name: so the keyboard goes from
+  // a band's name to the parts on it, from the top of the page down.
   let labelBottom = 0;
   for (const row of rows) {
     const { b } = row;
@@ -322,14 +324,18 @@ function renderCanvas() {
     const selected = S.sel && S.sel.type === "band" && S.sel.key === b.key;
     const bandEl = h("div", {
       class: `band${row.empty ? " empty-band" : ""}${S.snap && selected && !row.empty ? " grid" : ""}${selected ? " selected" : ""}${b.kind === "detail" ? " detail" : ""}`,
-      style: { left: `${page.margins.left}px`, top: `${row.y}px`, width: `${page.columnWidth}px`, height: `${row.shown}px`, backgroundSize: `${S.grid}px ${S.grid}px` },
+      style: {
+        left: `${GUTTER + page.margins.left * sc}px`, top: `${row.y * sc}px`, width: `${page.columnWidth}px`, height: `${row.shown}px`,
+        transform: `scale(${sc})`, backgroundSize: `${S.grid}px ${S.grid}px`,
+      },
       dataset: { bandKey: b.key, ...(b.node ? { cid: String(b.node._id) } : {}) },
     });
+    bandEl.style.setProperty("--sc", String(sc));
     if (!row.empty) {
       renderElements(b.node, bandEl);
       bandEl.append(h("div", { class: "band-resize", title: t("canvas.resizeBand", { band: nm.name }), dataset: { resizeBand: b.key } }));
+      if (bandEl.querySelector(".el.selected")) bandEl.classList.add("has-selection");
     }
-    pageEl.append(bandEl);
 
     const title = `${nm.where ? `${nm.name}: ${nm.where}. ` : `${nm.name}. `}${t("band.tech", { name: nm.tech })}`;
     if (row.empty) {
@@ -341,6 +347,7 @@ function renderCanvas() {
         "aria-label": `${nm.name}. ${nm.where ? `${nm.where}. ` : ""}${t("canvas.emptyBand")}`,
         "aria-pressed": selected ? "true" : "false",
       }, h("b", {}, nm.name), h("span", { class: "add-here" }, t("canvas.addHere"))));
+      sheet.append(bandEl);
       continue;
     }
     // Names of bands with something on them go left of the page; thin ones would overlap, so
@@ -357,6 +364,7 @@ function renderCanvas() {
       "aria-label": `${nm.name}. ${nm.where ? `${nm.where}. ` : ""}${t("canvas.bandHeight", { h: row.h })}`,
       "aria-pressed": selected ? "true" : "false",
     }, h("b", {}, nm.name), nm.where && room >= 44 ? h("small", {}, nm.where) : null));
+    sheet.append(bandEl);
   }
 
   sheet.style.height = `${Math.max(pageH * sc, labelBottom)}px`;
@@ -529,7 +537,7 @@ function containerNode(div, create = true) {
 }
 
 function startPointer(e) {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || e.target.closest(".stage-problem")) return;
   const handle = e.target.closest(".handle");
   const elDiv = e.target.closest(".el");
   const bandResize = e.target.closest("[data-resize-band]");
@@ -1009,11 +1017,25 @@ function setData(text, record = true) {
   }
 }
 
+/** Where a JSON.parse error is, as a line number of `text`. */
+function jsonLine(message, text) {
+  const line = /line (\d+)/.exec(message);
+  if (line) return Number(line[1]);
+  const pos = /position (\d+)/.exec(message);
+  return pos ? text.slice(0, Number(pos[1])).split("\n").length : null;
+}
+function jsonProblem(msg, message, text, key) {
+  const line = jsonLine(message, text);
+  msg.textContent = "";
+  msg.append(h("span", {}, line ? t(`${key}.badLine`, { line }) : t(`${key}.bad`)), " ", h("span", { class: "msg-hint" }, t("data.badHint")),
+    h("details", { class: "problem-details" }, h("summary", {}, t("err.details")), h("pre", {}, message)));
+  msg.className = "msg bad";
+}
+
 function renderDataMsg() {
   const msg = $("data-msg");
   if (dataError) {
-    msg.textContent = t("data.invalid", { error: dataError });
-    msg.className = "msg bad";
+    jsonProblem(msg, dataError, S.dataText, "data");
   } else {
     msg.textContent = t("data.count", { rows: S.rows.length, fields: S.dataFields.length });
     msg.className = "msg";
@@ -1031,8 +1053,7 @@ function setParams(text, record = true) {
     msg.textContent = "";
     msg.className = "msg";
   } catch (err) {
-    msg.textContent = t("data.invalid", { error: err.message });
-    msg.className = "msg bad";
+    jsonProblem(msg, err.message, text, "params");
     return;
   }
   if (record) {
@@ -1129,10 +1150,13 @@ function findContents(n) {
 /** Declares the fields a text names, so the template compiles. */
 function declareFieldsOf(el, expr) {
   const { holder, isRoot, fields } = fieldsFor(el);
-  for (const s of parseText(expressionToText(expr) ?? "")) {
-    if (!s.ref || s.ref.kind !== "F") continue;
-    const f = fields.find((x) => x.name === s.ref.name);
-    ensureField(holder, s.ref.name, f ? f.class : "java.lang.Object", isRoot);
+  const text = expressionToText(expr);
+  // In a text, every field it names; in a formula, those the data has.
+  const names = text !== null ? parseText(text).filter((s) => s.ref && s.ref.kind === "F").map((s) => s.ref.name)
+    : [...expr.matchAll(/\$F\{([^{}\n]+)\}/g)].map((m) => m[1]).filter((n) => fields.some((f) => f.name === n));
+  for (const name of names) {
+    const f = fields.find((x) => x.name === name);
+    ensureField(holder, name, f ? f.class : "java.lang.Object", isRoot);
   }
 }
 
@@ -1425,14 +1449,19 @@ function elementProps(form, el) {
   const shownText = kind === "staticText" ? staticToText((child(el, "text") || {}).text || "") : kind === "textField" ? expressionToText(expr) : null;
   const isFormula = kind === "textField" && shownText === null;
   const isToday = kind === "textField" && expr.trim() === TODAY;
-  setTitle(partName(el), t(`kind.${kind}.about`, {}, ""));
+  if (isFormula && !isToday) setTitle(t("kind.formula"), t("kind.formula.about"));
+  else setTitle(partName(el), t(`kind.${kind}.about`, {}, ""));
 
   if (isText) {
     const textSec = section("text", t("props.text"), {});
     if (isToday) {
       textSec.append(h("p", { class: "help strong" }, t("props.today")));
     } else if (isFormula) {
-      textSec.append(h("p", { class: "formula-note" }, t("props.isFormula")));
+      textSec.append(h("p", { class: "formula-note" }, t("props.isFormula"), " ", h("button", { type: "button", class: "insert-btn", onclick: () => {
+        S.open.add("adv");
+        renderProps();
+        $("prop-expr")?.focus();
+      } }, t("props.showFormula"))));
     } else {
       const box = h("textarea", {
         id: "prop-text", rows: "2", spellcheck: "true", "aria-label": t("props.textBox"), "aria-autocomplete": "list", "aria-expanded": "false",
@@ -1561,6 +1590,12 @@ function elementProps(form, el) {
     if (!value.trim()) { if (n) el.children.splice(el.children.indexOf(n), 1); return; }
     if (!n) { n = make("printWhenExpression", {}, [], ""); el.children.unshift(n); }
     n.text = value;
+    // A condition on a field of the data needs the field declared, with its class.
+    const { holder, isRoot, fields } = fieldsFor(el);
+    for (const [, name] of value.matchAll(/\$F\{([^{}]+)\}/g)) {
+      const f = fields.find((x) => x.name === name);
+      if (f) ensureField(holder, name, f.class, isRoot);
+    }
   };
   adv.append(field(t("props.showWhen"), h("select", { onchange: (e) => {
     const v = e.target.value;
@@ -1575,7 +1610,7 @@ function elementProps(form, el) {
   if (kind === "textField") {
     adv.append(h("div", { class: `prop formula${isFormula ? " is-formula" : ""}` },
       h("label", { for: "prop-expr" }, t("props.formula")),
-      h("textarea", { id: "prop-expr", rows: isFormula ? "4" : "2", spellcheck: "false", class: "code-input", oninput: (e) => ed(() => { setMainText(el, e.target.value); }, "expr"), onchange: () => renderProps() }, expr),
+      h("textarea", { id: "prop-expr", rows: isFormula ? "4" : "2", spellcheck: "false", class: "code-input", oninput: (e) => ed(() => { setMainText(el, e.target.value); declareFieldsOf(el, e.target.value); }, "expr"), onchange: () => renderProps() }, expr),
       h("span", { class: "help" }, t(isFormula ? "props.formulaHelpFx" : "props.formulaHelp"))));
   }
   form.append(adv);
@@ -1615,6 +1650,65 @@ function bordersSection(el, ed) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Problems in plain words. The engine's own message stays under "Technical details".
+
+/** What an error of the engine (or of reading a file) means: `{ title, hint }`. */
+function explain(raw) {
+  const s = String(raw);
+  const short = (x) => (x.length > 70 ? `${x.slice(0, 67)}…` : x);
+  let m;
+  if ((m = /`([^`]+)` not found in the resource directories/.exec(s))) return { title: t("err.missingFile", { file: m[1] }), hint: t("err.missingFileHint") };
+  if ((m = /field `([^`]+)` is not declared/.exec(s))) return { title: t("err.field", { name: m[1] }), hint: t("err.fieldHint") };
+  if ((m = /parameter `([^`]+)` is not declared/.exec(s))) return { title: t("err.param", { name: m[1] }), hint: t("err.fieldHint") };
+  if ((m = /(?:variable `([^`]+)` is not declared|unknown variable `([^`]+)`)/.exec(s))) return { title: t("err.variable", { name: m[1] || m[2] }), hint: t("err.fieldHint") };
+  if ((m = /cannot parse expression `([\s\S]*?)`:/.exec(s))) return { title: t("err.parse", { formula: short(m[1].trim()) }), hint: t("err.parseHint") };
+  if (/used as a boolean condition/.test(s)) return { title: t("err.condition"), hint: t(S.rows.length ? "err.conditionHint" : "err.needsData") };
+  if (/\.format\(null\)/.test(s)) return { title: t("err.formatNull"), hint: t(S.rows.length ? "err.formatNullHint" : "err.needsData") };
+  if (/format\(\) cannot format/.test(s)) return { title: t("err.formatType"), hint: t("err.formatTypeHint") };
+  if (/operator .* not applicable/.test(s)) return { title: t("err.operator"), hint: t("err.parseHint") };
+  if ((m = /unsupported date pattern `([^`]+)`/.exec(s))) return { title: t("err.datePattern", { pattern: m[1] }), hint: t("err.datePatternHint") };
+  if (/unsupported|unknown function/.test(s)) return { title: t("err.unsupported"), hint: t("err.unsupportedHint") };
+  if (/^invalid XML/.test(s)) return { title: t("err.xml"), hint: t("err.fileHint") };
+  if (/root element is|^invalid report template|style template/.test(s)) return { title: t("err.template"), hint: t("err.fileHint") };
+  if (/^invalid data/.test(s)) return { title: t("err.data"), hint: t("err.dataHint") };
+  if (/^limit exceeded/.test(s)) return { title: t("err.limit"), hint: t("err.limitHint") };
+  if (/^font error/.test(s)) return { title: t("err.font"), hint: t("err.otherHint") };
+  if (/WebAssembly|engine/i.test(s) && !engine) return { title: t("preview.noEngine"), hint: t("err.engineHint") };
+  return { title: t("err.other"), hint: t("err.otherHint") };
+}
+
+/** A problem as a box: what happened, what to do, and the engine's words folded away. */
+function problemBox(raw) {
+  const e = explain(raw);
+  return [h("p", { class: "problem-title" }, e.title), e.hint ? h("p", { class: "problem-hint" }, e.hint) : null,
+    h("details", { class: "problem-details" }, h("summary", {}, t("err.details")), h("pre", {}, String(raw)))];
+}
+
+// The problem shown at the top of the page: from the preview, or from opening or saving a file.
+let problem = null; // { raw, from: "preview" | "action", dismissed }
+function setProblem(raw, from) {
+  problem = raw ? { raw: String(raw), from, dismissed: false } : null;
+  renderProblem();
+}
+function clearProblem(from) {
+  if (problem && problem.from === from) setProblem(null);
+}
+function renderProblem() {
+  const box = $("stage-problem");
+  box.textContent = "";
+  box.hidden = !problem || problem.dismissed;
+  if (problem && !problem.dismissed) {
+    box.append(h("div", { class: "problem" }, ...problemBox(problem.raw)),
+      h("button", { type: "button", class: "icon-btn", "aria-label": t("err.dismiss"), title: t("err.dismiss"), onclick: () => { problem.dismissed = true; renderProblem(); } }, "×"));
+  }
+  const err = $("preview-error");
+  const fromPreview = problem && problem.from === "preview";
+  err.hidden = !fromPreview;
+  err.textContent = "";
+  if (fromPreview) err.append(...problemBox(problem.raw));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Preview and export
 
 let previewTimer = null;
@@ -1633,7 +1727,6 @@ function renderTo(format) {
 let previewState = { ok: true, text: "" };
 function renderPreview() {
   if (!engine) return;
-  const errBox = $("preview-error");
   try {
     const t0 = performance.now();
     const pdf = renderTo("pdf");
@@ -1642,18 +1735,16 @@ function renderPreview() {
     const old = previewUrl;
     previewUrl = url;
     if (old && old !== previewShown) URL.revokeObjectURL(old);
-    errBox.hidden = true;
+    clearProblem("preview");
     previewState = { ok: true, ms, kb: pdf.length / 1024 };
     document.body.dataset.previewBytes = String(pdf.length);
     document.body.dataset.previewCount = String(Number(document.body.dataset.previewCount || 0) + 1);
     showPreview();
   } catch (e) {
     previewState = { ok: false };
-    errBox.hidden = false;
+    // A problem that is already on screen stays as it is (closed if it was closed).
     const text = String(e.message || e);
-    const missing = /`([^`]+)` not found in the resource directories/.exec(text);
-    errBox.textContent = missing ? t("preview.missingFile", { file: missing[1] })
-      : /null used as a boolean|on null/.test(text) && !S.rows.length ? `${text}\n\n${t("preview.needsData")}` : text;
+    if (!problem || problem.raw !== text) setProblem(text, "preview");
   }
   renderPreviewMsg();
 }
@@ -1661,10 +1752,12 @@ function renderPreviewMsg() {
   const msg = $("preview-msg");
   if (!engine) return;
   if (previewState.ok) {
-    msg.textContent = t("preview.upToDate", { ms: previewState.ms < 10 ? previewState.ms.toFixed(1) : Math.round(previewState.ms), kb: previewState.kb.toFixed(0) });
+    msg.textContent = t("preview.upToDate");
+    msg.title = t("preview.made", { ms: previewState.ms < 10 ? previewState.ms.toFixed(1) : Math.round(previewState.ms), kb: previewState.kb.toFixed(0) });
     msg.className = "msg good";
   } else {
     msg.textContent = t("preview.problem");
+    msg.title = "";
     msg.className = "msg bad";
   }
   $("tab-alert").hidden = previewState.ok;
@@ -1712,7 +1805,8 @@ function saveTemplate(to) {
     download(text, `${baseName()}.${to}`, to === "jrxml" ? "application/xml" : "text/plain");
     announce(t("msg.saved", { file: `${baseName()}.${to}` }));
   } catch (e) {
-    announce(t("msg.cannotSave", { error: e.message || e }), "bad");
+    announce(t("msg.cannotSave", { error: explain(e.message || e).title }), "bad");
+    setProblem(e.message || e, "action");
   }
 }
 
@@ -1723,7 +1817,8 @@ function exportReport(format) {
     download(renderTo(format), `${baseName()}.${format}`, types[format]);
     announce(t("msg.downloaded", { file: `${baseName()}.${format}` }));
   } catch (e) {
-    announce(t("msg.cannotMake", { format: format.toUpperCase(), error: e.message || e }), "bad");
+    announce(t("msg.cannotMake", { format: format.toUpperCase(), error: explain(e.message || e).title }), "bad");
+    setProblem(e.message || e, "action");
   }
 }
 
@@ -1761,12 +1856,14 @@ async function startWith(kind) {
       setParams("{}", false);
       setData(JSON.stringify(JSON.parse(data), null, 2), false);
     }
+    clearProblem("action");
     setView("design");
     fitZoom();
     refresh();
     announce(kind === "blank" ? t("msg.blank") : t(kind === "invoice" ? "msg.openedInvoice" : "msg.openedEmployees"));
   } catch (e) {
-    announce(t("msg.cannotOpen", { error: e.message || e }), "bad");
+    announce(t("msg.cannotOpen", { error: explain(e.message || e).title }), "bad");
+    setProblem(e.message || e, "action");
   }
 }
 
@@ -1798,13 +1895,15 @@ async function openFiles(fileList) {
         madeUp = true;
       }
     }
+    clearProblem("action");
     setView("design");
     fitZoom();
     refresh();
     announce(main ? t(data ? "msg.openedWithData" : madeUp ? "msg.openedMadeUp" : "msg.opened", { file: main.name, data: data && data.name }) : t("msg.dataFrom", { file: data.name }));
   } catch (e) {
     const msg = String(e.message || e);
-    announce(/import/.test(msg) ? t("msg.needsImports", { file: main.name }) : t("msg.cannotOpenFile", { file: main ? main.name : "", error: msg }), "bad");
+    announce(/import/.test(msg) ? t("msg.needsImports", { file: main.name }) : t("msg.cannotOpenFile", { file: main ? main.name : "", error: explain(msg).title }), "bad");
+    setProblem(msg, "action");
   }
 }
 
@@ -1843,6 +1942,9 @@ function openGuide() {
 
 function changeLang(l) {
   setLang(l);
+  clearTimeout(toastTimer);
+  document.querySelector(".toast")?.classList.remove("show");
+  renderProblem();
   document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang())));
   renderDataMsg();
   renderPreviewMsg();
@@ -1962,8 +2064,7 @@ async function boot() {
   } catch (e) {
     $("preview-msg").textContent = t("preview.noEngine");
     $("preview-msg").className = "msg bad";
-    $("preview-error").hidden = false;
-    $("preview-error").textContent = t("preview.noEngineLong", { error: e.message || e });
+    setProblem(t("preview.noEngineLong", { error: e.message || e }), "preview");
     setView("preview");
     return;
   }
