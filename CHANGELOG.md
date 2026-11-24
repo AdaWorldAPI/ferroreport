@@ -27,6 +27,9 @@ the charts of JasperReports' own samples, instead of an approximation of its loo
   the range axis, candlestick bodies, wicks and volume bars. High-low charts draw open and
   close ticks only when `isShowOpenTicks` and `isShowCloseTicks` ask for them, as in
   JasperReports.
+- Gantt charts come out the same as JasperReports draws them: tasks down the left, the date
+  axis on top with JFreeChart's date ticks, bars placed as BarRenderer places them, and the
+  done and not-done parts of each task or subtask as a band through its middle.
 - Where a chart drawn as SVG is translucent (3D pie sections with a `foregroundAlpha` below 1,
   candlestick volume bars), the PDF gets the same opaque bitmaps JasperReports writes there,
   pixel for pixel, instead of translucent vector shapes.

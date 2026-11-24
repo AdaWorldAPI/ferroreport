@@ -815,6 +815,21 @@ pub fn render(
         category::draw(&mut cv, ch, data, texts, locale, area, &color_of);
         return clip_to(cv.items, x, y, w, h);
     }
+    if ch.kind == ChartKind::Gantt && ch.dataset.kind == DataKind::Gantt {
+        let mut area = jfree::Rect::new(x as f64, y as f64, w as f64, h as f64);
+        let items = data
+            .gantt
+            .iter()
+            .enumerate()
+            .map(|(i, (label, _))| jfree::LegendItem {
+                label: label.clone(),
+                graphic: jfree::LegendGraphic::square(color_of(i), None),
+            })
+            .collect();
+        titles_and_legend(&mut cv, ch, texts, &mut area, items);
+        category::draw_gantt(&mut cv, ch, data, texts, locale, area, &color_of);
+        return clip_to(cv.items, x, y, w, h);
+    }
     if matches!(
         ch.kind,
         ChartKind::XyLine
@@ -966,7 +981,7 @@ pub fn render(
         _ if ch.kind.is_pie() => pie(&mut cv, ch, data, locale, px, py, pw, ph, &color_of),
         ChartKind::Meter => meter(&mut cv, ch, data, texts, locale, px, py, pw, ph),
         ChartKind::Thermometer => thermometer(&mut cv, ch, data, texts, locale, px, py, pw, ph),
-        ChartKind::Gantt => gantt(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of),
+        ChartKind::Gantt => {}
         ChartKind::MultiAxis => multi_axis(&mut cv, ch, all, texts, locale, px, py, pw, ph),
         ChartKind::XyLine | ChartKind::XyArea | ChartKind::Scatter if ch.dataset.kind == DataKind::Xy => {
             xy_or_category(&mut cv, ch, data, texts, locale, px, py, pw, ph, &color_of)
@@ -2062,95 +2077,6 @@ fn xy_plot(
 
 // ---------------------------------------------------------------------------------------------
 // Gantt charts: tasks down the left, dates across the top.
-
-#[allow(clippy::too_many_arguments)]
-fn gantt(
-    cv: &mut Canvas,
-    ch: &ChartElement,
-    data: &DataState,
-    texts: &ChartTexts,
-    locale: &Locale,
-    px: f32,
-    py: f32,
-    pw: f32,
-    ph: f32,
-    color_of: &dyn Fn(usize) -> Color,
-) {
-    let font = ch.font.clone();
-    let lh = cv.line_height(&font);
-    let mut tasks: Vec<String> = Vec::new();
-    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
-    for (_, list) in &data.gantt {
-        for t in list {
-            if !tasks.contains(&t.task) {
-                tasks.push(t.task.clone());
-            }
-            lo = lo.min(t.start);
-            hi = hi.max(t.end);
-        }
-    }
-    let (lo, hi) = date_range(lo, hi);
-    let label_h = |present: bool| if present { lh + 6.0 } else { 0.0 };
-    let cat_label = texts.category_label.clone().filter(|s| !s.is_empty());
-    let value_label = texts.value_label.clone().filter(|s| !s.is_empty());
-    let widest = tasks.iter().map(|t| cv.width(&font, t)).fold(0.0f32, f32::max);
-    let left_w = label_h(cat_label.is_some()) + 4.0 + widest + 4.0;
-    let top_h = label_h(value_label.is_some()) + (lh + 4.0) + 2.0;
-    let (dx, dy, dw, dh) = (px + left_w, py + top_h, (pw - left_w).max(1.0), (ph - top_h).max(1.0));
-    let scale = date_scale(cv, lo, hi, dw, false, ch.time_format.as_deref(), locale, &font);
-    if let Some(bg) = ch.plot_backcolor {
-        cv.rect(dx, dy, dw, dh, Some(bg), None);
-    }
-    let xpos = |v: f64| scale.at(v, dx, dw, false);
-    for (t, label) in &scale.ticks {
-        let p = xpos(*t);
-        cv.line(p, dy, p, dy + dh, GRID, 0.5, Some([2.0, 2.0]));
-        cv.line(p, dy - 2.0, p, dy, Color::BLACK, 0.5, None);
-        cv.text(&font, Color::BLACK, label, p, dy - 2.0 - 4.0 - lh + 2.0, Anchor::Center);
-    }
-    cv.line(dx, dy, dx + dw, dy, Color::BLACK, 0.5, None);
-    cv.line(dx, dy, dx, dy + dh, Color::BLACK, 0.5, None);
-    if let Some(l) = &value_label {
-        cv.text(&font, Color::BLACK, l, dx + dw / 2.0, py + 3.0, Anchor::Center);
-    }
-    if let Some(l) = &cat_label {
-        rotated_label(cv, &font, l, px + 3.0, dy + dh / 2.0);
-    }
-    // Category bands as in bar charts: 5% margins, 20% between tasks, 20% between series.
-    let (ncat, nser) = (tasks.len(), data.gantt.len());
-    let cat_margin = if ncat > 1 { 0.2 } else { 0.0 };
-    let cat_w = dh * (1.0 - 0.1 - cat_margin) / ncat.max(1) as f32;
-    let cat_gap = if ncat > 1 { dh * cat_margin / (ncat - 1) as f32 } else { 0.0 };
-    let cat_start = |c: usize| dy + 0.05 * dh + c as f32 * (cat_w + cat_gap);
-    let item_margin = if nser > 1 { 0.2 } else { 0.0 };
-    let bar_h = dh * (1.0 - 0.1 - cat_margin - item_margin) / (ncat * nser).max(1) as f32;
-    let item_gap = if nser > 1 { dh * item_margin / (ncat * (nser - 1)).max(1) as f32 } else { 0.0 };
-    for (c, name) in tasks.iter().enumerate() {
-        cv.text(&font, Color::BLACK, name, dx - 4.0, cat_start(c) + cat_w / 2.0 - lh / 2.0, Anchor::Right);
-    }
-    let green = Color { r: 0, g: 0xFF, b: 0 };
-    let red = Color { r: 0xFF, g: 0, b: 0 };
-    for (s, (_, list)) in data.gantt.iter().enumerate() {
-        for t in list {
-            let Some(c) = tasks.iter().position(|n| *n == t.task) else { continue };
-            let y = cat_start(c) + s as f32 * (bar_h + item_gap);
-            let parts: Vec<(f64, f64, Option<f64>)> =
-                if t.subtasks.is_empty() { vec![(t.start, t.end, t.percent)] } else { t.subtasks.clone() };
-            for (a, b, percent) in parts {
-                let (x0, x1) = (xpos(a), xpos(b));
-                cv.rect(x0, y, (x1 - x0).max(0.5), bar_h, Some(color_of(s)), None);
-                // How far the task is done: a band through the middle, green then red.
-                if let Some(p) = percent {
-                    let p = p.clamp(0.0, 1.0) as f32;
-                    let (by, bh) = (y + bar_h * 0.35, bar_h * 0.3);
-                    let mid = x0 + (x1 - x0) * p;
-                    cv.rect(x0, by, mid - x0, bh, Some(green), None);
-                    cv.rect(mid, by, x1 - mid, bh, Some(red), None);
-                }
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------------------------
 // Meters and thermometers.

@@ -1,7 +1,7 @@
 //! Category plots (`CategoryPlot`): bar, stacked bar, line, area and stacked area charts as
 //! JFreeChart 1.5 draws them for JasperReports 7.
 
-use super::jfree::{CategoryAxis, LegendGraphic, NumberAxis, Rect, Side};
+use super::jfree::{CategoryAxis, DateAxis, LegendGraphic, NumberAxis, Rect, Side, ValueAxis};
 use super::{series_shape, Canvas, ChartElement, ChartKind, ChartTexts, DataState};
 use crate::format::Locale;
 use crate::model::Color;
@@ -169,23 +169,10 @@ fn items(
     let (lower_clip, upper_clip) = (vaxis.lower, vaxis.upper);
     match ch.kind {
         ChartKind::Bar | ChartKind::Bar3D => {
-            // BarRenderer: bars of equal width, 20% of the room between the series.
-            let space = if horizontal { data_area.h } else { data_area.w };
-            let cat_margin = if ncat > 1 { caxis.category_margin } else { 0.0 };
-            let item_margin = if nser > 1 { 0.2 } else { 0.0 };
-            let used = space * (1.0 - caxis.lower_margin - caxis.upper_margin - cat_margin - item_margin);
-            let bar_w = if nser * ncat > 0 { (used / (nser * ncat) as f64).min(space) } else { 0.0 };
             for c in 0..ncat {
                 for s in 0..nser {
                     let Some(v) = value(s, c) else { continue };
-                    let w0 = if nser > 1 {
-                        let gap = space * 0.2 / (ncat * (nser - 1)) as f64;
-                        let series_w =
-                            space * (1.0 - caxis.lower_margin - caxis.upper_margin - cat_margin - 0.2) / (ncat * nser) as f64;
-                        caxis.start(c, ncat, data_area, dom_side) + s as f64 * (series_w + gap) + series_w / 2.0 - bar_w / 2.0
-                    } else {
-                        caxis.middle(c, ncat, data_area, dom_side) - bar_w / 2.0
-                    };
+                    let (w0, bar_w) = bar_place(caxis, c, s, ncat, nser, data_area, dom_side);
                     let (low, high) = (v.min(0.0), v.max(0.0));
                     if high < lower_clip || low > upper_clip {
                         continue;
@@ -355,4 +342,99 @@ fn items(
         }
         _ => {}
     }
+}
+
+/// BarRenderer's bars: of equal width, 20% of the room between the series of a category.
+/// Where the bar of series `s` in category `c` starts across the category axis, and its width.
+fn bar_place(caxis: &CategoryAxis, c: usize, s: usize, ncat: usize, nser: usize, area: Rect, side: Side) -> (f64, f64) {
+    let space = if matches!(side, Side::Left | Side::Right) { area.h } else { area.w };
+    let cat_margin = if ncat > 1 { caxis.category_margin } else { 0.0 };
+    let item_margin = if nser > 1 { 0.2 } else { 0.0 };
+    let used = space * (1.0 - caxis.lower_margin - caxis.upper_margin - cat_margin - item_margin);
+    let bar_w = if nser * ncat > 0 { (used / (nser * ncat) as f64).min(space) } else { 0.0 };
+    let w0 = if nser > 1 {
+        let gap = space * 0.2 / (ncat * (nser - 1)) as f64;
+        let series_w = space * (1.0 - caxis.lower_margin - caxis.upper_margin - cat_margin - 0.2) / (ncat * nser) as f64;
+        caxis.start(c, ncat, area, side) + s as f64 * (series_w + gap) + series_w / 2.0 - bar_w / 2.0
+    } else {
+        caxis.middle(c, ncat, area, side) - bar_w / 2.0
+    };
+    (w0, bar_w)
+}
+
+/// Draws a Gantt chart in `area`: ChartFactory.createGanttChart's plot (tasks down the left,
+/// a date axis on top) and GanttRenderer's bars, with how far each task or subtask is done
+/// as a band through its middle (green, then red).
+pub(crate) fn draw_gantt(
+    cv: &mut Canvas,
+    ch: &ChartElement,
+    data: &DataState,
+    texts: &ChartTexts,
+    locale: &Locale,
+    area: Rect,
+    color_of: &dyn Fn(usize) -> Color,
+) {
+    let font = ch.font.clone();
+    let (dom_side, rng_side) = (Side::Left, Side::Top);
+    let mut tasks: Vec<String> = Vec::new();
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for (_, list) in &data.gantt {
+        for t in list {
+            if !tasks.contains(&t.task) {
+                tasks.push(t.task.clone());
+            }
+            lo = lo.min(t.start);
+            hi = hi.max(t.end);
+        }
+    }
+    let (ncat, nser) = (tasks.len(), data.gantt.len());
+    let (lo, hi) = DateAxis::auto_range(lo, hi, 0.05);
+    let mut daxis = DateAxis::new(lo, hi, font.clone());
+    daxis.format = ch.time_format.clone();
+    daxis.label = texts.value_label.clone();
+    if let Some(c) = ch.axis_color {
+        (daxis.line_color, daxis.tick_label_color, daxis.label_color) = (c, c, c);
+    }
+    let mut vaxis = ValueAxis::Date(daxis);
+    let mut caxis = CategoryAxis::new(tasks.clone(), font.clone());
+    caxis.label = texts.category_label.clone();
+
+    let plot = area.trim(4.0, 8.0, 4.0, 8.0);
+    let dom_space = caxis.reserve(cv, plot, dom_side);
+    let rng_space = vaxis.reserve(cv, plot, rng_side, locale);
+    let data_area = plot.trim(rng_space, dom_space, 0.0, 0.0).integerise();
+    if data_area.w <= 0.0 || data_area.h <= 0.0 {
+        return;
+    }
+    if let Some(bg) = ch.plot_backcolor {
+        cv.fill_rect(data_area, bg);
+    }
+    let ticks = vaxis.draw(cv, data_area.y, plot, data_area, rng_side, locale);
+    caxis.draw(cv, data_area.x, plot, data_area, dom_side);
+    let green = Color { r: 0, g: 0xFF, b: 0 };
+    let red = Color { r: 0xFF, g: 0, b: 0 };
+    cv.clipped(data_area, |cv| {
+        for (v, _) in &ticks {
+            grid_line(cv, data_area, vaxis.java2d(*v, data_area, rng_side), false);
+        }
+        for (s, (_, list)) in data.gantt.iter().enumerate() {
+            for t in list {
+                let Some(c) = tasks.iter().position(|n| *n == t.task) else { continue };
+                let (w0, bar_w) = bar_place(&caxis, c, s, ncat, nser, data_area, dom_side);
+                let parts: Vec<(f64, f64, Option<f64>)> =
+                    if t.subtasks.is_empty() { vec![(t.start, t.end, t.percent)] } else { t.subtasks.clone() };
+                for (a, b, percent) in parts {
+                    let (x0, x1) = (vaxis.java2d(a, data_area, rng_side), vaxis.java2d(b, data_area, rng_side));
+                    let (x0, len) = (x0.min(x1), (x1 - x0).abs());
+                    cv.fill_rect(Rect::new(x0, w0, len, bar_w), color_of(s));
+                    if let Some(p) = percent {
+                        // 35% to 65% of the bar's breadth.
+                        let (y, h) = (w0 + 0.35 * bar_w, bar_w * (0.65 - 0.35));
+                        cv.fill_rect(Rect::new(x0, y, len * p, h), green);
+                        cv.fill_rect(Rect::new(x0 + len * p, y, len * (1.0 - p), h), red);
+                    }
+                }
+            }
+        }
+    });
 }
