@@ -4,6 +4,22 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 [semantic versioning](https://semver.org); what that covers is in the README under
 [Stability](README.md#stability).
 
+## Unreleased
+
+- Font sets, as the `<fontSet>` of a JasperReports font extension defines them:
+  `--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"` (or `Renderer::register_font_set`)
+  makes a text whose font name is `Serif Fallback` draw the characters DejaVu Serif lacks in
+  DejaVu Sans. The text is cut into runs as JasperReports cuts it: the longest run one family
+  has, in the first family that has all of it; a character no family has stays in the first
+  family. Measured, broken into lines and embedded in the PDF with the font of each run;
+  checked against JasperReports 6.20.6 with a font extension that defines the same sets
+  (fixture 56-font-fallback, identical PDF, XLSX and CSV).
+- `--font-fallback` (`Renderer::font_fallback`) does the same for every font, without a font
+  set: characters a text's font lacks are drawn in the first of the `--font` families (in the
+  order given), DejaVu Sans, DejaVu Serif and DejaVu Sans Mono that has them. Off by default,
+  as JasperReports does not do it; texts whose characters are all in their font are drawn as
+  before either way.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`

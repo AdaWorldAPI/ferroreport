@@ -490,9 +490,10 @@ códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 
 - **Más formatos:** PPTX, como lo escribe el exportador de JasperReports (ODS y ODT ya están).
 - **Texto de cualquier escritura, lo que falta:** el árabe y el hebreo ya van de derecha a
   izquierda y el devanagari, el tailandés y las demás escrituras complejas ya se componen con su
-  forma (ver Text en la tabla de compatibilidad del README en inglés); falta la separación
-  silábica, usar otra fuente para los caracteres que le faltan a la elegida y un diccionario
-  para cortar líneas en tailandés, lao, jemer y birmano. El motor de composición, rustybuzz, ya no
+  forma (ver Text en la tabla de compatibilidad del README en inglés), y los caracteres que le
+  faltan a la fuente elegida se pueden dibujar con otra (conjuntos de fuentes con `--font-set` y
+  `--font-fallback`); falta la separación silábica y un diccionario para cortar líneas en
+  tailandés, lao, jemer y birmano. El motor de composición, rustybuzz, ya no
   se mantiene: se pasará a su sucesor, harfrust.
 - **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
 - **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con

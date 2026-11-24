@@ -141,3 +141,25 @@ fn devanagari_and_thai_are_shaped_and_broken() {
     }
     assert_eq!(thai.iter().map(|l| l.text.as_str()).collect::<String>(), "สวัสดีครับเราไปโรงเรียนด้วยกันในวันจันทร์");
 }
+
+/// Characters a font lacks are drawn in another font only when asked (`font_fallback`), as a
+/// JasperReports font set does: the longest run one font has, in the first font that has it.
+#[test]
+fn missing_characters_fall_back_to_another_font() {
+    let template = report(&text(0, 400, "Left", "Serif ⤴ then ★ star, عربي"), "DejaVu Serif");
+    let pdf = |r: &mut Renderer| {
+        let report = r.parse(&template).unwrap();
+        let doc = r.fill(&report, &[], Default::default()).unwrap();
+        r.to_pdf(&doc).unwrap()
+    };
+    let has = |pdf: &[u8], name: &[u8]| pdf.windows(name.len()).any(|w| w == name);
+    let mut plain = Renderer::new();
+    assert_eq!(lines(&mut plain, &template).len(), 1);
+    assert!(!has(&pdf(&mut plain), b"DejaVuSans"));
+    let mut fallback = Renderer::new().font_fallback(true);
+    let runs: Vec<String> = lines(&mut fallback, &template).iter().flatten().map(|l| l.text.clone()).collect();
+    // DejaVu Serif has the arrow, DejaVu Sans the star and the Arabic letters (shaped).
+    assert_eq!(runs[0], "Serif ⤴ then ");
+    assert_eq!(runs[1..].concat(), "★ star, عربي");
+    assert!(has(&pdf(&mut fallback), b"DejaVuSans"));
+}

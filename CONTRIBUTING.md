@@ -27,7 +27,9 @@ bindings/python/         Python package (PyPI)
 bindings/java/           Java package (Maven Central)
 editors/vscode/          VS Code extension for `.ferro`
 site/                    website, documentation and the visual designer (site/designer/)
-fixtures/<name>/         report.jrxml, data.json, params.json (optional), expected.json
+fixtures/<name>/         report.jrxml, data.json, params.json (optional), expected.json; fonts.txt
+                         and fontsets.txt (--font, --font-set), jasper-extension/ (the same
+                         font sets for the reference run)
 tools/compare.py         pixel comparison against JasperReports
 tools/compare_sheets.py  cell comparison of the Excel and CSV exports
 tools/bench.py           speed and memory of one fixture, cold
