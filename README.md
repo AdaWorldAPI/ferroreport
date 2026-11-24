@@ -748,7 +748,8 @@ of its own. What comes next, in 1.x releases:
 - **Text of every script, the rest of it:** Arabic and Hebrew run right to left and Devanagari,
   Thai and the other complex scripts are shaped (see Text in the compatibility table); still to
   come are hyphenation, fallback to another font for characters the chosen one lacks, and a
-  dictionary for Thai, Lao, Khmer and Myanmar line breaks.
+  dictionary for Thai, Lao, Khmer and Myanmar line breaks. The shaper, rustybuzz, is no longer
+  maintained: it will move to its successor, harfrust.
 - **Charts pixel for pixel** like JFreeChart (today they follow its look closely).
 - **Maps** and the remaining custom components; PAdES signatures with timestamps (B-T, B-LT)
   and a visible signature box.
