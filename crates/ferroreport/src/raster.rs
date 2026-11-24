@@ -147,7 +147,20 @@ impl Raster<'_> {
                 for line in &text.lines {
                     let mut ops = Vec::new();
                     let mut pen_x = line.x as f64;
-                    for c in line.text.chars() {
+                    if let Some(shaped) = &line.shaped {
+                        let k = size / 1000.0;
+                        for (cluster, glyphs) in shaped.clusters(&line.text) {
+                            for g in glyphs {
+                                let (gx, gy) = (pen_x + g.dx as f64 * k, line.baseline as f64 - g.dy as f64 * k);
+                                face.glyph_id_outline(g.id, size, gx, gy, &mut ops);
+                                pen_x += g.advance as f64 * k;
+                                if cluster == " " {
+                                    pen_x += line.word_spacing as f64;
+                                }
+                            }
+                        }
+                    }
+                    for c in line.text.chars().filter(|_| line.shaped.is_none()) {
                         face.glyph_outline(c, size, pen_x, line.baseline as f64, &mut ops);
                         pen_x += face.char_width(c, text.size) as f64;
                         if c == ' ' {

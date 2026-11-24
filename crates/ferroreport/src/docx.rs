@@ -385,20 +385,33 @@ fn empty_paragraph(out: &mut String) {
     out.push_str("<w:p><w:pPr><w:pStyle w:val=\"EMPTY_CELL_STYLE\"/></w:pPr></w:p>");
 }
 
-fn run_props(out: &mut String, font: &crate::model::FontSpec, color: Color, back: Option<Color>, script: crate::rich::Script) {
+/// Run properties. `complex`: the text has characters Word sets as complex script (Arabic,
+/// Hebrew, Indic, Thai), which take their bold, italic and size from the `Cs` properties.
+fn run_props(
+    out: &mut String,
+    font: &crate::model::FontSpec,
+    color: Color,
+    back: Option<Color>,
+    script: crate::rich::Script,
+    complex: bool,
+) {
     let name = escape(&font.name);
     let _ = write!(out, "<w:rPr><w:rFonts w:ascii=\"{name}\" w:hAnsi=\"{name}\" w:eastAsia=\"{name}\" w:cs=\"{name}\"/>");
     if font.bold {
-        out.push_str("<w:b/>");
+        out.push_str(if complex { "<w:b/><w:bCs/>" } else { "<w:b/>" });
     }
     if font.italic {
-        out.push_str("<w:i/>");
+        out.push_str(if complex { "<w:i/><w:iCs/>" } else { "<w:i/>" });
     }
     if font.strike {
         out.push_str("<w:strike/>");
     }
     let _ = write!(out, "<w:color w:val=\"{}\"/>", hex(color));
-    let _ = write!(out, "<w:sz w:val=\"{}\"/>", (font.size * 2.0).round().max(1.0) as i32);
+    let half_points = (font.size * 2.0).round().max(1.0) as i32;
+    let _ = write!(out, "<w:sz w:val=\"{half_points}\"/>");
+    if complex {
+        let _ = write!(out, "<w:szCs w:val=\"{half_points}\"/>");
+    }
     if let Some(b) = back {
         let _ = write!(out, "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>", hex(b));
     }
@@ -452,13 +465,19 @@ fn hyperlink_field(target: &crate::print::LinkTarget, tooltip: Option<&str>) -> 
 }
 
 fn text_paragraphs(out: &mut String, t: &CellInfo, bookmark: Option<&str>, field: Option<&str>) {
-    let jc = match t.halign {
-        HAlign::Center => Some("center"),
-        HAlign::Right => Some("right"),
-        HAlign::Justified => Some("both"),
+    // A right-to-left paragraph: Word reads left and right in it from its start, the right.
+    let rtl = crate::shape::is_rtl(&t.text);
+    let jc = match (t.halign, rtl) {
+        (HAlign::Center, _) => Some("center"),
+        (HAlign::Right, false) | (HAlign::Left, true) => Some("right"),
+        (HAlign::Right, true) => Some("left"),
+        (HAlign::Justified, _) => Some("both"),
         _ => None,
     };
     out.push_str("<w:p><w:pPr><w:pStyle w:val=\"Base\"/>");
+    if rtl {
+        out.push_str("<w:bidi/>");
+    }
     if let Some(jc) = jc {
         let _ = write!(out, "<w:jc w:val=\"{jc}\"/>");
     }
@@ -475,13 +494,15 @@ fn text_paragraphs(out: &mut String, t: &CellInfo, bookmark: Option<&str>, field
     }
     if t.runs.is_empty() {
         let mut props = String::new();
-        run_props(&mut props, &t.font, t.color, None, crate::rich::Script::Normal);
+        let complex = crate::shape::needs_shaping(&t.text);
+        run_props(&mut props, &t.font, t.color, None, crate::rich::Script::Normal, complex);
         text_run(out, &t.text, &props);
     } else {
         for run in &t.runs {
             let Some(piece) = t.text.get(run.start..run.end) else { continue };
             let mut props = String::new();
-            run_props(&mut props, &run.style.font, run.style.color, run.style.back, run.style.script);
+            let complex = crate::shape::needs_shaping(piece);
+            run_props(&mut props, &run.style.font, run.style.color, run.style.back, run.style.script, complex);
             text_run(out, piece, &props);
         }
     }
