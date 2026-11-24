@@ -16,6 +16,7 @@ The [release workflow](.github/workflows/release.yml) then publishes:
 | PyPI | `ferroreport` (wheels for Linux, macOS, Windows; Python 3.9+) | variable `PUBLISH_PYPI=true` |
 | crates.io | `ferroreport` (library) and `ferroreport-cli` | variable `PUBLISH_CRATES=true` |
 | Maven Central | the Java library, as `io.github.cristianencarnacion:ferroreport` | variable `PUBLISH_MAVEN=true` and four secrets (below) |
+| Visual Studio Marketplace | the VS Code extension, as `cristianencarnacion.ferroreport` | variable `PUBLISH_VSCODE=true` |
 | JitPack | the Java library, as `com.github.cristianEncarnacion:ferroreport:<tag>` | none: JitPack builds `bindings/java` from the tag the first time someone asks for it (`jitpack.yml`) |
 
 Repository variables live in *Settings → Secrets and variables → Actions → Variables*.
@@ -31,9 +32,10 @@ Current state:
 | Registry | Trusted publisher | Notes |
 |---|---|---|
 | crates.io | configured for `ferroreport` and `ferroreport-cli` (environment `crates-io`) | the `CARGO_REGISTRY_TOKEN` secret is only a fallback and can be deleted |
-| npm | to configure: package settings → Trusted publisher, workflow `release.yml`, environment `npm` | until then releases use `NPM_TOKEN`, which expires on 2026-11-28 |
-| PyPI | to configure: pending publisher for project `ferroreport`, environment `pypi` | needs two-factor authentication on the PyPI account first; then set the repository variable `PUBLISH_PYPI` to `true` |
-| Maven Central | no trusted publishing there: a user token and a signing key, as secrets of the environment `maven-central` | to configure (below); then set the repository variable `PUBLISH_MAVEN` to `true` |
+| npm | configured (environment `npm`, may publish) | npm validates it with the first release that uses it; then the `NPM_TOKEN` secret can be deleted |
+| PyPI | configured (environment `pypi`) | 1.0.0 was published through it |
+| Maven Central | no trusted publishing there: a user token and a signing key, as secrets of the environment `maven-central` | namespace `io.github.cristianencarnacion` verified; the secrets are still to add (below), then set the repository variable `PUBLISH_MAVEN` to `true` |
+| Visual Studio Marketplace | configured: publisher `cristianencarnacion`, policy for `release.yml` in the environment `vscode-marketplace` | the job runs `vsce publish --oidc`; the first publish activates the policy |
 
 How each one was set up, for reference:
 

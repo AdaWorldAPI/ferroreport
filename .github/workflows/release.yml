@@ -1,12 +1,13 @@
 # Publishes a release when a tag like v0.1.0 is pushed:
 #   - CLI binaries (Linux, macOS, Windows) and the VS Code extension on the GitHub release
+#   - VS Code extension on the Visual Studio Marketplace
 #   - Docker image on ghcr.io/cristianencarnacion/ferroreport
 #   - npm package `ferroreport` (WebAssembly)
 #   - PyPI package `ferroreport` (wheels for Linux, macOS, Windows)
 #   - crates.io crates `ferroreport` and `ferroreport-cli`
 #   - Maven Central library `io.github.cristianencarnacion:ferroreport`
 # GitHub release and Docker image need no setup. Each registry job runs once its repository
-# variable (PUBLISH_NPM, PUBLISH_PYPI, PUBLISH_CRATES, PUBLISH_MAVEN) is "true"; see RELEASING.md.
+# variable (PUBLISH_NPM, PUBLISH_PYPI, PUBLISH_CRATES, PUBLISH_MAVEN, PUBLISH_VSCODE) is "true"; see RELEASING.md.
 name: Release
 
 on:
@@ -124,6 +125,32 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  vscode-marketplace:
+    if: vars.PUBLISH_VSCODE == 'true'
+    needs: vscode
+    runs-on: ubuntu-latest
+    environment: vscode-marketplace
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: bin-vscode
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Trusted publishing: the Marketplace trusts release.yml in this environment, no token.
+      # A version the Marketplace already has is left alone.
+      - name: Publish
+        run: |
+          V=$(unzip -p ferroreport-vscode.vsix extension/package.json | jq -r .version)
+          if npx -y @vscode/vsce show cristianencarnacion.ferroreport --json 2>/dev/null | jq -e --arg v "$V" '.versions[]? | select(.version == $v)' >/dev/null; then
+            echo "ferroreport $V is already on the Marketplace"
+          else
+            npx -y @vscode/vsce publish --oidc --packagePath ferroreport-vscode.vsix
+          fi
 
   npm:
     if: vars.PUBLISH_NPM == 'true'
