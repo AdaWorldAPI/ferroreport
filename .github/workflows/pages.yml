@@ -1,10 +1,10 @@
-# Publishes the website and the in-browser playground to GitHub Pages.
+# Publishes the website, the in-browser playground and the designer to GitHub Pages.
 name: Pages
 
 on:
   push:
     branches: [main]
-    paths: ["site/**", "bindings/wasm/**", "crates/ferroreport/**", "fixtures/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "bindings/wasm/**", "crates/ferroreport/**", "fixtures/**", "examples/**", "tools/assemble-site.sh", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -33,17 +33,7 @@ jobs:
           tool: ${{ env.WASM_BINDGEN }}
       - run: bindings/wasm/build.sh
       - name: Assemble the site
-        run: |
-          mkdir -p _site
-          cp -r site/. _site/
-          mkdir -p _site/pkg _site/examples
-          cp bindings/wasm/pkg/web/* _site/pkg/
-          for f in 02-invoice 18-barcodes 21-markup 26-barcodes-1d; do
-            mkdir -p _site/examples/$f
-            cp fixtures/$f/report.jrxml fixtures/$f/data.json _site/examples/$f/
-            [ -f fixtures/$f/params.json ] && cp fixtures/$f/params.json _site/examples/$f/ || true
-          done
-          touch _site/.nojekyll
+        run: tools/assemble-site.sh _site
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site

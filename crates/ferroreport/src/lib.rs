@@ -22,6 +22,7 @@ pub mod crosstab;
 pub mod crypt;
 pub mod csv;
 pub mod data;
+pub mod design;
 pub mod docx;
 pub mod error;
 pub mod expr;

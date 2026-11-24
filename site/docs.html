@@ -19,6 +19,7 @@
     <a class="brand" href="./">ferro<span>report</span></a>
     <nav>
       <a class="wide" href="./#playground">Playground</a>
+      <a href="designer/">Designer</a>
       <a href="docs.html" aria-current="page">Docs</a>
       <a href="https://github.com/cristianEncarnacion/ferroreport">GitHub</a>
     </nav>
@@ -31,6 +32,7 @@
       <a href="#install">Install</a>
       <a href="#inputs">Template, data, parameters</a>
       <a href="#ferro">Templates in .ferro</a>
+      <a href="#designer">The designer</a>
       <b>Ways to call it</b>
       <a href="#cli">Command line</a>
       <a href="#http">HTTP API (any language)</a>
@@ -278,6 +280,33 @@ ferroreport convert old.jrxml --to jrxml -o new.jrxml   # JRXML 6 -&gt; JRXML 7<
         Python, <code>ferroreport::template::from_jrxml</code>, <code>to_jrxml</code> and <code>ferroreport::convert::jrxml_to_v7</code>
         in Rust. Every fixture renders to the same pixels from its JRXML, its JRXML 7 and its <code>.ferro</code>.</p>
 
+      <h2 id="designer">The designer</h2>
+      <p>The <a href="designer/">designer</a> makes and changes templates in the browser, without writing them: a page with the
+        report's bands (title, page header, column header, detail, footers, summary) at real size, the fields of your data on the
+        left, and the PDF beside the page, made again a moment after every change. It runs on your computer (the engine is
+        WebAssembly), so neither the template nor the data leave it, and it keeps your work in the browser until you start a new
+        report.</p>
+      <ol>
+        <li>Start from a blank report or an example, or open a <code>.ferro</code> or <code>.jrxml</code> file. A <code>.ferro</code>
+          that imports others opens when you select them together; a JSON file selected with it becomes the data.</li>
+        <li>Paste a sample of your data as JSON, or upload it. The designer lists its fields with their types (text, number,
+          date, yes/no, list).</li>
+        <li>Drag a field onto a band, or select a band and press the field. A field dropped on the detail band gets a heading in
+          the column header; numbers are aligned right with a format; a list (an array in each row) becomes a part that repeats
+          for each item, with its fields inside.</li>
+        <li>Add text, lines, rectangles, ellipses, images, the page number and today's date. Select a part to move it, resize it
+          by its handles or with <kbd>Shift</kbd> and the arrow keys, and change its text, font, colors, alignment, borders and
+          format in the properties panel. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
+        <li>Save the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7), or download the report as PDF,
+          Excel or Word.</li>
+      </ol>
+      <p>Parts it cannot edit yet (charts, tables, crosstabs, subreports, barcodes) are shown as boxes and saved as they were.
+        Images are kept inside the template as <code>data:</code> URIs, which ferroreport reads and JasperReports does not: give
+        JasperReports the image as a file instead. A <code>.ferro</code> it saves has every position written out, as
+        <code>convert</code> writes it, and <code>import</code>s and <code>def</code>s are expanded.</p>
+      <p>Editors can do the same from JavaScript: <code>toTree(template)</code> gives any template as a tree of its JRXML 7 form,
+        and <code>fromTree(tree, "ferro" | "jrxml")</code> writes it back (see <a href="#js">JavaScript</a>).</p>
+
       <h2 id="cli">Command line</h2>
 <pre>ferroreport render &lt;template.jrxml|template.ferro&gt; [options]
 ferroreport doctor &lt;template&gt;
@@ -514,6 +543,8 @@ writeFileSync("invoice.xlsx", render(template, rows, params, { format: "xlsx" })
         <tr><td><code>render(template, data?, params?, options?)</code></td><td><code>Uint8Array</code> with the PDF (or the Excel workbook or CSV text with <code>options.format</code>). Throws an <code>Error</code> with the reason if the template cannot be rendered</td></tr>
         <tr><td><code>inspect(template)</code></td><td><code>{ name, parameters, fields, warnings }</code>. <code>warnings</code> lists what the engine does not support in that template</td></tr>
         <tr><td><code>convert(template, to)</code></td><td>The template rewritten: <code>to</code> is <code>"ferro"</code> or <code>"jrxml"</code> (JRXML 7). See <a href="#ferro">Templates in .ferro</a></td></tr>
+        <tr><td><code>toTree(template, options?)</code></td><td>Any template (JRXML 6 or 7, or <code>.ferro</code>) as a tree an editor can change: its JRXML 7 form, one <code>{ tag, attrs, children, text? }</code> per element, with <code>attrs</code> as <code>[name, value]</code> pairs. <code>options.resources</code> holds the files a <code>.ferro</code> imports. The <a href="#designer">designer</a> is built on it</td></tr>
+        <tr><td><code>fromTree(tree, to?)</code></td><td>The tree written back as a template: <code>to</code> is <code>"jrxml"</code> (default) or <code>"ferro"</code></td></tr>
         <tr><td><code>version()</code></td><td>The engine version</td></tr>
       </table>
       <p><code>options</code> holds <code>locale</code>, <code>now</code>, <code>resources</code> (as above) and <code>format</code>:

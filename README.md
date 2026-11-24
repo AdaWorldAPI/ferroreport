@@ -16,6 +16,7 @@ JRXML and accessible by default. Against JasperReports itself it is about **250�
 <p align="center"><a href="https://cristianencarnacion.github.io/ferroreport/"><img src="docs/race.gif" alt="Race: JasperReports renders 1 invoice in 3.01 s; ferroreport renders 301 in the same time" width="760"></a></p>
 
 **[Try it in your browser](https://cristianencarnacion.github.io/ferroreport/)** ·
+[Design a report](https://cristianencarnacion.github.io/ferroreport/designer/) ·
 [Download](https://github.com/cristianEncarnacion/ferroreport/releases) ·
 [Docker](https://github.com/cristianEncarnacion/ferroreport/pkgs/container/ferroreport) ·
 [Leer en español](README.es.md)
@@ -329,6 +330,10 @@ ODS and ODT exporters lay a report out:
 ferroreport reads JRXML as JasperReports 6 and 7 write it, and a format of its own, `.ferro`:
 the same reports, written as an indented outline instead of XML. It is about half the size of
 the JRXML, a person can write it without a designer, and its reports are accessible by default.
+
+To make a template without writing it, use the **[designer](https://cristianencarnacion.github.io/ferroreport/designer/)**: it runs in the
+browser (nothing is uploaded), lists the fields of a sample of your data, lets you drag them onto
+the bands and style them, shows the PDF as you go, and saves `.ferro` and `.jrxml`.
 
 ```text
 report "Employees" lang=en
@@ -687,14 +692,14 @@ depends on what you make.
 | JasperReports templates you already have, without a JVM | **ferroreport** | The same pages, pixel for pixel on every fixture; 3 to 6× faster than a warm JVM, about 250× from a cold start, a tenth of the memory or less |
 | Data reports: groups, running totals, "page X of Y", crosstabs, charts, a million rows | **ferroreport** or JasperReports | Bands, groups, variables and late values are what the format is made of; rows stream in and pages stream out (a million rows in 13 MB). In Typst you would program that yourself, and the document is laid out in memory |
 | One template to PDF, Excel, Word, OpenDocument, CSV and HTML | **ferroreport**, JasperReports, Carbone | Typst writes PDF, PNG and SVG (HTML is experimental), not spreadsheets or Word |
-| Templates that business users design in Word or LibreOffice | **Carbone** | Templates come from Jaspersoft Studio or are written as text; there is no designer of its own yet |
-| A visual designer, viewers, a report server, dashboards | **Telerik, DevExpress, Stimulsoft**, Jaspersoft Studio and Server | None of these yet |
+| Templates that business users design in Word or LibreOffice | **Carbone** | Templates come from Jaspersoft Studio, are written as text, or are made in its [designer](https://cristianencarnacion.github.io/ferroreport/designer/), a first version that runs in the browser |
+| A visual designer, viewers, a report server, dashboards | **Telerik, DevExpress, Stimulsoft**, Jaspersoft Studio and Server | A first, simple [designer](https://cristianencarnacion.github.io/ferroreport/designer/) (fields, text, shapes, images, styles; not yet charts, tables or groups); none of the rest yet |
 | Pages you already have in HTML and CSS | **Chromium** (Gotenberg, Puppeteer), WeasyPrint | A browser per render is heavy, and it knows nothing of page totals or bands |
 | PDFs for archives and regulators, in open source | **ferroreport**, Typst | PDF/UA-1 and PDF/A-2/3 checked with veraPDF on every push, attachments (PDF/A-3 e-invoices), AES-256 encryption; Typst writes PDF/A and PDF/UA-1 too. JasperReports 7 moved its latest PDF tagging out of the free edition |
 | Templates uploaded by your own customers | **ferroreport**, Typst | Expressions come from a fixed list and nothing is deserialized; JasperReports compiles templates to Java |
 
 What would make ferroreport the first choice in more of these rows is on the roadmap below: a
-designer of its own, more of JasperReports' components, and time in production.
+designer that does more, more of JasperReports' components, and time in production.
 
 ## Stability
 
@@ -721,9 +726,12 @@ since then ODS and ODT), with
 the function library, Groovy expressions, every chart type, the barcodes, and a template format
 of its own. What comes next, in 1.x releases:
 
-- **A visual designer** in the browser, for `.ferro` and JRXML (Jaspersoft Studio works with
-  ferroreport's templates meanwhile; for `.ferro`, the VS Code extension highlights it and
-  `render --watch` renders it again on every save).
+- **A visual designer** in the browser, for `.ferro` and JRXML: the [first version](https://cristianencarnacion.github.io/ferroreport/designer/)
+  is available now. You drag the fields of your data onto the bands, add text, lines, shapes and
+  images, style them, see the PDF as you go, and save `.ferro` or `.jrxml`. Next: groups, charts,
+  tables, barcodes and subreports, several parts selected at once, and alignment guides.
+  Meanwhile Jaspersoft Studio works with ferroreport's templates, and for `.ferro` the VS Code
+  extension highlights it and `render --watch` renders it again on every save.
 - **More output:** PPTX, as JasperReports' exporter writes it (ODS and ODT are done).
 - **Text of every script:** right-to-left (Arabic, Hebrew), complex scripts (Devanagari, Thai)
   with their shaping, and hyphenation. Today text is set left to right without shaping.

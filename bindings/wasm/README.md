@@ -61,6 +61,12 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
     formula. `options.xlsxNumbers`: in Excel and ODS, write numbers as numbers.
 - `inspect(template) => { name, parameters, fields, warnings }`: `warnings` lists what the
   engine does not support in that template yet.
+- `toTree(template, options?) => { tag, attrs, children, text? }`: any template (JRXML 6 or 7,
+  or `.ferro`) as a tree of its JRXML 7 form, for editors; `attrs` are `[name, value]` pairs.
+  `options.resources` holds the files a `.ferro` template imports. The
+  [designer](https://cristianencarnacion.github.io/ferroreport/designer/) is built on it.
+- `fromTree(tree, to?) => string`: the tree written back as a template, `"jrxml"` (default)
+  or `"ferro"`.
 - `version() => string`
 
 Throws an `Error` with the reason when a template cannot be rendered.
