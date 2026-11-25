@@ -75,9 +75,9 @@ JRXML and accessible by default. Against JasperReports itself it is about **200Ã
 
 > **[Full documentation](https://cristianencarnacion.github.io/ferroreport/docs.html)**: every command, endpoint, function and option.
 > Available now: the [npm package](https://www.npmjs.com/package/ferroreport), the
+> [PyPI package](https://pypi.org/project/ferroreport/), the
 > [crates](https://crates.io/crates/ferroreport), the
 > [release binaries](https://github.com/cristianEncarnacion/ferroreport/releases) and the Docker image.
-> The PyPI package is being published.
 
 **JavaScript / TypeScript** (Node.js, Deno, Bun, browsers): `npm install ferroreport`
 
@@ -807,6 +807,9 @@ welcome, and you don't need to know Rust for most of them. Start with
 or [`help wanted`](https://github.com/cristianEncarnacion/ferroreport/labels/help%20wanted), or
 ask in [Discussions](https://github.com/cristianEncarnacion/ferroreport/discussions).
 
+The most useful bug report is a JRXML and sample data that render differently from
+JasperReports: it becomes a new fixture.
+
 ## Stability
 
 From 1.0, ferroreport follows [semantic versioning](https://semver.org). Within 1.x, these do
@@ -850,11 +853,6 @@ of its own. What comes next, in 1.x releases:
   and a visible signature box.
 
 What each release brought is in [CHANGELOG.md](CHANGELOG.md).
-
-## Contributing
-
-Contributions are welcome, especially new fixtures: a JRXML plus sample data that renders
-differently from JasperReports is the most useful bug report. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

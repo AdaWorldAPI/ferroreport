@@ -125,6 +125,14 @@ pub(crate) struct ShapingCache {
     plans: std::sync::Mutex<Vec<(PlanKey, std::sync::Arc<harfrust::ShapePlan>)>>,
 }
 
+// harfrust's font reads some of its tables the first time they are needed (through
+// `OnceLock`), and the types it keeps them in are neither `UnwindSafe` nor `RefUnwindSafe`.
+// Everything here, and in harfrust's font, is filled once through `OnceLock` or under a
+// `Mutex`: a panic while it is being filled leaves it empty, to be filled again, so
+// `FaceData` and `FontSet` stay unwind-safe as they were in 1.1.0.
+impl std::panic::UnwindSafe for ShapingCache {}
+impl std::panic::RefUnwindSafe for ShapingCache {}
+
 impl std::fmt::Debug for ShapingCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("ShapingCache")

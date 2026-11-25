@@ -79,9 +79,9 @@ mitad del tamaño de un JRXML y accesible por defecto. Frente al propio JasperRe
 ## Desde tu lenguaje
 
 > **[Documentación completa](https://cristianencarnacion.github.io/ferroreport/docs.html)** (en inglés): cada comando,
-> endpoint, función y opción. El [paquete de npm](https://www.npmjs.com/package/ferroreport), los
+> endpoint, función y opción. El [paquete de npm](https://www.npmjs.com/package/ferroreport), el
+> [de PyPI](https://pypi.org/project/ferroreport/), los [crates](https://crates.io/crates/ferroreport), los
 > [binarios de Releases](https://github.com/cristianEncarnacion/ferroreport/releases) y la imagen Docker ya están disponibles.
-> Los [crates](https://crates.io/crates/ferroreport) también; el paquete de PyPI se está publicando.
 
 - **JavaScript/TypeScript:** `npm install ferroreport` y
   `render(plantilla, filas, parametros, { locale: "es_DO" })` devuelve el PDF; con

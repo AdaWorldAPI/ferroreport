@@ -6,6 +6,12 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### Fixes
+
+- `FaceData` and `FontSet` are again `UnwindSafe` and `RefUnwindSafe`, as in 1.1.0 (the move to
+  harfrust had dropped both).
+- README: the PyPI package is listed as available, and the two Contributing sections are one.
+
 ### OpenDocument: large reports in the memory of a small one
 
 - ODS and ODT no longer keep the document's body in memory until it is written. Their styles
