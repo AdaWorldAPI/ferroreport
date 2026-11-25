@@ -464,9 +464,11 @@ JVM y compilar la plantilla, por eso la diferencia es de dos órdenes de magnitu
 un proceso por reporte y de 3 a 5 veces cuando no. Los PDF además suelen pesar menos que los de
 JasperReports 6 (1.2 MB en vez de 4.5 MB con 20,000 filas; más o menos lo mismo con un millón). Los libros de Excel también se escriben a medida que se generan: las columnas de la hoja
 salen de todas las páginas, así que un reporte grande se llena dos veces, una para encontrarlas
-y otra para escribir las filas (100,000 filas: unos 3 s y 66 MiB; 500,000: 15 s y 116 MiB; las
-mismas 500,000 filas a ODS tardan 16 s y usan 833 MiB). Un reporte con más filas de las que caben
-en una hoja (1,048,576) se detiene con un error que lo dice.
+y otra para escribir las filas (100,000 filas: unos 3 s y 66 MiB; 500,000: 15 s y 116 MiB). Un
+reporte con más filas de las que caben en una hoja (1,048,576) se detiene con un error que lo dice.
+Los archivos OpenDocument también, llenándose una vez más antes para encontrar sus estilos (que
+van antes del contenido en el archivo): 100,000 filas en 68 MiB como ODS y 37 MiB como ODT, un
+millón de filas en 37 MiB como ODT.
 
 ## Comparado con otras herramientas
 

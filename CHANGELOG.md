@@ -6,6 +6,27 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### OpenDocument: large reports in the memory of a small one
+
+- ODS and ODT no longer keep the document's body in memory until it is written. Their styles
+  come before the body in the file, so a large report is now filled once more first to find
+  them, and its rows are then compressed and written as they are made, like a large XLSX
+  workbook. A spreadsheet is filled three times (its columns, its styles, its rows), a text
+  twice; reports under about 100,000 elements are still filled once. Peak memory of
+  `ferroreport render` for `fixtures/09-large`: 100,000 rows as ODS 68 MiB (was 253 MiB), as
+  ODT 37 MiB (was 265 MiB); a million rows as ODT 37 MiB (was 1,672 MiB).
+- This needs rows that can be read again, as for XLSX: a data file, the rows the command line
+  and the server put aside (now also for `.odt` from standard input or sent one per line),
+  Python, and `Renderer::render_rows_to` in Rust, which now also reads them twice for ODT.
+  `Renderer::render_to`, `OdsStream::new` and `OdtStream::new` keep the body in memory as
+  before.
+- Small documents are the same bytes as in 1.1.0. A large one has the same files inside; only
+  `content.xml` is stored with its sizes after it, as the XLSX sheet already is.
+- If the rows read the second time are not the ones read the first (a table that changed
+  between the queries) and need styles the first pass did not see, those styles go to
+  `styles.xml`, so the file still opens; LibreOffice then shows their rows at its default
+  height.
+
 ### PowerPoint: PPTX
 
 - `-o report.pptx` or `--format pptx` on the command line, `"format": "pptx"` in the HTTP API

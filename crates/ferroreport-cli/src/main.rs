@@ -961,11 +961,12 @@ fn render(args: &[String]) -> CliResult {
     let parsed = started.elapsed();
     // Rows are read as they are needed and pages are written as they are finished, so the
     // size of the data does not decide how much memory the render takes.
-    // A large workbook reads its rows twice (see `Renderer::render_rows_to`), so rows from
-    // standard input are put in a file first for that format.
+    // A large workbook or OpenDocument file reads its rows more than once (see
+    // `Renderer::render_rows_to`), so rows from standard input are put in a file first for
+    // those formats.
     let mut kept = None;
     let data = match data.as_deref() {
-        Some("-") if matches!(format, ferroreport::Format::Xlsx | ferroreport::Format::Ods) => {
+        Some("-") if matches!(format, ferroreport::Format::Xlsx | ferroreport::Format::Ods | ferroreport::Format::Odt) => {
             let path = std::env::temp_dir().join(format!("ferroreport-rows-{}.json", std::process::id()));
             let keep = RemoveOnDrop(path.clone());
             let mut file = std::fs::File::create(&path).map_err(|e| format!("{}: {e}", path.display()))?;
