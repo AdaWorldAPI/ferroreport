@@ -99,6 +99,9 @@ def main() -> int:
         env = dict(os.environ)
         if os.environ.get("ORACLE_JAVA_GROOVY") and 'language="groovy"' in (fx / "report.jrxml").read_text(errors="replace"):
             env["ORACLE_JAVA"] = os.environ["ORACLE_JAVA_GROOVY"]
+        # A fixture's own JasperReports font extension (font sets), as fontsets.txt below.
+        if (fx / "jasper-extension").is_dir():
+            env["ORACLE_CLASSPATH"] = str(fx / "jasper-extension")
         pj, tj = run(cmd, cwd=fx, env=env) if not (fx / "data.sql").exists() else (None, 0.0)
         cmd = [args.bin, "render", str(fx / "report.jrxml"), "-o", str(ours_pdf), "-q", "--now", "2026-01-15T10:30:00"]
         if data.exists():
@@ -117,6 +120,11 @@ def main() -> int:
             for spec in (fx / "fonts.txt").read_text().split():
                 if Path(spec.split("=", 1)[-1].split(":")[0]).exists():
                     cmd += ["--font", spec]
+        # Font sets the fixture defines (fontsets.txt: Name=Family,Family per line).
+        if (fx / "fontsets.txt").exists():
+            for spec in (fx / "fontsets.txt").read_text().splitlines():
+                if spec.strip():
+                    cmd += ["--font-set", spec.strip()]
         po, to = run(cmd)
 
         row = {"fixture": fx.name, "jasper_s": round(tj, 3), "ferroreport_s": round(to, 4)}

@@ -62,6 +62,13 @@ fn register_fonts(renderer: &mut ferroreport::Renderer, dir: &std::path::Path) {
             renderer.register_font(family, flags.contains(&"bold"), flags.contains(&"italic"), bytes).unwrap();
         }
     }
+    // Font sets (`fontsets.txt`, a `Name=Family,Family` per line, as `--font-set`).
+    let Ok(sets) = std::fs::read_to_string(dir.join("fontsets.txt")) else { return };
+    for line in sets.lines().filter(|l| !l.trim().is_empty()) {
+        let (name, families) = line.split_once('=').unwrap();
+        let families: Vec<&str> = families.split(',').map(str::trim).collect();
+        renderer.register_font_set(name, &families).unwrap();
+    }
 }
 
 fn fixtures_dir() -> PathBuf {

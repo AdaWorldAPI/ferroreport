@@ -143,7 +143,10 @@ fn inspect(py: Python<'_>, template: String) -> PyResult<Py<PyAny>> {
     let report = ferroreport::parse(&template).map_err(err)?;
     let out = pyo3::types::PyDict::new(py);
     out.set_item("name", &report.name)?;
-    out.set_item("parameters", report.parameters.iter().map(|p| p.name.clone()).collect::<Vec<_>>())?;
+    out.set_item(
+        "parameters",
+        report.parameters.iter().filter(|p| p.name != ferroreport::text::HYPHENATE).map(|p| p.name.clone()).collect::<Vec<_>>(),
+    )?;
     out.set_item("fields", report.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>())?;
     out.set_item("warnings", &report.warnings)?;
     Ok(out.into_any().unbind())
