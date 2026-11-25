@@ -141,3 +141,65 @@ fn devanagari_and_thai_are_shaped_and_broken() {
     }
     assert_eq!(thai.iter().map(|l| l.text.as_str()).collect::<String>(), "สวัสดีครับเราไปโรงเรียนด้วยกันในวันจันทร์");
 }
+
+/// Characters a font lacks are drawn in another font only when asked (`font_fallback`), as a
+/// JasperReports font set does: the longest run one font has, in the first font that has it.
+#[test]
+fn missing_characters_fall_back_to_another_font() {
+    let template = report(&text(0, 400, "Left", "Serif ⤴ then ★ star, عربي"), "DejaVu Serif");
+    let pdf = |r: &mut Renderer| {
+        let report = r.parse(&template).unwrap();
+        let doc = r.fill(&report, &[], Default::default()).unwrap();
+        r.to_pdf(&doc).unwrap()
+    };
+    let has = |pdf: &[u8], name: &[u8]| pdf.windows(name.len()).any(|w| w == name);
+    let mut plain = Renderer::new();
+    assert_eq!(lines(&mut plain, &template).len(), 1);
+    assert!(!has(&pdf(&mut plain), b"DejaVuSans"));
+    let mut fallback = Renderer::new().font_fallback(true);
+    let runs: Vec<String> = lines(&mut fallback, &template).iter().flatten().map(|l| l.text.clone()).collect();
+    // DejaVu Serif has the arrow, DejaVu Sans the star and the Arabic letters (shaped).
+    assert_eq!(runs[0], "Serif ⤴ then ");
+    assert_eq!(runs[1..].concat(), "★ star, عربي");
+    assert!(has(&pdf(&mut fallback), b"DejaVuSans"));
+}
+
+/// Hyphenation is ferroreport's own and is set for a report: by its `ferroreport.text.hyphenate`
+/// property, or by the parameter of the same name when rendering.
+#[test]
+fn reports_ask_for_hyphenation() {
+    let body = text(0, 70, "Left", "Internationalization requires responsibility");
+    let hyphens = |template: &str, params: serde_json::Value| -> (usize, Vec<String>) {
+        let mut r = Renderer::new();
+        let report = r.parse(template).unwrap();
+        let params = ferroreport::params_from_json(&report, &params).unwrap();
+        let doc = r.fill(&report, &[], params).unwrap();
+        let mut n = 0;
+        fn walk(items: &[PrintItem], n: &mut usize) {
+            for item in items {
+                match item {
+                    PrintItem::Text(t) => *n += t.lines.iter().filter(|l| l.text.ends_with('-')).count(),
+                    PrintItem::Cell(_, inner) => walk(std::slice::from_ref(inner), n),
+                    PrintItem::Group(items) => walk(items, n),
+                    _ => {}
+                }
+            }
+        }
+        walk(&doc.pages[0].items, &mut n);
+        (n, report.warnings.clone())
+    };
+    let plain = report(&body, "DejaVu Sans");
+    assert_eq!(hyphens(&plain, serde_json::json!({})).0, 0);
+    // Asked for by the template...
+    let asked = plain.replace("<style ", r#"<property name="ferroreport.text.hyphenate" value="true"/><style "#);
+    assert!(hyphens(&asked, serde_json::json!({})).0 > 0);
+    // ...or by the render, which can also turn it off.
+    assert!(hyphens(&plain, serde_json::json!({"ferroreport.text.hyphenate": "en"})).0 > 0);
+    assert_eq!(hyphens(&asked, serde_json::json!({"ferroreport.text.hyphenate": "false"})).0, 0);
+    // On an element it is not read, and the template says so.
+    let on_element = plain
+        .replace(r#"height="60"/>"#, r#"height="60"><property name="ferroreport.text.hyphenate" value="true"/></reportElement>"#);
+    let (n, warnings) = hyphens(&on_element, serde_json::json!({}));
+    assert_eq!(n, 0);
+    assert!(warnings.iter().any(|w| w.contains("ferroreport.text.hyphenate")), "{warnings:?}");
+}

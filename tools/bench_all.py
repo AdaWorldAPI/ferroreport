@@ -8,9 +8,19 @@ Three situations are measured, because they answer different questions:
   warm   renders repeated inside one process that stays up. For JasperReports: the template
          compiled once, the JIT warmed up, rows already converted to Java objects, PDF
          exported to memory. What a long-running service pays per request.
-  large  100,000 and 1,000,000 rows (the 09-large fixture's rows repeated), with peak memory.
+  outputs
+         the 20,000-row fixture, cold, to each format both engines write (PDF, XLSX, DOCX,
+         ODS, ODT, CSV): what each output costs.
+  large  100,000, 500,000 and 1,000,000 rows (the 09-large fixture's rows repeated), with peak
+         memory: PDF at every size, and the spreadsheets and ODT where a sheet holds the rows.
 
-Usage: JASPER_LIB=/path/to/jars tools/bench_all.py [--quick] [--out docs/benchmarks.json]
+The small fixtures include 52-arabic (right-to-left text shaped with rustybuzz) next to the
+Latin ones, so the cost of complex scripts shows.
+
+Usage: JASPER_LIB=/path/to/jars tools/bench_all.py [--quick] [--wait-idle] [--out docs/benchmarks.json]
+
+On a machine that other work shares, --wait-idle starts each run on an idle machine and does a
+run again when other processes took CPU time during it (see tools/idle.py).
 
 With the jars of JasperReports 7, the fixtures are first converted to JRXML 7 (with
 `ferroreport convert`), and both engines render those.
@@ -26,6 +36,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import idle
 
 ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / "target" / "release" / "ferroreport"
@@ -49,7 +61,7 @@ def measured(cmd):
     """Wall seconds and peak resident memory (MiB) of a command, run through a tiny launcher
     (tools/maxrss.c): measured from Python, a light process would report Python's memory."""
     with tempfile.NamedTemporaryFile("r", suffix=".txt") as report:
-        p = subprocess.run([str(LAUNCHER), report.name, *map(str, cmd)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        p = idle.guarded(lambda: subprocess.run([str(LAUNCHER), report.name, *map(str, cmd)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True))
         if p.returncode != 0:
             raise SystemExit(f"command failed: {' '.join(map(str, cmd))}\n{p.stderr[-2000:]}")
         seconds, kib = report.read().split()
@@ -68,18 +80,18 @@ def fixture_args(fx):
     return data if data.exists() else None, params if params.exists() else None
 
 
-def cold(lib, name, runs, tmp):
+def cold(lib, name, runs, tmp, ext="pdf"):
     fx = FIXTURES / name
     data, params = fixture_args(fx)
-    jasper = java(lib, "Oracle", fx / "report.jrxml", data or "-", tmp / "j.pdf", *([params] if params else []))
-    ferro = [BIN, "render", fx / "report.jrxml", "-o", tmp / "f.pdf", "-q"]
+    jasper = java(lib, "Oracle", fx / "report.jrxml", data or "-", tmp / f"j.{ext}", *([params] if params else []))
+    ferro = [BIN, "render", fx / "report.jrxml", "-o", tmp / f"f.{ext}", "-q"]
     ferro += (["-d", data] if data else []) + (["-p", params] if params else [])
     out = {}
     for engine, cmd in (("jasper", jasper), ("ferroreport", ferro)):
         results = [measured(list(map(str, cmd))) for _ in range(runs)]
         out[engine] = {"seconds": statistics.median(r[0] for r in results), "mib": statistics.median(r[1] for r in results)}
-    out["jasper"]["bytes"] = (tmp / "j.pdf").stat().st_size
-    out["ferroreport"]["bytes"] = (tmp / "f.pdf").stat().st_size
+    out["jasper"]["bytes"] = (tmp / f"j.{ext}").stat().st_size
+    out["ferroreport"]["bytes"] = (tmp / f"f.{ext}").stat().st_size
     return out
 
 
@@ -88,14 +100,16 @@ def warm(lib, name, warmup, runs):
     data, params = fixture_args(fx)
     # The best of three rounds of each: the machine's noise only ever makes a round slower.
     j = min(
-        json.loads(run(java(lib, "Warm", fx / "report.jrxml", data or "-", params or "-", warmup, runs)).strip().splitlines()[-1])["median_ms"]
+        json.loads(idle.guarded(lambda: run(java(lib, "Warm", fx / "report.jrxml", data or "-", params or "-", warmup, runs))).strip().splitlines()[-1])["median_ms"]
         for _ in range(3)
     )
-    f = min((json.loads(run([WARM, fx, runs])) for _ in range(3)), key=lambda r: r["whole_ms"])
+    f = min((json.loads(idle.guarded(lambda: run([WARM, fx, runs]))) for _ in range(3)), key=lambda r: r["whole_ms"])
     return {"jasper_ms": j, "ferroreport_ms": f["whole_ms"], "ferroreport_parsed_ms": f["parsed_ms"]}
 
 
-def large(lib, rows, tmp, jasper_heap=None, ferro_runs=3):
+def large(lib, rows, tmp, others=(), jasper=True, jasper_heap=None, ferro_runs=3):
+    """PDF (top-level "ferroreport" and "jasper", as before), then each format of `others`
+    under "outputs". JasperReports runs once per format (`jasper=False`: not at all)."""
     src = json.loads((FIXTURES / "09-large" / "data.json").read_text())
     data = tmp / f"{rows}.json"
     with data.open("w") as f:
@@ -105,11 +119,21 @@ def large(lib, rows, tmp, jasper_heap=None, ferro_runs=3):
         f.write("]")
     tpl = FIXTURES / "09-large" / "report.jrxml"
     out = {"rows": rows}
-    results = [measured([str(BIN), "render", str(tpl), "-d", str(data), "-o", str(tmp / "f.pdf"), "-q"]) for _ in range(ferro_runs)]
-    out["ferroreport"] = {"seconds": statistics.median(r[0] for r in results), "mib": statistics.median(r[1] for r in results),
-                          "bytes": (tmp / "f.pdf").stat().st_size}
-    wall, mib = measured(list(map(str, java(lib, "Oracle", tpl, data, tmp / "j.pdf", heap=jasper_heap))))
-    out["jasper"] = {"seconds": wall, "mib": mib, "bytes": (tmp / "j.pdf").stat().st_size, "heap": jasper_heap or "default"}
+
+    def both(ext):
+        results = [measured([str(BIN), "render", str(tpl), "-d", str(data), "-o", str(tmp / f"f.{ext}"), "-q"]) for _ in range(ferro_runs)]
+        r = {"ferroreport": {"seconds": statistics.median(r[0] for r in results), "mib": statistics.median(r[1] for r in results),
+                             "bytes": (tmp / f"f.{ext}").stat().st_size}}
+        if jasper:
+            wall, mib = measured(list(map(str, java(lib, "Oracle", tpl, data, tmp / f"j.{ext}", heap=jasper_heap))))
+            r["jasper"] = {"seconds": wall, "mib": mib, "bytes": (tmp / f"j.{ext}").stat().st_size, "heap": jasper_heap or "default"}
+        for f in tmp.glob("[fj].*"):
+            f.unlink()
+        return r
+
+    out.update(both("pdf"))
+    if others:
+        out["outputs"] = {ext: both(ext) for ext in others}
     data.unlink()
     return out
 
@@ -118,7 +142,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="skip the million-row run")
     ap.add_argument("--out", default=str(ROOT / "docs" / "benchmarks.json"))
+    ap.add_argument("--wait-idle", action="store_true", help="on a shared machine: start each run on an idle machine, redo disturbed runs")
     args = ap.parse_args()
+    idle.enabled = args.wait_idle
+    load_start = [round(x, 2) for x in os.getloadavg()]
     global CLASSES, FIXTURES
     lib = os.environ.get("JASPER_LIB") or sys.exit("set JASPER_LIB to a directory with the JasperReports jars")
     jar = next(Path(lib).glob("jasperreports-[0-9]*.jar"), None)
@@ -130,7 +157,7 @@ def main():
         # JasperReports 7 reads JRXML 7 only: both engines render the fixtures converted to it.
         converted = tempfile.TemporaryDirectory()
         FIXTURES = Path(converted.name)
-        for name in ("01-employee-list", "02-invoice", "03-grouped-sales", "09-large"):
+        for name in ("01-employee-list", "02-invoice", "03-grouped-sales", "09-large", "52-arabic"):
             (FIXTURES / name).mkdir()
             for f in (ROOT / "fixtures" / name).iterdir():
                 if f.suffix == ".jrxml":
@@ -143,19 +170,32 @@ def main():
     version = subprocess.run([str(BIN), "--version"], capture_output=True, text=True).stdout.strip()
     jvm = subprocess.run(["java", "-version"], capture_output=True, text=True).stderr
     jvm = next((l for l in jvm.splitlines() if "version" in l and "Picked" not in l), "")
-    result = {"ferroreport": version, "jasperreports": jasper_version, "java": jvm, "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}",
-              "cold": {}, "warm": {}, "large": []}
+    cpu = next((l.split(":", 1)[1].strip() for l in Path("/proc/cpuinfo").read_text().splitlines() if l.startswith("model name")), "")
+    mem = next((int(l.split()[1]) // 1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith("MemTotal")), 0)
+    result = {"ferroreport": version, "jasperreports": jasper_version, "java": jvm,
+              "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}", "cpu": cpu, "memory_mib": mem,
+              "kernel": platform.release(),
+              # JVM flags from the environment that change how it runs (-XX, -Xmx...).
+              "java_flags": [o for v in ("JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS") for o in os.environ.get(v, "").split() if o.startswith("-X")],
+              "cold": {}, "warm": {}, "outputs": {}, "large": []}
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
-        for name, runs in (("02-invoice", 7), ("03-grouped-sales", 7), ("09-large", 5)):
+        for name, runs in (("02-invoice", 7), ("03-grouped-sales", 7), ("52-arabic", 7), ("09-large", 5)):
             result["cold"][name] = cold(lib, name, runs, tmp)
             print("cold", name, result["cold"][name], flush=True)
-        for name, warmup, runs in (("02-invoice", 500, 400), ("01-employee-list", 500, 400), ("03-grouped-sales", 500, 400), ("09-large", 4, 7)):
+        for name, warmup, runs in (("02-invoice", 500, 400), ("01-employee-list", 500, 400), ("03-grouped-sales", 500, 400),
+                                   ("52-arabic", 500, 400), ("09-large", 4, 7)):
             result["warm"][name] = warm(lib, name, warmup, runs)
             print("warm", name, result["warm"][name], flush=True)
-        for rows in (100_000,) if args.quick else (100_000, 1_000_000):
-            result["large"].append(large(lib, rows, tmp))
+        for ext in ("pdf", "xlsx", "docx", "ods", "odt", "csv"):
+            result["outputs"][ext] = cold(lib, "09-large", 5, tmp, ext)
+            print("outputs 09-large", ext, result["outputs"][ext], flush=True)
+        sizes = [(100_000, ("xlsx", "ods", "odt"), True), (500_000, ("xlsx", "ods"), False), (1_000_000, (), True)]
+        for rows, others, jasper in sizes[:1] if args.quick else sizes:
+            result["large"].append(large(lib, rows, tmp, others, jasper))
             print("large", result["large"][-1], flush=True)
+    # How busy the machine was (it may be shared), and what the runs did about it.
+    result["conditions"] = {"load_average_start": load_start, **idle.conditions()}
     Path(args.out).write_text(json.dumps(result, indent=1) + "\n")
     print("written", args.out)
 

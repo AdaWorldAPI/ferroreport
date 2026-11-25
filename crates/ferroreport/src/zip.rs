@@ -125,12 +125,24 @@ impl<W: Write> ZipStream<W> {
 
     /// Starts a file whose content comes in pieces ([`ZipStream::write`]) until [`ZipStream::end`].
     pub fn begin(&mut self, name: &str) -> io::Result<()> {
+        self.begin_at(name, LEVEL)
+    }
+
+    /// Like [`ZipStream::begin`], compressed at `level` (0 to 9) where the compressor for
+    /// pieces is built in.
+    pub fn begin_at(&mut self, name: &str, level: u8) -> io::Result<()> {
         debug_assert!(self.open.is_none());
         let offset = self.offset;
         self.offset32()?;
         self.put(&header(0x0403_4b50, DESCRIPTOR, DEFLATE, 0, 0, 0, name.as_bytes(), None))?;
-        self.open =
-            Some(Open { name: name.as_bytes().to_vec(), offset, crc: Crc::default(), size: 0, packed: 0, packer: Packer::new() });
+        self.open = Some(Open {
+            name: name.as_bytes().to_vec(),
+            offset,
+            crc: Crc::default(),
+            size: 0,
+            packed: 0,
+            packer: Packer::new(level),
+        });
         Ok(())
     }
 
@@ -201,8 +213,8 @@ struct Packer(flate2::Compress, Vec<u8>);
 
 #[cfg(not(target_arch = "wasm32"))]
 impl Packer {
-    fn new() -> Packer {
-        Packer(flate2::Compress::new(flate2::Compression::new(LEVEL as u32), false), vec![0; 1 << 16])
+    fn new(level: u8) -> Packer {
+        Packer(flate2::Compress::new(flate2::Compression::new(level as u32), false), vec![0; 1 << 16])
     }
 
     fn pack(&mut self, mut data: &[u8], last: bool, out: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
@@ -230,7 +242,7 @@ struct Packer(Vec<u8>);
 
 #[cfg(target_arch = "wasm32")]
 impl Packer {
-    fn new() -> Packer {
+    fn new(_level: u8) -> Packer {
         Packer(Vec::new())
     }
 

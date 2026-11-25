@@ -5,8 +5,12 @@
 //!
 //! Texts keep their fonts, colors, alignment, padding, borders and backgrounds; pictures,
 //! charts and barcodes are embedded as pictures; rectangles and lines become cell backgrounds
-//! and borders. The document is kept in memory until the end, where its styles are written
-//! before it.
+//! and borders.
+//!
+//! The automatic styles of `content.xml` come before the text, so a [`OdtStream`] made with
+//! [`OdtStream::new`] keeps the text in memory until the end. A large report is measured
+//! first instead (its styles found in a pass that keeps nothing), and its pages are then
+//! compressed and written as they are made ([`crate::Renderer::render_rows_to`]).
 
 use crate::fonts::FontSet;
 use crate::grid::{self, Cell, CellStyle, Node, What};
@@ -22,7 +26,7 @@ pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 /// Writes a text document page by page.
 pub struct OdtStream<W: std::io::Write> {
-    zip: crate::zip::ZipStream<W>,
+    content: odf::Content<W>,
     page_width: f32,
     page_height: f32,
     landscape: bool,
@@ -37,34 +41,70 @@ pub struct OdtStream<W: std::io::Write> {
 }
 
 impl<W: std::io::Write> OdtStream<W> {
+    /// A document kept in memory until [`OdtStream::finish`], when its styles are known.
     pub fn new(out: W, title: &str, page_width: f32, page_height: f32, landscape: bool) -> crate::Result<OdtStream<W>> {
-        Ok(OdtStream {
-            zip: odf::begin(out, MIMETYPE)?,
+        Ok(OdtStream::start(odf::Content::kept(out), title, (page_width, page_height, landscape), Styles::default()))
+    }
+
+    /// A document whose styles were measured (from the same pages): its pages are compressed
+    /// and written as they are made.
+    pub(crate) fn streamed(out: W, title: &str, page: (f32, f32, bool), mut styles: Styles) -> crate::Result<OdtStream<W>> {
+        let content = odf::Content::streamed(out, MIMETYPE, &mut styles, BODY_START)?;
+        Ok(OdtStream::start(content, title, page, styles))
+    }
+
+    fn start(
+        content: odf::Content<W>,
+        title: &str,
+        (page_width, page_height, landscape): (f32, f32, bool),
+        styles: Styles,
+    ) -> OdtStream<W> {
+        OdtStream {
+            content,
             page_width,
             page_height,
             landscape,
             title: title.to_string(),
             pages: 0,
-            styles: Styles::default(),
+            styles,
             pictures: Pictures::default(),
             body: String::new(),
             links: HashMap::new(),
             frames: 0,
-        })
+        }
+    }
+
+    /// From here on, only measure the document: what was kept of it is dropped, and
+    /// [`OdtStream::into_styles`] gives the styles of all its pages.
+    pub(crate) fn stop_keeping(&mut self) {
+        self.content.stop_keeping();
+        self.pictures = Pictures::measuring();
+    }
+
+    /// Whether the document is only being measured.
+    pub(crate) fn measuring(&self) -> bool {
+        self.content.measuring()
+    }
+
+    /// The paragraph a document ends with (one follows the last table), as small as it can be.
+    fn end_paragraph(&mut self) -> String {
+        self.styles.style("P", "paragraph", "", END_PARAGRAPH)
+    }
+
+    /// The styles of a document that was only measured, and the output it was given.
+    pub(crate) fn into_styles(mut self) -> crate::Result<(Styles, W)> {
+        self.end_paragraph();
+        let out = self.content.into_output().ok_or_else(|| crate::Error::Io("the document was not measured".into()))?;
+        Ok((self.styles, out))
     }
 
     /// Ends the document and writes the rest of the package.
     pub fn finish(mut self) -> crate::Result<W> {
-        let mut content = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content {}>\n", odf::NAMESPACES);
-        // The paragraph a document ends with (one follows the last table), as small as it can be.
-        let end = self.styles.style("P", "paragraph", "", END_PARAGRAPH);
-        self.styles.write(&mut content);
-        content.push_str("<office:body>\n<office:text>\n");
-        content.push_str(&self.body);
-        let _ = writeln!(content, "<text:p text:style-name=\"{end}\"/>");
-        content.push_str("</office:text>\n</office:body>\n</office:document-content>\n");
-        let styles = odf::styles_xml(self.page_width, self.page_height, self.landscape, DEFAULT_PARAGRAPH);
-        odf::finish(self.zip, MIMETYPE, &content, &styles, &self.title, &self.pictures)
+        let end = self.end_paragraph();
+        let body_end =
+            format!("<text:p text:style-name=\"{end}\"/>\n</office:text>\n</office:body>\n</office:document-content>\n");
+        let styles = odf::styles_xml(self.page_width, self.page_height, self.landscape, DEFAULT_PARAGRAPH, &self.styles);
+        self.content.finish(MIMETYPE, &self.styles, BODY_START, &body_end, &styles, &self.title, &self.pictures)
     }
 
     fn page_xml(&mut self, items: &[PrintItem], fonts: &FontSet) {
@@ -76,7 +116,8 @@ impl<W: std::io::Write> OdtStream<W> {
         let g = grid::layout(&nodes, &mut xcuts, height, NATURE);
         self.links = odf::page_links(items);
         let mut out = std::mem::take(&mut self.body);
-        let start = out.len();
+        out.clear();
+        let start = 0;
         // The first page sets the page style; the others start on a new page.
         let (attributes, brk) =
             if self.pages == 0 { (" style:master-page-name=\"Standard\"", "") } else { ("", " fo:break-before=\"page\"") };
@@ -220,7 +261,31 @@ impl<W: std::io::Write> crate::fill::PageSink for OdtStream<W> {
     fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> crate::Result<()> {
         self.page_xml(&page.items, fonts);
         self.pages += 1;
-        Ok(())
+        self.content.push(&mut self.body)
+    }
+}
+
+/// The first pass of a text document: kept while it is small, so that it is written from
+/// this pass alone; past [`crate::xlsx::KEEP_ITEMS`] elements only measured, for a second
+/// pass that writes it as it is made.
+pub(crate) struct FirstPass<W: std::io::Write> {
+    pub stream: OdtStream<W>,
+    items: usize,
+}
+
+impl<W: std::io::Write> FirstPass<W> {
+    pub fn new(stream: OdtStream<W>) -> FirstPass<W> {
+        FirstPass { stream, items: 0 }
+    }
+}
+
+impl<W: std::io::Write> crate::fill::PageSink for FirstPass<W> {
+    fn page(&mut self, page: crate::print::PrintPage, fonts: &FontSet) -> crate::Result<()> {
+        self.items += page.items.len();
+        if self.items > crate::xlsx::KEEP_ITEMS && !self.stream.measuring() {
+            self.stream.stop_keeping();
+        }
+        self.stream.page(page, fonts)
     }
 }
 
@@ -283,6 +348,9 @@ fn paragraph_style(styles: &mut Styles, t: &CellInfo) -> String {
 /// The default paragraph: no space around it, and as small as it can be (the paragraphs of
 /// empty cells use it, and must not make their rows taller).
 const DEFAULT_PARAGRAPH: &str = "<style:paragraph-properties fo:margin-top=\"0pt\" fo:margin-bottom=\"0pt\" fo:line-height=\"100%\"/><style:text-properties fo:font-size=\"1pt\" style:font-size-asian=\"1pt\" style:font-size-complex=\"1pt\"/>";
+
+/// `content.xml` from its styles to the first page.
+const BODY_START: &str = "<office:body>\n<office:text>\n";
 
 const END_PARAGRAPH: &str = "<style:paragraph-properties fo:margin-top=\"0pt\" fo:margin-bottom=\"0pt\" fo:line-height=\"1pt\"/><style:text-properties fo:font-size=\"1pt\" style:font-size-asian=\"1pt\" style:font-size-complex=\"1pt\"/>";
 

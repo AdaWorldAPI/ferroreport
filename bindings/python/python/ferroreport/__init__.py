@@ -172,8 +172,9 @@ def render(
     resource_dirs: extra directories for images and subreports. The template's own directory
         is always searched. Paths in templates can never leave these directories.
     now: value of `new Date()` in expressions (for reproducible output).
-    format: "pdf", "xlsx", "docx" (Word), "ods" or "odt" (OpenDocument spreadsheet or text),
-        "csv" or "html" (a web page that looks like the PDF, for previews).
+    format: "pdf", "xlsx", "docx" (Word), "pptx" (PowerPoint, a slide per page), "ods" or
+        "odt" (OpenDocument spreadsheet or text), "csv" or "html" (a web page that looks like
+        the PDF, for previews).
     max_pages, timeout: stop with FerroreportError if the report goes over this many pages
         or takes longer than this many seconds. Set them when templates or data come from
         other people.
@@ -245,7 +246,7 @@ def render_to_file(
 ) -> dict:
     """Like render(), writing the file to `output` as it is made: PDF and CSV pages go to
     disk as soon as they are finished, so memory stays flat however long the report is. The
-    format follows the file's extension (.pdf, .xlsx, .docx, .ods, .odt, .csv or .html) unless `format`
+    format follows the file's extension (.pdf, .xlsx, .docx, .pptx, .ods, .odt, .csv or .html) unless `format`
     is given.
 
     data_file: instead of `data`, the path of a file with the rows: a JSON array of objects,
@@ -256,7 +257,7 @@ def render_to_file(
     """
     if format is None:
         ext = os.path.splitext(os.fspath(output))[1].lower().lstrip(".")
-        format = ext if ext in ("xlsx", "docx", "ods", "odt", "csv", "html") else "pdf"
+        format = ext if ext in ("xlsx", "docx", "pptx", "ods", "odt", "csv", "html") else "pdf"
     if data is not None and data_file is not None:
         raise FerroreportError("give `data` or `data_file`, not both")
     source, dirs, mem = _prepare(template, resources, resource_dirs)

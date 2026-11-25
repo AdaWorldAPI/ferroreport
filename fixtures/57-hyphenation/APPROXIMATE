@@ -1,0 +1,1 @@
+JasperReports does not hyphenate: ferroreport.text.hyphenate is ferroreport's own property, which JasperReports ignores. Only the page count is compared; the PDF was looked at by eye.

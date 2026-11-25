@@ -90,6 +90,23 @@ impl StyledText {
         }
     }
 
+    /// Splits the runs that have characters their font lacks and another font has (font
+    /// sets, font fallback), as JasperReports resolves fonts before it measures a text.
+    pub fn resolve_fonts(&mut self, fonts: &mut FontSet) {
+        let mut runs = Vec::with_capacity(self.runs.len());
+        for run in std::mem::take(&mut self.runs) {
+            match fonts.fallback_runs(&run.style.font, &self.text[run.start..run.end]) {
+                Some(parts) => runs.extend(parts.into_iter().map(|(a, b, family)| {
+                    let mut style = run.style.clone();
+                    style.font.name = family;
+                    Run { start: run.start + a, end: run.start + b, style }
+                })),
+                None => runs.push(run),
+            }
+        }
+        self.runs = runs;
+    }
+
     /// The list paragraph starting at `start`, if any.
     fn para_at(&self, start: usize) -> Option<&Para> {
         self.paras.iter().find(|p| p.start == start)
