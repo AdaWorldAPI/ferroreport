@@ -258,7 +258,7 @@ fn round_half_even(int: &str, frac: &str, max_frac: usize) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::format::locale::{EN_US, ES_ES};
+    use crate::format::locale::{DE_AT, DE_CH, DE_DE, EN_US, ES_ES};
 
     fn fmt(p: &str, v: Value) -> String {
         NumberPattern::parse(p, &EN_US).format(&v, &EN_US).unwrap()
@@ -293,5 +293,17 @@ mod tests {
     fn locale_symbols() {
         let p = NumberPattern::parse("#,##0.00", &ES_ES);
         assert_eq!(p.format(&Value::Double(1234.5), &ES_ES).unwrap(), "1.234,50");
+    }
+
+    #[test]
+    fn german_symbols() {
+        // Values printed by Java 21.
+        let v = Value::Double(1234567.5);
+        let p = NumberPattern::parse("#,##0.00", &DE_DE);
+        assert_eq!(p.format(&v, &DE_DE).unwrap(), "1.234.567,50");
+        let p = NumberPattern::parse("#,##0.00", &DE_AT);
+        assert_eq!(p.format(&v, &DE_AT).unwrap(), "1\u{A0}234\u{A0}567,50");
+        let p = NumberPattern::parse("#,##0.00", &DE_CH);
+        assert_eq!(p.format(&v, &DE_CH).unwrap(), "1\u{2019}234\u{2019}567.50");
     }
 }
