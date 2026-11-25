@@ -447,14 +447,16 @@ Y con 100,000 filas (JasperReports una vez por formato, ferroreport la mediana d
 |---|---|---|---|---|
 | PDF | 11.53 s, 876 MiB | 1.28 s, 14 MiB | 9.0× | 64× |
 | XLSX | 6.63 s, 748 MiB | 3.12 s, 66 MiB | 2.1× | 11× |
-| ODS | 8.02 s, 715 MiB | 3.45 s, 246 MiB | 2.3× | 2.9× |
-| ODT | 7.80 s, 692 MiB | 2.45 s, 264 MiB | 3.2× | 2.6× |
+| ODS | 8.02 s, 715 MiB | 5.32 s, 68 MiB | 1.5× | 11× |
+| ODT | 7.80 s, 692 MiB | 4.41 s, 38 MiB | 1.8× | 18× |
 
 PDF, DOCX y CSV se escriben página por página, así que su memoria no crece.
-Las columnas de una hoja salen de todas las páginas, así que XLSX y ODS llenan dos veces un
-reporte grande, y ODS y ODT guardan la hoja o el texto en memoria hasta el final (sus estilos van
-primero en el archivo): su memoria crece con el reporte, la de ODS y ODT más. Son las salidas en
-las que ferroreport saca menos ventaja.
+Las columnas de una hoja salen de todas las páginas, así que XLSX llena dos veces un reporte
+grande; los estilos de un archivo OpenDocument van antes del contenido, así que un ODT grande se
+llena dos veces y un ODS grande tres. Así su memoria tampoco crece, a cambio de tiempo: son las
+salidas en las que ferroreport saca menos ventaja en velocidad. (Las filas de ODS y ODT de
+ferroreport con 100,000 filas se midieron otra vez después de ese cambio, en el mismo tipo de
+máquina; las de JasperReports son de las mismas pruebas que el resto.)
 
 **Contra JasperReports 7.1.1.** Las mismas pruebas, con los fixtures convertidos a JRXML 7 para
 los dos motores ([docs/benchmarks-7.1.1.json](docs/benchmarks-7.1.1.json)): en frío, 205 y 200
