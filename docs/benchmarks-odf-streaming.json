@@ -1,0 +1,48 @@
+{
+ "20k-xlsx": {
+  "seconds": 0.483668,
+  "mib": 60.62109375,
+  "bytes": 1193829
+ },
+ "20k-ods": {
+  "seconds": 0.516111,
+  "mib": 102.23828125,
+  "bytes": 404492
+ },
+ "20k-odt": {
+  "seconds": 0.505487,
+  "mib": 65.14453125,
+  "bytes": 475007
+ },
+ "100k": {
+  "rows": 100000,
+  "ferroreport": {
+   "seconds": 1.261192,
+   "mib": 15.515625,
+   "bytes": 6101993
+  },
+  "outputs": {
+   "xlsx": {
+    "ferroreport": {
+     "seconds": 3.101659,
+     "mib": 68.60546875,
+     "bytes": 5976665
+    }
+   },
+   "ods": {
+    "ferroreport": {
+     "seconds": 5.320331,
+     "mib": 68.171875,
+     "bytes": 1915397
+    }
+   },
+   "odt": {
+    "ferroreport": {
+     "seconds": 4.412282,
+     "mib": 37.66015625,
+     "bytes": 2311146
+    }
+   }
+  }
+ }
+}
