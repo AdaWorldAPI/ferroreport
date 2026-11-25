@@ -6,6 +6,15 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### Fixes
+
+- `FaceData` and `FontSet` are again `UnwindSafe` and `RefUnwindSafe`, as in 1.1.0 (the move to
+  harfrust had dropped both).
+- README: the PyPI package is listed as available, and the two Contributing sections are one.
+- Benchmarks: ferroreport's ODS and ODT at 100,000 rows measured again now that they are written
+  as they are made: 68 MiB and 38 MiB (were 246 and 264), in 5.3 s and 4.4 s (were 3.5 and 2.5;
+  `docs/benchmarks-odf-streaming.json`).
+
 ### OpenDocument: large reports in the memory of a small one
 
 - ODS and ODT no longer keep the document's body in memory until it is written. Their styles

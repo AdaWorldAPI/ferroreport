@@ -184,7 +184,7 @@
 
     <h3 class="bench-title">Each format: what an output costs</h3>
     <p class="fine">The 20,000-row report, cold, to each format both engines write. PDF, Word and CSV are written page by page;
-      a sheet's columns come from every page, and ODS and ODT are kept in memory until the end, so those take more memory.</p>
+      a sheet's columns come from every page and an OpenDocument file's styles come before its body, so large ones are filled more than once.</p>
     <div class="bench">
       <div class="bench-row">
         <h3>PDF <span>23× faster · 463 → 14 MiB</span></h3>
