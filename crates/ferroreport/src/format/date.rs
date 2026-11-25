@@ -106,5 +106,9 @@ mod tests {
         let jan = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap().and_hms_opt(0, 0, 0).unwrap();
         assert_eq!(format_date("MMM", &jan, &DE_AT).unwrap(), "Jän.");
         assert_eq!(format_date("MMM", &jan, &DE_DE).unwrap(), "Jan.");
+        // No pattern: Java 21 SHORT/SHORT for every German locale is `dd.MM.yy, HH:mm`.
+        for l in [&DE_DE, &DE_AT] {
+            assert_eq!(format_date(crate::format::short_date_time(l), &dt, l).unwrap(), "05.03.26, 14:07");
+        }
     }
 }

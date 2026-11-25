@@ -438,6 +438,7 @@ pub fn call(name: &str, args: Vec<Value>, env: &EvalEnv) -> Result<Value> {
             let pattern = match text(&a(3)) {
                 Some(p) => p,
                 None if env.locale.tag.starts_with("es") => "H:mm:ss z".to_string(),
+                None if env.locale.tag.starts_with("de") => "HH:mm:ss z".to_string(),
                 None => "h:mm:ss\u{202F}a z".to_string(),
             };
             date_format(name, &at, &pattern, env.locale)
