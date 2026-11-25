@@ -6,8 +6,8 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## 1.2.0
 
-PowerPoint export, charts drawn as JasperReports 7 draws them, OpenDocument files of any size
-in little memory, fonts that fall back for missing characters, hyphenation, a designer for
+PowerPoint export, charts drawn as JasperReports 7 draws them, large OpenDocument files in the
+memory of a small one, fonts that fall back for missing characters, hyphenation, a designer for
 people who do not program, and text shaped with harfrust. Every 1.1 template renders as before
 and the Rust API keeps 1.1's shape (`cargo semver-checks` against 1.1.0).
 
