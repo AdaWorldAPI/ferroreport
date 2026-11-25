@@ -441,6 +441,17 @@ struct Parser {
     page_height: f32,
     /// The report's `<property>` values, defaults for element properties.
     report_properties: Vec<(String, String)>,
+    /// How charts are drawn (`net.sf.jasperreports.chart.render.type`), from the report's
+    /// properties or a `jasperreports.properties` among the resources.
+    chart_render_type: Option<String>,
+}
+
+/// The value of `key` in a Java properties file.
+fn java_property(text: &str, key: &str) -> Option<String> {
+    text.lines().map(str::trim).filter(|l| !l.starts_with('#') && !l.starts_with('!')).find_map(|l| {
+        let at = l.find(['=', ':']).unwrap_or(l.len());
+        (l[..at].trim() == key).then(|| l.get(at + 1..).unwrap_or("").trim().to_string())
+    })
 }
 
 /// Most conditional styles one element may combine (variants are precomputed per subset).
@@ -527,7 +538,13 @@ impl Parser {
                     p.attr("name").map(|n| (n.to_string(), value))
                 })
                 .collect(),
+            chart_render_type: None,
         };
+        const RENDER_TYPE: &str = "net.sf.jasperreports.chart.render.type";
+        parser.chart_render_type =
+            parser.report_properties.iter().find(|(k, _)| k == RENDER_TYPE).map(|(_, v)| v.clone()).or_else(|| {
+                load("jasperreports.properties").and_then(|b| java_property(&String::from_utf8_lossy(&b), RENDER_TYPE))
+            });
         for (name, cond, props) in raw_conditionals {
             if let Some(e) = parser.expr(&cond)? {
                 parser.conditionals.entry(name).or_default().push((e, props));
@@ -1537,7 +1554,18 @@ impl Parser {
             None => Ok(None),
         };
         self.chart_count += 1;
-        Ok(ChartElement {
+        let settings = crate::chart::Settings {
+            show_open_ticks: flag(plot_node, &["isShowOpenTicks", "showOpenTicks"], false),
+            show_close_ticks: flag(plot_node, &["isShowCloseTicks", "showCloseTicks"], false),
+            foreground_alpha: plot.and_then(|p| p.attr("foregroundAlpha")).and_then(number::<f32>).unwrap_or(1.0),
+            svg: chart
+                .and_then(|c| c.attr("renderType"))
+                .map(str::to_string)
+                .or_else(|| self.chart_render_type.clone())
+                .as_deref()
+                == Some("svg"),
+        };
+        let element = ChartElement {
             dial,
             axes,
             axis_color,
@@ -1602,7 +1630,9 @@ impl Parser {
             plot_backcolor: color(plot, "backcolor"),
             value_format,
             boxed,
-        })
+        };
+        crate::chart::set_settings(&element, settings);
+        Ok(element)
     }
 
     /// The plot of a meter or thermometer (`<meterPlot>`, `<thermometerPlot>`).

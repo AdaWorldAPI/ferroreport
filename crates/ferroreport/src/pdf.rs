@@ -1061,6 +1061,15 @@ impl<W: std::io::Write> PdfStream<W> {
                     }
                 }
             }
+            Pixels::Raw { samples, gray: false, alpha: Some(alpha) } if keyed(image.id, samples, alpha) => {
+                // A chart bitmap: transparent pixels are black, and no other pixel is.
+                let compressed = deflate(samples);
+                let mut x = chunk.image_xobject(r, &compressed);
+                x.filter(Filter::FlateDecode);
+                x.width(image.width as i32).height(image.height as i32).bits_per_component(8);
+                x.color_space().device_rgb();
+                x.insert(Name(b"Mask")).array().items([0, 0, 0, 0, 0, 0]);
+            }
             Pixels::Raw { samples, gray, alpha } => {
                 self.raw_image(&mut chunk, r, image.width, image.height, samples, *gray, alpha.as_deref())?;
             }
@@ -1293,7 +1302,10 @@ impl<W: std::io::Write> PdfStream<W> {
                 | PrintItem::Link(_)
                 | PrintItem::Element(_) => {}
                 PrintItem::Path { ops, fill, stroke, dash } => {
-                    if ops.is_empty() || (fill.is_none() && stroke.is_none()) {
+                    // A path that neither fills nor strokes clips what follows it (up to the
+                    // end of the coordinate system it is in, charts' data areas).
+                    let clip = fill.is_none() && stroke.is_none();
+                    if ops.is_empty() || (clip && depth == 0) {
                         continue;
                     }
                     let y = |v: f64| ph - v as f32;
@@ -1341,7 +1353,8 @@ impl<W: std::io::Write> PdfStream<W> {
                     match (fill.is_some(), stroke.is_some()) {
                         (true, true) => c.fill_nonzero_and_stroke(),
                         (true, false) => c.fill_nonzero(),
-                        _ => c.stroke(),
+                        (false, true) => c.stroke(),
+                        (false, false) => c.clip_nonzero().end_path(),
                     };
                 }
                 PrintItem::Rect { x, y, w, h, fill, stroke, radius, path } => {
@@ -2521,6 +2534,17 @@ pub fn write_pdf(doc: &PrintDocument, fonts: &FontSet, options: &PdfOptions) -> 
         crate::sign::apply(&mut bytes, signature)?;
     }
     Ok(bytes)
+}
+
+/// Whether an RGB image is a chart bitmap whose transparent pixels a color key can mask:
+/// transparent pixels black, opaque ones not.
+fn keyed(id: usize, samples: &[u8], alpha: &[u8]) -> bool {
+    id >= crate::image::KEYED_IDS
+        && alpha.iter().zip(samples.chunks(3)).all(|(&a, c)| match a {
+            0 => c == [0, 0, 0],
+            255 => c != [0, 0, 0],
+            _ => false,
+        })
 }
 
 #[cfg(test)]

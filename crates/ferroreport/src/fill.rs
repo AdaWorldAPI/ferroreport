@@ -645,6 +645,7 @@ fn chart_over_run(
     inner.dataset.run = None;
     inner.evaluation_time = EvaluationTime::Now;
     inner.evaluation_group = None;
+    crate::chart::copy_settings(ch, &inner);
     let report = crate::table::chart_report(inner, run, w, h);
     let connection = images.connection.clone();
     let (params, records) = run_inputs(run, &report, scope, env, "chart", connection.as_ref())?;

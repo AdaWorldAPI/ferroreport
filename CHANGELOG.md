@@ -147,6 +147,55 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   details"; a three-step guide on the first visit; English and Spanish. Its browser tests run
   in CI.
 
+### Charts as JasperReports 7 draws them
+
+Charts follow JFreeChart 1.5's layout rules as JasperReports 7.1 uses them, measured against
+the charts of JasperReports' own samples, instead of an approximation of its look.
+Of JasperReports 7.1.1's 24 chart samples, 20 now come out pixel for pixel the same (none did
+before), which takes the 7.1.1 samples that match from 47 to 67 of 101. Still different: the
+bar chart sample with a chart customizer, meter and thermometer charts, and one page of the
+time period bar chart. JasperReports 6.20 draws charts with JFreeChart 1.0.19 (framed legend,
+3D charts in 3D), so its chart samples still differ.
+
+- Bar, stacked bar, line, area and stacked area charts (and their 3D variants, which
+  JasperReports 7 draws flat) come out the same as JasperReports draws them: plot insets, the
+  room the axes take, tick units and tick labels, category labels shortened with `...` the way
+  JFreeChart shortens them, legend items and spacing (no frame around the legend), series
+  colors, shapes and grid lines.
+- Pie charts come out the same as JasperReports draws them: the pie's size and place, its
+  shadow, section outlines, the labels' boxes, shadows and link lines, and how labels are
+  moved apart when they would overlap. 3D pie charts are drawn flat with their
+  `foregroundAlpha`, as JasperReports 7 draws them.
+- XY line, XY area, scatter, time series, XY bar, bubble, candlestick and high-low charts come
+  out the same as JasperReports draws them: number and date axes (JFreeChart's date tick
+  units, from milliseconds to years, and their formats), the room the range axis takes
+  decided before the domain axis's, series drawn last to first, shapes, bars, bubbles sized on
+  the range axis, candlestick bodies, wicks and volume bars. High-low charts draw open and
+  close ticks only when `isShowOpenTicks` and `isShowCloseTicks` ask for them, as in
+  JasperReports.
+- Gantt charts come out the same as JasperReports draws them: tasks down the left, the date
+  axis on top with JFreeChart's date ticks, bars placed as BarRenderer places them, and the
+  done and not-done parts of each task or subtask as a band through its middle.
+- Multiple axis charts made of bar and line charts come out the same as JasperReports draws
+  them: every chart's value axis beside the plot in the order given, each in its own color and
+  format, the grid lines of the first one, the last chart drawn first, and shapes handed out
+  chart after chart.
+- Where a chart drawn as SVG is translucent (3D pie sections with a `foregroundAlpha` below 1,
+  candlestick volume bars), the PDF gets the same opaque bitmaps JasperReports writes there,
+  pixel for pixel, instead of translucent vector shapes.
+- Text in charts is measured as JFreeChart measures it (AWT's whole-point font metrics) and
+  written as glyph outlines, as JasperReports writes it: chart text is no longer selectable
+  in the PDF.
+- `net.sf.jasperreports.chart.render.type=svg` (on the chart, in the report's properties or
+  in a `jasperreports.properties` among the resource folders) measures text the way
+  JasperReports does when it draws charts as SVG.
+- What a chart draws inside its plot is clipped to the plot, as in JasperReports.
+- The value axis of horizontal bar charts is above the plot, and a series color given alone
+  replaces only the first default color, as in JasperReports.
+- `tools/samples.py` runs JasperReports in the UTC time zone, like the rows' dates, so samples
+  that read a date's month or day (the time series ones) group their rows the same on any
+  machine.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`
