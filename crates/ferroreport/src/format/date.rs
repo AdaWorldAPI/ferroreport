@@ -84,7 +84,7 @@ pub fn format_date(pattern: &str, dt: &NaiveDateTime, locale: &Locale) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::format::locale::{EN_US, ES_DO};
+    use crate::format::locale::{DE_AT, DE_DE, EN_US, ES_DO};
     use chrono::NaiveDate;
 
     #[test]
@@ -97,5 +97,18 @@ mod tests {
         assert_eq!(format_date("'Q''s' yyyy", &dt, &EN_US).unwrap(), "Q's 2026");
         // Values printed by Java 21 for es-DO.
         assert_eq!(format_date("EEE MMM hh:mm a", &dt, &ES_DO).unwrap(), "jue mar 02:07 p.\u{202F}m.");
+    }
+
+    #[test]
+    fn formats_german_names() {
+        let dt = NaiveDate::from_ymd_opt(2026, 3, 5).unwrap().and_hms_opt(14, 7, 9).unwrap();
+        assert_eq!(format_date("EEEE, d. MMMM yyyy", &dt, &DE_DE).unwrap(), "Donnerstag, 5. März 2026");
+        let jan = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap().and_hms_opt(0, 0, 0).unwrap();
+        assert_eq!(format_date("MMM", &jan, &DE_AT).unwrap(), "Jän.");
+        assert_eq!(format_date("MMM", &jan, &DE_DE).unwrap(), "Jan.");
+        // No pattern: Java 21 SHORT/SHORT for every German locale is `dd.MM.yy, HH:mm`.
+        for l in [&DE_DE, &DE_AT] {
+            assert_eq!(format_date(crate::format::short_date_time(l), &dt, l).unwrap(), "05.03.26, 14:07");
+        }
     }
 }

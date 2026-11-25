@@ -15,6 +15,8 @@ use crate::value::Value;
 pub fn short_date_time(locale: &Locale) -> &'static str {
     if locale.tag.starts_with("es") {
         "d/M/yy, H:mm"
+    } else if locale.tag.starts_with("de") {
+        "dd.MM.yy, HH:mm"
     } else {
         "M/d/yy, h:mm\u{202F}a"
     }

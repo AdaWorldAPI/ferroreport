@@ -184,7 +184,7 @@ impl Renderer {
         }
     }
 
-    /// Sets the locale used for number and date formatting (`en_US`, `es_DO`, `es_ES`, ...).
+    /// Sets the locale used for number and date formatting (`en_US`, `es_DO`, `es_ES`, `de_DE`, ...).
     pub fn locale(mut self, tag: &str) -> Renderer {
         self.locale = Locale::from_tag(tag);
         self

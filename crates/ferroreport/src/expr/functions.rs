@@ -438,6 +438,7 @@ pub fn call(name: &str, args: Vec<Value>, env: &EvalEnv) -> Result<Value> {
             let pattern = match text(&a(3)) {
                 Some(p) => p,
                 None if env.locale.tag.starts_with("es") => "H:mm:ss z".to_string(),
+                None if env.locale.tag.starts_with("de") => "HH:mm:ss z".to_string(),
                 None => "h:mm:ss\u{202F}a z".to_string(),
             };
             date_format(name, &at, &pattern, env.locale)
@@ -655,7 +656,7 @@ fn parse_prefix(text: &str) -> Option<NaiveDateTime> {
 /// The day weeks start on (0 = Sunday), as `java.time.temporal.WeekFields.of(locale)` says.
 fn first_day_of_week(locale: &Locale) -> u32 {
     match locale.tag {
-        "es_ES" => 1,
+        "es_ES" | "de_DE" | "de_AT" | "de_CH" => 1,
         _ => 0,
     }
 }
@@ -663,7 +664,7 @@ fn first_day_of_week(locale: &Locale) -> u32 {
 /// The days a first week must have in the new year to be week 1.
 fn minimal_days(locale: &Locale) -> i64 {
     match locale.tag {
-        "es_ES" => 4,
+        "es_ES" | "de_DE" | "de_AT" | "de_CH" => 4,
         _ => 1,
     }
 }
