@@ -471,3 +471,217 @@ export function sampleFor(root) {
   })));
   return rows(declaredFields(root), 3);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Text without code: an expression made of texts and values joined with + is shown and edited
+// as `.ferro` 1.1 writes a `text`: `"Invoice " + $F{number}` is `Invoice {number}`. `$P{}`,
+// `$V{}` and `$R{}` stay as they are written; `\{`, `\}`, `\$` and `\\` are the characters
+// themselves. Anything else (a method call, arithmetic, a condition) is a formula, and is left
+// as it is written.
+
+// A name in `{name}`: letters, digits and `_`, not starting with a digit, in parts joined by `.`
+// (as template.rs `field_ref` reads it).
+const NAME_START = /[\p{Alphabetic}_]/u;
+const NAME_CHAR = /[\p{Alphabetic}\p{N}_]/u;
+const HOLE_AHEAD = /^\{[\p{Alphabetic}_][\p{Alphabetic}\p{N}_]*(?:\.[\p{Alphabetic}_][\p{Alphabetic}\p{N}_]*)*\}(?!\})/u;
+const SHORT_NAME = /^[\p{Alphabetic}_][\p{Alphabetic}\p{N}_]*(?:\.[\p{Alphabetic}_][\p{Alphabetic}\p{N}_]*)*$/u;
+
+/** Where `{name}` that starts at `i` ends (the index of its `}`), or -1. */
+function fieldRef(cs, i) {
+  let j = i + 1;
+  for (;;) {
+    if (!(j < cs.length && NAME_START.test(cs[j]))) return -1;
+    while (j < cs.length && NAME_CHAR.test(cs[j])) j++;
+    if (cs[j] === ".") j++;
+    else if (cs[j] === "}" && cs[j + 1] !== "}") return j;
+    else return -1;
+  }
+}
+
+/**
+ * A text as the designer's Text box (and `.ferro`) reads it: `[{ lit }, { ref: { kind, name } }]`,
+ * where `kind` is F, P, V or R. Adjacent characters are one `lit`.
+ */
+export function parseText(text) {
+  const cs = [...(text || "")];
+  const segs = [];
+  let lit = "";
+  let i = 0;
+  while (i < cs.length) {
+    const c = cs[i];
+    if (c === "\\" && i + 1 < cs.length && "{}$=\\".includes(cs[i + 1])) {
+      lit += cs[i + 1];
+      i += 2;
+      continue;
+    }
+    let ref = null;
+    if (c === "$" && i + 2 < cs.length && "FPVR".includes(cs[i + 1]) && cs[i + 2] === "{") {
+      let e = -1;
+      for (let j = i + 3; j < cs.length; j++) if (cs[j] === "}" || cs[j] === "{" || cs[j] === "\n") { e = j; break; }
+      if (e > i + 3 && cs[e] === "}") ref = { kind: cs[i + 1], name: cs.slice(i + 3, e).join(""), next: e + 1 };
+    } else if (c === "{" && (i === 0 || cs[i - 1] !== "{")) {
+      const e = fieldRef(cs, i);
+      if (e !== -1) ref = { kind: "F", name: cs.slice(i + 1, e).join(""), next: e + 1 };
+    }
+    if (ref) {
+      if (lit) segs.push({ lit });
+      lit = "";
+      segs.push({ ref: { kind: ref.kind, name: ref.name } });
+      i = ref.next;
+    } else {
+      lit += c;
+      i += 1;
+    }
+  }
+  if (lit) segs.push({ lit });
+  return segs;
+}
+
+/** A Java string literal, as template.rs `java_string` writes it. */
+export function javaString(s) {
+  return `"${s.replace(/[\\"\n\t\r]/g, (c) => ({ "\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r" })[c])}"`;
+}
+
+const refText = ({ kind, name }) => `$${kind}{${name}}`;
+
+/**
+ * What the Text box's text makes: `{ static: "..." }` when it has no values in it, or
+ * `{ expression: "..." }`, the expression `.ferro` makes of it.
+ */
+export function textToExpression(text) {
+  const segs = parseText(text);
+  if (!segs.some((s) => s.ref)) return { static: segs.map((s) => s.lit).join("") };
+  const parts = segs.map((s) => (s.ref ? refText(s.ref) : javaString(s.lit)));
+  // `{a}{b}` joins two texts, not two numbers.
+  if (segs.length > 1 && segs[0].ref && segs[1].ref) parts.unshift('""');
+  return { expression: parts.join(" + ") };
+}
+
+/** The parts of an expression that is only texts and values joined with +, or null. */
+function exprTerms(expr) {
+  const s = expr || "";
+  let i = 0;
+  const terms = [];
+  const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
+  ws();
+  if (i >= s.length) return null;
+  for (;;) {
+    ws();
+    if (s[i] === '"') {
+      let lit = "";
+      i++;
+      for (;;) {
+        if (i >= s.length || s[i] === "\n") return null;
+        const c = s[i];
+        if (c === '"') { i++; break; }
+        if (c === "\\") {
+          const n = s[i + 1];
+          const simple = { '"': '"', "\\": "\\", n: "\n", t: "\t", r: "\r", "'": "'", b: "\b", f: "\f" };
+          if (n in simple) { lit += simple[n]; i += 2; continue; }
+          const u = /^u+([0-9a-fA-F]{4})/.exec(s.slice(i + 1));
+          if (u) { lit += String.fromCharCode(parseInt(u[1], 16)); i += 1 + u[0].length; continue; }
+          return null;
+        }
+        lit += c;
+        i++;
+      }
+      terms.push({ lit });
+    } else {
+      const m = /^\$([FPVR])\{([^{}\n]+)\}/.exec(s.slice(i));
+      if (!m) return null;
+      terms.push({ ref: { kind: m[1], name: m[2] } });
+      i += m[0].length;
+    }
+    ws();
+    if (i >= s.length) break;
+    if (s[i] !== "+") return null;
+    i++;
+  }
+  return terms;
+}
+
+/**
+ * What an expression of texts and values prints, in a form two expressions can be compared by:
+ * a value alone (which a number format applies to), or a text made of pieces. Null when it is not
+ * text: `$F{a} + $F{b}` adds two numbers.
+ */
+function meaning(terms) {
+  if (terms.length === 1 && terms[0].ref) return { value: terms[0].ref };
+  if (terms.length > 1 && !("lit" in terms[0]) && !("lit" in terms[1])) return null;
+  const pieces = [];
+  for (const t of terms) {
+    if (t.ref) pieces.push({ ref: t.ref });
+    else if (t.lit && pieces.length && "lit" in pieces[pieces.length - 1]) pieces[pieces.length - 1].lit += t.lit;
+    else if (t.lit) pieces.push({ lit: t.lit });
+  }
+  return { text: pieces };
+}
+
+/** The Text box's text for pieces of text and values; `full` escapes every special character. */
+function piecesToText(pieces, full) {
+  let out = "";
+  pieces.forEach((p, idx) => {
+    const prev = pieces[idx - 1];
+    const next = pieces[idx + 1];
+    if (p.ref) {
+      const short = p.ref.kind === "F" && SHORT_NAME.test(p.ref.name) && !out.endsWith("{");
+      out += short ? `{${p.ref.name}}` : refText(p.ref);
+      return;
+    }
+    const cs = [...p.lit];
+    cs.forEach((c, k) => {
+      const rest = cs.slice(k).join("");
+      const last = k === cs.length - 1;
+      let esc = full;
+      if (c === "\\") esc = esc || (last ? !!next : "{}$=\\".includes(cs[k + 1]));
+      else if (c === "{") esc = esc || HOLE_AHEAD.test(rest) || (last && next && next.ref && next.ref.kind === "F");
+      else if (c === "}") esc = esc || (k === 0 && prev && prev.ref);
+      else if (c === "$") esc = esc || /^\$[FPVR]\{/.test(rest) || (cs.length - k <= 2 && /^\$[FPVR]?$/.test(rest) && !!next);
+      else esc = false;
+      out += esc ? `\\${c}` : c;
+    });
+  });
+  return out;
+}
+
+const sameMeaning = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * The Text box's text for an expression, when it is only texts and values joined with +
+ * (`"Invoice " + $F{number}` is `Invoice {number}`, `$F{total}` is `{total}`), or null when it is
+ * a formula that the Text box cannot show as it is.
+ */
+export function expressionToText(expr) {
+  const terms = exprTerms(expr);
+  const m = terms && meaning(terms);
+  if (!m) return null;
+  const pieces = m.value ? [{ ref: m.value }] : m.text;
+  for (const full of [false, true]) {
+    const text = piecesToText(pieces, full);
+    const back = textToExpression(text);
+    const again = back.expression !== undefined ? exprTerms(back.expression) : [{ lit: back.static }];
+    if (again && sameMeaning(meaning(again), m)) return text;
+  }
+  return null;
+}
+
+/** The Text box's text for a static text: the text with its special characters escaped. */
+export function staticToText(s) {
+  return expressionToText(javaString(s || "")) ?? s;
+}
+
+/**
+ * How the canvas shows a text field: `{ segs }` (pieces of text and values) for one the Text
+ * box can show, or `{ formula: [...] }`, the formula with its values picked out.
+ */
+export function expressionSegments(expr) {
+  const text = expressionToText(expr);
+  if (text !== null) return { segs: parseText(text) };
+  const formula = [];
+  for (const p of (expr || "").split(/(\$[FPVR]\{[^{}\n]+\})/)) {
+    const m = /^\$([FPVR])\{(.+)\}$/.exec(p);
+    if (m) formula.push({ ref: { kind: m[1], name: m[2] } });
+    else if (p) formula.push({ lit: p });
+  }
+  return { formula };
+}

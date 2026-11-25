@@ -127,6 +127,17 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   as JasperReports does not do it; texts whose characters are all in their font are drawn as
   before either way.
 
+### Designer
+
+- The designer is easier for people who do not program: text and fields are written as
+  `Invoice {number} · {customer}` (type `{` to choose a field) and fields show on the page as
+  pills, formulas stay under Advanced untouched; the bands have plain names ("Each row of your
+  data") and empty ones are slim strips to drop on; the page fills the width, with the PDF in a
+  Preview tab and Download PDF (or Excel, Word, PowerPoint) as the main button; the properties are in
+  sections; problems are said in plain words, with the engine's message under "Technical
+  details"; a three-step guide on the first visit; English and Spanish. Its browser tests run
+  in CI.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`

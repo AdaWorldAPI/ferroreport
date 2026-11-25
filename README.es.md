@@ -189,9 +189,10 @@ mismos reportes, escritos como un esquema con sangría en vez de XML. Ocupa más
 que el JRXML, se puede escribir sin diseñador, y sus reportes son accesibles por defecto.
 
 Para hacer una plantilla sin escribirla, usa el **[diseñador](https://cristianencarnacion.github.io/ferroreport/designer/)**: corre en el
-navegador (no se sube nada), muestra los campos de una muestra de tus datos, te deja
-arrastrarlos a las bandas y darles estilo, enseña el PDF mientras trabajas y guarda `.ferro` y
-`.jrxml` (por ahora en inglés).
+navegador (no se sube nada), en español o en inglés: muestra los campos de una muestra de tus
+datos, te deja arrastrarlos a la página y darles estilo, escribe los textos con sus campos como
+`Factura {number}`, sin código, enseña el PDF en su vista previa, lo descarga en PDF, Excel o
+Word, y guarda `.ferro` y `.jrxml`.
 
 ```text
 report "Empleados" lang=es

@@ -282,24 +282,34 @@ ferroreport convert old.jrxml --to jrxml -o new.jrxml   # JRXML 6 -&gt; JRXML 7<
         in Rust. Every fixture renders to the same pixels from its JRXML, its JRXML 7 and its <code>.ferro</code>.</p>
 
       <h2 id="designer">The designer</h2>
-      <p>The <a href="designer/">designer</a> makes and changes templates in the browser, without writing them: a page with the
-        report's bands (title, page header, column header, detail, footers, summary) at real size, the fields of your data on the
-        left, and the PDF beside the page, made again a moment after every change. It runs on your computer (the engine is
-        WebAssembly), so neither the template nor the data leave it, and it keeps your work in the browser until you start a new
-        report.</p>
+      <p>The <a href="designer/">designer</a> makes and changes templates in the browser, without writing them and without knowing
+        JasperReports: the page in the middle, the fields of your data on the left, and what the selected part looks like on the
+        right. It runs on your computer (the engine is WebAssembly), so neither the template nor the data leave it, and it keeps
+        your work in the browser until you start a new report. It speaks English and Spanish (the EN / ES switch; at first, your
+        browser's language), and the first time it opens it shows a three-step guide, which Help, Getting started shows again.</p>
       <ol>
-        <li>Start from a blank report or an example, or open a <code>.ferro</code> or <code>.jrxml</code> file. A <code>.ferro</code>
-          that imports others opens when you select them together; a JSON file selected with it becomes the data.</li>
-        <li>Paste a sample of your data as JSON, or upload it. The designer lists its fields with their types (text, number,
-          date, yes/no, list).</li>
-        <li>Drag a field onto a band, or select a band and press the field. A field dropped on the detail band gets a heading in
-          the column header; numbers are aligned right with a format; a list (an array in each row) becomes a part that repeats
-          for each item, with its fields inside.</li>
-        <li>Add text, lines, rectangles, ellipses, images, the page number and today's date. Select a part to move it, resize it
-          by its handles or with <kbd>Shift</kbd> and the arrow keys, and change its text, font, colors, alignment, borders and
-          format in the properties panel. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
-        <li>Save the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7), or download the report as PDF,
-          Excel, Word or PowerPoint.</li>
+        <li>Start from the invoice example, a blank report or a file (File, Open a file…: a <code>.ferro</code> or
+          <code>.jrxml</code>; a <code>.ferro</code> that imports others opens when you select them together, and a JSON file
+          selected with it becomes the data).</li>
+        <li>Add your data: Upload data file, or Edit sample data (a list of rows in JSON). The designer lists its fields with
+          their types in plain words (text, number, whole number, date, yes or no, list).</li>
+        <li>Drag a field onto the page, or select an area and click the field. The areas have plain names: Report title (top
+          of the first page), Top of every page, Column titles, Each row of your data (it repeats), Below the rows, Bottom of
+          every page, End of the report (totals); their JasperReports names are in their tooltips. An empty area is a slim
+          strip that says <i>Add something here</i>. A field dropped on the rows gets a column title above it; numbers are
+          aligned right with a format; a list (an array in each row) becomes a part that repeats for each item, with its fields
+          inside.</li>
+        <li>Select a part to change it. Its Text box holds words and fields the way <code>.ferro</code> writes them,
+          <code>Invoice {number} · {customer}</code>: type <kbd>{</kbd>, or press Insert a field, to choose one, and the page
+          shows each field as a pill with its name. A text that is worked out with a formula (a method call, arithmetic, a
+          condition) is shown under Advanced, as JasperReports writes it, and is saved as it was. The rest is in sections: Look
+          (font, size, bold, italic, underline, colors), Alignment, Border, and, folded, Position and size and Advanced (grow to
+          fit, blank when there is no value, show only when, the formula). Number formats are chosen by an example (1,234.56,
+          $1,234.56, 12%, 2026-11-24). <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes; the arrow keys move.</li>
+        <li>Download PDF (the main button), or Excel, Word or PowerPoint from its menu; the Preview tab shows the PDF, made again a moment
+          after every change. File saves the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7). When the report
+          cannot be made, a message over the page says why in plain words and what to do, with the engine's own message under
+          Technical details.</li>
       </ol>
       <p>Parts it cannot edit yet (charts, tables, crosstabs, subreports, barcodes) are shown as boxes and saved as they were.
         Images are kept inside the template as <code>data:</code> URIs, which ferroreport reads and JasperReports does not: give
