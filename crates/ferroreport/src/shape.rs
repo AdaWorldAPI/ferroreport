@@ -234,7 +234,7 @@ impl<'a> Shaper<'a> {
             return;
         }
         let millis = 1000.0 / self.font.units_per_em() as f32;
-        // Right-to-left glyphs come out in visual order, clusters decreasing (rustybuzz left
+        // Right-to-left glyphs come out in visual order, clusters decreasing (harfrust left
         // them in reading order when the plan had features and they had to be reversed here;
         // harfrust does not).
         for (info, pos) in buf.glyph_infos().iter().zip(buf.glyph_positions()) {

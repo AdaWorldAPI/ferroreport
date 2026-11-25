@@ -46,6 +46,40 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   rustybuzz and self_cell. resvg still uses rustybuzz to lay out text in SVG images, so it stays
   in the build; `deny.toml` no longer needs to ignore its advisory.
 
+### Font fallback and hyphenation
+
+- Hyphenation of long words at line ends, when the template asks for it with ferroreport's own
+  report property `ferroreport.text.hyphenate` (JasperReports does not hyphenate, and ignores
+  it): `true` hyphenates every plain text of the report in the language of the render's locale,
+  `es`, `en_US`... in that language, `false` not at all. Tables, lists and subreports without a
+  setting of their own follow the report they are in. The property is also a parameter of the
+  same name, so a render can set it (`-p params.json`, the packages, the HTTP API) without
+  touching the template. On an element it is not read (a warning says so). A word that does not
+  fit is cut after the last syllable that fits with a hyphen, which is drawn. Plain text only;
+  the height of stretching texts and page splits follow the hyphenated lines. Patterns for
+  English, Spanish, French, Italian, Portuguese and Catalan are built in (hypher, MIT or
+  Apache-2.0, no dependencies; the command line grows by about 60 KB); the Cargo feature
+  `hyphenation-all` builds in all 48 languages of hypher, and `default-features = false`
+  leaves hyphenation out. Templates without the property render as before.
+- PDF: a character the text's font does not have is left out, as JasperReports leaves it out,
+  instead of being drawn as the font's missing-glyph box. It takes no width when the lines are
+  drawn and aligned, and still counts as wide as that box for the text's height and where it is
+  cut, as in JasperReports (checked against 6.20.6, identical pages). Text shaped with
+  harfrust (right to left, complex scripts) still shows the box.
+- Font sets, as the `<fontSet>` of a JasperReports font extension defines them:
+  `--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"` (or `Renderer::register_font_set`)
+  makes a text whose font name is `Serif Fallback` draw the characters DejaVu Serif lacks in
+  DejaVu Sans. The text is cut into runs as JasperReports cuts it: the longest run one family
+  has, in the first family that has all of it; a character no family has stays in the first
+  family. Measured, broken into lines and embedded in the PDF with the font of each run;
+  checked against JasperReports 6.20.6 with a font extension that defines the same sets
+  (fixture 56-font-fallback, identical PDF, XLSX and CSV).
+- `--font-fallback` (`Renderer::font_fallback`) does the same for every font, without a font
+  set: characters a text's font lacks are drawn in the first of the `--font` families (in the
+  order given), DejaVu Sans, DejaVu Serif and DejaVu Sans Mono that has them. Off by default,
+  as JasperReports does not do it; texts whose characters are all in their font are drawn as
+  before either way.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`

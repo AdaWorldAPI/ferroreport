@@ -15,7 +15,7 @@ use crate::format::format_value;
 use crate::image::{ImageData, ImageStore};
 use crate::model::*;
 use crate::print::*;
-use crate::text::{break_lines, text_after_lines, text_before_line, vertical_metrics, Measure};
+use crate::text::{break_lines_hyphenated, text_after_lines, text_before_line, vertical_metrics, Measure};
 use crate::value::{JavaType, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -779,32 +779,42 @@ fn printed_text(
     };
     let p = te.boxed.padding;
     let (cw, ch) = ((w - p.left - p.right).max(0.0), h - p.top - p.bottom);
-    if te.markup != crate::rich::Markup::None {
-        let st = crate::rich::parse(text, &run_style(te, color), te.markup);
-        let (k, total, rest) = crate::rich::lines_that_fit(&st, fonts, cw, te.style.line_spacing, ch);
-        let mut out = st.text;
-        if k < total {
-            out.truncate(rest);
-            if out.ends_with('\n') {
-                out.pop();
+    let te = match text_form(fonts, te, color, text) {
+        TextForm::Plain(te) => te,
+        TextForm::Styled(st) => {
+            let (k, total, rest) = crate::rich::lines_that_fit(&st, fonts, cw, te.style.line_spacing, ch);
+            let mut out = st.text;
+            if k < total {
+                out.truncate(rest);
+                if out.ends_with('\n') {
+                    out.pop();
+                }
             }
+            if te.markup == crate::rich::Markup::None {
+                // Plain text in more than one font is still plain text to other exporters.
+                return (out, Vec::new());
+            }
+            // Other exporters name the fonts the markup names (a font set, not its families).
+            let runs =
+                if fonts.resolves_fonts() { crate::rich::parse(text, &run_style(te, color), te.markup).runs } else { st.runs };
+            let runs = runs
+                .into_iter()
+                .filter(|r| r.start < out.len() && r.end > r.start)
+                .map(|mut r| {
+                    r.end = r.end.min(out.len());
+                    r
+                })
+                .collect();
+            return (out, runs);
         }
-        let runs = st
-            .runs
-            .into_iter()
-            .filter(|r| r.start < out.len() && r.end > r.start)
-            .map(|mut r| {
-                r.end = r.end.min(out.len());
-                r
-            })
-            .collect();
-        return (out, runs);
-    }
+    };
+    let te = &*te;
+    let hyphenator = fonts.hyphenator();
     let face_id = fonts.resolve(&te.style.font);
     let face = fonts.face(face_id);
     let size = te.style.font.size;
     let vm = vertical_metrics(face, size, te.style.line_spacing);
-    let lines = break_lines(text, face, size, cw, Measure::Fill);
+    let lines = break_lines_hyphenated(text, face, size, cw, Measure::Fill, hyphenator);
     let fit = vm.lines_that_fit(ch).min(lines.len());
     if te.truncate.keep_full {
         return (text.to_string(), Vec::new());
@@ -925,12 +935,53 @@ fn text_item(
         // Rotated text does not stretch the element.
         return (PrintItem::Transform(m, vec![item]), h);
     }
-    if te.markup != crate::rich::Markup::None {
-        let st = crate::rich::parse(text, &run_style(te, color), te.markup);
-        return crate::rich::layout(fonts, te, &st, x, y, w, h, clip);
+    match text_form(fonts, te, color, text) {
+        TextForm::Styled(st) => crate::rich::layout(fonts, te, &st, x, y, w, h, clip),
+        TextForm::Plain(te) => {
+            let (t, needed) = plain_text_item(fonts, &te, color, x, y, w, h, text, clip);
+            (PrintItem::Text(t), needed)
+        }
     }
-    let (t, needed) = plain_text_item(fonts, te, color, x, y, w, h, text, clip);
-    (PrintItem::Text(t), needed)
+}
+
+/// How a text element's text is laid out: in its font alone, or as styled runs. Short-lived,
+/// on the stack: the element is copied only when its font changes, which is rare.
+#[allow(clippy::large_enum_variant)]
+enum TextForm<'a> {
+    /// In one font: the element's, or the one family of its font set (or fallback) that has
+    /// every character.
+    Plain(std::borrow::Cow<'a, TextElement>),
+    /// Styled or HTML markup, or a text drawn in more than one font (font sets, fallback).
+    Styled(crate::rich::StyledText),
+}
+
+fn text_form<'a>(fonts: &mut FontSet, te: &'a TextElement, color: Color, text: &str) -> TextForm<'a> {
+    if te.markup != crate::rich::Markup::None {
+        let mut st = crate::rich::parse(text, &run_style(te, color), te.markup);
+        st.resolve_fonts(fonts);
+        return TextForm::Styled(st);
+    }
+    let normalized = crate::text::normalize(text);
+    match fonts.fallback_runs(&te.style.font, &normalized) {
+        None => TextForm::Plain(std::borrow::Cow::Borrowed(te)),
+        Some(runs) if runs.len() == 1 => {
+            let mut te = te.clone();
+            te.style.font.name = runs[0].2.clone();
+            TextForm::Plain(std::borrow::Cow::Owned(te))
+        }
+        Some(runs) => {
+            let base = run_style(te, color);
+            let runs = runs
+                .into_iter()
+                .map(|(start, end, family)| {
+                    let mut style = base.clone();
+                    style.font.name = family;
+                    crate::rich::Run { start, end, style }
+                })
+                .collect();
+            TextForm::Styled(crate::rich::StyledText { text: normalized.into_owned(), runs, paras: Vec::new() })
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -954,7 +1005,8 @@ fn plain_text_item(
     // Like JasperReports: the fill-time measurement decides the height and where the text is
     // cut; the export-time measurement decides the drawn line breaks.
     let vm = vertical_metrics(face, size, te.style.line_spacing);
-    let fill_lines = break_lines(text, face, size, cw, Measure::Fill);
+    let hyphenator = fonts.hyphenator();
+    let fill_lines = break_lines_hyphenated(text, face, size, cw, Measure::Fill, hyphenator);
     let needed = p.top + p.bottom + vm.block_height(fill_lines.len());
     let fit = if clip { vm.lines_that_fit(ch).min(fill_lines.len()) } else { fill_lines.len() };
     let rendered_text = if fit < fill_lines.len() {
@@ -969,7 +1021,7 @@ fn plain_text_item(
         Some(st) => Measure::Standard(st.font),
         None => Measure::Render,
     };
-    let mut lines = break_lines(&rendered_text, face, size, cw, render);
+    let mut lines = break_lines_hyphenated(&rendered_text, face, size, cw, render, hyphenator);
     if clip {
         lines.truncate(vm.lines_that_fit(ch));
     }
@@ -1512,50 +1564,61 @@ fn layout_elements(le: &mut LayoutEnv, original: &[Element], design_h: f32, avai
             }
             if y + h > a + 1e-3 {
                 match &el.kind {
-                    ElementKind::Text(te) if te.stretch && m.text.is_some() && te.markup != crate::rich::Markup::None => {
-                        // Styled text continues on the next page as styled markup.
-                        let text = m.text.take().unwrap_or_default();
-                        let base = run_style(te, el.forecolor);
-                        let st = crate::rich::parse(&text, &base, te.markup);
-                        let p = te.boxed.padding;
-                        let (k, total, rest_at) = crate::rich::lines_that_fit(
-                            &st,
-                            le.fonts,
-                            (w - p.left - p.right).max(0.0),
-                            te.style.line_spacing,
-                            a - y - p.top - p.bottom,
-                        );
-                        let cont = |s: String| {
-                            let mut e = freeze(el, Some(s));
-                            if let ElementKind::Text(t) = &mut e.kind {
-                                t.markup = crate::rich::Markup::Styled;
-                            }
-                            e
-                        };
-                        if k == 0 {
-                            rest.push(cont(st.to_styled_markup(&base)));
-                            continue;
-                        }
-                        if k < total {
-                            rest.push(cont(st.tail(rest_at).to_styled_markup(&base)));
-                        }
-                        m.text = Some(text);
-                        h = a - y;
-                    }
                     ElementKind::Text(te) if te.stretch && m.text.is_some() => {
                         let text = m.text.take().unwrap_or_default();
-                        let face = le.fonts.resolve(&te.style.font);
-                        let f = le.fonts.face(face);
                         let p = te.boxed.padding;
-                        let lines = break_lines(&text, f, te.style.font.size, (w - p.left - p.right).max(0.0), Measure::Fill);
-                        let vm = vertical_metrics(f, te.style.font.size, te.style.line_spacing);
-                        let k = vm.lines_that_fit(a - y - p.top - p.bottom);
+                        let (cw, room) = ((w - p.left - p.right).max(0.0), a - y - p.top - p.bottom);
+                        // How many lines stay on this page, and what continues on the next.
+                        let (k, cont) = match text_form(le.fonts, te, el.forecolor, &text) {
+                            TextForm::Styled(st) if te.markup != crate::rich::Markup::None => {
+                                // Styled text continues on the next page as styled markup.
+                                let base = run_style(te, el.forecolor);
+                                let (k, total, rest_at) =
+                                    crate::rich::lines_that_fit(&st, le.fonts, cw, te.style.line_spacing, room);
+                                let raw = crate::rich::parse(&text, &base, te.markup);
+                                let styled = |s: String| {
+                                    let mut e = freeze(el, Some(s));
+                                    if let ElementKind::Text(t) = &mut e.kind {
+                                        t.markup = crate::rich::Markup::Styled;
+                                    }
+                                    e
+                                };
+                                let cont = match k {
+                                    0 => Some(styled(raw.to_styled_markup(&base))),
+                                    k if k < total => Some(styled(raw.tail(rest_at).to_styled_markup(&base))),
+                                    _ => None,
+                                };
+                                (k, cont)
+                            }
+                            TextForm::Styled(st) => {
+                                // Plain text in more than one font continues as plain text.
+                                let (k, total, rest_at) =
+                                    crate::rich::lines_that_fit(&st, le.fonts, cw, te.style.line_spacing, room);
+                                let cont = match k {
+                                    0 => Some(freeze(el, Some(text.clone()))),
+                                    k if k < total => Some(freeze(el, Some(st.text[rest_at..].to_string()))),
+                                    _ => None,
+                                };
+                                (k, cont)
+                            }
+                            TextForm::Plain(te) => {
+                                let hyphenator = le.fonts.hyphenator();
+                                let face = le.fonts.resolve(&te.style.font);
+                                let f = le.fonts.face(face);
+                                let lines = break_lines_hyphenated(&text, f, te.style.font.size, cw, Measure::Fill, hyphenator);
+                                let vm = vertical_metrics(f, te.style.font.size, te.style.line_spacing);
+                                let k = vm.lines_that_fit(room);
+                                let cont = match k {
+                                    0 => Some(freeze(el, Some(text.clone()))),
+                                    k if k < lines.len() => Some(freeze(el, Some(text_after_lines(&text, &lines, k)))),
+                                    _ => None,
+                                };
+                                (k, cont)
+                            }
+                        };
+                        rest.extend(cont);
                         if k == 0 {
-                            rest.push(freeze(el, Some(text)));
                             continue;
-                        }
-                        if k < lines.len() {
-                            rest.push(freeze(el, Some(text_after_lines(&text, &lines, k))));
                         }
                         m.text = Some(text);
                         h = a - y;
@@ -2213,6 +2276,7 @@ fn run_subreport(le: &mut LayoutEnv, sr: &SubreportElement) -> Result<(Vec<Segme
         params.insert(name.clone(), eval(e, le.scope, le.env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| le.scope.param("REPORT_LOCALE").unwrap_or_default());
+    inherit_hyphenation(&mut params, &report, le.scope);
 
     let connection = le.images.connection.clone();
     let records = match (&sr.data_source, sr.connection, connection, &report.query) {
@@ -2818,6 +2882,7 @@ fn run_inputs(
         params.insert(name.clone(), eval(e, scope, env)?);
     }
     params.entry("REPORT_LOCALE".into()).or_insert_with(|| scope.param("REPORT_LOCALE").unwrap_or_default());
+    inherit_hyphenation(&mut params, report, scope);
     if let Ok(bundle) = scope.param(crate::expr::eval::RESOURCE_BUNDLE) {
         params.entry(crate::expr::eval::RESOURCE_BUNDLE.into()).or_insert(bundle);
     }
@@ -2835,6 +2900,17 @@ fn run_inputs(
     };
     let records = crate::data::records_from_json(report, &rows)?;
     Ok((params, records))
+}
+
+/// A subreport, table or list without a hyphenation setting of its own hyphenates as the
+/// report it is in does, unless it is handed one.
+fn inherit_hyphenation(params: &mut HashMap<String, Value>, report: &Report, outer: &dyn Scope) {
+    let own = report.parameters.iter().any(|p| p.name == crate::text::HYPHENATE);
+    if let (false, Ok(v)) = (own, outer.param(crate::text::HYPHENATE)) {
+        if !v.is_null() {
+            params.entry(crate::text::HYPHENATE.into()).or_insert(v);
+        }
+    }
 }
 
 /// The parameters a report fills with: those given, the built-in ones, then the defaults of
@@ -4219,6 +4295,21 @@ fn fill_flow(
 ) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
     // A horizontal list is filled twice: once to learn how tall each row ends, since every
     // cell of a row is as tall as its tallest, and once to lay the cells out at that height.
+    // A nested report's hyphenation lasts while it is filled.
+    let outer = fonts.set_hyphenation(None);
+    let filled = fill_flow_inner(report, records, params, fonts, images, env);
+    fonts.restore_hyphenation(outer);
+    filled
+}
+
+fn fill_flow_inner(
+    report: &Report,
+    records: &[Record],
+    params: HashMap<String, Value>,
+    fonts: &mut FontSet,
+    images: &mut ImageStore,
+    env: &EvalEnv,
+) -> Result<(Vec<Segment>, HashMap<String, Value>)> {
     let mut row_heights = Vec::new();
     if report.horizontal {
         let mut first = new_filler(report, Rows::from_slice(records, report), params.clone(), fonts, images, env)?;
@@ -4290,6 +4381,7 @@ fn new_filler<'a>(
     images: &'a mut ImageStore,
     env: &'a EvalEnv<'a>,
 ) -> Result<Filler<'a>> {
+    fonts.set_language(env.locale.tag);
     // Built-in variables, in the order Jasper declares them.
     let count_var = |name: String, reset: ResetType| VarDef {
         name,
@@ -4364,6 +4456,7 @@ fn new_filler<'a>(
         };
         params.insert(p.name.clone(), v);
     }
+    fonts.set_hyphenation(params.get(crate::text::HYPHENATE));
 
     let committed = vec![VarState::default(); defs.len()];
     Ok(Filler {

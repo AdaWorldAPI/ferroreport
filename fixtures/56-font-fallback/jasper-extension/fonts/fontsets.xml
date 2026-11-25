@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fontFamilies>
+	<fontSet name="Serif Fallback">
+		<family familyName="DejaVu Serif" primary="true"/>
+		<family familyName="DejaVu Sans"/>
+	</fontSet>
+	<fontSet name="Mono Fallback">
+		<family familyName="DejaVu Sans Mono" primary="true"/>
+		<family familyName="DejaVu Serif"/>
+		<family familyName="DejaVu Sans"/>
+	</fontSet>
+</fontFamilies>

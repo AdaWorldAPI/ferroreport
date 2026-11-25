@@ -387,7 +387,7 @@ cada vez (también interpreta la plantilla). Mediana por reporte:
 | 20,000 filas, 477 páginas | 1170.3 ms | 222.3 ms | 5.3× |
 
 El reporte en árabe (el fixture `52-arabic`) se compone en cada corrida: las letras se unen con
-rustybuzz y las líneas se ordenan de derecha a izquierda con el algoritmo bidireccional de
+harfrust y las líneas se ordenan de derecha a izquierda con el algoritmo bidireccional de
 Unicode.
 
 **Muchos a la vez: un servicio con carga.** La misma JVM en caliente y el mismo ferroreport,
@@ -528,10 +528,13 @@ códigos de barras y un formato de plantilla propio. Lo que viene, en versiones 
 - **Más formatos:** PPTX, como lo escribe el exportador de JasperReports (ODS y ODT ya están).
 - **Texto de cualquier escritura, lo que falta:** el árabe y el hebreo ya van de derecha a
   izquierda y el devanagari, el tailandés y las demás escrituras complejas ya se componen con su
-  forma (ver Text en la tabla de compatibilidad del README en inglés); falta la separación
-  silábica, usar otra fuente para los caracteres que le faltan a la elegida y un diccionario
-  para cortar líneas en tailandés, lao, jemer y birmano. El motor de composición es harfrust, el
-  port a Rust que mantiene el proyecto HarfBuzz (reemplazó a rustybuzz, que ya no se mantiene).
+  forma (ver Text en la tabla de compatibilidad del README en inglés), y los caracteres que le
+  faltan a la fuente elegida se pueden dibujar con otra (conjuntos de fuentes con `--font-set` y
+  `--font-fallback`) y el texto simple se puede separar en sílabas al final de la línea
+  (`ferroreport.text.hyphenate`); falta un diccionario para cortar líneas en tailandés, lao,
+  jemer y birmano, y separar en sílabas el texto con formato (styled y HTML). El motor de
+  composición es harfrust, el port a Rust que mantiene el proyecto HarfBuzz (reemplazó a
+  rustybuzz, que ya no se mantiene).
 - **Gráficos píxel por píxel** como JFreeChart (hoy siguen de cerca su estilo).
 - **Mapas** y los demás componentes propios; firmas PAdES con sello de tiempo (B-T, B-LT) y con
   recuadro visible.

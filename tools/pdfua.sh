@@ -20,6 +20,9 @@ for dir in "$root"/fixtures/*/; do
   if [ -f "$dir/fonts.txt" ]; then
     while IFS= read -r f; do p=${f#*=}; [ -n "$f" ] && [ -f "${p%%:*}" ] && args+=(--font "$f"); done < "$dir/fonts.txt"
   fi
+  if [ -f "$dir/fontsets.txt" ]; then
+    while IFS= read -r f; do [ -n "$f" ] && args+=(--font-set "$f"); done < "$dir/fontsets.txt"
+  fi
   "$bin" render "${args[@]}" 2>/dev/null || echo "$name: not rendered"
 done
 docker run --rm -v "$out":/data verapdf/cli:latest --flavour ua1 --format xml --maxfailuresdisplayed 3 /data > "$out/report.xml" 2>/dev/null

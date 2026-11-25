@@ -46,7 +46,11 @@ def compare(fx: Path, args) -> tuple:
         cmd = [args.oracle, str(fx / "report.jrxml"), str(data) if data.exists() else "-", str(jasper)]
         if params.exists():
             cmd.append(str(params))
-        pj = subprocess.run(cmd, capture_output=True, text=True, cwd=fx)
+        # A fixture's own JasperReports font extension (font sets), as fontsets.txt below.
+        env = dict(os.environ)
+        if (fx / "jasper-extension").is_dir():
+            env["ORACLE_CLASSPATH"] = str(fx / "jasper-extension")
+        pj = subprocess.run(cmd, capture_output=True, text=True, cwd=fx, env=env)
         cmd = [args.bin, "render", str(fx / "report.jrxml"), "-o", str(ours), "-q", "--now", "2026-01-15T10:30:00"]
         if data.exists():
             cmd += ["-d", str(data)]
@@ -57,6 +61,10 @@ def compare(fx: Path, args) -> tuple:
             for spec in (fx / "fonts.txt").read_text().split():
                 if Path(spec.split("=", 1)[-1].split(":")[0]).exists():
                     cmd += ["--font", spec]
+        if (fx / "fontsets.txt").exists():
+            for spec in (fx / "fontsets.txt").read_text().splitlines():
+                if spec.strip():
+                    cmd += ["--font-set", spec.strip()]
         po = subprocess.run(cmd, capture_output=True, text=True)
         if not jasper.exists():
             if (fx / "ORACLE-SKIP").exists():
