@@ -172,7 +172,10 @@ impl Raster<'_> {
                         }
                     }
                     for c in line.text.chars().filter(|_| line.shaped.is_none()) {
-                        face.glyph_outline(c, size, pen_x, line.baseline as f64, &mut ops);
+                        // Characters the font lacks are left out, as in the PDF.
+                        if face.has_glyph(c) {
+                            face.glyph_outline(c, size, pen_x, line.baseline as f64, &mut ops);
+                        }
                         pen_x += face.char_width(c, text.size) as f64;
                         if c == ' ' {
                             pen_x += line.word_spacing as f64;

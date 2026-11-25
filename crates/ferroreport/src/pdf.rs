@@ -1469,7 +1469,8 @@ impl<W: std::io::Write> PdfStream<W> {
                         }
                         let mut encode = |s: &str| -> Vec<u8> {
                             s.chars()
-                                .filter(|ch| !ch.is_control())
+                                // Characters the font lacks are left out, as JasperReports does.
+                                .filter(|&ch| !ch.is_control() && face.has_glyph(ch))
                                 .flat_map(|ch| used.code(face.glyph(ch), ch).to_be_bytes())
                                 .collect()
                         };

@@ -18,6 +18,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import idle
+
 ROOT = Path(__file__).resolve().parent.parent
 LAUNCHER = ROOT / "target" / "maxrss"
 
@@ -25,7 +27,7 @@ LAUNCHER = ROOT / "target" / "maxrss"
 def measured(cmd):
     """(last line of output as JSON, peak MiB) of a command."""
     with tempfile.NamedTemporaryFile() as f:
-        p = subprocess.run([str(LAUNCHER), f.name, *map(str, cmd)], capture_output=True, text=True)
+        p = idle.guarded(lambda: subprocess.run([str(LAUNCHER), f.name, *map(str, cmd)], capture_output=True, text=True))
         if p.returncode != 0:
             raise SystemExit(p.stdout + p.stderr)
         _, kib = Path(f.name).read_text().split()
@@ -39,7 +41,10 @@ def main():
     ap.add_argument("--seconds", type=float, default=8)
     ap.add_argument("--fixtures", nargs="*", default=["02-invoice", "03-grouped-sales"])
     ap.add_argument("--threads", nargs="*", type=int, default=[1, 2, 10, 50, 100])
+    ap.add_argument("--wait-idle", action="store_true", help="on a shared machine: start each run on an idle machine, redo disturbed runs")
     args = ap.parse_args()
+    idle.enabled = args.wait_idle
+    load_start = [round(x, 2) for x in os.getloadavg()]
     if not args.lib:
         raise SystemExit("set JASPER_LIB to a folder with the JasperReports jars")
     subprocess.run(["cc", "-O2", "-o", str(LAUNCHER), str(ROOT / "tools" / "maxrss.c")], check=True)
@@ -50,8 +55,14 @@ def main():
     example = ROOT / "target" / "release" / "examples" / "concurrent"
     version = subprocess.run([str(ROOT / "target" / "release" / "ferroreport"), "--version"], capture_output=True, text=True).stdout.strip()
     jar = next(Path(args.lib).glob("jasperreports-[0-9]*.jar"), None)
-    out = {"ferroreport": version, "jasperreports": jar.stem.split("-", 1)[1] if jar else "unknown",
-           "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}", "seconds": args.seconds, "reports": {}}
+    jvm = subprocess.run(["java", "-version"], capture_output=True, text=True).stderr
+    jvm = next((l for l in jvm.splitlines() if "version" in l and "Picked" not in l), "")
+    cpu = next((l.split(":", 1)[1].strip() for l in Path("/proc/cpuinfo").read_text().splitlines() if l.startswith("model name")), "")
+    out = {"ferroreport": version, "jasperreports": jar.stem.split("-", 1)[1] if jar else "unknown", "java": jvm,
+           "machine": f"{os.cpu_count()} CPUs, {platform.system()} {platform.machine()}", "cpu": cpu,
+           # JVM flags from the environment that change how it runs (-XX, -Xmx...).
+           "java_flags": [o for v in ("JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS") for o in os.environ.get(v, "").split() if o.startswith("-X")],
+           "seconds": args.seconds, "reports": {}}
     for name in args.fixtures:
         fx = ROOT / "fixtures" / name
         data, params = fx / "data.json", fx / "params.json"
@@ -64,6 +75,8 @@ def main():
             print(f"{name:18} {threads:4} threads  jasper {jasper['per_second']:8.1f}/s p95 {jasper['p95_ms']:7.1f} ms {jasper['peak_mib']:6.0f} MiB"
                   f"   ferroreport {ferro['per_second']:8.1f}/s p95 {ferro['p95_ms']:7.1f} ms {ferro['peak_mib']:6.0f} MiB", flush=True)
         out["reports"][name] = rows
+    # How busy the machine was (it may be shared), and what the runs did about it.
+    out["conditions"] = {"load_average_start": load_start, **idle.conditions()}
     (ROOT / "docs" / "benchmarks-concurrent.json").write_text(json.dumps(out, indent=1) + "\n")
 
 

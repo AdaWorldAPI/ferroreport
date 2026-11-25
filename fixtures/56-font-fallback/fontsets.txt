@@ -1,0 +1,2 @@
+Serif Fallback=DejaVu Serif,DejaVu Sans
+Mono Fallback=DejaVu Sans Mono,DejaVu Serif,DejaVu Sans

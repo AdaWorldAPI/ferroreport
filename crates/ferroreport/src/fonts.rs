@@ -208,11 +208,15 @@ impl FaceData {
 
     /// Glyph advance in thousandths of an em, truncated.
     fn advance_millis(&self, c: char) -> i64 {
-        // Control characters (U+0000-001F, U+007F-009F) are neither drawn nor measured, as in Java.
-        if c.is_control() {
+        // Control characters (U+0000-001F, U+007F-009F) are neither drawn nor measured, as in
+        // Java; nor, when exporting, are characters the font lacks: JasperReports' PDF exporter
+        // (iText) gives them no width and leaves them out, though filling (AWT) measured them
+        // with the font's missing-glyph box.
+        let glyph = self.glyph(c);
+        if c.is_control() || glyph == 0 {
             return 0;
         }
-        (self.advance(self.glyph(c)) as f64 * 1000.0 / self.units_per_em as f64) as i64
+        (self.advance(glyph) as f64 * 1000.0 / self.units_per_em as f64) as i64
     }
 
     /// Distance from the top of a line to its baseline.
@@ -299,6 +303,24 @@ pub struct FontSet {
     resolved: HashMap<(String, bool, bool), FaceId>,
     /// Families that had to be substituted, for diagnostics.
     pub substitutions: Vec<(String, String)>,
+    /// User families in the order they were registered (as written), the first fonts tried
+    /// for a character the text's own font lacks.
+    user_order: Vec<String>,
+    /// Font sets by lowercase name: their families in search order, the first one primary.
+    sets: HashMap<String, Vec<String>>,
+    /// Whether every font falls back to the other fonts for characters it lacks.
+    fallback: bool,
+    /// The language of the render's locale (`en`), for texts hyphenated in it.
+    language: String,
+    /// The hyphenation the report being filled asks for: `None` off, `Some("")` in the
+    /// locale's language, `Some("es")` in that language.
+    hyphenation: Option<String>,
+}
+
+/// Characters every font "has", as Java's `Font.canDisplay` sees them: controls and the
+/// invisible formatting characters are never drawn, so they never call for another font.
+fn always_displayable(c: char) -> bool {
+    c.is_control() || matches!(c, '\u{200C}'..='\u{200F}' | '\u{2028}'..='\u{202E}' | '\u{206A}'..='\u{206F}')
 }
 
 impl FontSet {
@@ -312,9 +334,186 @@ impl FontSet {
         let id = self.faces.len();
         self.faces.push(Arc::new(face));
         self.by_key.insert((family.to_ascii_lowercase(), bold, italic), id);
-        self.user_families.insert(family.to_ascii_lowercase());
+        if self.user_families.insert(family.to_ascii_lowercase()) {
+            self.user_order.push(family.to_string());
+        }
         self.resolved.clear();
         Ok(())
+    }
+
+    /// Whether `family` names a font this set draws with: a registered family or one of the
+    /// bundled DejaVu families (common names such as `SansSerif` included).
+    pub fn has_family(&self, family: &str) -> bool {
+        self.user_families.contains(&family.to_ascii_lowercase()) || builtin_family(family).is_some()
+    }
+
+    /// Registers a font set, as a JasperReports font extension declares one (`<fontSet>`):
+    /// a text whose font name is `name` is drawn in `families`, each run of characters in the
+    /// first of them that has them all; characters none of them has stay in the first family.
+    /// The families must be registered already (or be bundled ones).
+    pub fn register_set(&mut self, name: &str, families: &[&str]) -> Result<()> {
+        if families.is_empty() {
+            return Err(Error::Font(format!("font set {name}: no families")));
+        }
+        if let Some(f) = families.iter().find(|f| !self.has_family(f)) {
+            return Err(Error::Font(format!("font set {name}: unknown family {f}")));
+        }
+        self.sets.insert(name.trim().to_ascii_lowercase(), families.iter().map(|f| f.trim().to_string()).collect());
+        Ok(())
+    }
+
+    /// Sets the language texts are hyphenated in when they do not name one (the locale's).
+    pub(crate) fn set_language(&mut self, locale: &str) {
+        self.language = locale.to_string();
+    }
+
+    /// Sets the hyphenation of the report being filled from the value of its
+    /// [`crate::text::HYPHENATE`] parameter (`true`, `false`, a language), returning the one
+    /// it replaces.
+    pub(crate) fn set_hyphenation(&mut self, value: Option<&crate::value::Value>) -> Option<String> {
+        let setting = value.filter(|v| !v.is_null()).map(|v| v.to_java_string()).and_then(|v| {
+            let v = v.trim();
+            match v.to_ascii_lowercase().as_str() {
+                "" | "false" | "no" => None,
+                "true" | "yes" => Some(String::new()),
+                _ => Some(v.to_string()),
+            }
+        });
+        std::mem::replace(&mut self.hyphenation, setting)
+    }
+
+    /// Puts back a hyphenation [`FontSet::set_hyphenation`] replaced.
+    pub(crate) fn restore_hyphenation(&mut self, setting: Option<String>) {
+        self.hyphenation = setting;
+    }
+
+    /// How the plain texts of the report being filled are hyphenated, if at all.
+    pub(crate) fn hyphenator(&self) -> Option<crate::text::Hyphenator> {
+        let language = self.hyphenation.as_deref()?;
+        crate::text::Hyphenator::for_language(if language.is_empty() { &self.language } else { language })
+    }
+
+    /// Whether some texts may be drawn in more than one font (font sets or fallback).
+    pub fn resolves_fonts(&self) -> bool {
+        !self.sets.is_empty() || self.fallback
+    }
+
+    /// Turns font fallback on or off: with it on, characters a text's font lacks are drawn in
+    /// the first font that has them, looking at the registered families (in the order they
+    /// were registered) and then at the bundled DejaVu Sans, Serif and Sans Mono, as if every
+    /// family were a font set of itself followed by those.
+    pub fn set_fallback(&mut self, on: bool) {
+        self.fallback = on;
+    }
+
+    /// The face of `family` in exactly the style asked for, if it has one.
+    fn exact_face(&mut self, family: &str, bold: bool, italic: bool) -> Option<FaceId> {
+        let key = family.to_ascii_lowercase();
+        if self.user_families.contains(&key) {
+            return self.by_key.get(&(key, bold, italic)).copied();
+        }
+        let builtin = builtin_family(family)?;
+        Some(self.builtin(builtin, bold, italic))
+    }
+
+    /// Splits `text`, written in `spec`, into runs by the family that draws them when the text
+    /// needs more than its own font: `(from, to, family)` with byte offsets into `text`.
+    /// `None` when the text is drawn in `spec`'s face as usual (no font set, no fallback, or
+    /// nothing the face lacks that another font has).
+    ///
+    /// This is how JasperReports resolves a font set (`JRStyledTextUtil.resolveFonts`): from
+    /// each position, the longest run of characters that one family has, in the first family
+    /// (in search order) that has them all; a character no family has goes in the primary
+    /// family. A bold or italic text looks at the faces of that style first, then at the other
+    /// styles down to the regular faces.
+    pub fn fallback_runs(&mut self, spec: &FontSpec, text: &str) -> Option<Vec<(usize, usize, String)>> {
+        if !self.resolves_fonts() {
+            return None;
+        }
+        // Each family with its faces, in search order, by style: [regular, bold, italic, both].
+        let mut lists: [Vec<(usize, FaceId)>; 4] = Default::default();
+        let families: Vec<String>;
+        if let Some(set) = self.sets.get(&spec.name.trim().to_ascii_lowercase()) {
+            families = set.clone();
+            for (k, f) in families.iter().enumerate() {
+                for (s, (b, i)) in [(false, false), (true, false), (false, true), (true, true)].into_iter().enumerate() {
+                    if let Some(id) = self.exact_face(f, b, i) {
+                        lists[s].push((k, id));
+                    }
+                }
+            }
+        } else if self.fallback {
+            let primary = self.resolve(spec);
+            if text.chars().all(|c| always_displayable(c) || self.faces[primary].has_glyph(c)) {
+                return None;
+            }
+            let mut names = vec![spec.name.clone()];
+            names.extend(self.user_order.iter().cloned());
+            names.extend(["DejaVu Sans", "DejaVu Serif", "DejaVu Sans Mono"].map(String::from));
+            families = names;
+            // The text's own face comes first in every style, as it is drawn without fallback.
+            for list in lists.iter_mut() {
+                list.push((0, primary));
+            }
+            for (k, f) in families.iter().enumerate().skip(1) {
+                for (s, (b, i)) in [(false, false), (true, false), (false, true), (true, true)].into_iter().enumerate() {
+                    if let Some(id) = self.exact_face(f, b, i) {
+                        if !lists[s].iter().any(|&(_, seen)| seen == id) {
+                            lists[s].push((k, id));
+                        }
+                    }
+                }
+            }
+        } else {
+            return None;
+        }
+        let order: &[usize] = match (spec.bold, spec.italic) {
+            (true, true) => &[3, 1, 2, 0],
+            (true, false) => &[1, 0],
+            (false, true) => &[2, 0],
+            (false, false) => &[0],
+        };
+        let supports = |fonts: &FontSet, id: FaceId, c: char| always_displayable(c) || fonts.faces[id].has_glyph(c);
+        // The longest run from `from` that one face of `list` has, and that face's family.
+        let match_run = |fonts: &FontSet, list: &[(usize, FaceId)], from: usize| -> Option<(usize, usize)> {
+            let mut valid: Vec<(usize, FaceId)> = list.to_vec();
+            let mut last = None;
+            let mut end = from;
+            for c in text[from..].chars() {
+                valid.retain(|&(_, id)| supports(fonts, id, c));
+                let Some(&(family, _)) = valid.first() else { break };
+                last = Some(family);
+                end += c.len_utf8();
+            }
+            last.map(|family| (end, family))
+        };
+        let mut runs: Vec<(usize, usize, usize)> = Vec::new();
+        let push = |runs: &mut Vec<(usize, usize, usize)>, from: usize, to: usize, family: usize| match runs.last_mut() {
+            Some(last) if last.2 == family && last.1 == from => last.1 = to,
+            _ => runs.push((from, to, family)),
+        };
+        let mut at = 0;
+        while at < text.len() {
+            match order.iter().find_map(|&s| match_run(self, &lists[s], at)) {
+                Some((end, family)) => {
+                    push(&mut runs, at, end, family);
+                    at = end;
+                }
+                None => {
+                    // No family has it: the primary family draws it (as a missing glyph).
+                    let end = at + text[at..].chars().next().map_or(1, char::len_utf8);
+                    push(&mut runs, at, end, 0);
+                    at = end;
+                }
+            }
+        }
+        if runs.is_empty() {
+            runs.push((0, 0, 0));
+        }
+        if self.fallback && !self.sets.contains_key(&spec.name.trim().to_ascii_lowercase()) && runs.iter().all(|r| r.2 == 0) {
+            return None;
+        }
+        Some(runs.into_iter().map(|(a, b, k)| (a, b, families[k].clone())).collect())
     }
 
     pub fn face(&self, id: FaceId) -> &FaceData {
@@ -439,5 +638,62 @@ mod tests {
         assert_eq!(fonts.face(id).family, "DejaVu Sans");
         assert!(fonts.face(id).bold);
         assert_eq!(fonts.substitutions.len(), 1);
+    }
+
+    fn spec(name: &str, bold: bool, italic: bool) -> FontSpec {
+        FontSpec { name: name.into(), size: 10.0, bold, italic, underline: false, strike: false, pdf_font: None }
+    }
+
+    fn families(runs: Option<Vec<(usize, usize, String)>>, text: &str) -> Vec<(String, String)> {
+        runs.unwrap_or_default().into_iter().map(|(a, b, f)| (text[a..b].to_string(), f)).collect()
+    }
+
+    #[test]
+    fn missing_characters_are_measured_like_jasperreports() {
+        let mut fonts = FontSet::new();
+        let id = fonts.resolve(&spec("DejaVu Serif", false, false));
+        let f = fonts.face(id);
+        // Filling (AWT) counts the missing-glyph box; exporting (iText) gives it no width.
+        assert!(f.fill_width("★", 10.0) > 5.0);
+        assert_eq!(f.text_width("a★b", 10.0), f.text_width("ab", 10.0));
+    }
+
+    #[test]
+    fn no_fallback_unless_asked() {
+        let mut fonts = FontSet::new();
+        assert!(fonts.fallback_runs(&spec("DejaVu Serif", false, false), "rating ★").is_none());
+    }
+
+    #[test]
+    fn font_sets_resolve_like_jasperreports() {
+        let mut fonts = FontSet::new();
+        fonts.register_set("Serif Fallback", &["DejaVu Serif", "DejaVu Sans"]).unwrap();
+        assert!(fonts.register_set("Broken", &["DejaVu Serif", "No Such Font"]).is_err());
+        // The longest run one family has, in the first family that has it all: DejaVu Serif
+        // lacks the star, DejaVu Sans the arrow; CJK is in neither and stays in the primary.
+        let text = "arrow ⤴ then ★ star 漢 end";
+        let runs = families(fonts.fallback_runs(&spec("serif fallback", false, false), text), text);
+        let want = [("arrow ⤴ then ", "DejaVu Serif"), ("★ star ", "DejaVu Sans"), ("漢 end", "DejaVu Serif")];
+        assert_eq!(runs, want.map(|(t, f)| (t.to_string(), f.to_string())));
+        // A text the primary family has whole is one run in it.
+        let runs = families(fonts.fallback_runs(&spec("Serif Fallback", true, false), "plain"), "plain");
+        assert_eq!(runs, [("plain".to_string(), "DejaVu Serif".to_string())]);
+    }
+
+    #[test]
+    fn fallback_looks_at_registered_fonts_first() {
+        let mut fonts = FontSet::new();
+        fonts.set_fallback(true);
+        // Nothing missing: drawn as before.
+        assert!(fonts.fallback_runs(&spec("DejaVu Serif", false, false), "all there").is_none());
+        // Nobody has it: drawn as before, as a missing glyph.
+        assert!(fonts.fallback_runs(&spec("DejaVu Serif", false, false), "漢").is_none());
+        let text = "rating ★★ ok";
+        let runs = families(fonts.fallback_runs(&spec("DejaVu Serif", false, true), text), text);
+        assert_eq!(runs, [(text.to_string(), "DejaVu Sans".to_string())]);
+        // A registered family comes before the bundled ones.
+        fonts.register("Mono Copy", false, false, builtin_files().nth(8).unwrap().to_vec()).unwrap();
+        let runs = families(fonts.fallback_runs(&spec("DejaVu Serif", false, false), text), text);
+        assert_eq!(runs, [(text.to_string(), "Mono Copy".to_string())]);
     }
 }

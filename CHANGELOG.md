@@ -27,6 +27,106 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   `styles.xml`, so the file still opens; LibreOffice then shows their rows at its default
   height.
 
+### PowerPoint: PPTX
+
+- `-o report.pptx` or `--format pptx` on the command line, `"format": "pptx"` in the HTTP API
+  (answered as `application/vnd.openxmlformats-officedocument.presentationml.presentation`),
+  `Format::Pptx` in Rust, `format="pptx"` in Python, `{ format: "pptx" }` in JavaScript,
+  `Format.PPTX` in Java, and "Report as PowerPoint" in the designer's Save menu.
+- Laid out like JasperReports' PPTX exporter: each page is a slide of the report's page size
+  and each element a shape where it is on the page. Texts are text boxes with their fonts,
+  sizes, bold, italic, underline, strike-through, colors, highlight, superscript and
+  subscript, alignment, padding, background, line spacing and rotation; rectangles (rounded
+  too), ellipses and lines are shapes with their fill and pen; frames are rectangles under
+  their elements; images are pictures (each stored once) cut to their element as in the PDF;
+  charts and barcodes are drawn as pictures.
+- Where Jasper's exporter leaves things out: borders that differ by side are drawn as lines,
+  and links to a page or an anchor of the report jump to its slide (links to web pages and
+  other files work in both).
+- Slides and pictures are written as the pages are filled, so a long report does not stay in
+  memory. A report without pages is a presentation without slides.
+- The `.pptx` of 54 of the 55 fixtures opens in LibreOffice Impress with a slide for each page
+  of its PDF; 09-large (477 slides) needs more memory than the machine it was checked on had,
+  and was checked from its first 2,000 rows. Against the `.pptx` JasperReports writes for 53
+  fixtures: the same slides, and all but one of 88,506 text boxes at the same place and size
+  with the same font size.
+- Not yet: `net.sf.jasperreports.export.pptx.*` properties and embedded fonts.
+- For contributors: `tools/oracle` writes JasperReports' own `.pptx` (`out.pptx`).
+
+### Benchmarks of 1.1.0
+
+- Every published number is measured again with 1.1.0, against JasperReports 6.20.6 and 7.1.1
+  on the same 2-CPU machine (`docs/benchmarks.json`, `docs/benchmarks-7.1.1.json`,
+  `docs/benchmarks-concurrent.json`, the README, the site). Some got worse and say so: an
+  invoice from a cold start is now about 200× faster than JasperReports, not 250× (JasperReports
+  starts faster on this machine than in the 0.12 runs), against a warm JVM 3 to 5× faster, not
+  3 to 6×, and a million rows take 16 MB of memory, not 13 MB (the engine itself is larger), in 12 s
+  instead of 14 s.
+- `tools/bench_all.py` also measures a right-to-left report (`52-arabic`), the 20,000-row report
+  to each format (PDF, XLSX, DOCX, ODS, ODT, CSV) for both engines, and 100,000 rows to XLSX, ODS
+  and ODT, so the cost of each output is published: ODS and ODT keep the document in memory and
+  take the most (about 250 MiB for 100,000 rows).
+- `--wait-idle` in `tools/bench_all.py` and `tools/bench_concurrent.py`, for a machine that other
+  work shares: each run starts on an idle machine, and a run that other processes took CPU time
+  from is done again (`tools/idle.py`). The results record the CPU, the memory, the kernel, the
+  JVM flags from the environment and how busy the machine was.
+- `tools/http_check.py` again (`docs/http-check.json`): a million rows over HTTP now peak at
+  47 to 49 MiB in the server, so the docs say about 50 MB instead of 45 MB.
+- The race on the website, its GIF and the promo video use the new invoice timings (2.63 s
+  against 11 ms: 234 invoices in the time JasperReports takes for one, not 301), and the
+  playground's JasperReports times are measured again.
+
+### Text shaping with harfrust
+
+- Right-to-left and complex text (Arabic, Hebrew, Devanagari, Thai...) is shaped with harfrust
+  0.16, the HarfBuzz project's maintained Rust port, instead of rustybuzz, which is no longer
+  maintained (RUSTSEC-2026-0206). Output is unchanged: every fixture renders to the same bytes
+  in every format, and the text `pdftotext` extracts is the same. Each font's shaping tables
+  are still read once and kept with the font, and shape plans are still made once per
+  direction and script.
+- Speed: shaping takes fewer instructions (2,000 rows of the Arabic fixture: 11% fewer, of the
+  Devanagari one: 18% fewer, of the Thai one: 2% more). harfrust reads a font's old-style
+  `kern` table the first time it shapes with it, even with kerning off: for FreeSerif (the
+  Thai and Devanagari fixtures) that is about 10 million instructions, a few milliseconds,
+  once per process. Latin text is not shaped and takes the same time as before (09-large).
+- Dependencies: harfrust (MIT), with read-fonts and font-types (MIT or Apache-2.0), replaces
+  rustybuzz and self_cell. resvg still uses rustybuzz to lay out text in SVG images, so it stays
+  in the build; `deny.toml` no longer needs to ignore its advisory.
+
+### Font fallback and hyphenation
+
+- Hyphenation of long words at line ends, when the template asks for it with ferroreport's own
+  report property `ferroreport.text.hyphenate` (JasperReports does not hyphenate, and ignores
+  it): `true` hyphenates every plain text of the report in the language of the render's locale,
+  `es`, `en_US`... in that language, `false` not at all. Tables, lists and subreports without a
+  setting of their own follow the report they are in. The property is also a parameter of the
+  same name, so a render can set it (`-p params.json`, the packages, the HTTP API) without
+  touching the template. On an element it is not read (a warning says so). A word that does not
+  fit is cut after the last syllable that fits with a hyphen, which is drawn. Plain text only;
+  the height of stretching texts and page splits follow the hyphenated lines. Patterns for
+  English, Spanish, French, Italian, Portuguese and Catalan are built in (hypher, MIT or
+  Apache-2.0, no dependencies; the command line grows by about 60 KB); the Cargo feature
+  `hyphenation-all` builds in all 48 languages of hypher, and `default-features = false`
+  leaves hyphenation out. Templates without the property render as before.
+- PDF: a character the text's font does not have is left out, as JasperReports leaves it out,
+  instead of being drawn as the font's missing-glyph box. It takes no width when the lines are
+  drawn and aligned, and still counts as wide as that box for the text's height and where it is
+  cut, as in JasperReports (checked against 6.20.6, identical pages). Text shaped with
+  harfrust (right to left, complex scripts) still shows the box.
+- Font sets, as the `<fontSet>` of a JasperReports font extension defines them:
+  `--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"` (or `Renderer::register_font_set`)
+  makes a text whose font name is `Serif Fallback` draw the characters DejaVu Serif lacks in
+  DejaVu Sans. The text is cut into runs as JasperReports cuts it: the longest run one family
+  has, in the first family that has all of it; a character no family has stays in the first
+  family. Measured, broken into lines and embedded in the PDF with the font of each run;
+  checked against JasperReports 6.20.6 with a font extension that defines the same sets
+  (fixture 56-font-fallback, identical PDF, XLSX and CSV).
+- `--font-fallback` (`Renderer::font_fallback`) does the same for every font, without a font
+  set: characters a text's font lacks are drawn in the first of the `--font` families (in the
+  order given), DejaVu Sans, DejaVu Serif and DejaVu Sans Mono that has them. Off by default,
+  as JasperReports does not do it; texts whose characters are all in their font are drawn as
+  before either way.
+
 ## 1.1.0
 
 ### Short forms in `.ferro`

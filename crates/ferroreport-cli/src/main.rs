@@ -29,9 +29,9 @@ RENDER OPTIONS:
                                 as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
-                                extension picks the format: .pdf, .xlsx, .docx, .ods, .odt,
-                                .csv or .html
-    -f, --format <pdf|xlsx|docx|ods|odt|csv|html>
+                                extension picks the format: .pdf, .xlsx, .docx, .pptx, .ods,
+                                .odt, .csv or .html
+    -f, --format <pdf|xlsx|docx|pptx|ods|odt|csv|html>
                                 Output format, when the file name does not say it. html is a
                                 web page that looks like the PDF, for previews
         --xlsx-numbers          In XLSX and ODS, write numbers as numbers (default: as formatted
@@ -72,6 +72,12 @@ RENDER OPTIONS:
     -l, --locale <tag>          Locale for numbers and dates (default: en_US)
         --font <Family=file.ttf[:bold][:italic]>
                                 Register an extra font (repeatable)
+        --font-set <Name=Family,Family,...>
+                                Define a font set, as in a JasperReports font extension: text
+                                in font Name is drawn in the first of the families that has
+                                its characters; the first family is the primary one (repeatable)
+        --font-fallback         Draw characters a text's font lacks in another font that has
+                                them: the --font families, then DejaVu Sans, Serif, Sans Mono
     -r, --resources <dir>       Extra directory for images and other resources (repeatable;
                                 the template's own directory is always searched)
         --now <YYYY-MM-DDTHH:MM:SS>
@@ -102,8 +108,8 @@ CONVERT:
     Templates are rendered the same in either format.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
-add format xlsx, docx, ods, odt, csv or html to the request for Excel, Word, OpenDocument,
-CSV or a web preview):
+add format xlsx, docx, pptx, ods, odt, csv or html to the request for Excel, Word,
+PowerPoint, OpenDocument, CSV or a web preview):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
@@ -809,6 +815,8 @@ fn render(args: &[String]) -> CliResult {
     let mut output = None;
     let mut locale = "en_US".to_string();
     let mut fonts = Vec::new();
+    let mut font_sets = Vec::new();
+    let mut font_fallback = false;
     let mut now = None;
     let mut quiet = false;
     let mut resources = Vec::new();
@@ -860,6 +868,8 @@ fn render(args: &[String]) -> CliResult {
             "-o" | "--output" => output = Some(value(a)?),
             "-l" | "--locale" => locale = value(a)?,
             "--font" => fonts.push(value(a)?),
+            "--font-set" => font_sets.push(value(a)?),
+            "--font-fallback" => font_fallback = true,
             "--now" => now = Some(value(a)?),
             "-q" | "--quiet" => quiet = true,
             "-r" | "--resources" => resources.push(value(a)?),
@@ -870,7 +880,7 @@ fn render(args: &[String]) -> CliResult {
     let template = template.ok_or("missing template path")?;
     let format = match format {
         Some(f) => ferroreport::Format::parse(&f)
-            .ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, ods, odt, csv or html)"))?,
+            .ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, pptx, ods, odt, csv or html)"))?,
         None => output
             .as_deref()
             .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))
@@ -941,6 +951,12 @@ fn render(args: &[String]) -> CliResult {
         let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
         renderer.register_font(family, flags.contains(&"bold"), flags.contains(&"italic"), bytes)?;
     }
+    for spec in &font_sets {
+        let (name, families) = spec.split_once('=').ok_or("--font-set expects Name=Family,Family")?;
+        let families: Vec<&str> = families.split(',').map(str::trim).filter(|f| !f.is_empty()).collect();
+        renderer.register_font_set(name, &families)?;
+    }
+    renderer.set_font_fallback(font_fallback);
     let params = ferroreport::params_from_json(&report, &params_json)?;
     let parsed = started.elapsed();
     // Rows are read as they are needed and pages are written as they are finished, so the
@@ -1046,8 +1062,9 @@ fn watch(args: &[String]) -> CliResult {
     while let Some(a) = it.next() {
         match a.as_str() {
             "-d" | "--data" | "-p" | "--params" | "-r" | "--resources" => watched.extend(it.next().map(PathBuf::from)),
-            "-o" | "--output" | "-f" | "--format" | "-l" | "--locale" | "--font" | "--now" | "--db" | "--pdfa" | "--attach"
-            | "--max-row" | "--max-pages" | "--timeout" | "--user-password" | "--owner-password" | "--permissions" => {
+            "-o" | "--output" | "-f" | "--format" | "-l" | "--locale" | "--font" | "--font-set" | "--now" | "--db" | "--pdfa"
+            | "--attach" | "--max-row" | "--max-pages" | "--timeout" | "--user-password" | "--owner-password"
+            | "--permissions" => {
                 it.next();
             }
             s if s.starts_with("--sign-") => {
@@ -1285,7 +1302,8 @@ fn doctor(args: &[String]) -> CliResult {
     );
     println!(
         "  {} parameters, {} fields, {} variables, {} groups",
-        report.parameters.len(),
+        // The template's own parameters, not the one its hyphenation property stands for.
+        report.parameters.iter().filter(|p| p.name != ferroreport::text::HYPHENATE).count(),
         report.fields.len(),
         report.variables.len(),
         report.groups.len()

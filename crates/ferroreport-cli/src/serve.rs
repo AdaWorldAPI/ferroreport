@@ -4,7 +4,7 @@
 //! POST /render             {"template": "<jasperReport ...>" | "templateName": "invoice.jrxml",
 //!                           "data": [...], "params": {...}, "locale": "es_DO",
 //!                           "resources": {"logo.png": "<base64>"},
-//!                           "format": "pdf" | "xlsx" | "docx" | "ods" | "odt" | "csv" | "html",
+//!                           "format": "pdf" | "xlsx" | "docx" | "pptx" | "ods" | "odt" | "csv" | "html",
 //!                           "csvSafe": true, "xlsxNumbers": true, "tagged": true} -> the file
 //! POST /render/<name>      {"data": [...], "params": {...}}  (template from --templates)
 //! POST /inspect            {"template": "..."}                          -> JSON
@@ -872,7 +872,7 @@ fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) 
                         200,
                         serde_json::json!({
                             "name": r.name,
-                            "parameters": r.parameters.iter().map(|p| &p.name).collect::<Vec<_>>(),
+                            "parameters": r.parameters.iter().map(|p| &p.name).filter(|n| *n != ferroreport::text::HYPHENATE).collect::<Vec<_>>(),
                             "fields": r.fields.iter().map(|f| &f.name).collect::<Vec<_>>(),
                             "warnings": r.warnings,
                         }),
@@ -891,7 +891,7 @@ fn answer(state: &Arc<State>, req: &mut Request, stream: &mut Option<Streamed>) 
                 None => ferroreport::Format::Pdf,
                 Some(f) => match ferroreport::Format::parse(&f) {
                     Some(f) => f,
-                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, docx, ods, odt, csv or html)")),
+                    None => return error(400, format!("unknown format `{f}` (pdf, xlsx, docx, pptx, ods, odt, csv or html)")),
                 },
             };
             let m = &state.metrics;

@@ -1,7 +1,8 @@
 //! # ferroreport
 //!
 //! Renders JasperReports JRXML templates (and templates in its own format, see [`template`]) to
-//! PDF, Excel (XLSX), Word (DOCX), OpenDocument (ODS, ODT), CSV and HTML without a JVM.
+//! PDF, Excel (XLSX), Word (DOCX), PowerPoint (PPTX), OpenDocument (ODS, ODT), CSV and HTML
+//! without a JVM.
 //!
 //! ```no_run
 //! let template = std::fs::read_to_string("invoice.jrxml")?;
@@ -37,7 +38,9 @@ pub mod model;
 mod odf;
 pub mod ods;
 pub mod odt;
+mod ooxml;
 pub mod pdf;
+pub mod pptx;
 pub mod print;
 mod raster;
 pub mod rich;
@@ -92,10 +95,12 @@ pub enum Format {
     /// OpenDocument text document (LibreOffice Writer), laid out like JasperReports' ODT
     /// exporter.
     Odt,
+    /// PowerPoint presentation, a slide per page, laid out like JasperReports' PPTX exporter.
+    Pptx,
 }
 
 impl Format {
-    /// `pdf`, `xlsx`, `csv`, `html`, `docx`, `ods` or `odt` (any case).
+    /// `pdf`, `xlsx`, `csv`, `html`, `docx`, `ods`, `odt` or `pptx` (any case).
     pub fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
@@ -105,6 +110,7 @@ impl Format {
             "docx" | "word" => Some(Format::Docx),
             "ods" => Some(Format::Ods),
             "odt" => Some(Format::Odt),
+            "pptx" | "powerpoint" => Some(Format::Pptx),
             _ => None,
         }
     }
@@ -118,6 +124,7 @@ impl Format {
             Format::Docx => "docx",
             Format::Ods => "ods",
             Format::Odt => "odt",
+            Format::Pptx => "pptx",
         }
     }
 
@@ -130,6 +137,7 @@ impl Format {
             Format::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             Format::Ods => ods::MIMETYPE,
             Format::Odt => odt::MIMETYPE,
+            Format::Pptx => pptx::MIMETYPE,
         }
     }
 }
@@ -292,6 +300,31 @@ impl Renderer {
         self.fonts.register(family, bold, italic, data)
     }
 
+    /// Registers a font set, like a `<fontSet>` in a JasperReports font extension: text whose
+    /// font name is `name` is drawn in `families` (registered ones or the bundled DejaVu
+    /// families), each run of characters in the first family that has them all; characters
+    /// none of them has stay in the first family, which is the primary one.
+    pub fn register_font_set(&mut self, name: &str, families: &[&str]) -> Result<()> {
+        self.fonts.register_set(name, families)
+    }
+
+    /// Draws characters a text's font lacks in another font that has them (off by default:
+    /// JasperReports leaves them out unless the font is a font set). The fonts are looked at
+    /// in this order: the registered families, in the order they were registered, then the
+    /// bundled DejaVu Sans, DejaVu Serif and DejaVu Sans Mono. As with a font set, the longest
+    /// run of characters one font has is drawn in that font, so a font that has the missing
+    /// character and the ones around it draws them all. Texts whose characters are all in
+    /// their font are not affected.
+    pub fn font_fallback(mut self, on: bool) -> Renderer {
+        self.fonts.set_fallback(on);
+        self
+    }
+
+    /// Like [`Renderer::font_fallback`], for a renderer already built.
+    pub fn set_font_fallback(&mut self, on: bool) {
+        self.fonts.set_fallback(on);
+    }
+
     /// Fills a parsed report into a print document.
     pub fn fill(&mut self, report: &Report, records: &[Record], params: HashMap<String, Value>) -> Result<PrintDocument> {
         let env = self.env(report);
@@ -386,6 +419,12 @@ impl Renderer {
                 sink.finish()?;
                 Ok(stats)
             }
+            Format::Pptx => {
+                let mut sink = pptx::PptxStream::new(out, &report.name, report.page_width, report.page_height)?;
+                let stats = fill::fill_to(report, rows, params, &mut self.fonts, &mut self.images, &env, self.limits, &mut sink)?;
+                sink.finish()?;
+                Ok(stats)
+            }
             Format::Xlsx | Format::Ods => {
                 let mut count = 0;
                 let rows = rows.inspect(|_| count += 1);
@@ -418,7 +457,7 @@ impl Renderer {
     /// Renders a report whose rows can be read again from the start: `rows` gives a new
     /// iterator over them each time it is called (open the file again, run the query again).
     ///
-    /// PDF, CSV, HTML and Word read them once, like [`Renderer::render_to`]. An Excel
+    /// PDF, CSV, HTML, Word and PowerPoint read them once, like [`Renderer::render_to`]. An Excel
     /// workbook needs them twice when it is large: the columns of its sheet come from every
     /// page, so the report is filled once to find them and once more to write the rows, which
     /// are compressed and sent on as they are made. A workbook of a million rows then takes
@@ -568,6 +607,7 @@ impl Renderer {
             Format::Docx => docx::write_docx(doc, &self.fonts)?,
             Format::Ods => self.to_ods(doc, &self.xlsx)?,
             Format::Odt => odt::write_odt(doc, &self.fonts)?,
+            Format::Pptx => pptx::write_pptx(doc, &self.fonts)?,
         })
     }
 

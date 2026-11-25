@@ -77,6 +77,11 @@ fn every_fixture_streams_to_the_same_document() {
         assert_eq!(f.streamed(Format::Xlsx).0, f.in_memory(Format::Xlsx), "{name}: XLSX");
         assert!(f.streamed(Format::Ods).0 == f.in_memory(Format::Ods), "{name}: ODS");
         assert!(f.streamed(Format::Odt).0 == f.in_memory(Format::Odt), "{name}: ODT");
+        let pptx = f.streamed(Format::Pptx).0;
+        assert!(pptx == f.in_memory(Format::Pptx), "{name}: PPTX");
+        let slides = String::from_utf8_lossy(&pptx).matches("ppt/slides/slide").count();
+        // Each slide is named in the archive twice: its entry and the central directory.
+        assert_eq!(slides, stats.pages * 2, "{name}: PPTX slides");
         let html = String::from_utf8(f.streamed(Format::Html).0).unwrap();
         assert_eq!(html.matches("<svg class=\"page\"").count(), stats.pages, "{name}: HTML pages");
         assert_eq!(

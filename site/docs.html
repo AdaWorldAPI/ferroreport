@@ -9,7 +9,7 @@
 <meta property="og:url" content="https://cristianencarnacion.github.io/ferroreport/docs.html">
 <meta property="og:title" content="ferroreport documentation">
 <meta property="og:image" content="https://cristianencarnacion.github.io/ferroreport/img/invoice.png">
-<meta name="description" content="How to render JasperReports JRXML templates to PDF, Excel, Word, CSV and HTML with ferroreport: command line, HTTP API, JavaScript, Python, Java and Rust; PDF/A, encryption, .ferro templates and migrating a project.">
+<meta name="description" content="How to render JasperReports JRXML templates to PDF, Excel, Word, PowerPoint, CSV and HTML with ferroreport: command line, HTTP API, JavaScript, Python, Java and Rust; PDF/A, encryption, .ferro templates and migrating a project.">
 <link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
 </head>
@@ -46,6 +46,7 @@
       <a href="#crosstabs">Crosstabs</a>
       <a href="#excel">Excel and CSV</a>
       <a href="#word">Word</a>
+      <a href="#powerpoint">PowerPoint</a>
       <a href="#opendocument">OpenDocument</a>
       <a href="#html">HTML previews</a>
       <a href="#tagged">Accessible PDFs</a>
@@ -63,7 +64,7 @@
     <article class="doc">
       <h1>Documentation</h1>
       <p>ferroreport takes a template (JasperReports' <code>.jrxml</code>, or its own <a href="#ferro"><code>.ferro</code></a>), your rows
-        as JSON and your parameters, and returns a PDF, an Excel workbook, a Word document, a CSV file or an HTML preview. Every way of calling it, from the command line to Python, uses the same engine and produces the same bytes.</p>
+        as JSON and your parameters, and returns a PDF, an Excel workbook, a Word document, a PowerPoint presentation, an OpenDocument file, a CSV file or an HTML preview. Every way of calling it, from the command line to Python, uses the same engine and produces the same bytes.</p>
 
       <h2 id="first">Your first PDF</h2>
       <p>You need three files: the template you designed in Jaspersoft Studio, the rows, and the parameters.</p>
@@ -298,7 +299,7 @@ ferroreport convert old.jrxml --to jrxml -o new.jrxml   # JRXML 6 -&gt; JRXML 7<
           by its handles or with <kbd>Shift</kbd> and the arrow keys, and change its text, font, colors, alignment, borders and
           format in the properties panel. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
         <li>Save the template as <code>.ferro</code> or <code>.jrxml</code> (JasperReports 7), or download the report as PDF,
-          Excel or Word.</li>
+          Excel, Word or PowerPoint.</li>
       </ol>
       <p>Parts it cannot edit yet (charts, tables, crosstabs, subreports, barcodes) are shown as boxes and saved as they were.
         Images are kept inside the template as <code>data:</code> URIs, which ferroreport reads and JasperReports does not: give
@@ -318,8 +319,8 @@ ferroreport serve [options]</pre>
         <tr><th>Option</th><th>Meaning</th></tr>
         <tr><td><code>-d, --data &lt;file.json&gt;</code></td><td>Rows: a JSON array of objects, or one object per line. <code>-</code> reads them from standard input. Omit for reports without data. The file is read as the report needs it, so it can be larger than memory</td></tr>
         <tr><td><code>-p, --params &lt;file.json&gt;</code></td><td>Parameter values</td></tr>
-        <tr><td><code>-o, --output &lt;file&gt;</code></td><td>Output file (default: the template name with <code>.pdf</code>). The extension picks the format: <code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.ods</code>, <code>.odt</code>, <code>.csv</code> or <code>.html</code>. <code>-</code> writes to standard output</td></tr>
-        <tr><td><code>-f, --format &lt;pdf|xlsx|docx|ods|odt|csv|html&gt;</code></td><td>Output format, when the file name does not say it (for example with <code>-o -</code>)</td></tr>
+        <tr><td><code>-o, --output &lt;file&gt;</code></td><td>Output file (default: the template name with <code>.pdf</code>). The extension picks the format: <code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.pptx</code>, <code>.ods</code>, <code>.odt</code>, <code>.csv</code> or <code>.html</code>. <code>-</code> writes to standard output</td></tr>
+        <tr><td><code>-f, --format &lt;pdf|xlsx|docx|pptx|ods|odt|csv|html&gt;</code></td><td>Output format, when the file name does not say it (for example with <code>-o -</code>)</td></tr>
         <tr><td><code>--xlsx-numbers</code></td><td>In Excel and ODS, writes numbers as numbers with their format pattern instead of as the formatted text. See <a href="#excel">Excel and CSV</a></td></tr>
         <tr><td><code>--csv-safe</code></td><td>In CSV, puts an apostrophe before values a spreadsheet would run as a formula. Use it when the data comes from other people</td></tr>
         <tr><td><code>--tagged</code></td><td>In PDF, says what the content is, for screen readers. See <a href="#tagged">Accessible PDFs</a></td></tr>
@@ -334,6 +335,8 @@ ferroreport serve [options]</pre>
         <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Stops if the render takes longer than this</td></tr>
         <tr><td><code>-l, --locale &lt;tag&gt;</code></td><td>Number and date formatting: <code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>--font Family=file.ttf[:bold][:italic]</code></td><td>Registers an extra font. Repeat it for each style</td></tr>
+        <tr><td><code>--font-set "Name=Family,Family"</code></td><td>Defines a font set, as a JasperReports font extension does. See <a href="#fonts">Fonts</a></td></tr>
+        <tr><td><code>--font-fallback</code></td><td>Draws characters a text's font lacks in another font that has them. See <a href="#fonts">Fonts</a></td></tr>
         <tr><td><code>-r, --resources &lt;dir&gt;</code></td><td>Extra directory for images and subreports. The template's own directory is always searched</td></tr>
         <tr><td><code>--now &lt;YYYY-MM-DDTHH:MM:SS&gt;</code></td><td>Fixes the value of <code>new Date()</code>, for reproducible output</td></tr>
         <tr><td><code>-q, --quiet</code></td><td>Does not print the timing line</td></tr>
@@ -431,7 +434,7 @@ compared with JasperReports: 46 the same pages and text, 0 differ, 2 JasperRepor
         <tr><td><code>params</code></td><td>Object of parameter values</td></tr>
         <tr><td><code>locale</code></td><td><code>en_US</code> (default), <code>es_DO</code>, <code>es_MX</code>, <code>es_ES</code></td></tr>
         <tr><td><code>now</code></td><td>Fixed value of <code>new Date()</code>, ISO-8601</td></tr>
-        <tr><td><code>format</code></td><td><code>html</code> returns a <a href="#html">web preview</a>; <code>pdf</code> (default), <code>xlsx</code> (returns <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>), <code>docx</code>, <code>ods</code> (<code>application/vnd.oasis.opendocument.spreadsheet</code>), <code>odt</code> (<code>application/vnd.oasis.opendocument.text</code>) or <code>csv</code> (<code>text/csv</code>). Also accepted in the URL: <code>/render/invoice?format=xlsx</code></td></tr>
+        <tr><td><code>format</code></td><td><code>html</code> returns a <a href="#html">web preview</a>; <code>pdf</code> (default), <code>xlsx</code> (returns <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>), <code>docx</code>, <code>pptx</code> (<code>application/vnd.openxmlformats-officedocument.presentationml.presentation</code>), <code>ods</code> (<code>application/vnd.oasis.opendocument.spreadsheet</code>), <code>odt</code> (<code>application/vnd.oasis.opendocument.text</code>) or <code>csv</code> (<code>text/csv</code>). Also accepted in the URL: <code>/render/invoice?format=xlsx</code></td></tr>
         <tr><td><code>tagged</code></td><td><code>true</code> for a tagged PDF. See <a href="#tagged">Accessible PDFs</a></td></tr>
         <tr><td><code>pdfa</code></td><td><code>"2b"</code>, <code>"2u"</code>, <code>"2a"</code>, <code>"3b"</code>, <code>"3u"</code> or <code>"3a"</code> for PDF/A. See <a href="#pdf">PDF/A, attachments, encryption</a></td></tr>
         <tr><td><code>password</code>, <code>ownerPassword</code>, <code>permissions</code></td><td>Encrypt the PDF: the password that opens it, the one that lifts the permissions, and what is allowed without it (a list or a text with commas)</td></tr>
@@ -480,7 +483,7 @@ $pdf = curl_exec($ch);</pre>
       <p>Two things can be changed, each on its own, for reports with more rows than you want in memory.</p>
       <p><b>Rows one per line.</b> Send <code>Content-Type: application/x-ndjson</code> with the request (everything in the table above
         except <code>data</code>) on the first line, and one row per line after it. The server reads the rows as the report asks for them,
-        so neither side holds them all: a million rows render with the server at about 45 MB. Send them straight from a query:</p>
+        so neither side holds them all: a million rows render with the server at about 50 MB. Send them straight from a query:</p>
 <pre># rows.ndjson
 {"params": {"YEAR": 2026}}
 {"sku": "FX-1000", "qty": 21, "price": "185.00"}
@@ -548,7 +551,7 @@ writeFileSync("invoice.xlsx", render(template, rows, params, { format: "xlsx" })
         <tr><td><code>version()</code></td><td>The engine version</td></tr>
       </table>
       <p><code>options</code> holds <code>locale</code>, <code>now</code>, <code>resources</code> (as above) and <code>format</code>:
-        <code>"pdf"</code> (default), <code>"xlsx"</code>, <code>"docx"</code>, <code>"ods"</code>, <code>"odt"</code>, <code>"html"</code> or <code>"csv"</code> (UTF-8 bytes). Also <code>maxPages</code> (stop a
+        <code>"pdf"</code> (default), <code>"xlsx"</code>, <code>"docx"</code>, <code>"pptx"</code>, <code>"ods"</code>, <code>"odt"</code>, <code>"html"</code> or <code>"csv"</code> (UTF-8 bytes). Also <code>maxPages</code> (stop a
         report that grows past that many pages), <code>csvSafe</code> (guard CSV against spreadsheet formulas in the data) and
         <code>xlsxNumbers</code> (numbers as numbers in Excel and ODS). For PDF: <code>tagged</code>, <code>pdfa</code> (<code>"3b"</code>...),
         <code>attachments</code> (<code>[{ name, data, mime }]</code>), and <code>password</code>, <code>ownerPassword</code> and
@@ -576,7 +579,7 @@ pdf = ferroreport.render(
     resource_dirs=["./brand"],             # optional: extra folders for images and subreports
     resources={"logo.png": logo_bytes},    # optional: images and subreports held in memory
     now=datetime(2026, 3, 5, 10, 0),       # optional: value of new Date() in expressions
-    format="pdf",                          # optional: "pdf", "xlsx" (Excel), "docx", "ods", "odt", "csv" or "html"
+    format="pdf",                          # optional: "pdf", "xlsx" (Excel), "docx", "pptx", "ods", "odt", "csv" or "html"
 )                                          # returns bytes
 
 ferroreport.render_to_file("invoice.jrxml", "invoice.xlsx", rows)   # format from the extension
@@ -587,8 +590,8 @@ stats = ferroreport.render_to_file("sales.jrxml", "sales.pdf", data_file="sales.
 print(stats)                               # {"pages": 23810, "rows": 1000000}</pre>
       <table>
         <tr><th>Function</th><th>Does</th></tr>
-        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers, tagged, pdfa, attachments, password, owner_password, permissions)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, Word with <code>format="docx"</code>, OpenDocument with <code>format="ods"</code> or <code>format="odt"</code>, CSV with <code>format="csv"</code>, HTML with <code>format="html"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect; <code>pdfa</code>, <code>attachments</code> and the passwords and <code>permissions</code> are described in <a href="#pdf">PDF/A, attachments, encryption</a></td></tr>
-        <tr><td><code>render_to_file(template, output, data=None, params=None, *, data_file, ...)</code></td><td>Same arguments; writes the file to <code>output</code> as it is made and returns <code>{"pages", "rows"}</code>. Without <code>format</code>, the extension (<code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.ods</code>, <code>.odt</code>, <code>.csv</code>, <code>.html</code>) decides. <code>data_file</code> is a file of rows (a JSON array or one object per line) read as the report needs it, instead of <code>data</code></td></tr>
+        <tr><td><code>render(template, data=None, params=None, *, locale, resources, resource_dirs, now, format, max_pages, timeout, csv_safe, xlsx_numbers, tagged, pdfa, attachments, password, owner_password, permissions)</code></td><td>Returns the file as <code>bytes</code>: PDF by default, Excel with <code>format="xlsx"</code>, Word with <code>format="docx"</code>, PowerPoint with <code>format="pptx"</code>, OpenDocument with <code>format="ods"</code> or <code>format="odt"</code>, CSV with <code>format="csv"</code>, HTML with <code>format="html"</code>. <code>max_pages</code> and <code>timeout</code> (seconds) stop a report that grows past what you expect; <code>pdfa</code>, <code>attachments</code> and the passwords and <code>permissions</code> are described in <a href="#pdf">PDF/A, attachments, encryption</a></td></tr>
+        <tr><td><code>render_to_file(template, output, data=None, params=None, *, data_file, ...)</code></td><td>Same arguments; writes the file to <code>output</code> as it is made and returns <code>{"pages", "rows"}</code>. Without <code>format</code>, the extension (<code>.pdf</code>, <code>.xlsx</code>, <code>.docx</code>, <code>.pptx</code>, <code>.ods</code>, <code>.odt</code>, <code>.csv</code>, <code>.html</code>) decides. <code>data_file</code> is a file of rows (a JSON array or one object per line) read as the report needs it, instead of <code>data</code></td></tr>
         <tr><td><code>inspect(template)</code></td><td>Returns a dict with <code>name</code>, <code>parameters</code>, <code>fields</code> and <code>warnings</code></td></tr>
         <tr><td><code>convert(template, to="ferro")</code></td><td>Returns the template rewritten, as <code>.ferro</code> or (<code>to="jrxml"</code>) JRXML 7. See <a href="#ferro">Templates in .ferro</a></td></tr>
         <tr><td><code>FerroreportError</code></td><td>Raised when a template cannot be parsed, filled or exported</td></tr>
@@ -634,7 +637,7 @@ try (ResultSet sales = statement.executeQuery("select * from sales order by regi
     reports.template(Path.of("reports/sales.jrxml"))
         .rows(sales)
         .maxPages(50_000).timeout(Duration.ofMinutes(2))
-        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .ods, .odt, .csv and .html work the same way
+        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .pptx, .ods, .odt, .csv and .html work the same way
 }
 
 // Quarkus / JAX-RS: stream the PDF into the response
@@ -673,8 +676,10 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         <tr><td><code>.resource_dir(dir)</code></td><td>Adds a folder for images and subreports. Templates cannot read outside these folders</td></tr>
         <tr><td><code>.resource(name, bytes)</code>, <code>add_resource(name, bytes)</code></td><td>Adds an image or subreport held in memory</td></tr>
         <tr><td><code>register_font(family, bold, italic, data)</code></td><td>Registers a TrueType or OpenType font</td></tr>
+        <tr><td><code>register_font_set(name, &amp;[families])</code></td><td>Defines a font set (see <a href="#fonts">Fonts</a>)</td></tr>
+        <tr><td><code>.font_fallback(true)</code>, <code>set_font_fallback(true)</code></td><td>Draws characters a text's font lacks in another font that has them</td></tr>
         <tr><td><code>render_json(template, rows, params)</code></td><td>Parses, fills and exports to PDF in one call</td></tr>
-        <tr><td><code>render_json_as(template, rows, params, Format::Xlsx)</code></td><td>The same, to <code>Format::Pdf</code>, <code>Format::Xlsx</code>, <code>Format::Docx</code>, <code>Format::Ods</code>, <code>Format::Odt</code>, <code>Format::Csv</code> or <code>Format::Html</code></td></tr>
+        <tr><td><code>render_json_as(template, rows, params, Format::Xlsx)</code></td><td>The same, to <code>Format::Pdf</code>, <code>Format::Xlsx</code>, <code>Format::Docx</code>, <code>Format::Pptx</code>, <code>Format::Ods</code>, <code>Format::Odt</code>, <code>Format::Csv</code> or <code>Format::Html</code></td></tr>
         <tr><td><code>ferroreport::parse</code>, <code>fill</code>, <code>to_pdf</code> on the renderer</td><td>The three steps separately, to parse a template once and fill it many times</td></tr>
         <tr><td><code>render_report_json(&amp;report, rows, params, format)</code></td><td>Renders a template already parsed with <code>ferroreport::parse</code></td></tr>
         <tr><td><code>render_to(&amp;report, rows, params, format, writer)</code></td><td>Renders rows that arrive one at a time (any iterator of records; <code>JsonRows</code> reads them from JSON text) to any <code>std::io::Write</code>, page by page. Returns the number of pages and rows. See <a href="#large">Large reports and limits</a></td></tr>
@@ -795,6 +800,20 @@ std::fs::write("invoice.pdf", pdf)?;</pre>
         and backgrounds. A page break separates the pages, so the document has as many pages as the PDF. Like Jasper's, the document is
         made for reading and light editing, not for reflowing: rounded rectangles and ellipses come out as plain boxes.</p>
 
+      <h2 id="powerpoint">PowerPoint</h2>
+      <p>Ask for <code>pptx</code> (<code>-o report.pptx</code>, <code>format="pptx"</code>, <code>Format::Pptx</code>,
+        <code>Format.PPTX</code>) and you get a presentation laid out like JasperReports' PPTX exporter: each page is a slide of the
+        report's page size, and each element is a shape where it is on the page. Texts are text boxes with their fonts, sizes, bold,
+        italic, underline, strike-through, colors, styled runs, alignment, padding, background, line spacing and rotation; rectangles
+        (rounded too), ellipses and lines are shapes with their fill and pen; frames are rectangles under their elements; images are
+        pictures cut to their element as in the PDF, and charts and barcodes are drawn as pictures. A box with the same border on
+        every side gets it as the shape's outline, and borders that differ by side are drawn as lines (Jasper's exporter leaves those
+        out). Links to web pages and other files work, and links to a page or an anchor of the report jump to its slide. Slides are
+        written as the pages are filled.</p>
+      <p>Not available yet: the <code>net.sf.jasperreports.export.pptx.*</code> properties (such as a page used as the slide master)
+        and fonts embedded in the file. PowerPoint and LibreOffice wrap text with their own font metrics, so a line that just fits in
+        the PDF can wrap in the slide.</p>
+
       <h2 id="opendocument">OpenDocument (ODS and ODT)</h2>
       <p>Ask for <code>ods</code> or <code>odt</code> (<code>-o report.ods</code>, <code>format="odt"</code>, <code>Format::Ods</code>,
         <code>Format.ODT</code>) and you get the files LibreOffice and other OpenDocument applications open, laid out the way
@@ -902,7 +921,7 @@ ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --sign-key key.pem 
 
       <h2 id="large">Large reports and limits</h2>
       <p>A report does not have to fit in memory. Rows are read as the report asks for them and each page is written as soon as it
-        is finished, so a million rows and 23,810 pages render in about 13 MB, at about 70,000 rows a second on one core.</p>
+        is finished, so a million rows and 23,810 pages render in about 16 MB, at about 80,000 rows a second on one core.</p>
       <table>
         <tr><th>From</th><th>How</th></tr>
         <tr><td>Command line</td><td>Nothing to do: <code>ferroreport render sales.jrxml -d sales.json -o sales.pdf</code> already reads and writes as it goes. The rows can be a JSON array or one object per line, from a file or from standard input</td></tr>
@@ -916,7 +935,7 @@ ferroreport render invoice.jrxml -d rows.json -o invoice.pdf --sign-key key.pem 
       <ul>
         <li><b>PDF and CSV</b> are written page by page. So are <b>Excel</b> workbooks, in two passes: the columns of a sheet come from
           every page, so a large report is filled once to find them and once more to write its rows, which are compressed and sent on
-          as they are made (100,000 rows: about 3 s and 58 MiB; 500,000: 17 s and 92 MiB). That needs rows that can be read twice: a
+          as they are made (100,000 rows: about 3 s and 66 MiB; 500,000: 15 s and 116 MiB). That needs rows that can be read twice: a
           file, or rows the command line, the server, Python and Java put aside for you; in Rust, <code>render_rows_to</code>. Small
           workbooks are still filled once. A report with more rows than a sheet holds (1,048,576) stops with an error that says so.
           <b>OpenDocument</b> files are written as they are made too, filled once more first to find their styles (100,000 rows: 68 MiB
@@ -980,6 +999,45 @@ ferroreport.render_to_file("sales.jrxml", "sales.pdf", rows)</pre>
         extension, so templates that use them match JasperReports exactly. A family the engine does not have is replaced by a built-in one.</p>
       <p>Add your own TrueType or OpenType fonts with <code>--font</code> on the command line or <code>register_font</code> in Rust. The
         JavaScript and Python packages use the built-in families for now.</p>
+      <p>A character the text's font does not have is left out of the PDF, as JasperReports leaves it out (when the text is measured
+        for its height it still counts as wide as the font's missing-glyph box, as in JasperReports). To draw it in another font, use a
+        font set or font fallback:</p>
+      <ul>
+        <li><strong>Font sets</strong> work as the <code>&lt;fontSet&gt;</code> of a JasperReports font extension. With
+          <code>--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"</code> (or <code>register_font_set</code>), a text whose font name is
+          <code>Serif Fallback</code> is drawn in DejaVu Serif, and the characters DejaVu Serif lacks in DejaVu Sans. Like JasperReports,
+          the text is cut into the longest runs one family has, each drawn in the first family (in the order given) that has all of it;
+          so the words around a missing character go to the other family with it. A character no family has stays in the first family,
+          the primary one. Bold and italic text look at the faces of their style first. The families must be registered fonts or the
+          built-in ones.</li>
+        <li><strong>Font fallback</strong> (<code>--font-fallback</code>, or <code>font_fallback(true)</code>) does the same for every font,
+          as if each were a font set of itself followed by the <code>--font</code> families, in the order given, and then DejaVu Sans, DejaVu
+          Serif and DejaVu Sans Mono. It is off by default, because JasperReports does not do it, and texts whose characters are all in
+          their font are drawn as without it.</li>
+      </ul>
+      <p>Either way the text is measured, broken into lines and embedded in the PDF with the font that draws each run. A plain text drawn
+        in more than one font is laid out like styled text, as in JasperReports, and stays plain text in Excel, Word and CSV.</p>
+
+      <h2 id="hyphenation">Hyphenation</h2>
+      <p>JasperReports does not hyphenate: a word that does not fit at the end of a line goes to the next one, and a word longer than
+        the line is cut between letters. ferroreport does the same unless the template asks for hyphenation with its own property,
+        <code>ferroreport.text.hyphenate</code>, which JasperReports ignores:</p>
+<pre>&lt;!-- every text of the report, in the language of the render's locale (--locale) --&gt;
+&lt;property name="ferroreport.text.hyphenate" value="true"/&gt;
+
+&lt;!-- or in a language of its own; "false" turns it off --&gt;
+&lt;property name="ferroreport.text.hyphenate" value="es"/&gt;</pre>
+      <p>In <code>.ferro</code>: <code>property ferroreport.text.hyphenate value=true</code> under <code>report</code>. The setting is the
+        report's: tables, lists and subreports follow it unless they have their own, and on an element it is not read (the template
+        loads with a warning; a text in another language can go in a subreport). It is also a parameter of the same name, so a render
+        can turn it on without changing the template: <code>{"ferroreport.text.hyphenate": "es"}</code> in the parameters. A word that does not fit is cut after the last of its syllables that fits with a hyphen, and the hyphen is
+        drawn; the rest of the word starts the next line. Only words made of letters are hyphenated, never inside numbers or codes,
+        with at least two letters before the hyphen and two or three after it, as each language's patterns say. The height of a
+        stretching text and where a text is cut across pages follow the hyphenated lines. Styled and HTML text, right-to-left and
+        complex-script text are not hyphenated.</p>
+      <p>The patterns of English, Spanish, French, Italian, Portuguese and Catalan are built in (about 60 KB). Rust users who need
+        more build with the <code>hyphenation-all</code> feature (the 48 languages of <code>hypher</code>, about 1.1 MB more), or without
+        default features to leave hyphenation out. A language without patterns is not hyphenated.</p>
 
       <h2 id="locale">Locale and dates</h2>
       <p>The locale decides how patterns such as <code>#,##0.00</code> and <code>dd MMMM yyyy</code> are written: decimal and grouping
