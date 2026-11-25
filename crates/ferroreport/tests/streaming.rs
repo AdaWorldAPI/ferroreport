@@ -77,6 +77,11 @@ fn every_fixture_streams_to_the_same_document() {
         assert_eq!(f.streamed(Format::Xlsx).0, f.in_memory(Format::Xlsx), "{name}: XLSX");
         assert!(f.streamed(Format::Ods).0 == f.in_memory(Format::Ods), "{name}: ODS");
         assert!(f.streamed(Format::Odt).0 == f.in_memory(Format::Odt), "{name}: ODT");
+        let pptx = f.streamed(Format::Pptx).0;
+        assert!(pptx == f.in_memory(Format::Pptx), "{name}: PPTX");
+        let slides = String::from_utf8_lossy(&pptx).matches("ppt/slides/slide").count();
+        // Each slide is named in the archive twice: its entry and the central directory.
+        assert_eq!(slides, stats.pages * 2, "{name}: PPTX slides");
         let html = String::from_utf8(f.streamed(Format::Html).0).unwrap();
         assert_eq!(html.matches("<svg class=\"page\"").count(), stats.pages, "{name}: HTML pages");
         assert_eq!(
@@ -198,6 +203,31 @@ fn html_pages_carry_the_report_as_text_and_escape_it() {
     assert!(out.starts_with(b"<svg class=\"page\""));
 }
 
+/// The files of a ZIP archive, in order, with their content.
+fn unzip(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
+    let u16_at = |i: usize| u16::from_le_bytes([zip[i], zip[i + 1]]) as usize;
+    let u32_at = |i: usize| u32::from_le_bytes([zip[i], zip[i + 1], zip[i + 2], zip[i + 3]]) as usize;
+    let end = zip.len() - 22;
+    assert_eq!(u32_at(end), 0x0605_4b50);
+    let (count, mut at) = (u16_at(end + 10), u32_at(end + 16));
+    let mut files = Vec::new();
+    for _ in 0..count {
+        assert_eq!(u32_at(at), 0x0201_4b50);
+        let (method, packed, size, name_len, local) =
+            (u16_at(at + 10), u32_at(at + 20), u32_at(at + 24), u16_at(at + 28), u32_at(at + 42));
+        let name = String::from_utf8(zip[at + 46..at + 46 + name_len].to_vec()).unwrap();
+        let data = local + 30 + u16_at(local + 26) + u16_at(local + 28);
+        let content = match method {
+            0 => zip[data..data + packed].to_vec(),
+            _ => miniz_oxide::inflate::decompress_to_vec(&zip[data..data + packed]).unwrap(),
+        };
+        assert_eq!(content.len(), size, "{name}");
+        files.push((name, content));
+        at += 46 + name_len;
+    }
+    files
+}
+
 /// A workbook too large to keep is made in two passes over its rows, and comes out the same
 /// as when its pages are all in memory.
 #[test]
@@ -225,18 +255,36 @@ fn a_large_workbook_is_written_in_two_passes_and_is_the_same() {
     assert_eq!(stats.rows, 40_000);
     assert!(streamed == kept, "the workbook written in two passes differs from the one written from memory");
 
-    // An OpenDocument spreadsheet is made the same way.
+    // An OpenDocument spreadsheet is made the same way, with a pass between the two that
+    // finds the styles that come before its rows.
     let doc = r.fill(&large.report, &records, Default::default()).unwrap();
     let kept = r.to_ods(&doc, &Default::default()).unwrap();
     drop(doc);
     asked.set(0);
     let mut streamed = Vec::new();
     large.renderer().render_rows_to(&large.report, &mut again, Default::default(), Format::Ods, &mut streamed).unwrap();
-    assert_eq!(asked.get(), 2, "a spreadsheet this size reads its rows twice");
-    assert!(streamed == kept, "the spreadsheet written in two passes differs from the one written from memory");
+    assert_eq!(asked.get(), 3, "a spreadsheet this size reads its rows three times");
+    // `content.xml` is written in pieces, so its sizes follow it in the archive instead of
+    // preceding it: the files in it are the same.
+    assert!(unzip(&streamed) == unzip(&kept), "the spreadsheet written as it is made differs from the one written from memory");
+
+    // An OpenDocument text: its styles first, then its pages as they are made.
+    let doc = r.fill(&large.report, &records, Default::default()).unwrap();
+    let kept = r.export(&doc, Format::Odt).unwrap();
+    drop(doc);
+    asked.set(0);
+    let mut streamed = Vec::new();
+    large.renderer().render_rows_to(&large.report, &mut again, Default::default(), Format::Odt, &mut streamed).unwrap();
+    assert_eq!(asked.get(), 2, "a text document this size reads its rows twice");
+    assert!(unzip(&streamed) == unzip(&kept), "the text document written as it is made differs from the one written from memory");
 
     // A small one is filled once, and other formats always are.
-    for (format, rows) in [(Format::Xlsx, &lines[..2_000]), (Format::Csv, &lines[..])] {
+    for (format, rows) in [
+        (Format::Xlsx, &lines[..2_000]),
+        (Format::Ods, &lines[..2_000]),
+        (Format::Odt, &lines[..2_000]),
+        (Format::Csv, &lines[..]),
+    ] {
         let rows = &rows[..rows.rfind('\n').unwrap() + 1];
         asked.set(0);
         let mut again = || -> ferroreport::Result<RowIter> {

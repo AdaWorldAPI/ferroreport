@@ -6,7 +6,7 @@ without JasperReports (or anything else) on your classpath: this library has no 
 
 Rows are read from a `ResultSet` or any `Iterable` as the report needs them and pages are
 written as they are finished, so a report can be far larger than the heap: a million rows take
-about 13 MB in the engine and a few megabytes in your JVM.
+about 16 MB in the engine and a few megabytes in your JVM.
 
 ```java
 Ferroreport reports = Ferroreport.local();
@@ -22,7 +22,7 @@ try (ResultSet sales = statement.executeQuery("select * from sales order by regi
     reports.template(Path.of("reports/sales.jrxml"))
         .rows(sales)
         .maxPages(50_000).timeout(Duration.ofMinutes(2))
-        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .ods, .odt, .csv and .html work the same way
+        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .pptx, .ods, .odt, .csv and .html work the same way
 }
 ```
 

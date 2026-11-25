@@ -38,6 +38,7 @@ const en = {
   "download.as": "Download the report as",
   "download.xlsx": "Excel (.xlsx)",
   "download.docx": "Word (.docx)",
+  "download.pptx": "PowerPoint (.pptx)",
   "download.pdfItem": "PDF",
 
   "data.title": "Your data",
@@ -325,7 +326,7 @@ const en = {
   "guide.s2": "Drag fields onto the page",
   "guide.s2d": "Drop them where they should print. What you put on “Each row of your data” repeats for every row.",
   "guide.s3": "Download",
-  "guide.s3d": "Get the report as PDF, Excel or Word. Save the template to use it again.",
+  "guide.s3d": "Get the report as PDF, Excel, Word or PowerPoint. Save the template to use it again.",
   "guide.how": "How do you want to start?",
   "guide.invoice": "Start from the invoice example",
   "guide.blank": "Start blank",
@@ -436,6 +437,7 @@ const es = {
   "download.as": "Descargar el reporte como",
   "download.xlsx": "Excel (.xlsx)",
   "download.docx": "Word (.docx)",
+  "download.pptx": "PowerPoint (.pptx)",
   "download.pdfItem": "PDF",
 
   "data.title": "Tus datos",
@@ -723,7 +725,7 @@ const es = {
   "guide.s2": "Arrastra campos a la página",
   "guide.s2d": "Suéltalos donde deben imprimirse. Lo que pongas en “Cada fila de tus datos” se repite en cada fila.",
   "guide.s3": "Descarga",
-  "guide.s3d": "Obtén el reporte en PDF, Excel o Word. Guarda la plantilla para usarla otra vez.",
+  "guide.s3d": "Obtén el reporte en PDF, Excel, Word o PowerPoint. Guarda la plantilla para usarla otra vez.",
   "guide.how": "¿Cómo quieres empezar?",
   "guide.invoice": "Empezar con el ejemplo de facturas",
   "guide.blank": "Empezar en blanco",

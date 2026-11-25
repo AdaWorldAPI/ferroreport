@@ -196,7 +196,7 @@ public final class Report {
 
     /**
      * Renders the report to a file, page by page. The format follows the extension
-     * ({@code .pdf}, {@code .xlsx}, {@code .docx}, {@code .ods}, {@code .odt}, {@code .csv}, {@code .html}) unless {@link #format} was set. If
+     * ({@code .pdf}, {@code .xlsx}, {@code .docx}, {@code .pptx}, {@code .ods}, {@code .odt}, {@code .csv}, {@code .html}) unless {@link #format} was set. If
      * rendering fails, no file is left behind.
      */
     public void renderTo(Path file) {

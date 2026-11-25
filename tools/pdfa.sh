@@ -23,6 +23,9 @@ for dir in "$root"/fixtures/*/; do
   if [ -f "$dir/fonts.txt" ]; then
     while IFS= read -r f; do p=${f#*=}; [ -n "$f" ] && [ -f "${p%%:*}" ] && args+=(--font "$f"); done < "$dir/fonts.txt"
   fi
+  if [ -f "$dir/fontsets.txt" ]; then
+    while IFS= read -r f; do [ -n "$f" ] && args+=(--font-set "$f"); done < "$dir/fontsets.txt"
+  fi
   attach="$dir/report.jrxml:text/xml"
   [ -f "$dir/data.json" ] && attach="$dir/data.json"
   "$bin" render "$dir/report.jrxml" "${args[@]}" --pdfa 2a -o "$out/2a/$name.pdf" 2>/dev/null || echo "$name: not rendered as PDF/A-2a"

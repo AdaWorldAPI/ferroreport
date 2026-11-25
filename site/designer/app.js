@@ -1812,7 +1812,7 @@ function saveTemplate(to) {
 
 function exportReport(format) {
   closeMenus();
-  const types = { pdf: "application/pdf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  const types = { pdf: "application/pdf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation" };
   try {
     download(renderTo(format), `${baseName()}.${format}`, types[format]);
     announce(t("msg.downloaded", { file: `${baseName()}.${format}` }));

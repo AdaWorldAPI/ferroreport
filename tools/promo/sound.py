@@ -1,8 +1,9 @@
 """Synthesizes the soundtrack of the promo video (no samples, only numpy).
 
 Usage: python3 tools/promo/sound.py out.wav
-The timeline matches tools/promo/film.py: title 0-2.6 s, race 3.0-6.01 s, verdict, end card at 9.0 s.
-Everything sits on a 120 bpm grid, so the race starts and ends on a beat.
+The timeline matches tools/promo/film.py: title 0-2.6 s, race from 3.0 s for as long as JasperReports
+takes (J_END in site/index.html, 2.63 s), verdict, end card at 9.0 s. Everything sits on a 120 bpm
+grid, so the race starts on a beat.
 """
 import sys
 import wave
@@ -85,38 +86,41 @@ for f, pan in ((D3, -0.3), (A3, 0.3), (E4, -0.1), (D2, 0.0)):
     swell = 0.35 + 0.65 * np.clip((x - 2.6) / 3.4, 0, 1)
     add(lowpass(pad * swell, 900), 0, pan, 0.045)
 
-# --- title: a soft whoosh in, then an accent when "300x faster" lands ---
+# --- title: a soft whoosh in, then an accent when "from any language." lands ---
 add(whoosh(0.7, 300, 5000, rise=False), 0.0, 0.0, 0.10)
 add(kick(0.7), 0.05)
 for f, pan in ((D4, -0.4), (A4, 0.4), (FS5, 0.0)):
     add(tone(f, 1.6, decay=0.5, harmonics=WARM), 0.72, pan, 0.10)
 add(kick(0.9), 0.72)
 
-# --- race, 3.00 s to 6.01 s: beat, Jasper's slow ticks, ferroreport's flurry, a riser ---
+# --- race, from 3.00 s: beat, Jasper's slow ticks, ferroreport's flurry, a riser ---
+# The race's timings, as in site/index.html: J_END, F_END and the start of each of Jasper's steps.
 RACE = 3.0
-for beat in range(6):
+J_END, F_END = 2.63, 0.0112
+JASPER_STEPS = (0.0, 0.23, 0.40, 1.91, 2.33)
+for beat in range(int(J_END / 0.5) + 1):
     add(kick(0.9), RACE + beat * 0.5)
     add(tone(D2, 0.45, decay=0.2, harmonics=(1, 0.5, 0.2)), RACE + beat * 0.5, 0, 0.20)
-for i in range(12):  # offbeat hats, getting brighter
+for i in range(int(J_END / 0.25)):  # offbeat hats, getting brighter
     x = t(0.05)
     hat = rng.standard_normal(len(x))
     hat = (hat - lowpass(hat, 6000)) * np.exp(-x / 0.012)
     add(hat, RACE + 0.25 + i * 0.25, 0.25, 0.04 + 0.006 * i)
-for at in (0.0, 0.62, 1.10, 2.16, 2.60):  # Jasper's log lines: dull, left
+for at in JASPER_STEPS:  # Jasper's log lines: dull, left
     add(tone(196, 0.18, decay=0.05, harmonics=(1, 0.3)), RACE + at, -0.7, 0.16)
 for k in range(3):  # ferroreport's three steps: done before you hear the first one end
     add(tone(1320 * (1.12 ** k), 0.12, decay=0.03), RACE + 0.01 + k * 0.035, 0.7, 0.14)
-steps = int((3.01 - 0.01) / 0.075)
+steps = int((J_END - F_END) / 0.075)
 for k in range(steps):  # one flick per sheet on screen, climbing
     add(flick(k / steps), RACE + 0.01 + k * 0.075, 0.55 + 0.25 * np.sin(k), 0.12 + 0.08 * k / steps)
-add(whoosh(3.0, 200, 9000), RACE, 0.0, 0.09)
+add(whoosh(J_END, 200, 9000), RACE, 0.0, 0.09)
 arp = (D4, FS4, A4, D5, E5, FS5, A5)
-for k in range(24):  # an arpeggio that climbs with the counter
+for k in range(int(J_END / 0.125)):  # an arpeggio that climbs with the counter
     add(tone(arp[k % len(arp)] * (2 if k >= 14 else 1), 0.2, decay=0.07, harmonics=(1, 0.3)), RACE + k * 0.125, 0.3, 0.035 + 0.003 * k)
 
-# --- 6.01 s: Jasper's single invoice lands; then the verdict ---
-add(tone(98, 0.5, decay=0.12, harmonics=(1, 0.6, 0.3)), 6.01, -0.6, 0.35)
-HIT = 6.4
+# --- Jasper's single invoice lands; then the verdict ---
+add(tone(98, 0.5, decay=0.12, harmonics=(1, 0.6, 0.3)), RACE + J_END, -0.6, 0.35)
+HIT = RACE + J_END + 0.39
 add(kick(1.3), HIT)
 x = t(1.2)
 add(lowpass(rng.standard_normal(len(x)), 500) * np.exp(-x / 0.35), HIT, 0, 0.25)  # low boom

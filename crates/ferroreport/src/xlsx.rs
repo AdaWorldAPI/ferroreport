@@ -72,7 +72,7 @@ pub(crate) struct FirstPass {
 }
 
 /// Most elements kept from the first pass (about 100 MB of pages).
-const KEEP_ITEMS: usize = 100_000;
+pub(crate) const KEEP_ITEMS: usize = 100_000;
 
 impl FirstPass {
     pub fn new() -> FirstPass {

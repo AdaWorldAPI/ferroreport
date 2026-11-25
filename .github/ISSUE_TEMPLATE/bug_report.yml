@@ -1,0 +1,42 @@
+name: A report comes out wrong
+description: ferroreport renders a template differently from JasperReports, fails on it, or crashes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! A template we can run is what makes a bug fixable. Remove anything private from it and from the data first.
+        `ferroreport doctor your.jrxml` lists features ferroreport doesn't support yet; its output helps too.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you expected (JasperReports' output, if you have it) and what ferroreport does. Screenshots of both help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: template
+    attributes:
+      label: Template and data
+      description: Attach the .jrxml or .ferro and a small sample of the data (JSON), or paste them here.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ferroreport version
+      placeholder: "1.1.0 (ferroreport --version)"
+    validations:
+      required: true
+  - type: dropdown
+    id: from
+    attributes:
+      label: Used from
+      options: [Command line, HTTP server, JavaScript, Python, Java, Rust, Docker, Visual designer]
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Operating system, the output format (PDF, Excel...), the JasperReports version you compare with.

@@ -6,8 +6,11 @@
 //! as numbers, with a number style made from their format pattern.
 //!
 //! The columns come from every page, so a workbook is made in two passes, as in
-//! [`crate::xlsx`]; the sheet is kept in memory until the end, where its styles are written
-//! before it.
+//! [`crate::xlsx`]. The automatic styles of `content.xml` come before the sheet, so a
+//! [`OdsStream`] made with [`OdsStream::new`] keeps the sheet in memory until the end; a
+//! large report is measured first instead (its styles found in a pass that keeps nothing),
+//! and its rows are then compressed and written as they are made
+//! ([`crate::Renderer::render_rows_to`]).
 
 use crate::fonts::FontSet;
 use crate::grid::{self, Cell, CellStyle, Sides, What};
@@ -23,7 +26,9 @@ pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadshee
 /// Writes a spreadsheet page by page. `columns` must have seen every page that will be
 /// written (see [`XlsxColumns`]).
 pub struct OdsStream<W: std::io::Write> {
-    zip: crate::zip::ZipStream<W>,
+    content: odf::Content<W>,
+    /// The rows of the page being written.
+    piece: String,
     xcuts: grid::Cuts,
     height: i32,
     page_width: f32,
@@ -32,8 +37,6 @@ pub struct OdsStream<W: std::io::Write> {
     options: XlsxOptions,
     styles: Styles,
     pictures: Pictures,
-    /// The columns and rows of the sheet, written so far.
-    body: String,
     row_no: usize,
     pages_done: usize,
     name: String,
@@ -43,6 +46,7 @@ pub struct OdsStream<W: std::io::Write> {
 }
 
 impl<W: std::io::Write> OdsStream<W> {
+    /// A sheet kept in memory until [`OdsStream::finish`], when its styles are known.
     pub fn new(
         out: W,
         columns: XlsxColumns,
@@ -52,6 +56,66 @@ impl<W: std::io::Write> OdsStream<W> {
         landscape: bool,
         options: XlsxOptions,
     ) -> crate::Result<OdsStream<W>> {
+        let page = (page_width, page_height, landscape);
+        let mut s =
+            OdsStream::start(odf::Content::kept(out), columns, name, page, options, Styles::default(), Pictures::default())?;
+        // The columns, first in the sheet.
+        s.content.push(&mut s.piece)?;
+        Ok(s)
+    }
+
+    /// A sheet that is only measured: its rows are made and thrown away, and
+    /// [`OdsStream::into_styles`] gives the styles they use.
+    pub(crate) fn measuring(
+        out: W,
+        columns: XlsxColumns,
+        name: &str,
+        page: (f32, f32, bool),
+        options: XlsxOptions,
+    ) -> crate::Result<OdsStream<W>> {
+        let mut s = OdsStream::start(
+            odf::Content::measured(out),
+            columns,
+            name,
+            page,
+            options,
+            Styles::default(),
+            Pictures::measuring(),
+        )?;
+        s.content.push(&mut s.piece)?;
+        Ok(s)
+    }
+
+    /// A sheet whose styles were measured (from the same pages): its rows are compressed and
+    /// written as they are made.
+    pub(crate) fn streamed(
+        out: W,
+        columns: XlsxColumns,
+        name: &str,
+        page: (f32, f32, bool),
+        options: XlsxOptions,
+        styles: Styles,
+    ) -> crate::Result<OdsStream<W>> {
+        // The package is started once the columns are known (they ask for their styles).
+        let mut s = OdsStream::start(odf::Content::measured(out), columns, name, page, options, styles, Pictures::default())?;
+        let ta = table_style(&mut s.styles);
+        let body_start = s.body_start(&ta);
+        let odf::Content::Held { out, .. } = s.content else { unreachable!("started as measured") };
+        s.content = odf::Content::streamed(out, MIMETYPE, &mut s.styles, &body_start)?;
+        // The columns, first in the sheet.
+        s.content.push(&mut s.piece)?;
+        Ok(s)
+    }
+
+    fn start(
+        content: odf::Content<W>,
+        columns: XlsxColumns,
+        name: &str,
+        (page_width, page_height, landscape): (f32, f32, bool),
+        options: XlsxOptions,
+        mut styles: Styles,
+        pictures: Pictures,
+    ) -> crate::Result<OdsStream<W>> {
         let mut xcuts = columns.cuts;
         xcuts.close(page_width.round() as i32);
         if xcuts.spans() > MAX_COLUMNS {
@@ -60,15 +124,15 @@ impl<W: std::io::Write> OdsStream<W> {
                 xcuts.spans()
             )));
         }
-        let mut styles = Styles::default();
         let plain = empty_style(&mut styles, &CellStyle::default());
-        let mut body = String::new();
+        let mut piece = String::new();
         for i in 0..xcuts.spans() {
             let co = column_style(&mut styles, xcuts.size(i) as f32);
-            let _ = writeln!(body, "<table:table-column table:style-name=\"{co}\" table:default-cell-style-name=\"{plain}\"/>");
+            let _ = writeln!(piece, "<table:table-column table:style-name=\"{co}\" table:default-cell-style-name=\"{plain}\"/>");
         }
         Ok(OdsStream {
-            zip: odf::begin(out, MIMETYPE)?,
+            content,
+            piece,
             xcuts,
             height: page_height.round() as i32,
             page_width,
@@ -76,8 +140,7 @@ impl<W: std::io::Write> OdsStream<W> {
             landscape,
             options,
             styles,
-            pictures: Pictures::default(),
-            body,
+            pictures,
             row_no: 0,
             pages_done: 0,
             name: crate::xlsx::sheet_name(name),
@@ -117,7 +180,7 @@ impl<W: std::io::Write> OdsStream<W> {
         let mut row = Vec::new();
         for (ri, cells) in g.cells.iter().enumerate() {
             let ro = row_style(&mut self.styles, g.rows.size(ri) as f32);
-            let _ = writeln!(self.body, "<table:table-row table:style-name=\"{ro}\">");
+            let _ = writeln!(self.piece, "<table:table-row table:style-name=\"{ro}\">");
             row.clear();
             for (ci, cell) in cells.iter().enumerate() {
                 let xml = match cell {
@@ -137,12 +200,12 @@ impl<W: std::io::Write> OdsStream<W> {
                 };
                 row.push(xml);
             }
-            write_cells(&mut self.body, &row);
-            self.body.push_str("</table:table-row>\n");
+            write_cells(&mut self.piece, &row);
+            self.piece.push_str("</table:table-row>\n");
         }
         self.row_no += g.cells.len();
         self.pages_done += 1;
-        Ok(())
+        self.content.push(&mut self.piece)
     }
 
     /// The corner cell of an element (written to `out`), and its style.
@@ -206,49 +269,57 @@ impl<W: std::io::Write> OdsStream<W> {
         }
     }
 
-    /// Ends the sheet and writes the rest of the package.
-    pub fn finish(mut self) -> crate::Result<W> {
+    /// What is written after the last page: the row of a report without pages, and the
+    /// style of the sheet (asked for in this order, as the styles are numbered by it).
+    fn close(&mut self) -> crate::Result<String> {
         if self.pages_done == 0 {
             // A report without pages: one empty row the height of a page, as the XLSX export
             // writes.
             let ro = row_style(&mut self.styles, self.page_height);
             let plain = empty_style(&mut self.styles, &CellStyle::default());
             let _ = writeln!(
-                self.body,
+                self.piece,
                 "<table:table-row table:style-name=\"{ro}\"><table:table-cell table:style-name=\"{plain}\"/></table:table-row>"
             );
+            self.content.push(&mut self.piece)?;
         }
-        let ta = self.styles.style(
-            "ta",
-            "table",
-            " style:master-page-name=\"Standard\"",
-            "<style:table-properties table:display=\"true\" style:writing-mode=\"lr-tb\"/>",
-        );
-        let mut content = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content {}>\n", odf::NAMESPACES);
-        self.styles.write(&mut content);
+        Ok(table_style(&mut self.styles))
+    }
+
+    /// `content.xml` from its styles to the first column.
+    fn body_start(&self, ta: &str) -> String {
         let sheet = escape(&self.name);
-        let _ = writeln!(
-            content,
-            "<office:body>\n<office:spreadsheet>\n<table:table table:name=\"{sheet}\" table:style-name=\"{ta}\">"
-        );
-        content.push_str(&self.body);
-        content.push_str("</table:table>\n");
+        format!("<office:body>\n<office:spreadsheet>\n<table:table table:name=\"{sheet}\" table:style-name=\"{ta}\">\n")
+    }
+
+    /// The styles of a sheet that was only measured, and the output it was given.
+    pub(crate) fn into_styles(mut self) -> crate::Result<(Styles, W)> {
+        self.close()?;
+        let out = self.content.into_output().ok_or_else(|| crate::Error::Io("the sheet was not measured".into()))?;
+        Ok((self.styles, out))
+    }
+
+    /// Ends the sheet and writes the rest of the package.
+    pub fn finish(mut self) -> crate::Result<W> {
+        let ta = self.close()?;
+        let body_start = self.body_start(&ta);
+        let mut end = String::from("</table:table>\n");
         if self.pages_done > 0 && !self.anchors.is_empty() {
-            content.push_str("<table:named-expressions>\n");
+            end.push_str("<table:named-expressions>\n");
             let quoted = escape(&self.name.replace('\'', "''"));
             for (name, row, col) in &self.anchors {
                 let cell = format!("$&apos;{quoted}&apos;.${}${}", crate::xlsx::column_name(*col), row + 1);
                 let _ = writeln!(
-                    content,
+                    end,
                     "<table:named-range table:name=\"{}\" table:base-cell-address=\"{cell}\" table:cell-range-address=\"{cell}\"/>",
                     escape(name)
                 );
             }
-            content.push_str("</table:named-expressions>\n");
+            end.push_str("</table:named-expressions>\n");
         }
-        content.push_str("</office:spreadsheet>\n</office:body>\n</office:document-content>\n");
-        let styles = odf::styles_xml(self.page_width, self.page_height, self.landscape, "");
-        odf::finish(self.zip, MIMETYPE, &content, &styles, &self.name, &self.pictures)
+        end.push_str("</office:spreadsheet>\n</office:body>\n</office:document-content>\n");
+        let styles = odf::styles_xml(self.page_width, self.page_height, self.landscape, "", &self.styles);
+        self.content.finish(MIMETYPE, &self.styles, &body_start, &end, &styles, &self.name, &self.pictures)
     }
 }
 
@@ -291,6 +362,16 @@ fn write_cells(out: &mut String, cells: &[String]) {
         }
         i += n;
     }
+}
+
+/// The style of the sheet: it is printed on the page of the report.
+fn table_style(styles: &mut Styles) -> String {
+    styles.style(
+        "ta",
+        "table",
+        " style:master-page-name=\"Standard\"",
+        "<style:table-properties table:display=\"true\" style:writing-mode=\"lr-tb\"/>",
+    )
 }
 
 fn column_style(styles: &mut Styles, width: f32) -> String {
@@ -591,6 +672,59 @@ pub(crate) mod tests {
         assert_eq!(content.matches("<table:table-row ").count(), 1);
         assert!(!content.contains("named-range"));
         assert!(content.contains("style:row-height=\"842pt\""));
+    }
+
+    /// Every style a part names, and every style it declares.
+    pub(crate) fn style_names(xml: &str) -> (std::collections::BTreeSet<String>, std::collections::BTreeSet<String>) {
+        let values = |attr: &str| -> std::collections::BTreeSet<String> {
+            xml.split(attr).skip(1).map(|rest| rest[..rest.find('"').unwrap()].to_string()).collect()
+        };
+        let mut used = values(" table:style-name=\"");
+        for attr in
+            [" text:style-name=\"", " draw:style-name=\"", " style:data-style-name=\"", " table:default-cell-style-name=\""]
+        {
+            used.extend(values(attr));
+        }
+        (used, values(" style:name=\""))
+    }
+
+    /// Measured and written from different pages (rows that changed between the passes),
+    /// a sheet still declares every style it uses: those found late are in `styles.xml`.
+    #[test]
+    fn styles_found_late_go_to_styles_xml() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/02-invoice");
+        let read = |f: &str| std::fs::read_to_string(dir.join(f)).unwrap();
+        let mut r = crate::Renderer::new().resource_dir(&dir);
+        let report = r.parse(&read("report.jrxml")).unwrap();
+        let rows = crate::data::records_from_json(&report, &serde_json::from_str(&read("data.json")).unwrap()).unwrap();
+        let params = crate::params_from_json(&report, &serde_json::from_str(&read("params.json")).unwrap()).unwrap();
+        let doc = r.fill(&report, &rows, params).unwrap();
+        let fonts = crate::fonts::FontSet::new();
+        let mut columns = XlsxColumns::new();
+        for page in &doc.pages {
+            columns.add(&page.items);
+        }
+        let page = (doc.page_width, doc.page_height, doc.landscape);
+        let options = XlsxOptions { detect_cell_type: true };
+        // Measured from no pages at all.
+        let measure = OdsStream::measuring(Vec::new(), columns.clone(), &doc.name, page, options.clone()).unwrap();
+        let (styles, out) = measure.into_styles().unwrap();
+        let mut sheet = OdsStream::streamed(out, columns, &doc.name, page, options, styles).unwrap();
+        for p in &doc.pages {
+            sheet.add(&p.items, &fonts).unwrap();
+        }
+        let bytes = sheet.finish().unwrap();
+        let parts: Vec<(String, String)> =
+            crate::zip::tests::read(&bytes).into_iter().map(|(n, d)| (n, String::from_utf8_lossy(&d).into_owned())).collect();
+        check_package(&bytes, &parts, MIMETYPE);
+        let (content, styles) = (part(&parts, "content.xml"), part(&parts, "styles.xml"));
+        let (used, mut declared) = style_names(content);
+        let (_, common) = style_names(styles);
+        assert!(common.iter().any(|n| n.starts_with("ce")), "late cell styles are common styles");
+        assert!(styles.contains("<office:font-face-decls>"), "with their fonts");
+        declared.extend(common);
+        let missing: Vec<_> = used.difference(&declared).collect();
+        assert!(missing.is_empty(), "styles used but not declared: {missing:?}");
     }
 
     #[test]

@@ -1,0 +1,22 @@
+name: Something ferroreport should do
+description: A feature, a JasperReports feature that is missing, or an output format.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The report or the situation, in your words. What you do today instead helps us understand.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: Optional. How JasperReports does it, or how you imagine it.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Helping
+      options:
+        - label: I'd like to work on this myself.

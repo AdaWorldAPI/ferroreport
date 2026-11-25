@@ -1,5 +1,5 @@
 //! WebAssembly bindings: `render(template, data, params, options)` returning the PDF (or XLSX,
-//! DOCX, ODS, ODT, CSV or HTML) bytes.
+//! DOCX, PPTX, ODS, ODT, CSV or HTML) bytes.
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
@@ -53,7 +53,7 @@ fn resources(options: &JsValue) -> Vec<(String, Vec<u8>)> {
 /// - `data`: rows (an array of objects) or JSON text.
 /// - `params`: report parameters (an object) or JSON text.
 /// - `options`: `{ locale?: string, now?: string | Date, resources?: { [path]: Uint8Array | string },
-///   format?: "pdf" | "xlsx" | "docx" | "ods" | "odt" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
+///   format?: "pdf" | "xlsx" | "docx" | "pptx" | "ods" | "odt" | "csv" | "html", maxPages?: number, csvSafe?: boolean, xlsxNumbers?: boolean,
 ///   tagged?: boolean, pdfa?: "2b" | "2u" | "2a" | "3b" | "3u" | "3a",
 ///   attachments?: { name: string, data: Uint8Array | string, mime?: string }[],
 ///   password?: string, ownerPassword?: string, permissions?: string | string[] }`
@@ -136,7 +136,7 @@ pub fn render(template: &str, data: JsValue, params: JsValue, options: JsValue) 
     }
     let format = match get(&options, "format").as_string() {
         Some(f) => ferroreport::Format::parse(&f).ok_or_else(|| {
-            JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, docx, ods, odt, csv or html)"))
+            JsError::new(&format!("options.format: unknown format `{f}` (pdf, xlsx, docx, pptx, ods, odt, csv or html)"))
         })?,
         None => ferroreport::Format::Pdf,
     };
@@ -150,7 +150,7 @@ pub fn inspect(template: &str) -> Result<JsValue, JsError> {
     let report = ferroreport::parse(template).map_err(js_err)?;
     let out = serde_json::json!({
         "name": report.name,
-        "parameters": report.parameters.iter().map(|p| p.name.clone()).collect::<Vec<_>>(),
+        "parameters": report.parameters.iter().filter(|p| p.name != ferroreport::text::HYPHENATE).map(|p| p.name.clone()).collect::<Vec<_>>(),
         "fields": report.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
         "warnings": report.warnings,
     });
