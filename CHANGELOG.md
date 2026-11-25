@@ -6,6 +6,31 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### Benchmarks of 1.1.0
+
+- Every published number is measured again with 1.1.0, against JasperReports 6.20.6 and 7.1.1
+  on the same 2-CPU machine (`docs/benchmarks.json`, `docs/benchmarks-7.1.1.json`,
+  `docs/benchmarks-concurrent.json`, the README, the site). Some got worse and say so: an
+  invoice from a cold start is now about 200× faster than JasperReports, not 250× (JasperReports
+  starts faster on this machine than in the 0.12 runs), against a warm JVM 3 to 5× faster, not
+  3 to 6×, and a million rows take 16 MB of memory, not 13 MB (the engine itself is larger), in 12 s
+  instead of 14 s.
+- `tools/bench_all.py` also measures a right-to-left report (`52-arabic`), the 20,000-row report
+  to each format (PDF, XLSX, DOCX, ODS, ODT, CSV) for both engines, and 100,000 rows to XLSX, ODS
+  and ODT, so the cost of each output is published: ODS and ODT keep the document in memory and
+  take the most (about 250 MiB for 100,000 rows).
+- `--wait-idle` in `tools/bench_all.py` and `tools/bench_concurrent.py`, for a machine that other
+  work shares: each run starts on an idle machine, and a run that other processes took CPU time
+  from is done again (`tools/idle.py`). The results record the CPU, the memory, the kernel, the
+  JVM flags from the environment and how busy the machine was.
+- `tools/http_check.py` again (`docs/http-check.json`): a million rows over HTTP now peak at
+  47 to 49 MiB in the server, so the docs say about 50 MB instead of 45 MB.
+- The race on the website, its GIF and the promo video use the new invoice timings (2.63 s
+  against 11 ms: 234 invoices in the time JasperReports takes for one, not 301), and the
+  playground's JasperReports times are measured again.
+
+### Text shaping with harfrust
+
 - Right-to-left and complex text (Arabic, Hebrew, Devanagari, Thai...) is shaped with harfrust
   0.16, the HarfBuzz project's maintained Rust port, instead of rustybuzz, which is no longer
   maintained (RUSTSEC-2026-0206). Output is unchanged: every fixture renders to the same bytes
