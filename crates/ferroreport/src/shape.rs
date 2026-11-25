@@ -5,10 +5,10 @@
 //!
 //! Text in simple scripts (Latin, Greek, Cyrillic...) never comes here: it keeps the
 //! character-by-character layout that reproduces JasperReports' widths exactly. Text with a
-//! right-to-left character or a script that needs shaping is shaped with rustybuzz (a Rust
-//! port of HarfBuzz) run by run, reordered with the Unicode Bidirectional Algorithm, and
-//! broken into lines at the Unicode line-break opportunities (UAX #14), measured with the
-//! shaped advances.
+//! right-to-left character or a script that needs shaping is shaped with harfrust (the
+//! HarfBuzz project's Rust port of HarfBuzz) run by run, reordered with the Unicode
+//! Bidirectional Algorithm, and broken into lines at the Unicode line-break opportunities
+//! (UAX #14), measured with the shaped advances.
 //!
 //! Thai, Lao, Khmer and Myanmar write words without spaces, and finding the words needs a
 //! dictionary. Without one, lines break before a Thai or Lao leading vowel (เ แ โ ใ ไ),
@@ -16,7 +16,6 @@
 //! is cut between grapheme clusters, never inside one.
 
 use crate::fonts::FaceData;
-use rustybuzz::{Direction, UnicodeBuffer};
 use unicode_bidi::{BidiClass, Level, ParagraphBidiInfo};
 use unicode_script::{Script, UnicodeScript};
 
@@ -117,23 +116,13 @@ pub fn is_rtl(text: &str) -> bool {
     })
 }
 
-type RbFace<'a> = rustybuzz::Face<'a>;
-
-self_cell::self_cell!(
-    /// A font's bytes and rustybuzz's tables read from them.
-    struct OwnedFace {
-        owner: std::sync::Arc<[u8]>,
-        #[covariant]
-        dependent: RbFace,
-    }
-);
-
 /// What shaping keeps of a face between texts, made the first time the face shapes: the face
-/// as rustybuzz reads it, and the shape plans made for it.
+/// as harfrust reads it (which keeps its layout tables, parsed once, inside it), and the shape
+/// plans made for it.
 #[derive(Default)]
 pub(crate) struct ShapingCache {
-    face: std::sync::OnceLock<Option<OwnedFace>>,
-    plans: std::sync::Mutex<Vec<(PlanKey, std::sync::Arc<rustybuzz::ShapePlan>)>>,
+    font: std::sync::OnceLock<Option<harfrust::Font>>,
+    plans: std::sync::Mutex<Vec<(PlanKey, std::sync::Arc<harfrust::ShapePlan>)>>,
 }
 
 impl std::fmt::Debug for ShapingCache {
@@ -146,43 +135,47 @@ impl std::fmt::Debug for ShapingCache {
 #[derive(Clone, Copy, PartialEq)]
 struct PlanKey {
     rtl: bool,
-    script: rustybuzz::Script,
+    script: harfrust::Script,
     simple: bool,
+}
+
+/// The features shaping turns off. Like JasperReports, no kerning; and Latin and the other
+/// simple scripts inside a shaped line keep one glyph per character (no fi ligature), as
+/// everywhere else: a plan for simple scripts takes all three, any other the first.
+fn features_off() -> [harfrust::Feature; 3] {
+    let off = |t: &[u8; 4]| harfrust::Feature::new(harfrust::Tag::new(t), 0, ..);
+    [off(b"kern"), off(b"liga"), off(b"clig")]
 }
 
 /// Shapes text in one face.
 pub(crate) struct Shaper<'a> {
-    face: &'a rustybuzz::Face<'a>,
+    font: harfrust::ShaperFont<'a, 'a>,
     cache: &'a ShapingCache,
 }
 
 impl<'a> Shaper<'a> {
     pub fn new(face: &'a FaceData) -> Option<Shaper<'a>> {
         let cache = face.shaping_cache();
-        let owned = cache
-            .face
-            .get_or_init(|| OwnedFace::try_new(face.data.clone(), |data| rustybuzz::Face::from_slice(data, 0).ok_or(())).ok())
+        let font = cache
+            .font
+            .get_or_init(|| {
+                // The font's bytes are shared with the face, not copied.
+                let bytes: std::sync::Arc<dyn AsRef<[u8]> + Send + Sync> = std::sync::Arc::new(face.data.clone());
+                harfrust::Font::new(harfrust::font::Blob::Shared(bytes), 0)
+            })
             .as_ref()?;
-        Some(Shaper { face: owned.borrow_dependent(), cache })
+        Some(Shaper { font: harfrust::ShaperFont::new(font), cache })
     }
 
-    fn face(&self) -> &rustybuzz::Face<'a> {
-        self.face
-    }
-
-    /// The plan for shaping in `key`'s direction and script. Like JasperReports, no kerning;
-    /// and Latin and the other simple scripts inside a shaped line keep one glyph per
-    /// character (no fi ligature), as everywhere else.
-    fn plan(&self, key: PlanKey) -> std::sync::Arc<rustybuzz::ShapePlan> {
+    /// The plan for shaping in `key`'s direction and script, with `features` (see
+    /// [`features_off`]).
+    fn plan(&self, key: PlanKey, features: &[harfrust::Feature]) -> std::sync::Arc<harfrust::ShapePlan> {
         let mut plans = self.cache.plans.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((_, plan)) = plans.iter().find(|(k, _)| *k == key) {
             return plan.clone();
         }
-        let tag = rustybuzz::ttf_parser::Tag::from_bytes;
-        let off = |t: &[u8; 4]| rustybuzz::Feature::new(tag(t), 0, ..);
-        let features = if key.simple { vec![off(b"kern"), off(b"liga"), off(b"clig")] } else { vec![off(b"kern")] };
-        let direction = if key.rtl { Direction::RightToLeft } else { Direction::LeftToRight };
-        let plan = std::sync::Arc::new(rustybuzz::ShapePlan::new(self.face(), direction, Some(key.script), None, &features));
+        let plan =
+            std::sync::Arc::new(harfrust::ShapePlan::new(&self.font, direction(key.rtl), Some(key.script), None, features));
         plans.push((key, plan.clone()));
         plan
     }
@@ -195,6 +188,7 @@ impl<'a> Shaper<'a> {
         if !text.is_empty() {
             let bidi = ParagraphBidiInfo::new(text, Some(level));
             let (levels, runs) = bidi.visual_runs(0..text.len());
+            let mut buf = harfrust::Buffer::new();
             for run in runs {
                 let run_rtl = levels[run.start].is_rtl();
                 let mut items = script_items(text, run.clone());
@@ -202,7 +196,7 @@ impl<'a> Shaper<'a> {
                     items.reverse();
                 }
                 for (range, script) in items {
-                    self.shape_item(text, range, run_rtl, script, &mut glyphs);
+                    self.shape_item(text, range, run_rtl, script, &mut buf, &mut glyphs);
                 }
             }
         }
@@ -210,24 +204,40 @@ impl<'a> Shaper<'a> {
         ShapedLine { glyphs, rtl, advance }
     }
 
-    fn shape_item(&self, text: &str, range: std::ops::Range<usize>, rtl: bool, script: Script, out: &mut Vec<Glyph>) {
-        let mut buf = UnicodeBuffer::new();
+    /// Shapes `range` of `text`, one script in one direction, into `out`, in `buf` (reused
+    /// from item to item).
+    fn shape_item(
+        &self,
+        text: &str,
+        range: std::ops::Range<usize>,
+        rtl: bool,
+        script: Script,
+        buf: &mut harfrust::Buffer,
+        out: &mut Vec<Glyph>,
+    ) {
+        buf.clear();
         for (i, c) in text[range.clone()].char_indices() {
-            buf.add(c, (range.start + i) as u32);
+            buf.push(c as u32, (range.start + i) as u32);
         }
         buf.set_pre_context(&text[..range.start]);
         buf.set_post_context(&text[range.end..]);
-        buf.set_direction(if rtl { Direction::RightToLeft } else { Direction::LeftToRight });
-        let script =
-            rustybuzz::Script::from_iso15924_tag(rustybuzz::ttf_parser::Tag::from_bytes_lossy(script.short_name().as_bytes()))
-                .unwrap_or(rustybuzz::script::COMMON);
-        buf.set_script(script);
+        buf.set_direction(direction(rtl));
+        let script = script.short_name().parse().unwrap_or(harfrust::Script::COMMON);
+        buf.set_script(Some(script));
         let simple = !text[range].chars().any(complex);
-        let plan = self.plan(PlanKey { rtl, script, simple });
-        let shaped = rustybuzz::shape_with_plan(self.face(), &plan, buf);
-        let from = out.len();
-        let millis = 1000.0 / self.face().units_per_em() as f32;
-        for (info, pos) in shaped.glyph_infos().iter().zip(shaped.glyph_positions()) {
+        let features = features_off();
+        let features = if simple { &features[..] } else { &features[..1] };
+        let plan = self.plan(PlanKey { rtl, script, simple }, features);
+        // Shaping only fails when the buffer's direction or script is not the plan's, and both
+        // come from the same key.
+        if harfrust::shape(&self.font, buf, harfrust::ShapeOptions::new().plan(Some(&plan)).features(features)).is_err() {
+            return;
+        }
+        let millis = 1000.0 / self.font.units_per_em() as f32;
+        // Right-to-left glyphs come out in visual order, clusters decreasing (rustybuzz left
+        // them in reading order when the plan had features and they had to be reversed here;
+        // harfrust does not).
+        for (info, pos) in buf.glyph_infos().iter().zip(buf.glyph_positions()) {
             out.push(Glyph {
                 id: info.glyph_id as u16,
                 cluster: info.cluster,
@@ -238,12 +248,14 @@ impl<'a> Shaper<'a> {
                 rtl,
             });
         }
-        // Right-to-left glyphs come out in visual order, clusters decreasing. rustybuzz 0.20
-        // leaves them in reading order when the plan has features: put them in visual order.
-        let run = &mut out[from..];
-        if rtl && run.first().map(|g| g.cluster) < run.last().map(|g| g.cluster) {
-            run.reverse();
-        }
+    }
+}
+
+fn direction(rtl: bool) -> harfrust::Direction {
+    if rtl {
+        harfrust::Direction::RightToLeft
+    } else {
+        harfrust::Direction::LeftToRight
     }
 }
 
@@ -509,6 +521,18 @@ mod tests {
         // Lam followed by alef is one ligature.
         let lam_alef = shaper.shape_line("لا", true);
         assert_eq!(lam_alef.glyphs.len(), 1);
+    }
+
+    #[test]
+    fn right_to_left_glyphs_come_in_visual_order() {
+        let (fonts, id) = dejavu();
+        let shaper = Shaper::new(fonts.face(id)).unwrap();
+        // Arabic (kerning off) and Hebrew: left to right on the page is the text backwards.
+        for text in ["مرحبا بالعالم", "שלום עולם"] {
+            let line = shaper.shape_line(text, true);
+            assert!(line.glyphs.windows(2).all(|w| w[0].cluster >= w[1].cluster), "{text}: {:?}", line.glyphs);
+            assert_eq!(line.glyphs.first().map(|g| g.cluster as usize), text.char_indices().last().map(|(i, _)| i));
+        }
     }
 
     #[test]
