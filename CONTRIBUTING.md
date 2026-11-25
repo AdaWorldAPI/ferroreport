@@ -33,7 +33,9 @@ fixtures/<name>/         report.jrxml, data.json, params.json (optional), expect
 tools/compare.py         pixel comparison against JasperReports
 tools/compare_sheets.py  cell comparison of the Excel and CSV exports
 tools/bench.py           speed and memory of one fixture, cold
-tools/bench_all.py       every number in the README: cold, warm JVM, 100,000 and 1,000,000 rows
+tools/bench_all.py       every number in the README: cold, warm JVM, each output format,
+                         100,000 to 1,000,000 rows (--wait-idle on a shared machine)
+tools/bench_concurrent.py  many reports at once, in one process
 tools/oracle/            the reference renderer (a small Java program around JasperReports)
 ```
 

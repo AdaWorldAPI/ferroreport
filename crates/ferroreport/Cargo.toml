@@ -20,12 +20,10 @@ subsetter = "0.2"
 ttf-parser = "0.25"
 # Text shaping (Arabic joining, Indic clusters), the Unicode Bidirectional Algorithm and
 # line-break opportunities, for text in scripts that are not one glyph per character.
-rustybuzz = "0.20"
+harfrust = "0.16"
 unicode-bidi = "0.3"
 unicode-script = "0.5"
 unicode-linebreak = "0.1"
-# Keeps each font's shaping tables next to the font bytes they read, parsed once.
-self_cell = "1"
 # Hyphenation of long words at line ends (`ferroreport.text.hyphenate`), with the patterns of
 # English, Spanish, French, Italian, Portuguese and Catalan embedded (about 60 KB);
 # feature `hyphenation-all` embeds every language hypher has (about 1.1 MB more).

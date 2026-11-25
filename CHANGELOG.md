@@ -6,6 +6,48 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### Benchmarks of 1.1.0
+
+- Every published number is measured again with 1.1.0, against JasperReports 6.20.6 and 7.1.1
+  on the same 2-CPU machine (`docs/benchmarks.json`, `docs/benchmarks-7.1.1.json`,
+  `docs/benchmarks-concurrent.json`, the README, the site). Some got worse and say so: an
+  invoice from a cold start is now about 200× faster than JasperReports, not 250× (JasperReports
+  starts faster on this machine than in the 0.12 runs), against a warm JVM 3 to 5× faster, not
+  3 to 6×, and a million rows take 16 MB of memory, not 13 MB (the engine itself is larger), in 12 s
+  instead of 14 s.
+- `tools/bench_all.py` also measures a right-to-left report (`52-arabic`), the 20,000-row report
+  to each format (PDF, XLSX, DOCX, ODS, ODT, CSV) for both engines, and 100,000 rows to XLSX, ODS
+  and ODT, so the cost of each output is published: ODS and ODT keep the document in memory and
+  take the most (about 250 MiB for 100,000 rows).
+- `--wait-idle` in `tools/bench_all.py` and `tools/bench_concurrent.py`, for a machine that other
+  work shares: each run starts on an idle machine, and a run that other processes took CPU time
+  from is done again (`tools/idle.py`). The results record the CPU, the memory, the kernel, the
+  JVM flags from the environment and how busy the machine was.
+- `tools/http_check.py` again (`docs/http-check.json`): a million rows over HTTP now peak at
+  47 to 49 MiB in the server, so the docs say about 50 MB instead of 45 MB.
+- The race on the website, its GIF and the promo video use the new invoice timings (2.63 s
+  against 11 ms: 234 invoices in the time JasperReports takes for one, not 301), and the
+  playground's JasperReports times are measured again.
+
+### Text shaping with harfrust
+
+- Right-to-left and complex text (Arabic, Hebrew, Devanagari, Thai...) is shaped with harfrust
+  0.16, the HarfBuzz project's maintained Rust port, instead of rustybuzz, which is no longer
+  maintained (RUSTSEC-2026-0206). Output is unchanged: every fixture renders to the same bytes
+  in every format, and the text `pdftotext` extracts is the same. Each font's shaping tables
+  are still read once and kept with the font, and shape plans are still made once per
+  direction and script.
+- Speed: shaping takes fewer instructions (2,000 rows of the Arabic fixture: 11% fewer, of the
+  Devanagari one: 18% fewer, of the Thai one: 2% more). harfrust reads a font's old-style
+  `kern` table the first time it shapes with it, even with kerning off: for FreeSerif (the
+  Thai and Devanagari fixtures) that is about 10 million instructions, a few milliseconds,
+  once per process. Latin text is not shaped and takes the same time as before (09-large).
+- Dependencies: harfrust (MIT), with read-fonts and font-types (MIT or Apache-2.0), replaces
+  rustybuzz and self_cell. resvg still uses rustybuzz to lay out text in SVG images, so it stays
+  in the build; `deny.toml` no longer needs to ignore its advisory.
+
+### Font fallback and hyphenation
+
 - Hyphenation of long words at line ends, when the template asks for it with ferroreport's own
   report property `ferroreport.text.hyphenate` (JasperReports does not hyphenate, and ignores
   it): `true` hyphenates every plain text of the report in the language of the render's locale,
@@ -23,7 +65,7 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
   instead of being drawn as the font's missing-glyph box. It takes no width when the lines are
   drawn and aligned, and still counts as wide as that box for the text's height and where it is
   cut, as in JasperReports (checked against 6.20.6, identical pages). Text shaped with
-  rustybuzz (right to left, complex scripts) still shows the box.
+  harfrust (right to left, complex scripts) still shows the box.
 - Font sets, as the `<fontSet>` of a JasperReports font extension defines them:
   `--font-set "Serif Fallback=DejaVu Serif,DejaVu Sans"` (or `Renderer::register_font_set`)
   makes a text whose font name is `Serif Fallback` draw the characters DejaVu Serif lacks in

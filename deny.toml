@@ -10,9 +10,8 @@ ignore = [
     # ttf-parser only reads fonts the operator installs, and replacing it is on the roadmap.
     { id = "RUSTSEC-2026-0543", reason = "chrono: unmaintained, no vulnerability; dates only" },
     { id = "RUSTSEC-2026-0192", reason = "ttf-parser: unmaintained, no vulnerability; operator-supplied fonts only" },
-    # rustybuzz shapes right-to-left and complex text. resvg (charts, SVG) depends on it too, so
-    # it stays in the build either way; harfrust, its successor, is on the roadmap.
-    { id = "RUSTSEC-2026-0206", reason = "rustybuzz: unmaintained, no vulnerability; also used by resvg" },
+    # rustybuzz (RUSTSEC-2026-0206) is no longer ours: text is shaped with harfrust. resvg still
+    # uses it to lay out SVG text, which `unmaintained = "workspace"` does not report.
 ]
 
 [licenses]
