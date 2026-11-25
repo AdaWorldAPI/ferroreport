@@ -138,8 +138,10 @@ fn open(e: &quick_xml::events::BytesStart<'_>, pos: u64, raw: bool) -> Result<No
     for a in e.attributes() {
         let a = a.map_err(|x| Error::Xml(format!("{x} (byte {pos})")))?;
         let key = name(a.key.as_ref());
-        #[allow(deprecated)]
-        let value = a.unescape_value().map_err(|x| Error::Xml(format!("{x} (byte {pos})")))?;
+        // `normalized_value` is what the deprecated `unescape_value` called, and unlike it it
+        // exists when another crate in the graph enables quick-xml's `encoding` feature.
+        let value =
+            a.normalized_value(quick_xml::XmlVersion::Implicit1_0).map_err(|x| Error::Xml(format!("{x} (byte {pos})")))?;
         node.attrs.push((key, value.into_owned()));
     }
     Ok(node)
