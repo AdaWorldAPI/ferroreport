@@ -40,7 +40,7 @@ written again every time you save the template or the data.
 ferroreport render invoices.ferro -d invoices.json -o invoices.pdf --watch
 ```
 
-Change the extension of `-o` to get `.xlsx`, `.docx`, `.ods`, `.odt`, `.csv` or `.html` from the same
+Change the extension of `-o` to get `.xlsx`, `.docx`, `.pptx`, `.ods`, `.odt`, `.csv` or `.html` from the same
 template. To get the command, download it from
 [Releases](https://github.com/cristianEncarnacion/ferroreport/releases) or run
 `cargo install ferroreport-cli`.

@@ -6,6 +6,32 @@ Every release of ferroreport, newest first. From 1.0.0 on, versions follow
 
 ## Unreleased
 
+### PowerPoint: PPTX
+
+- `-o report.pptx` or `--format pptx` on the command line, `"format": "pptx"` in the HTTP API
+  (answered as `application/vnd.openxmlformats-officedocument.presentationml.presentation`),
+  `Format::Pptx` in Rust, `format="pptx"` in Python, `{ format: "pptx" }` in JavaScript,
+  `Format.PPTX` in Java, and "Report as PowerPoint" in the designer's Save menu.
+- Laid out like JasperReports' PPTX exporter: each page is a slide of the report's page size
+  and each element a shape where it is on the page. Texts are text boxes with their fonts,
+  sizes, bold, italic, underline, strike-through, colors, highlight, superscript and
+  subscript, alignment, padding, background, line spacing and rotation; rectangles (rounded
+  too), ellipses and lines are shapes with their fill and pen; frames are rectangles under
+  their elements; images are pictures (each stored once) cut to their element as in the PDF;
+  charts and barcodes are drawn as pictures.
+- Where Jasper's exporter leaves things out: borders that differ by side are drawn as lines,
+  and links to a page or an anchor of the report jump to its slide (links to web pages and
+  other files work in both).
+- Slides and pictures are written as the pages are filled, so a long report does not stay in
+  memory. A report without pages is a presentation without slides.
+- The `.pptx` of 54 of the 55 fixtures opens in LibreOffice Impress with a slide for each page
+  of its PDF; 09-large (477 slides) needs more memory than the machine it was checked on had,
+  and was checked from its first 2,000 rows. Against the `.pptx` JasperReports writes for 53
+  fixtures: the same slides, and all but one of 88,506 text boxes at the same place and size
+  with the same font size.
+- Not yet: `net.sf.jasperreports.export.pptx.*` properties and embedded fonts.
+- For contributors: `tools/oracle` writes JasperReports' own `.pptx` (`out.pptx`).
+
 ### Benchmarks of 1.1.0
 
 - Every published number is measured again with 1.1.0, against JasperReports 6.20.6 and 7.1.1

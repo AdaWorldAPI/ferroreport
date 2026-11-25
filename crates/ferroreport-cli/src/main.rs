@@ -29,9 +29,9 @@ RENDER OPTIONS:
                                 as they are needed, so the file can be larger than memory
     -p, --params <file.json>    JSON object with parameter values
     -o, --output <file>         Output file (default: <template>.pdf; - writes stdout). The
-                                extension picks the format: .pdf, .xlsx, .docx, .ods, .odt,
-                                .csv or .html
-    -f, --format <pdf|xlsx|docx|ods|odt|csv|html>
+                                extension picks the format: .pdf, .xlsx, .docx, .pptx, .ods,
+                                .odt, .csv or .html
+    -f, --format <pdf|xlsx|docx|pptx|ods|odt|csv|html>
                                 Output format, when the file name does not say it. html is a
                                 web page that looks like the PDF, for previews
         --xlsx-numbers          In XLSX and ODS, write numbers as numbers (default: as formatted
@@ -108,8 +108,8 @@ CONVERT:
     Templates are rendered the same in either format.
 
 SERVE OPTIONS (HTTP API for any language: POST /render, POST /render/<name>, POST /inspect;
-add format xlsx, docx, ods, odt, csv or html to the request for Excel, Word, OpenDocument,
-CSV or a web preview):
+add format xlsx, docx, pptx, ods, odt, csv or html to the request for Excel, Word,
+PowerPoint, OpenDocument, CSV or a web preview):
         --host <addr>           Address to listen on (default: 127.0.0.1; 0.0.0.0 in Docker)
     -P, --port <n>              Port (default: 8080)
     -t, --templates <dir>       Directory of templates for POST /render/<name>
@@ -880,7 +880,7 @@ fn render(args: &[String]) -> CliResult {
     let template = template.ok_or("missing template path")?;
     let format = match format {
         Some(f) => ferroreport::Format::parse(&f)
-            .ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, ods, odt, csv or html)"))?,
+            .ok_or_else(|| format!("unknown format {f} (pdf, xlsx, docx, pptx, ods, odt, csv or html)"))?,
         None => output
             .as_deref()
             .and_then(|o| PathBuf::from(o).extension().and_then(|e| ferroreport::Format::parse(&e.to_string_lossy())))

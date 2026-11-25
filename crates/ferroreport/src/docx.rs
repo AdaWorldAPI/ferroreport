@@ -10,6 +10,7 @@ use crate::fonts::FontSet;
 use crate::grid::{self, Cell, CellStyle, Nature, Node, What};
 use crate::image::{ImageData, Pixels};
 use crate::model::{Color, HAlign, LineStyle, Pen, Rotation, VAlign};
+use crate::ooxml::Media;
 use crate::print::{CellInfo, PrintItem, Shape};
 use crate::xlsx::escape;
 use crate::zip::ZipStream;
@@ -33,10 +34,7 @@ pub struct DocxStream<W: std::io::Write> {
     landscape: bool,
     title: String,
     pages: usize,
-    /// Pictures: file name and bytes.
-    media: Vec<(String, Vec<u8>)>,
-    /// Pictures of images already written, by image identifier.
-    names: HashMap<usize, String>,
+    media: Media,
     buf: String,
     /// The links and anchors of the page being written, by where their element starts.
     links: HashMap<(i32, i32), std::sync::Arc<crate::print::LinkInfo>>,
@@ -58,8 +56,7 @@ impl<W: std::io::Write> DocxStream<W> {
             pages: 0,
             links: HashMap::new(),
             bookmarks: 0,
-            media: Vec::new(),
-            names: HashMap::new(),
+            media: Media::default(),
             buf: String::new(),
         })
     }
@@ -81,7 +78,7 @@ impl<W: std::io::Write> DocxStream<W> {
         let mut rels = String::from(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n <Relationship Id=\"rIdStyles\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>\n <Relationship Id=\"rIdSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/>\n",
         );
-        for (name, _) in &self.media {
+        for name in &self.media.names {
             let _ = writeln!(
                 rels,
                 " <Relationship Id=\"{}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/{name}\"/>",
@@ -90,19 +87,15 @@ impl<W: std::io::Write> DocxStream<W> {
         }
         rels.push_str("</Relationships>\n");
         self.zip.add("word/_rels/document.xml.rels", rels.as_bytes()).map_err(io)?;
-        for (name, bytes) in std::mem::take(&mut self.media) {
+        for (name, bytes) in std::mem::take(&mut self.media.pending) {
             self.zip.add(&format!("word/media/{name}"), &bytes).map_err(io)?;
         }
         self.zip.add("word/styles.xml", STYLES.as_bytes()).map_err(io)?;
         self.zip.add("word/settings.xml", SETTINGS.as_bytes()).map_err(io)?;
         self.zip.add("[Content_Types].xml", CONTENT_TYPES.as_bytes()).map_err(io)?;
-        self.zip.add("_rels/.rels", ROOT_RELS.as_bytes()).map_err(io)?;
-        let core = format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><dc:title>{}</dc:title><dc:creator>ferroreport</dc:creator></cp:coreProperties>\n",
-            escape(&self.title)
-        );
-        self.zip.add("docProps/core.xml", core.as_bytes()).map_err(io)?;
-        self.zip.add("docProps/app.xml", APP.as_bytes()).map_err(io)?;
+        self.zip.add("_rels/.rels", crate::ooxml::root_rels("word/document.xml").as_bytes()).map_err(io)?;
+        self.zip.add("docProps/core.xml", crate::ooxml::core_xml(&self.title).as_bytes()).map_err(io)?;
+        self.zip.add("docProps/app.xml", crate::ooxml::APP.as_bytes()).map_err(io)?;
         self.zip.finish().map_err(io)
     }
 
@@ -242,14 +235,10 @@ impl<W: std::io::Write> DocxStream<W> {
                     _ => "",
                 };
                 let picture = match &e.shape {
-                    Shape::Image { data: Some(data), .. } => self.media_name(data).map(|n| (n, fit(data, &e.shape, w, h))),
+                    Shape::Image { data: Some(data), .. } => self.media.image(data).map(|n| (n, fit(data, &e.shape, w, h))),
                     Shape::Picture { .. } if w > 0.0 && h > 0.0 => {
                         let area = [e.x, e.y, e.w, e.h];
-                        crate::raster::render_png(drawn, fonts, area, PICTURE_SCALE).map(|png| {
-                            let name = format!("img_{}.png", self.media.len());
-                            self.media.push((name.clone(), png));
-                            (name, (e.w, e.h))
-                        })
+                        crate::raster::render_png(drawn, fonts, area, PICTURE_SCALE).map(|png| (self.media.png(png), (e.w, e.h)))
                     }
                     _ => None,
                 };
@@ -270,27 +259,6 @@ impl<W: std::io::Write> DocxStream<W> {
         let id = self.bookmarks;
         self.bookmarks += 1;
         format!("<w:bookmarkStart w:id=\"{id}\" w:name=\"{}\"/><w:bookmarkEnd w:id=\"{id}\"/>", escape(name))
-    }
-
-    /// The media file of an image, written once however often it is used.
-    fn media_name(&mut self, data: &ImageData) -> Option<String> {
-        if let Some(n) = self.names.get(&data.id) {
-            return Some(n.clone());
-        }
-        let (ext, bytes) = match &data.pixels {
-            Pixels::Jpeg { data, .. } => ("jpg", data.clone()),
-            Pixels::Raw { samples, gray, alpha } => {
-                ("png", crate::xlsx::encode_png(data.width, data.height, samples, *gray, alpha.as_deref())?)
-            }
-            Pixels::Svg(svg) => {
-                let (w, h) = crate::svg::picture_size(&svg.tree);
-                ("png", crate::svg::png(&svg.tree, w, h)?)
-            }
-        };
-        let name = format!("img_{}.{ext}", self.media.len());
-        self.media.push((name.clone(), bytes));
-        self.names.insert(data.id, name.clone());
-        Some(name)
     }
 }
 
@@ -544,10 +512,6 @@ const STYLES: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\
 const SETTINGS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:zoom w:percent=\"100\"/><w:defaultTabStop w:val=\"720\"/><w:compat/></w:settings>\n";
 
 const CONTENT_TYPES: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Default Extension=\"png\" ContentType=\"image/png\"/><Default Extension=\"jpg\" ContentType=\"image/jpeg\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/><Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/><Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/><Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/><Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/></Types>\n";
-
-const ROOT_RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\"/><Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\"/></Relationships>\n";
-
-const APP: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>ferroreport</Application></Properties>\n";
 
 #[cfg(test)]
 mod tests {

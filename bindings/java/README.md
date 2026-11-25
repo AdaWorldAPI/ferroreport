@@ -22,7 +22,7 @@ try (ResultSet sales = statement.executeQuery("select * from sales order by regi
     reports.template(Path.of("reports/sales.jrxml"))
         .rows(sales)
         .maxPages(50_000).timeout(Duration.ofMinutes(2))
-        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .ods, .odt, .csv and .html work the same way
+        .renderTo(Path.of("sales.pdf"));          // .xlsx, .docx, .pptx, .ods, .odt, .csv and .html work the same way
 }
 ```
 
